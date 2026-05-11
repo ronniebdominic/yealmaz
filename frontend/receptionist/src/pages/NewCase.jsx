@@ -15,19 +15,14 @@ export default function NewCase() {
   });
 
   useEffect(() => {
-    // Load clinics for dropdown
-    api.get('/cases?limit=1').catch(() => {}); // warm up
-    // We'll load clinics via a simple approach
     loadClinics();
   }, []);
 
   const loadClinics = async () => {
     try {
       // Get unique clinics from recent cases
-      const res = await api.get('/cases?limit=100');
-      const unique = {};
-      res.data.cases.forEach(c => { if (c.clinic) unique[c.clinic.id] = c.clinic; });
-      setClinics(Object.values(unique));
+      const res = await api.get('/clinics');
+      setClinics(res.data);
     } catch {}
   };
 
