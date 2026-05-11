@@ -42,12 +42,13 @@ io.on('connection', (socket) => {
 });
 
 // ── Middleware ───────────────────────────────────────────
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+app.use(cors({ origin: '*', credentials: false }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ───────────────────────────────────────────────
 app.use('/api/auth',          require('./routes/auth'));
+app.use('/api/clinics',       require('./routes/clinics'));
 app.use('/api/cases',         require('./routes/cases'));
 app.use('/api/stages',        require('./routes/stages'));
 app.use('/api/payments',      require('./routes/payments'));
