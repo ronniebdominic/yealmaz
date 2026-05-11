@@ -1,0 +1,177 @@
+// Ye-Almaz Dental Lab — Database Schema
+// Run: npx prisma db push
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── USERS ──────────────────────────────────────────────
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  casesAsReceptionist Case[]         @relation("ReceptionistCases")
+  payments            Payment[]      @relation("VerifiedPayments")
+  deliveries          DeliveryLog[]
+  notifications       Notification[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  CLINIC
+  DELIVERY
+}
+
+// ── CLINICS ────────────────────────────────────────────
+model Clinic {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  address   String?
+  password  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases Case[]
+
+  @@map("clinics")
+}
+
+// ── CASES ──────────────────────────────────────────────
+model Case {
+  id              String      @id @default(uuid())
+  caseNumber      String      @unique // e.g. YAL-2024-0001
+  patientName     String
+  patientAge      Int?
+  workType        String      // e.g. Crown, Bridge, Denture, Aligner
+  toothNumbers    String?     // e.g. "14, 15, 16"
+  shade           String?     // e.g. A2, B1
+  notes           String?
+  dueDate         DateTime?
+  status          CaseStatus  @default(RECEIVED)
+  qrCodeUrl       String?     // URL of the generated QR image
+  qrCodeData      String?     // The encoded URL in the QR
+
+  // Payment
+  paymentStatus   PaymentStatus @default(PENDING)
+  totalAmount     Float?
+
+  // Relations
+  clinicId        String
+  clinic          Clinic      @relation(fields: [clinicId], references: [id])
+  receptionistId  String?
+  receptionist    User?       @relation("ReceptionistCases", fields: [receptionistId], references: [id])
+
+  stages          CaseStage[]
+  payment         Payment?
+  deliveryLogs    DeliveryLog[]
+  notifications   Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cases")
+}
+
+enum CaseStatus {
+  RECEIVED          // Case just entered
+  IMPRESSION        // Impression taken / received
+  CASTING           // Casting in progress
+  FABRICATION       // Fabrication in progress
+  QUALITY_CHECK     // QC stage
+  READY_TO_DISPATCH // Payment verified, ready to send
+  OUT_FOR_DELIVERY  // Delivery guy picked up
+  DELIVERED         // Confirmed delivered
+  ON_HOLD           // Paused for some reason
+}
+
+enum PaymentStatus {
+  PENDING           // No screenshot yet
+  SCREENSHOT_UPLOADED // Clinic uploaded screenshot
+  VERIFIED          // Receptionist approved
+  REJECTED          // Receptionist rejected (needs re-upload)
+}
+
+// ── CASE STAGES (QR scan history) ──────────────────────
+model CaseStage {
+  id          String    @id @default(uuid())
+  caseId      String
+  case        Case      @relation(fields: [caseId], references: [id])
+  stageName   CaseStatus
+  scannedAt   DateTime  @default(now())
+  scannedBy   String?   // name or user ID of who scanned
+  location    String?   // optional lab section name
+  notes       String?
+
+  @@map("case_stages")
+}
+
+// ── PAYMENTS ───────────────────────────────────────────
+model Payment {
+  id              String        @id @default(uuid())
+  caseId          String        @unique
+  case            Case          @relation(fields: [caseId], references: [id])
+  screenshotUrl   String?       // Cloudinary URL
+  amount          Float?
+  status          PaymentStatus @default(PENDING)
+  rejectionReason String?
+  uploadedAt      DateTime?
+  verifiedAt      DateTime?
+  verifiedById    String?
+  verifiedBy      User?         @relation("VerifiedPayments", fields: [verifiedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+// ── DELIVERY LOGS ──────────────────────────────────────
+model DeliveryLog {
+  id           String   @id @default(uuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id])
+  deliveryById String
+  deliveredBy  User     @relation(fields: [deliveryById], references: [id])
+  pickedUpAt   DateTime?
+  deliveredAt  DateTime?
+  signature    String?  // optional base64 or URL
+  notes        String?
+
+  createdAt DateTime @default(now())
+
+  @@map("delivery_logs")
+}
+
+// ── NOTIFICATIONS ──────────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  caseId    String?
+  case      Case?    @relation(fields: [caseId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
