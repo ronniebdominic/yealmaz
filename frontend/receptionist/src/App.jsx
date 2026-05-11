@@ -7,12 +7,24 @@ import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Payments from './pages/Payments';
 import Delivery from './pages/Delivery';
+import DeliveryDashboard from './pages/DeliveryDashboard';
 import './index.css';
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
   return children;
+}
+
+// Sends each role to their correct home screen
+function RoleHome() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'DELIVERY') return <DeliveryDashboard />;
+  return <Dashboard />;
 }
 
 function AppRoutes() {
@@ -20,11 +32,16 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/cases" element={<ProtectedRoute><Cases /></ProtectedRoute>} />
-      <Route path="/cases/new" element={<ProtectedRoute><NewCase /></ProtectedRoute>} />
-      <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-      <Route path="/delivery" element={<ProtectedRoute><Delivery /></ProtectedRoute>} />
+
+      {/* Home — role-aware */}
+      <Route path="/" element={<ProtectedRoute><RoleHome /></ProtectedRoute>} />
+
+      {/* Receptionist + Admin only */}
+      <Route path="/cases" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Cases /></ProtectedRoute>} />
+      <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><NewCase /></ProtectedRoute>} />
+      <Route path="/payments" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Payments /></ProtectedRoute>} />
+      <Route path="/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Delivery /></ProtectedRoute>} />
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
