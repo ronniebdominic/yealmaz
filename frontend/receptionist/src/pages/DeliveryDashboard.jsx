@@ -54,7 +54,7 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
 
 // ── Main dashboard ───────────────────────────────────────────────────────────
 export default function DeliveryDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal]     = useState(null);
@@ -251,6 +251,25 @@ export default function DeliveryDashboard() {
       {scanMode && (
         <QRScanner onScan={handleScan} onClose={() => setScanMode(false)} />
       )}
+
+      {/* Bottom FAB — sign out */}
+      <button
+        onClick={logout}
+        title="Sign out"
+        style={{
+          position: 'fixed', bottom: 24, right: 24,
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'var(--surface)', border: '2px solid var(--red)',
+          boxShadow: 'var(--shadow-lg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, cursor: 'pointer', zIndex: 50,
+          transition: 'all .15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--red-dim)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
+      >
+        ⏻
+      </button>
     </div>
   );
 }

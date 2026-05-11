@@ -25,7 +25,6 @@ export default function Login() {
         <div className="login-logo">
           <div className="tooth">🦷</div>
           <h1>Ye-Almaz Dental Lab</h1>
-          <p>Receptionist Dashboard</p>
         </div>
 
         <form onSubmit={handleSubmit}>
