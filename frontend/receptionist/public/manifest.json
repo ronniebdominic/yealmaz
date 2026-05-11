@@ -1,0 +1,19 @@
+{
+  "name": "Ye-Almaz Delivery",
+  "short_name": "YA Delivery",
+  "description": "Ye-Almaz Dental Lab — Delivery Management",
+  "theme_color": "#0F2044",
+  "background_color": "#0A1628",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -131,3 +131,28 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .login-logo .tooth{font-size:40px}
 .login-logo h1{font-size:20px;font-weight:700;color:var(--navy);margin-top:8px}
 .login-logo p{font-size:13px;color:var(--text-3);margin-top:4px}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+/* Tablet: ≤ 900px — collapse 4-col stat grid to 2 cols */
+@media (max-width:900px){
+  :root{--sidebar-w:0px}
+  .sidebar{display:none}
+  .main{margin-left:0!important}
+  .stats-grid{grid-template-columns:repeat(2,1fr)!important}
+  .stats-grid.stats-3{grid-template-columns:repeat(3,1fr)!important}
+  .content{padding:16px}
+  .topbar{padding:0 16px}
+}
+/* Phone: ≤ 540px — single column */
+@media (max-width:540px){
+  .stats-grid{grid-template-columns:1fr!important}
+  .stats-grid.stats-3{grid-template-columns:repeat(3,1fr)!important}
+  .grid-2{grid-template-columns:1fr!important}
+  .table-wrap table thead{display:none}
+  .table-wrap table td{display:block;padding:6px 12px}
+  .table-wrap table td:first-child{padding-top:12px}
+  .table-wrap table td:last-child{padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .content{padding:12px}
+  .topbar{height:52px}
+  .topbar-title{font-size:15px}
+}

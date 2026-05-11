@@ -10,14 +10,28 @@ const prisma = new PrismaClient();
 // Delivery guy sees cases ready to dispatch or already picked up
 router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
   try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const cases = await prisma.case.findMany({
       where: {
-        status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] },
-        paymentStatus: 'VERIFIED' // Safety check: only verified payment cases
+        OR: [
+          // Active cases: ready to pick up or already en route (payment must be verified)
+          {
+            status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] },
+            paymentStatus: 'VERIFIED'
+          },
+          // Today's completed deliveries (for the Delivered tab)
+          {
+            status: 'DELIVERED',
+            deliveryLogs: { some: { deliveredAt: { gte: todayStart } } }
+          }
+        ]
       },
       include: {
         clinic: { select: { name: true, address: true, phone: true } },
-        payment: true
+        payment: true,
+        deliveryLogs: { orderBy: { deliveredAt: 'desc' }, take: 1 }
       },
       orderBy: { updatedAt: 'asc' }
     });
