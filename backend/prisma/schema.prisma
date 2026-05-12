@@ -37,6 +37,7 @@ enum Role {
   RECEPTIONIST
   CLINIC
   DELIVERY
+  LAB_TECH
 }
 
 // ── CLINICS ────────────────────────────────────────────

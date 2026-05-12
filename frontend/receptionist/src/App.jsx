@@ -1,3 +1,4 @@
+import LabDashboard from './pages/LabDashboard';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -24,6 +25,7 @@ function RoleHome() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'DELIVERY') return <DeliveryDashboard />;
+  if (user.role === 'LAB_TECH') return <LabDashboard />;
   return <Dashboard />;
 }
 

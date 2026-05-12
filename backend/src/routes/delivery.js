@@ -19,7 +19,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
           // Active cases: ready to pick up or already en route (payment must be verified)
           {
             status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] },
-            paymentStatus: 'VERIFIED'
+            paymentStatus: 'PENDING'
           },
           // Today's completed deliveries (for the Delivered tab)
           {
