@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Expo Go (LAN — real device)",
+      "request": "launch",
+      "type": "reactnative",
+      "cwd": "${workspaceFolder}/yealmaz-clinic-app",
+      "platform": "expoGo",
+      "expoHostType": "lan",
+      "packagerPort": 8082
+    },
+    {
+      "name": "Expo Go (Tunnel — outside local network)",
+      "request": "launch",
+      "type": "reactnative",
+      "cwd": "${workspaceFolder}/yealmaz-clinic-app",
+      "platform": "expoGo",
+      "expoHostType": "tunnel",
+      "packagerPort": 8082
+    },
+    {
+      "name": "Android Emulator",
+      "request": "launch",
+      "type": "reactnative",
+      "cwd": "${workspaceFolder}/yealmaz-clinic-app",
+      "platform": "android",
+      "packagerPort": 8082
+    },
+    {
+      "name": "Attach to running Expo (JS debugger)",
+      "request": "attach",
+      "type": "reactnative",
+      "cwd": "${workspaceFolder}/yealmaz-clinic-app",
+      "packagerPort": 8082
+    }
+  ]
+}

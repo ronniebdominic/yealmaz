@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Clinic App — Debug",
+      "type": "expo",
+      "request": "attach",
+      "projectRoot": "${workspaceFolder}/yealmaz-clinic-app",
+      "bundlerPort": "8082",
+      "bundlerHost": "127.0.0.1",
+      "restart": true
+    }
+  ]
+}

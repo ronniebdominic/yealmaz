@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Expo Metro",
+      "type": "shell",
+      "command": "npx expo start --port 8082 --clear",
+      "options": {
+        "cwd": "${workspaceFolder}/yealmaz-clinic-app"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "expo-metro",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting Metro Bundler",
+          "endsPattern": "Waiting on http://localhost:8082"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "expo"
+      }
+    }
+  ]
+}

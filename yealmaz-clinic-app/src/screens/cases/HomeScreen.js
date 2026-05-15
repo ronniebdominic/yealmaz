@@ -59,13 +59,19 @@ export default function HomeScreen({ navigation }) {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   const loadCases = useCallback(async () => {
     try {
+      setApiError('');
       const res = await api.get('/cases?limit=50');
       setCases(res.data.cases || []);
     } catch (err) {
-      console.error(err);
+      const msg = err.response
+        ? `Server error ${err.response.status}: ${err.response.data?.error || err.response.statusText}`
+        : 'Cannot reach server — check your network and API_BASE in client.js';
+      setApiError(msg);
+      console.error('[HomeScreen] loadCases failed:', msg);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -113,6 +119,13 @@ export default function HomeScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
         showsVerticalScrollIndicator={false}
       >
+
+        {/* ── API Error Banner ── */}
+        {apiError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>⚠️ {apiError}</Text>
+          </View>
+        ) : null}
 
         {/* ── Stats ── */}
         <View style={styles.statsRow}>
@@ -246,6 +259,14 @@ const styles = StyleSheet.create({
   overduePill: { backgroundColor: Colors.redDim, paddingHorizontal: 8, paddingVertical: 2, borderRadius: Radius.full },
   overdueText: { fontSize: 10, fontWeight: '600', color: Colors.red },
   dueDate: { fontSize: 11, color: Colors.text3 },
+
+  // Error banner
+  errorBanner: {
+    backgroundColor: '#3d1a1a', borderRadius: Radius.md,
+    padding: Spacing.md, marginBottom: Spacing.lg,
+    borderWidth: 1, borderColor: 'rgba(198,40,40,0.4)',
+  },
+  errorBannerText: { fontSize: 12, color: '#ef9a9a', lineHeight: 17 },
 
   // Empty
   emptyState: { alignItems: 'center', paddingVertical: 48 },

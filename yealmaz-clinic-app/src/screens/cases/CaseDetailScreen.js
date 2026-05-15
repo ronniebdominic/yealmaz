@@ -65,13 +65,19 @@ export default function CaseDetailScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [screenshot, setScreenshot] = useState(null);
+  const [loadError, setLoadError] = useState('');
 
   const loadCase = useCallback(async () => {
     try {
+      setLoadError('');
       const res = await api.get(`/cases/${caseId}`);
       setCaseData(res.data);
     } catch (err) {
-      console.error(err);
+      const msg = err.response
+        ? `Server error ${err.response.status}: ${err.response.data?.error || err.response.statusText}`
+        : 'Cannot reach server — check your network and API_BASE in client.js';
+      setLoadError(msg);
+      console.error('[CaseDetail] loadCase failed:', msg);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -91,7 +97,7 @@ export default function CaseDetailScreen({ navigation, route }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -146,10 +152,16 @@ export default function CaseDetailScreen({ navigation, route }) {
     );
   }
 
-  if (!caseData) {
+  if (loadError || !caseData) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={{ color: Colors.text2 }}>Case not found.</Text>
+        <Text style={{ fontSize: 32, marginBottom: 12 }}>⚠️</Text>
+        <Text style={{ color: Colors.text1, fontWeight: '700', fontSize: 16, marginBottom: 8 }}>
+          {loadError ? 'Failed to load case' : 'Case not found'}
+        </Text>
+        {loadError ? (
+          <Text style={{ color: '#ef9a9a', fontSize: 12, textAlign: 'center', paddingHorizontal: 32 }}>{loadError}</Text>
+        ) : null}
       </View>
     );
   }

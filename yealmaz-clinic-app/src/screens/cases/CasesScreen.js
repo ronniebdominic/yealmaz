@@ -21,9 +21,11 @@ export default function CasesScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(initialFilter);
+  const [apiError, setApiError] = useState('');
 
   const loadCases = useCallback(async () => {
     try {
+      setApiError('');
       const params = { limit: 100 };
       if (search) params.search = search;
       if (filter === 'delivered') params.status = 'DELIVERED';
@@ -33,7 +35,11 @@ export default function CasesScreen({ navigation, route }) {
       if (filter === 'payment') data = data.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
       setCases(data);
     } catch (err) {
-      console.error(err);
+      const msg = err.response
+        ? `Server error ${err.response.status}: ${err.response.data?.error || err.response.statusText}`
+        : 'Cannot reach server — check your network and API_BASE in client.js';
+      setApiError(msg);
+      console.error('[CasesScreen] loadCases failed:', msg);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -120,6 +126,12 @@ export default function CasesScreen({ navigation, route }) {
           </TouchableOpacity>
         ))}
       </View>
+
+      {apiError ? (
+        <View style={{ margin: Spacing.lg, backgroundColor: '#3d1a1a', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(198,40,40,0.4)' }}>
+          <Text style={{ fontSize: 12, color: '#ef9a9a', lineHeight: 17 }}>⚠️ {apiError}</Text>
+        </View>
+      ) : null}
 
       {loading ? (
         <ActivityIndicator color={Colors.blue} style={{ marginTop: 60 }} />
