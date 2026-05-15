@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Ye-Almaz Clinic",
+    "slug": "yealmaz-clinic",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1D3A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yealmaz.clinic",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to take photos of payment screenshots",
+        "NSPhotoLibraryUsageDescription": "Used to upload payment screenshots from your gallery"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B1D3A"
+      },
+      "package": "com.yealmaz.clinic",
+      "permissions": ["CAMERA","READ_EXTERNAL_STORAGE","WRITE_EXTERNAL_STORAGE","INTERNET","ACCESS_NETWORK_STATE"],
+      "versionCode": 1
+    },
+    "plugins": [
+      ["expo-image-picker", {
+        "photosPermission": "Allow Ye-Almaz Clinic to access your photos to upload payment screenshots.",
+        "cameraPermission": "Allow Ye-Almaz Clinic to use your camera to take payment photos."
+      }]
+    ]
+  }
+}
