@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Payments from './pages/Payments';
+import Billing from './pages/Billing';
 import Delivery from './pages/Delivery';
 import DeliveryDashboard from './pages/DeliveryDashboard';
 import './index.css';
@@ -41,6 +42,7 @@ function AppRoutes() {
       {/* Receptionist + Admin only */}
       <Route path="/cases" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Cases /></ProtectedRoute>} />
       <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><NewCase /></ProtectedRoute>} />
+      <Route path="/billing" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Billing /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Payments /></ProtectedRoute>} />
       <Route path="/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Delivery /></ProtectedRoute>} />
 

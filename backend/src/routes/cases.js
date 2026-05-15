@@ -126,7 +126,7 @@ router.post('/', protect, async (req, res) => {
         dueDate: dueDate ? new Date(dueDate) : null,
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
         clinicId,
-        status: 'RECEIVED'
+        status: 'CASE_ACCEPTED'
       }
     });
 
@@ -149,7 +149,7 @@ router.post('/', protect, async (req, res) => {
     await prisma.caseStage.create({
       data: {
         caseId: newCase.id,
-        stageName: 'RECEIVED',
+        stageName: 'CASE_ACCEPTED',
         scannedBy: req.user.name,
         notes: 'Case received and registered'
       }

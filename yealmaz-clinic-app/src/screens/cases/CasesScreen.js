@@ -31,7 +31,7 @@ export default function CasesScreen({ navigation, route }) {
       if (filter === 'delivered') params.status = 'DELIVERED';
       const res = await api.get('/cases', { params });
       let data = res.data.cases || [];
-      if (filter === 'active') data = data.filter(c => !['DELIVERED', 'ON_HOLD'].includes(c.status));
+      if (filter === 'active') data = data.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
       if (filter === 'payment') data = data.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
       setCases(data);
     } catch (err) {
@@ -49,7 +49,7 @@ export default function CasesScreen({ navigation, route }) {
   useEffect(() => { loadCases(); }, [loadCases]);
 
   const renderCase = ({ item: c }) => {
-    const stage = STAGES[c.status] || STAGES.RECEIVED;
+    const stage = STAGES[c.status] || STAGES.CASE_ACCEPTED;
     const pay = PAYMENT_STATUS[c.paymentStatus];
 
     return (

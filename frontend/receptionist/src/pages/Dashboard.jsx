@@ -136,7 +136,7 @@ export default function Dashboard() {
                 {recentCases?.length === 0 ? (
                   <tr><td colSpan={7} className="empty-state">No cases yet</td></tr>
                 ) : recentCases?.map(c => (
-                  <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases/${c.id}`)}>
+                  <tr key={c.id} style={{ cursor: 'pointer' }}>
                     <td><span className="case-number">{c.caseNumber}</span></td>
                     <td><span className="patient-name">{c.patientName}</span></td>
                     <td>{c.clinic?.name}</td>

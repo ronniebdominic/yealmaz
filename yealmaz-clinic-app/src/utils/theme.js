@@ -83,15 +83,37 @@ export const Shadow = {
 
 // Stage config
 export const STAGES = {
-  RECEIVED:          { label: 'Received',          color: '#5C6BC0', icon: '📥', step: 0 },
-  IMPRESSION:        { label: 'Diecutting',         color: '#7B1FA2', icon: '✂️',  step: 1 },
-  CASTING:           { label: 'Casting',            color: '#E65100', icon: '🔥', step: 2 },
-  FABRICATION:       { label: 'CAD CAM Milling',    color: '#1565C0', icon: '🖥️', step: 3 },
-  QUALITY_CHECK:     { label: 'Quality Check',      color: '#2E7D32', icon: '🔍', step: 4 },
-  READY_TO_DISPATCH: { label: 'Ready to Dispatch',  color: '#00897B', icon: '📦', step: 5 },
-  OUT_FOR_DELIVERY:  { label: 'Out for Delivery',   color: '#F57F17', icon: '🚚', step: 6 },
-  DELIVERED:         { label: 'Delivered',           color: '#1B5E20', icon: '✅', step: 7 },
-  ON_HOLD:           { label: 'On Hold',            color: '#B71C1C', icon: '⏸️', step: -1 },
+  // Case received
+  CASE_ACCEPTED:             { label: 'Case Accepted',              color: '#3949AB', icon: '📥', step: 0  },
+  // Model preparation
+  PLASTER_DEPARTMENT:        { label: 'Plaster Department',         color: '#6A1B9A', icon: '🏺', step: 1  },
+  MARGIN_DEPARTMENT:         { label: 'Margin Department',          color: '#7B1FA2', icon: '✂️', step: 2  },
+  // CAD/CAM
+  SCANNING:                  { label: 'Scanning',                   color: '#1565C0', icon: '🔬', step: 3  },
+  DESIGNING:                 { label: 'Designing',                  color: '#0277BD', icon: '🖥️', step: 4  },
+  // Manufacturing
+  MILLING_SINTERING:         { label: 'Milling / Sintering',        color: '#E65100', icon: '⚙️', step: 5  },
+  RESIN_3D_PRINTING:         { label: 'Resin 3D Printing',          color: '#BF360C', icon: '🖨️', step: 5  },
+  METAL_3D_PRINTING:         { label: 'Metal 3D Printing',          color: '#4E342E', icon: '🔩', step: 5  },
+  // Ceramic & finishing
+  METAL_FINISHING:           { label: 'Metal Finishing',            color: '#795548', icon: '🔨', step: 6  },
+  OPAQUE_APPLICATION:        { label: 'Opaque Application',         color: '#F57F17', icon: '🎨', step: 7  },
+  CERAMIC_LAYERING:          { label: 'Ceramic Layering',           color: '#D84315', icon: '🏛️', step: 8  },
+  ZIRCONIA_FITTING_FINISHING:{ label: 'Zirconia Fitting',           color: '#00695C', icon: '💎', step: 8  },
+  GLAZING:                   { label: 'Glazing',                    color: '#00838F', icon: '✨', step: 9  },
+  THERMO_PRESS:              { label: 'Thermo Press',               color: '#C62828', icon: '🔥', step: 9  },
+  TRIMMING:                  { label: 'Trimming',                   color: '#558B2F', icon: '✂️', step: 10 },
+  // Finalization
+  QUALITY_CHECK:             { label: 'Quality Check',              color: '#2E7D32', icon: '🔍', step: 11 },
+  PAYMENT_INVOICING:         { label: 'Payment / Invoicing',        color: '#00695C', icon: '💰', step: 12 },
+  // Dispatch
+  READY_TO_DISPATCH:         { label: 'Ready to Dispatch',          color: '#00897B', icon: '📦', step: 13 },
+  OUT_FOR_DELIVERY:          { label: 'Out for Delivery',           color: '#EF6C00', icon: '🚚', step: 14 },
+  DELIVERED:                 { label: 'Delivered',                  color: '#1B5E20', icon: '✅', step: 15 },
+  // Exceptions
+  ON_HOLD:                   { label: 'On Hold',                    color: '#B71C1C', icon: '⏸️', step: -1 },
+  REMAKE:                    { label: 'Remake',                     color: '#6A1B9A', icon: '🔄', step: -2 },
+  CANCELLED:                 { label: 'Cancelled',                  color: '#424242', icon: '❌', step: -3 },
 };
 
 export const PAYMENT_STATUS = {

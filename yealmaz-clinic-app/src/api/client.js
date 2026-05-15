@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ── Change this to your deployed backend URL when going live ──
-export const API_BASE = 'http://localhost:5000'; // Replace with your PC's local IP
+export const API_BASE = 'http://10.0.2.2:5000/api'; // Android emulator → host PC. Use localhost for Expo Web
 // export const API_BASE = 'https://your-backend.railway.app/api'; // Production
 
 console.log('[API] Base URL:', API_BASE);

@@ -10,8 +10,15 @@ import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../u
 import { format } from 'date-fns';
 
 const STAGE_ORDER = [
-  'RECEIVED', 'IMPRESSION', 'CASTING', 'FABRICATION',
-  'QUALITY_CHECK', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED'
+  'CASE_ACCEPTED',
+  'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
+  'SCANNING', 'DESIGNING',
+  'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING',
+  'METAL_FINISHING', 'OPAQUE_APPLICATION',
+  'CERAMIC_LAYERING', 'ZIRCONIA_FITTING_FINISHING',
+  'GLAZING', 'THERMO_PRESS', 'TRIMMING',
+  'QUALITY_CHECK', 'PAYMENT_INVOICING',
+  'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED',
 ];
 
 function InfoRow({ label, value, valueColor }) {
@@ -26,7 +33,7 @@ function InfoRow({ label, value, valueColor }) {
 
 function ProgressBar({ status }) {
   const currentStep = STAGES[status]?.step ?? 0;
-  const total = 7;
+  const total = 15;
 
   return (
     <View style={styles.progressWrap}>
@@ -166,7 +173,7 @@ export default function CaseDetailScreen({ navigation, route }) {
     );
   }
 
-  const stage = STAGES[caseData.status] || STAGES.RECEIVED;
+  const stage = STAGES[caseData.status] || STAGES.CASE_ACCEPTED;
   const pay = PAYMENT_STATUS[caseData.paymentStatus];
   const canUploadPayment = !['VERIFIED'].includes(caseData.paymentStatus);
 
@@ -210,7 +217,6 @@ export default function CaseDetailScreen({ navigation, route }) {
           <InfoRow label="Tooth Numbers" value={caseData.toothNumbers} />
           <InfoRow label="Shade" value={caseData.shade} />
           <InfoRow label="Due Date" value={caseData.dueDate ? format(new Date(caseData.dueDate), 'dd MMMM yyyy') : null} />
-          <InfoRow label="Amount" value={caseData.totalAmount ? `₹${caseData.totalAmount.toLocaleString('en-IN')}` : null} valueColor={Colors.blue} />
           {caseData.notes && (
             <View style={styles.notesBox}>
               <Text style={styles.notesLabel}>Notes</Text>
@@ -219,12 +225,88 @@ export default function CaseDetailScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* ── Payment Section ── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Payment</Text>
-          <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg }]}>
-            <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
+        {/* ── Invoice Card ── */}
+        {caseData.payment?.invoiceNumber ? (
+          <View style={styles.card}>
+            <View style={styles.invoiceHeader}>
+              <View>
+                <Text style={styles.invoiceTitle}>Invoice</Text>
+                <Text style={styles.invoiceNumber}>{caseData.payment.invoiceNumber}</Text>
+              </View>
+              <View style={[styles.invoiceAmountBadge, { backgroundColor: Colors.blue + '15' }]}>
+                <Text style={styles.invoiceAmountLabel}>Amount Due</Text>
+                <Text style={styles.invoiceAmount}>
+                  ₹{(caseData.payment.amount ?? caseData.totalAmount ?? 0).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.invoiceDivider} />
+
+            <View style={styles.invoiceRows}>
+              <View style={styles.invoiceRow}>
+                <Text style={styles.invoiceRowLabel}>Work Type</Text>
+                <Text style={styles.invoiceRowValue}>{caseData.workType}</Text>
+              </View>
+              {caseData.toothNumbers ? (
+                <View style={styles.invoiceRow}>
+                  <Text style={styles.invoiceRowLabel}>Tooth Numbers</Text>
+                  <Text style={styles.invoiceRowValue}>{caseData.toothNumbers}</Text>
+                </View>
+              ) : null}
+              {caseData.shade ? (
+                <View style={styles.invoiceRow}>
+                  <Text style={styles.invoiceRowLabel}>Shade</Text>
+                  <Text style={styles.invoiceRowValue}>{caseData.shade}</Text>
+                </View>
+              ) : null}
+              {caseData.payment.invoiceIssuedAt ? (
+                <View style={styles.invoiceRow}>
+                  <Text style={styles.invoiceRowLabel}>Issued</Text>
+                  <Text style={styles.invoiceRowValue}>
+                    {format(new Date(caseData.payment.invoiceIssuedAt), 'dd MMM yyyy')}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {caseData.payment.invoiceNotes ? (
+              <View style={styles.invoiceNotesBox}>
+                <Text style={styles.invoiceNotesText}>{caseData.payment.invoiceNotes}</Text>
+              </View>
+            ) : null}
+
+            {/* Payment status inside invoice card */}
+            <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg, marginTop: Spacing.md }]}>
+              <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
+            </View>
           </View>
+        ) : caseData.totalAmount ? (
+          /* Amount set but no invoice issued yet */
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Payment</Text>
+            <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg }]}>
+              <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
+            </View>
+            <View style={styles.invoiceRow}>
+              <Text style={styles.invoiceRowLabel}>Amount</Text>
+              <Text style={[styles.invoiceRowValue, { color: Colors.blue, fontWeight: '700' }]}>
+                ₹{caseData.totalAmount.toLocaleString('en-IN')}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* ── Payment Upload Section ── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Payment Proof</Text>
+          {!caseData.payment?.invoiceNumber && (
+            <View style={[styles.invoiceNotesBox, { marginBottom: Spacing.md }]}>
+              <Text style={{ fontSize: 13, color: Colors.text3, textAlign: 'center' }}>
+                Invoice not yet issued by the lab. You'll be able to upload payment once an invoice is sent.
+              </Text>
+            </View>
+          )}
 
           {caseData.paymentStatus === 'REJECTED' && caseData.payment?.rejectionReason && (
             <View style={styles.rejectionBox}>
@@ -240,7 +322,7 @@ export default function CaseDetailScreen({ navigation, route }) {
             </View>
           )}
 
-          {canUploadPayment && (
+          {canUploadPayment && caseData.payment?.invoiceNumber && (
             <View style={styles.uploadSection}>
               <Text style={styles.uploadTitle}>
                 {caseData.paymentStatus === 'REJECTED' ? '🔄 Re-upload Payment' : '📤 Upload Payment Screenshot'}
@@ -291,7 +373,7 @@ export default function CaseDetailScreen({ navigation, route }) {
             <Text style={{ color: Colors.text3, fontSize: 13 }}>No stage scans yet.</Text>
           ) : (
             caseData.stages?.map((s, i) => {
-              const st = STAGES[s.stageName] || STAGES.RECEIVED;
+              const st = STAGES[s.stageName] || STAGES.CASE_ACCEPTED;
               return (
                 <View key={s.id} style={styles.timelineItem}>
                   <View style={styles.timelineDotWrap}>
@@ -386,6 +468,21 @@ const styles = StyleSheet.create({
   },
   notesLabel: { fontSize: 11, fontWeight: '700', color: Colors.text3, marginBottom: 4 },
   notesText: { fontSize: 13, color: Colors.text2, lineHeight: 19 },
+
+  // Invoice card
+  invoiceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
+  invoiceTitle: { fontSize: 11, fontWeight: '700', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  invoiceNumber: { fontSize: 15, fontWeight: '800', color: Colors.blue, fontFamily: 'monospace' },
+  invoiceAmountBadge: { borderRadius: Radius.md, padding: Spacing.sm, alignItems: 'flex-end' },
+  invoiceAmountLabel: { fontSize: 10, fontWeight: '700', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  invoiceAmount: { fontSize: 22, fontWeight: '800', color: Colors.blue },
+  invoiceDivider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.md },
+  invoiceRows: { gap: 2 },
+  invoiceRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  invoiceRowLabel: { fontSize: 13, color: Colors.text3, fontWeight: '500' },
+  invoiceRowValue: { fontSize: 13, color: Colors.text1, fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
+  invoiceNotesBox: { backgroundColor: '#FFFBEB', borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.md },
+  invoiceNotesText: { fontSize: 12, color: Colors.text2, lineHeight: 18 },
 
   // Payment
   payStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, marginBottom: Spacing.md },

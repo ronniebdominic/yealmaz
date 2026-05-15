@@ -154,6 +154,90 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST'), async
   }
 });
 
+// ── GET /api/payments/billing ────────────────────────────
+// Receptionist sees all cases needing billing attention
+router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const cases = await prisma.case.findMany({
+      where: {
+        OR: [
+          { status: 'PAYMENT_INVOICING' },
+          {
+            totalAmount: { not: null },
+            paymentStatus: { in: ['PENDING', 'SCREENSHOT_UPLOADED', 'REJECTED'] }
+          }
+        ]
+      },
+      include: {
+        clinic: { select: { name: true, phone: true, email: true, address: true } },
+        payment: true
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+    res.json(cases);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch billing cases.' });
+  }
+});
+
+// ── POST /api/payments/:caseId/invoice ───────────────────
+// Receptionist issues or updates an invoice for a case
+router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const { amount, notes } = req.body;
+    if (!amount || parseFloat(amount) <= 0) {
+      return res.status(400).json({ error: 'A valid amount is required.' });
+    }
+
+    const caseData = await prisma.case.findUnique({
+      where: { id: req.params.caseId },
+      include: { clinic: { select: { id: true, name: true } } }
+    });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    const invoiceNumber = `INV-${caseData.caseNumber}`;
+
+    const payment = await prisma.payment.upsert({
+      where: { caseId: req.params.caseId },
+      update: {
+        amount: parseFloat(amount),
+        invoiceNumber,
+        invoiceIssuedAt: new Date(),
+        invoiceNotes: notes || null
+      },
+      create: {
+        caseId: req.params.caseId,
+        amount: parseFloat(amount),
+        invoiceNumber,
+        invoiceIssuedAt: new Date(),
+        invoiceNotes: notes || null,
+        status: 'PENDING'
+      }
+    });
+
+    await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { totalAmount: parseFloat(amount) }
+    });
+
+    const io = req.app.get('io');
+    io.to(`clinic_${caseData.clinic.id}`).emit('invoice_issued', {
+      caseId: caseData.id,
+      caseNumber: caseData.caseNumber,
+      patientName: caseData.patientName,
+      invoiceNumber,
+      amount: parseFloat(amount),
+      message: `Invoice issued: ₹${parseFloat(amount).toLocaleString('en-IN')}`
+    });
+
+    res.json({ success: true, payment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not issue invoice.' });
+  }
+});
+
 // ── GET /api/payments/pending ────────────────────────────
 // Receptionist sees all unverified payments
 router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {

@@ -1,13 +1,27 @@
 const STATUS_MAP = {
-  RECEIVED:          { label: 'Received',          cls: 'badge-received' },
-  IMPRESSION:        { label: 'Impression',        cls: 'badge-impression' },
-  CASTING:           { label: 'Casting',           cls: 'badge-casting' },
-  FABRICATION:       { label: 'Fabrication',       cls: 'badge-fabrication' },
-  QUALITY_CHECK:     { label: 'Quality Check',     cls: 'badge-qc' },
-  READY_TO_DISPATCH: { label: 'Ready to Dispatch', cls: 'badge-ready' },
-  OUT_FOR_DELIVERY:  { label: 'Out for Delivery',  cls: 'badge-dispatch' },
-  DELIVERED:         { label: 'Delivered',         cls: 'badge-delivered' },
-  ON_HOLD:           { label: 'On Hold',           cls: 'badge-hold' },
+  CASE_ACCEPTED:             { label: 'Case Accepted',            cls: 'badge-received' },
+  PLASTER_DEPARTMENT:        { label: 'Plaster Department',       cls: 'badge-impression' },
+  MARGIN_DEPARTMENT:         { label: 'Margin Department',        cls: 'badge-impression' },
+  SCANNING:                  { label: 'Scanning',                 cls: 'badge-fabrication' },
+  DESIGNING:                 { label: 'Designing',                cls: 'badge-fabrication' },
+  MILLING_SINTERING:         { label: 'Milling / Sintering',      cls: 'badge-casting' },
+  RESIN_3D_PRINTING:         { label: 'Resin 3D Printing',        cls: 'badge-casting' },
+  METAL_3D_PRINTING:         { label: 'Metal 3D Printing',        cls: 'badge-casting' },
+  METAL_FINISHING:           { label: 'Metal Finishing',          cls: 'badge-casting' },
+  OPAQUE_APPLICATION:        { label: 'Opaque Application',       cls: 'badge-fabrication' },
+  CERAMIC_LAYERING:          { label: 'Ceramic Layering',         cls: 'badge-fabrication' },
+  ZIRCONIA_FITTING_FINISHING:{ label: 'Zirconia Fitting',         cls: 'badge-fabrication' },
+  GLAZING:                   { label: 'Glazing',                  cls: 'badge-qc' },
+  THERMO_PRESS:              { label: 'Thermo Press',             cls: 'badge-casting' },
+  TRIMMING:                  { label: 'Trimming',                 cls: 'badge-qc' },
+  QUALITY_CHECK:             { label: 'Quality Check',            cls: 'badge-qc' },
+  PAYMENT_INVOICING:         { label: 'Payment / Invoicing',      cls: 'badge-ready' },
+  READY_TO_DISPATCH:         { label: 'Ready to Dispatch',        cls: 'badge-ready' },
+  OUT_FOR_DELIVERY:          { label: 'Out for Delivery',         cls: 'badge-dispatch' },
+  DELIVERED:                 { label: 'Delivered',                cls: 'badge-delivered' },
+  ON_HOLD:                   { label: 'On Hold',                  cls: 'badge-hold' },
+  REMAKE:                    { label: 'Remake',                   cls: 'badge-hold' },
+  CANCELLED:                 { label: 'Cancelled',                cls: 'badge-hold' },
 };
 
 const PAY_MAP = {
@@ -28,7 +42,12 @@ export function PaymentBadge({ status }) {
 }
 
 export const STAGE_ICONS = {
-  RECEIVED: '📥', IMPRESSION: '🦷', CASTING: '🔩',
-  FABRICATION: '⚙️', QUALITY_CHECK: '🔍',
+  CASE_ACCEPTED: '📥', PLASTER_DEPARTMENT: '🏺', MARGIN_DEPARTMENT: '✂️',
+  SCANNING: '🔬', DESIGNING: '🖥️',
+  MILLING_SINTERING: '⚙️', RESIN_3D_PRINTING: '🖨️', METAL_3D_PRINTING: '🔩',
+  METAL_FINISHING: '🔨', OPAQUE_APPLICATION: '🎨', CERAMIC_LAYERING: '🏛️',
+  ZIRCONIA_FITTING_FINISHING: '💎', GLAZING: '✨', THERMO_PRESS: '🔥', TRIMMING: '✂️',
+  QUALITY_CHECK: '🔍', PAYMENT_INVOICING: '💰',
   READY_TO_DISPATCH: '📦', OUT_FOR_DELIVERY: '🚚', DELIVERED: '✅',
+  ON_HOLD: '⏸️', REMAKE: '🔄', CANCELLED: '❌',
 };

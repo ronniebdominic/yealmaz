@@ -26,7 +26,7 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
       recentCases
     ] = await Promise.all([
       prisma.case.count(),
-      prisma.case.count({ where: { status: { in: ['RECEIVED', 'IMPRESSION', 'CASTING', 'FABRICATION', 'QUALITY_CHECK'] } } }),
+      prisma.case.count({ where: { status: { notIn: ['DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED'] } } }),
       prisma.case.count({ where: { status: 'DELIVERED' } }),
       prisma.case.count({ where: { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } } }),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
@@ -104,8 +104,14 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
 router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
     const statuses = [
-      'RECEIVED', 'IMPRESSION', 'CASTING', 'FABRICATION',
-      'QUALITY_CHECK', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED'
+      'CASE_ACCEPTED', 'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
+      'SCANNING', 'DESIGNING',
+      'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING',
+      'METAL_FINISHING', 'OPAQUE_APPLICATION', 'CERAMIC_LAYERING',
+      'ZIRCONIA_FITTING_FINISHING', 'GLAZING', 'THERMO_PRESS', 'TRIMMING',
+      'QUALITY_CHECK', 'PAYMENT_INVOICING',
+      'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED',
+      'ON_HOLD', 'REMAKE', 'CANCELLED'
     ];
 
     const counts = await Promise.all(

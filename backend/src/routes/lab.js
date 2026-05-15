@@ -12,7 +12,7 @@ router.get('/active', protect, async (req, res) => {
     const cases = await prisma.case.findMany({
       where: {
         status: {
-          notIn: ['DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY']
+          notIn: ['DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED']
         }
       },
       include: {

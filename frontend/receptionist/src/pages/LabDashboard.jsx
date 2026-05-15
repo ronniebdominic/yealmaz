@@ -6,68 +6,100 @@ import { format } from 'date-fns';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
-  { code: 'DIECUT',   label: 'Diecutting',        short: 'DIE', color: '#7C3AED', bg: '#7C3AED18', icon: '✂️',  nextDept: 'CAD CAM Milling' },
-  { code: 'CASTING',  label: 'Casting',            short: 'CST', color: '#B45309', bg: '#B4530918', icon: '🔥',  nextDept: 'CAD CAM Milling' },
-  { code: 'CAD_CAM',  label: 'CAD CAM Milling',    short: 'CMI', color: '#1A56A0', bg: '#1A56A018', icon: '🖥️',  nextDept: 'Ceramic Finishing' },
-  { code: 'CERAMIC',  label: 'Ceramic Finishing',  short: 'CFI', color: '#0E7490', bg: '#0E749018', icon: '🏺',  nextDept: 'Quality Control' },
-  { code: 'QC',       label: 'Quality Control',    short: 'QC',  color: '#15803D', bg: '#15803D18', icon: '🔍',  nextDept: 'Dispatch' },
-  { code: 'DISPATCH', label: 'Dispatch',           short: 'DSP', color: '#B45309', bg: '#B4530918', icon: '📦',  nextDept: 'Ready for Delivery' },
+  { code: 'RECEPTION',    label: 'Reception',            short: 'REC', color: '#3949AB', bg: '#3949AB18', icon: '📥',  nextDept: 'Plaster Department' },
+  { code: 'PLASTER',      label: 'Plaster Department',   short: 'PLS', color: '#6A1B9A', bg: '#6A1B9A18', icon: '🏺',  nextDept: 'Margin Department' },
+  { code: 'MARGIN',       label: 'Margin Department',    short: 'MRG', color: '#7B1FA2', bg: '#7B1FA218', icon: '✂️',  nextDept: 'Scanning' },
+  { code: 'SCANNING',     label: 'Scanning',             short: 'SCN', color: '#1565C0', bg: '#1565C018', icon: '🔬',  nextDept: 'Designing' },
+  { code: 'DESIGNING',    label: 'Designing',            short: 'DES', color: '#0277BD', bg: '#0277BD18', icon: '🖥️',  nextDept: 'Milling / Printing' },
+  { code: 'MILLING',      label: 'Milling / Sintering',  short: 'MIL', color: '#E65100', bg: '#E6510018', icon: '⚙️',  nextDept: 'Metal Finishing' },
+  { code: 'RESIN_PRINT',  label: 'Resin 3D Printing',    short: 'R3D', color: '#BF360C', bg: '#BF360C18', icon: '🖨️',  nextDept: 'Trimming' },
+  { code: 'METAL_PRINT',  label: 'Metal 3D Printing',    short: 'M3D', color: '#4E342E', bg: '#4E342E18', icon: '🔩',  nextDept: 'Metal Finishing' },
+  { code: 'METAL_FINISH', label: 'Metal Finishing',      short: 'MFN', color: '#795548', bg: '#79554818', icon: '🔨',  nextDept: 'Opaque Application' },
+  { code: 'OPAQUE',       label: 'Opaque Application',   short: 'OPQ', color: '#F57F17', bg: '#F57F1718', icon: '🎨',  nextDept: 'Ceramic Layering' },
+  { code: 'CERAMIC',      label: 'Ceramic Layering',     short: 'CER', color: '#D84315', bg: '#D8431518', icon: '🏛️',  nextDept: 'Glazing' },
+  { code: 'ZIRCONIA',     label: 'Zirconia Fitting',     short: 'ZRC', color: '#00695C', bg: '#00695C18', icon: '💎',  nextDept: 'Glazing' },
+  { code: 'GLAZING',      label: 'Glazing',              short: 'GLZ', color: '#00838F', bg: '#00838F18', icon: '✨',  nextDept: 'Quality Control' },
+  { code: 'THERMO',       label: 'Thermo Press',         short: 'THP', color: '#C62828', bg: '#C6282818', icon: '🔥',  nextDept: 'Quality Control' },
+  { code: 'TRIMMING',     label: 'Trimming',             short: 'TRM', color: '#558B2F', bg: '#558B2F18', icon: '✂️',  nextDept: 'Quality Control' },
+  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: '#15803D', bg: '#15803D18', icon: '🔍',  nextDept: 'Payment / Invoicing' },
+  { code: 'PAYMENT',      label: 'Payment / Invoicing',  short: 'PAY', color: '#00695C', bg: '#00695C18', icon: '💰',  nextDept: 'Dispatch' },
+  { code: 'DISPATCH',     label: 'Dispatch',             short: 'DSP', color: '#B45309', bg: '#B4530918', icon: '📦',  nextDept: 'Out for Delivery' },
 ];
 
 const STAGE_LABELS = {
-  RECEIVED: 'Received', IMPRESSION: 'Diecutting', CASTING: 'Casting',
-  FABRICATION: 'CAD CAM', QUALITY_CHECK: 'Ceramic / QC',
-  READY_TO_DISPATCH: 'Ready to Ship', OUT_FOR_DELIVERY: 'Out for Delivery', DELIVERED: 'Delivered'
+  CASE_ACCEPTED: 'Case Accepted', PLASTER_DEPARTMENT: 'Plaster', MARGIN_DEPARTMENT: 'Margin',
+  SCANNING: 'Scanning', DESIGNING: 'Designing',
+  MILLING_SINTERING: 'Milling', RESIN_3D_PRINTING: 'Resin Print', METAL_3D_PRINTING: 'Metal Print',
+  METAL_FINISHING: 'Metal Finish', OPAQUE_APPLICATION: 'Opaque', CERAMIC_LAYERING: 'Ceramic',
+  ZIRCONIA_FITTING_FINISHING: 'Zirconia', GLAZING: 'Glazing', THERMO_PRESS: 'Thermo', TRIMMING: 'Trimming',
+  QUALITY_CHECK: 'QC', PAYMENT_INVOICING: 'Payment',
+  READY_TO_DISPATCH: 'Ready to Ship', OUT_FOR_DELIVERY: 'Out for Delivery', DELIVERED: 'Delivered',
+  ON_HOLD: 'On Hold', REMAKE: 'Remake', CANCELLED: 'Cancelled',
 };
 
 const STAGE_COLORS = {
-  RECEIVED: '#4F46E5', IMPRESSION: '#7C3AED', CASTING: '#B45309',
-  FABRICATION: '#1A56A0', QUALITY_CHECK: '#15803D',
-  READY_TO_DISPATCH: '#0E7490', OUT_FOR_DELIVERY: '#B45309', DELIVERED: '#0F2044'
+  CASE_ACCEPTED: '#3949AB', PLASTER_DEPARTMENT: '#6A1B9A', MARGIN_DEPARTMENT: '#7B1FA2',
+  SCANNING: '#1565C0', DESIGNING: '#0277BD',
+  MILLING_SINTERING: '#E65100', RESIN_3D_PRINTING: '#BF360C', METAL_3D_PRINTING: '#4E342E',
+  METAL_FINISHING: '#795548', OPAQUE_APPLICATION: '#F57F17', CERAMIC_LAYERING: '#D84315',
+  ZIRCONIA_FITTING_FINISHING: '#00695C', GLAZING: '#00838F', THERMO_PRESS: '#C62828', TRIMMING: '#558B2F',
+  QUALITY_CHECK: '#15803D', PAYMENT_INVOICING: '#00695C',
+  READY_TO_DISPATCH: '#0E7490', OUT_FOR_DELIVERY: '#B45309', DELIVERED: '#0F2044',
+  ON_HOLD: '#B71C1C', REMAKE: '#6A1B9A', CANCELLED: '#424242',
 };
 
 // ── QR Scanner component ──────────────────────────────────
 function QRScanner({ onScan, onClose }) {
-  const scannerRef = useRef(null);
   const scannerInstance = useRef(null);
 
   useEffect(() => {
-    let scanner;
+    const containerId = 'qr-reader';
+
     const init = async () => {
       try {
+        // Wipe any stale elements left by a previous instance
+        const container = document.getElementById(containerId);
+        if (container) container.innerHTML = '';
+
         const { Html5Qrcode } = await import('html5-qrcode');
-        scanner = new Html5Qrcode('qr-reader');
+        const scanner = new Html5Qrcode(containerId, { verbose: false });
         scannerInstance.current = scanner;
+
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 10, qrbox: { width: 240, height: 240 }, disableFlip: false },
           (decodedText) => {
-            // Extract case ID from URL like http://localhost:5000/api/scan/CASE_ID
             let caseId = decodedText;
             const match = decodedText.match(/\/scan\/([a-f0-9-]{36})/i);
             if (match) caseId = match[1];
             onScan(caseId);
           },
-          () => {} // ignore scan errors
+          () => {}
         );
       } catch (err) {
         console.error('Scanner error:', err);
         toast.error('Could not access camera. Please allow camera permission.');
       }
     };
+
     init();
+
     return () => {
-      if (scannerInstance.current) {
-        scannerInstance.current.stop().catch(() => {});
-      }
+      const s = scannerInstance.current;
+      if (!s) return;
+      scannerInstance.current = null;
+      // stop() pauses the stream; clear() removes all injected DOM elements
+      s.stop()
+        .catch(() => {})
+        .finally(() => { try { s.clear(); } catch (_) {} });
     };
   }, []);
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.9)',
+      position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.92)',
       backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20
+      alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20,
     }}>
       <div style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 20, overflow: 'hidden' }}>
         {/* Header */}
@@ -78,14 +110,8 @@ function QRScanner({ onScan, onClose }) {
           </button>
         </div>
 
-        {/* Scanner */}
-        <div style={{ position: 'relative' }}>
-          <div id="qr-reader" style={{ width: '100%' }} />
-          {/* Overlay corners */}
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 220, height: 220, border: '2px solid #1A56A0', borderRadius: 8, boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)' }} />
-          </div>
-        </div>
+        {/* Scanner — single container, no extra overlay so only one video renders */}
+        <div id="qr-reader" style={{ width: '100%' }} />
 
         <div style={{ padding: '14px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-2)' }}>
           Point camera at the case QR code

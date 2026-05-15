@@ -7,12 +7,14 @@ import { useNavigate } from 'react-router-dom';
 import CaseDetailModal from '../components/CaseDetailModal';
 
 const FILTERS = [
-  { label: 'All', value: '' },
-  { label: 'Received', value: 'RECEIVED' },
-  { label: 'In Production', value: 'FABRICATION' },
-  { label: 'Quality Check', value: 'QUALITY_CHECK' },
-  { label: 'Ready to Ship', value: 'READY_TO_DISPATCH' },
-  { label: 'Delivered', value: 'DELIVERED' },
+  { label: 'All',            value: '' },
+  { label: 'Accepted',       value: 'CASE_ACCEPTED' },
+  { label: 'CAD/CAM',        value: 'DESIGNING' },
+  { label: 'Manufacturing',  value: 'MILLING_SINTERING' },
+  { label: 'Ceramic',        value: 'CERAMIC_LAYERING' },
+  { label: 'Quality Check',  value: 'QUALITY_CHECK' },
+  { label: 'Ready to Ship',  value: 'READY_TO_DISPATCH' },
+  { label: 'Delivered',      value: 'DELIVERED' },
 ];
 
 export default function Cases() {

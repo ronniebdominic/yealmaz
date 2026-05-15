@@ -7,43 +7,94 @@ const prisma = new PrismaClient();
 
 // ── Department definitions ────────────────────────────────
 const DEPARTMENTS = {
-  CAD_CAM:  { code: 'CAD_CAM',  label: 'CAD CAM Milling',    short: 'CMI', stage: 'FABRICATION' },
-  CERAMIC:  { code: 'CERAMIC',  label: 'Ceramic Finishing',   short: 'CFI', stage: 'QUALITY_CHECK' },
-  DIECUT:   { code: 'DIECUT',   label: 'Diecutting',          short: 'DIE', stage: 'IMPRESSION' },
-  CASTING:  { code: 'CASTING',  label: 'Casting',             short: 'CST', stage: 'CASTING' },
-  QC:       { code: 'QC',       label: 'Quality Control',     short: 'QC',  stage: 'QUALITY_CHECK' },
-  DISPATCH: { code: 'DISPATCH', label: 'Dispatch',            short: 'DSP', stage: 'READY_TO_DISPATCH' },
+  RECEPTION:    { code: 'RECEPTION',    label: 'Reception',               short: 'REC', stage: 'CASE_ACCEPTED' },
+  PLASTER:      { code: 'PLASTER',      label: 'Plaster Department',       short: 'PLS', stage: 'PLASTER_DEPARTMENT' },
+  MARGIN:       { code: 'MARGIN',       label: 'Margin Department',        short: 'MRG', stage: 'MARGIN_DEPARTMENT' },
+  SCANNING:     { code: 'SCANNING',     label: 'Scanning',                 short: 'SCN', stage: 'SCANNING' },
+  DESIGNING:    { code: 'DESIGNING',    label: 'Designing',                short: 'DES', stage: 'DESIGNING' },
+  MILLING:      { code: 'MILLING',      label: 'Milling / Sintering',      short: 'MIL', stage: 'MILLING_SINTERING' },
+  RESIN_PRINT:  { code: 'RESIN_PRINT',  label: 'Resin 3D Printing',        short: 'R3D', stage: 'RESIN_3D_PRINTING' },
+  METAL_PRINT:  { code: 'METAL_PRINT',  label: 'Metal 3D Printing',        short: 'M3D', stage: 'METAL_3D_PRINTING' },
+  METAL_FINISH: { code: 'METAL_FINISH', label: 'Metal Finishing',          short: 'MFN', stage: 'METAL_FINISHING' },
+  OPAQUE:       { code: 'OPAQUE',       label: 'Opaque Application',       short: 'OPQ', stage: 'OPAQUE_APPLICATION' },
+  CERAMIC:      { code: 'CERAMIC',      label: 'Ceramic Layering',         short: 'CER', stage: 'CERAMIC_LAYERING' },
+  ZIRCONIA:     { code: 'ZIRCONIA',     label: 'Zirconia Fitting',         short: 'ZRC', stage: 'ZIRCONIA_FITTING_FINISHING' },
+  GLAZING:      { code: 'GLAZING',      label: 'Glazing',                  short: 'GLZ', stage: 'GLAZING' },
+  THERMO:       { code: 'THERMO',       label: 'Thermo Press',             short: 'THP', stage: 'THERMO_PRESS' },
+  TRIMMING:     { code: 'TRIMMING',     label: 'Trimming',                 short: 'TRM', stage: 'TRIMMING' },
+  QC:           { code: 'QC',           label: 'Quality Control',          short: 'QC',  stage: 'QUALITY_CHECK' },
+  PAYMENT:      { code: 'PAYMENT',      label: 'Payment / Invoicing',      short: 'PAY', stage: 'PAYMENT_INVOICING' },
+  DISPATCH:     { code: 'DISPATCH',     label: 'Dispatch',                 short: 'DSP', stage: 'READY_TO_DISPATCH' },
 };
 
-// Department flow: when scanned at a department → sets this status
+// Department scan → sets this status
 const DEPT_TO_STAGE = {
-  DIECUT:   'IMPRESSION',
-  CASTING:  'CASTING',
-  CAD_CAM:  'FABRICATION',
-  CERAMIC:  'QUALITY_CHECK',
-  QC:       'QUALITY_CHECK',
-  DISPATCH: 'READY_TO_DISPATCH',
+  RECEPTION:    'CASE_ACCEPTED',
+  PLASTER:      'PLASTER_DEPARTMENT',
+  MARGIN:       'MARGIN_DEPARTMENT',
+  SCANNING:     'SCANNING',
+  DESIGNING:    'DESIGNING',
+  MILLING:      'MILLING_SINTERING',
+  RESIN_PRINT:  'RESIN_3D_PRINTING',
+  METAL_PRINT:  'METAL_3D_PRINTING',
+  METAL_FINISH: 'METAL_FINISHING',
+  OPAQUE:       'OPAQUE_APPLICATION',
+  CERAMIC:      'CERAMIC_LAYERING',
+  ZIRCONIA:     'ZIRCONIA_FITTING_FINISHING',
+  GLAZING:      'GLAZING',
+  THERMO:       'THERMO_PRESS',
+  TRIMMING:     'TRIMMING',
+  QC:           'QUALITY_CHECK',
+  PAYMENT:      'PAYMENT_INVOICING',
+  DISPATCH:     'READY_TO_DISPATCH',
 };
 
-// What stage comes AFTER each department scan
+// What comes next after each scan point
 const NEXT_DEPT_LABEL = {
-  DIECUT:   'CAD CAM Milling',
-  CASTING:  'CAD CAM Milling',
-  CAD_CAM:  'Ceramic Finishing',
-  CERAMIC:  'Quality Control',
-  QC:       'Dispatch',
-  DISPATCH: 'Ready for Delivery',
+  RECEPTION:    'Plaster Department',
+  PLASTER:      'Margin Department',
+  MARGIN:       'Scanning',
+  SCANNING:     'Designing',
+  DESIGNING:    'Milling / Printing',
+  MILLING:      'Metal / Ceramic Finishing',
+  RESIN_PRINT:  'Trimming',
+  METAL_PRINT:  'Metal Finishing',
+  METAL_FINISH: 'Opaque Application',
+  OPAQUE:       'Ceramic Layering',
+  CERAMIC:      'Glazing',
+  ZIRCONIA:     'Glazing',
+  GLAZING:      'Quality Control',
+  THERMO:       'Quality Control',
+  TRIMMING:     'Quality Control',
+  QC:           'Payment / Invoicing',
+  PAYMENT:      'Dispatch',
+  DISPATCH:     'Out for Delivery',
 };
 
 const STAGE_LABELS = {
-  RECEIVED:          'Case Received',
-  IMPRESSION:        'Diecutting',
-  CASTING:           'Casting',
-  FABRICATION:       'CAD CAM Milling',
-  QUALITY_CHECK:     'Ceramic / QC',
-  READY_TO_DISPATCH: 'Ready to Dispatch',
-  OUT_FOR_DELIVERY:  'Out for Delivery',
-  DELIVERED:         'Delivered'
+  CASE_ACCEPTED:             'Case Accepted',
+  PLASTER_DEPARTMENT:        'Plaster Department',
+  MARGIN_DEPARTMENT:         'Margin Department',
+  SCANNING:                  'Scanning',
+  DESIGNING:                 'Designing',
+  MILLING_SINTERING:         'Milling / Sintering',
+  RESIN_3D_PRINTING:         'Resin 3D Printing',
+  METAL_3D_PRINTING:         'Metal 3D Printing',
+  METAL_FINISHING:           'Metal Finishing',
+  OPAQUE_APPLICATION:        'Opaque Application',
+  CERAMIC_LAYERING:          'Ceramic Layering',
+  ZIRCONIA_FITTING_FINISHING:'Zirconia Fitting & Finishing',
+  GLAZING:                   'Glazing',
+  THERMO_PRESS:              'Thermo Press',
+  TRIMMING:                  'Trimming',
+  QUALITY_CHECK:             'Quality Control',
+  PAYMENT_INVOICING:         'Payment / Invoicing',
+  READY_TO_DISPATCH:         'Ready to Dispatch',
+  OUT_FOR_DELIVERY:          'Out for Delivery',
+  DELIVERED:                 'Delivered',
+  ON_HOLD:                   'On Hold',
+  REMAKE:                    'Remake',
+  CANCELLED:                 'Cancelled',
 };
 
 // ── GET /api/scan/departments ────────────────────────────
@@ -73,8 +124,8 @@ router.post('/:caseId', async (req, res) => {
       return res.status(404).json({ error: 'Case not found. Invalid QR code.' });
     }
 
-    if (caseData.status === 'DELIVERED') {
-      return res.status(400).json({ error: 'This case has already been delivered.' });
+    if (['DELIVERED', 'CANCELLED'].includes(caseData.status)) {
+      return res.status(400).json({ error: `This case is already ${caseData.status.toLowerCase()}.` });
     }
 
     const newStatus = DEPT_TO_STAGE[department];

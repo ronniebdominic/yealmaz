@@ -16,11 +16,8 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     const cases = await prisma.case.findMany({
       where: {
         OR: [
-          // Active cases: ready to pick up or already en route (payment must be verified)
-          {
-            status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] },
-            paymentStatus: 'PENDING'
-          },
+          // Active cases: ready to pick up or already en route
+          { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
           // Today's completed deliveries (for the Delivered tab)
           {
             status: 'DELIVERED',

@@ -68,7 +68,7 @@ model Case {
   shade           String?     // e.g. A2, B1
   notes           String?
   dueDate         DateTime?
-  status          CaseStatus  @default(RECEIVED)
+  status          CaseStatus  @default(CASE_ACCEPTED)
   qrCodeUrl       String?     // URL of the generated QR image
   qrCodeData      String?     // The encoded URL in the QR
 
@@ -94,15 +94,44 @@ model Case {
 }
 
 enum CaseStatus {
-  RECEIVED          // Case just entered
-  IMPRESSION        // Impression taken / received
-  CASTING           // Casting in progress
-  FABRICATION       // Fabrication in progress
-  QUALITY_CHECK     // QC stage
-  READY_TO_DISPATCH // Payment verified, ready to send
-  OUT_FOR_DELIVERY  // Delivery guy picked up
-  DELIVERED         // Confirmed delivered
-  ON_HOLD           // Paused for some reason
+  // Case received
+  CASE_ACCEPTED
+
+  // Model preparation
+  PLASTER_DEPARTMENT
+  MARGIN_DEPARTMENT
+
+  // Digital CAD/CAM
+  SCANNING
+  DESIGNING
+
+  // Manufacturing
+  MILLING_SINTERING
+  RESIN_3D_PRINTING
+  METAL_3D_PRINTING
+
+  // Ceramic & finishing
+  METAL_FINISHING
+  OPAQUE_APPLICATION
+  CERAMIC_LAYERING
+  ZIRCONIA_FITTING_FINISHING
+  GLAZING
+  THERMO_PRESS
+  TRIMMING
+
+  // Finalization
+  QUALITY_CHECK
+  PAYMENT_INVOICING
+
+  // Dispatch
+  READY_TO_DISPATCH
+  OUT_FOR_DELIVERY
+  DELIVERED
+
+  // Exception states
+  ON_HOLD
+  REMAKE
+  CANCELLED
 }
 
 enum PaymentStatus {
@@ -139,6 +168,10 @@ model Payment {
   verifiedAt      DateTime?
   verifiedById    String?
   verifiedBy      User?         @relation("VerifiedPayments", fields: [verifiedById], references: [id])
+
+  invoiceNumber   String?       @unique
+  invoiceIssuedAt DateTime?
+  invoiceNotes    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

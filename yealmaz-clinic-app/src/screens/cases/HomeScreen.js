@@ -19,9 +19,9 @@ function StatCard({ value, label, color, icon, onPress }) {
 }
 
 function CaseCard({ c, onPress }) {
-  const stage = STAGES[c.status] || STAGES.RECEIVED;
+  const stage = STAGES[c.status] || STAGES.CASE_ACCEPTED;
   const pay = PAYMENT_STATUS[c.paymentStatus];
-  const isOverdue = c.dueDate && new Date(c.dueDate) < new Date() && c.status !== 'DELIVERED';
+  const isOverdue = c.dueDate && new Date(c.dueDate) < new Date() && !['DELIVERED', 'CANCELLED'].includes(c.status);
 
   return (
     <TouchableOpacity style={[styles.caseCard, Shadow.sm]} onPress={onPress} activeOpacity={0.88}>
@@ -86,7 +86,7 @@ export default function HomeScreen({ navigation }) {
 
   const onRefresh = () => { setRefreshing(true); loadCases(); };
 
-  const active = cases.filter(c => !['DELIVERED', 'ON_HOLD'].includes(c.status));
+  const active = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
   const pending = cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED');
   const delivered = cases.filter(c => c.status === 'DELIVERED');
   const recent = [...cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);

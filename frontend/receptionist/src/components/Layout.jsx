@@ -36,10 +36,13 @@ export default function Layout({ children, pendingPayments = 0, newCases = 0 }) 
             <span>➕</span> New Case
           </button>
 
-          <div className="nav-section-label">Payments</div>
+          <div className="nav-section-label">Billing</div>
+          <button className={active('/billing')} onClick={() => nav('/billing')}>
+            <span>💰</span> Billing & Invoicing
+            {pendingPayments > 0 && <span className="badge-count">{pendingPayments}</span>}
+          </button>
           <button className={active('/payments')} onClick={() => nav('/payments')}>
             <span>💳</span> Verify Payments
-            {pendingPayments > 0 && <span className="badge-count">{pendingPayments}</span>}
           </button>
 
           <div className="nav-section-label">Delivery</div>

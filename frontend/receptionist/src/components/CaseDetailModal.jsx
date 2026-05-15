@@ -5,15 +5,41 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const STATUSES = [
-  'RECEIVED','IMPRESSION','CASTING','FABRICATION',
-  'QUALITY_CHECK','READY_TO_DISPATCH','OUT_FOR_DELIVERY','DELIVERED','ON_HOLD'
+  'CASE_ACCEPTED',
+  'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
+  'SCANNING', 'DESIGNING',
+  'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING',
+  'METAL_FINISHING', 'OPAQUE_APPLICATION', 'CERAMIC_LAYERING',
+  'ZIRCONIA_FITTING_FINISHING', 'GLAZING', 'THERMO_PRESS', 'TRIMMING',
+  'QUALITY_CHECK', 'PAYMENT_INVOICING',
+  'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED',
+  'ON_HOLD', 'REMAKE', 'CANCELLED',
 ];
 
 const STATUS_LABELS = {
-  RECEIVED:'Received', IMPRESSION:'Impression', CASTING:'Casting',
-  FABRICATION:'Fabrication', QUALITY_CHECK:'Quality Check',
-  READY_TO_DISPATCH:'Ready to Dispatch', OUT_FOR_DELIVERY:'Out for Delivery',
-  DELIVERED:'Delivered', ON_HOLD:'On Hold'
+  CASE_ACCEPTED:             'Case Accepted',
+  PLASTER_DEPARTMENT:        'Plaster Department',
+  MARGIN_DEPARTMENT:         'Margin Department',
+  SCANNING:                  'Scanning',
+  DESIGNING:                 'Designing',
+  MILLING_SINTERING:         'Milling / Sintering',
+  RESIN_3D_PRINTING:         'Resin 3D Printing',
+  METAL_3D_PRINTING:         'Metal 3D Printing',
+  METAL_FINISHING:           'Metal Finishing',
+  OPAQUE_APPLICATION:        'Opaque Application',
+  CERAMIC_LAYERING:          'Ceramic Layering',
+  ZIRCONIA_FITTING_FINISHING:'Zirconia Fitting & Finishing',
+  GLAZING:                   'Glazing',
+  THERMO_PRESS:              'Thermo Press',
+  TRIMMING:                  'Trimming',
+  QUALITY_CHECK:             'Quality Check',
+  PAYMENT_INVOICING:         'Payment / Invoicing',
+  READY_TO_DISPATCH:         'Ready to Dispatch',
+  OUT_FOR_DELIVERY:          'Out for Delivery',
+  DELIVERED:                 'Delivered',
+  ON_HOLD:                   'On Hold',
+  REMAKE:                    'Remake',
+  CANCELLED:                 'Cancelled',
 };
 
 export default function CaseDetailModal({ caseId, onClose }) {
