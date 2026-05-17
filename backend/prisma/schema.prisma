@@ -63,6 +63,7 @@ model Case {
   caseNumber      String      @unique // e.g. YAL-2024-0001
   patientName     String
   patientAge      Int?
+  doctorName      String?     // referring doctor / dentist
   workType        String      // e.g. Crown, Bridge, Denture, Aligner
   toothNumbers    String?     // e.g. "14, 15, 16"
   shade           String?     // e.g. A2, B1

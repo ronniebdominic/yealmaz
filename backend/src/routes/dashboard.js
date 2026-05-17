@@ -127,4 +127,130 @@ router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async
   }
 });
 
+// ── GET /api/dashboard/admin-analytics ──────────────────
+// Full analytics for the admin dashboard
+// Query params: from, to (ISO date strings), clinicId
+router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { from, to, clinicId } = req.query;
+    const dateFrom = from ? new Date(from) : new Date(new Date().getFullYear(), 0, 1); // default: start of year
+    const dateTo   = to   ? new Date(to)   : new Date();
+
+    const paymentWhere = {
+      status: 'VERIFIED',
+      verifiedAt: { gte: dateFrom, lte: dateTo },
+    };
+
+    const caseWhere = {
+      ...(clinicId ? { clinicId } : {}),
+    };
+
+    // ── Overall KPIs ────────────────────────────────────────
+    const [totalRevenue, totalCases, activeCases, deliveredCases, pendingPayments] = await Promise.all([
+      prisma.payment.aggregate({
+        where: { ...paymentWhere, ...(clinicId ? { case: { clinicId } } : {}) },
+        _sum: { amount: true },
+      }),
+      prisma.case.count({ where: caseWhere }),
+      prisma.case.count({ where: { ...caseWhere, status: { notIn: ['DELIVERED', 'ON_HOLD', 'CANCELLED'] } } }),
+      prisma.case.count({ where: { ...caseWhere, status: 'DELIVERED' } }),
+      prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
+    ]);
+
+    // ── Monthly revenue trend (12 months ending at dateTo) ──
+    const monthlyTrend = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(dateTo);
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const start = new Date(d.getFullYear(), d.getMonth(), 1);
+      const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const agg = await prisma.payment.aggregate({
+        where: {
+          status: 'VERIFIED',
+          verifiedAt: { gte: start, lte: end },
+          ...(clinicId ? { case: { clinicId } } : {}),
+        },
+        _sum: { amount: true },
+        _count: true,
+      });
+      monthlyTrend.push({
+        month: start.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+        revenue: agg._sum.amount || 0,
+        cases: agg._count,
+      });
+    }
+
+    // ── Revenue by clinic ────────────────────────────────────
+    const clinics = await prisma.clinic.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const revenueByClinic = await Promise.all(
+      clinics.map(async (c) => {
+        const agg = await prisma.payment.aggregate({
+          where: {
+            ...paymentWhere,
+            case: { clinicId: c.id },
+          },
+          _sum: { amount: true },
+          _count: true,
+        });
+        const caseCount = await prisma.case.count({ where: { clinicId: c.id } });
+        return {
+          id: c.id,
+          name: c.name,
+          revenue: agg._sum.amount || 0,
+          paidCases: agg._count,
+          totalCases: caseCount,
+        };
+      })
+    );
+
+    // ── Revenue by work type (product category) ─────────────
+    const allCases = await prisma.case.findMany({
+      where: caseWhere,
+      select: { workType: true, totalAmount: true, payment: { select: { status: true, amount: true } } },
+    });
+
+    const workTypeMap = {};
+    for (const c of allCases) {
+      const wt = c.workType || 'Other';
+      if (!workTypeMap[wt]) workTypeMap[wt] = { count: 0, revenue: 0 };
+      workTypeMap[wt].count += 1;
+      if (c.payment?.status === 'VERIFIED' && c.payment?.amount) {
+        workTypeMap[wt].revenue += c.payment.amount;
+      }
+    }
+    const revenueByWorkType = Object.entries(workTypeMap)
+      .map(([workType, d]) => ({ workType, count: d.count, revenue: d.revenue }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // ── Top performing clinics (by revenue) ──────────────────
+    const topClinics = [...revenueByClinic]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    res.json({
+      kpi: {
+        totalRevenue: totalRevenue._sum.amount || 0,
+        totalCases,
+        activeCases,
+        deliveredCases,
+        pendingPayments,
+      },
+      monthlyTrend,
+      revenueByClinic: revenueByClinic.sort((a, b) => b.revenue - a.revenue),
+      revenueByWorkType,
+      topClinics,
+      clinicList: clinics,
+    });
+  } catch (err) {
+    console.error('[admin-analytics]', err);
+    res.status(500).json({ error: 'Could not load analytics.' });
+  }
+});
+
 module.exports = router;

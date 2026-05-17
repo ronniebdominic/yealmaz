@@ -91,28 +91,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Revenue strip */}
-        <div className="card" style={{ marginBottom: '20px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '32px' }}>
-          <div>
-            <div style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 500 }}>This Month's Revenue</div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--navy)' }}>
-              ₹{(stats?.thisMonthRevenue || 0).toLocaleString('en-IN')}
-            </div>
-          </div>
-          {stats?.revenueGrowth !== null && (
-            <div>
-              <div style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 500 }}>vs Last Month</div>
-              <div style={{ fontSize: '18px', fontWeight: 700, color: parseFloat(stats.revenueGrowth) >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                {parseFloat(stats.revenueGrowth) >= 0 ? '▲' : '▼'} {Math.abs(stats.revenueGrowth)}%
-              </div>
-            </div>
-          )}
-          <div style={{ marginLeft: 'auto' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 500 }}>Ready to Ship</div>
-            <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>{stats?.activeCases ?? 0}</div>
-          </div>
-        </div>
-
         {/* Recent Cases */}
         <div className="card">
           <div className="card-header">

@@ -48,6 +48,11 @@ export default function CasesScreen({ navigation, route }) {
 
   useEffect(() => { loadCases(); }, [loadCases]);
 
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', loadCases);
+    return unsub;
+  }, [navigation, loadCases]);
+
   const renderCase = ({ item: c }) => {
     const stage = STAGES[c.status] || STAGES.CASE_ACCEPTED;
     const pay = PAYMENT_STATUS[c.paymentStatus];

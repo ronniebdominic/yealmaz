@@ -84,6 +84,12 @@ export default function HomeScreen({ navigation }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Reload whenever this screen comes back into focus (e.g. after submitting a new case)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', loadCases);
+    return unsub;
+  }, [navigation, loadCases]);
+
   const onRefresh = () => { setRefreshing(true); loadCases(); };
 
   const active = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));

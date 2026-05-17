@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const res = await api.post('/clinic/login', { email, password });
+      const res = await api.post('/auth/clinic/login', { email, password });
       const { token, clinic } = res.data;
       try {
         await AsyncStorage.setItem('ya_clinic_token', token);

@@ -15,7 +15,7 @@ const WORK_TYPES = [
 
 export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
-    patientName: '', patientAge: '', workType: '',
+    patientName: '', patientAge: '', doctorName: '', workType: '',
     toothNumbers: '', shade: '', notes: '',
     dueDate: '', totalAmount: '',
   });
@@ -78,6 +78,11 @@ export default function NewCaseScreen({ navigation }) {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Patient Name *</Text>
             <TextInput style={styles.input} placeholder="e.g. Ahmed Al-Rashid" placeholderTextColor={Colors.text3} value={form.patientName} onChangeText={set('patientName')} />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Doctor Name</Text>
+            <TextInput style={styles.input} placeholder="e.g. Dr. Sarah Ahmed" placeholderTextColor={Colors.text3} value={form.doctorName} onChangeText={set('doctorName')} />
           </View>
 
           <View style={styles.row}>

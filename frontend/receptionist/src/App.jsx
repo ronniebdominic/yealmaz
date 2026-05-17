@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Payments from './pages/Payments';
@@ -27,6 +28,7 @@ function RoleHome() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'DELIVERY') return <DeliveryDashboard />;
   if (user.role === 'LAB_TECH') return <LabDashboard />;
+  if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
   return <Dashboard />;
 }
 
@@ -45,6 +47,9 @@ function AppRoutes() {
       <Route path="/billing" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Billing /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Payments /></ProtectedRoute>} />
       <Route path="/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Delivery /></ProtectedRoute>} />
+
+      {/* Admin only */}
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboard /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

@@ -5,6 +5,8 @@ import {
   Image, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
 import { format } from 'date-fns';
@@ -21,6 +23,100 @@ const STAGE_ORDER = [
   'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED',
 ];
 
+const LAB = {
+  name: 'Ye-Almaz Dental Laboratory',
+  address: 'Addis Ababa, Ethiopia',
+  phone: '+251 911 000 000',
+};
+
+function buildInvoiceHTML(c) {
+  const inv = c.payment;
+  const amount = (inv?.amount ?? c.totalAmount ?? 0).toLocaleString('en-IN');
+  const issued = inv?.invoiceIssuedAt ? new Date(inv.invoiceIssuedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+  const due    = c.dueDate ? new Date(c.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+  const isPaid = c.paymentStatus === 'VERIFIED';
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${inv?.invoiceNumber || 'Invoice'}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:32px;font-size:14px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #1565C0}
+  .lab-name{font-size:20px;font-weight:800;color:#1565C0;margin-bottom:4px}
+  .lab-sub{font-size:11px;color:#888;line-height:1.5}
+  .inv-meta{text-align:right}
+  .inv-meta h1{font-size:26px;font-weight:800;color:#1565C0;letter-spacing:2px}
+  .inv-num{font-size:12px;color:#555;margin-top:4px;font-family:monospace}
+  .status-pill{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-top:6px}
+  .paid{background:#D1FAE5;color:#065F46}
+  .pending{background:#FEF3C7;color:#92400E}
+  .section{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}
+  .section-title{font-size:9px;font-weight:700;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+  .bill-name{font-size:14px;font-weight:700;margin-bottom:3px}
+  .bill-sub{font-size:12px;color:#666;line-height:1.6}
+  .dates{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+  .date-val{font-size:12px;font-weight:600}
+  .date-mono{font-family:monospace}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  thead tr{background:#1565C0;color:#fff}
+  th{padding:9px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:0.5px}
+  td{padding:12px 14px;border-bottom:1px solid #eee;font-size:13px}
+  .total-row td{background:#F0F5FF;font-weight:700;border-bottom:none}
+  .total-amt{color:#1565C0;font-size:18px;font-weight:800;text-align:right}
+  .notes{background:#FFFBEB;border-radius:6px;padding:12px;font-size:12px;color:#555;margin-bottom:20px}
+  .footer{margin-top:32px;padding-top:14px;border-top:1px solid #eee;font-size:10px;color:#aaa;text-align:center;line-height:1.7}
+</style></head><body>
+<div class="header">
+  <div>
+    <div class="lab-name">🦷 ${LAB.name}</div>
+    <div class="lab-sub">${LAB.address}<br>${LAB.phone}</div>
+  </div>
+  <div class="inv-meta">
+    <h1>INVOICE</h1>
+    <div class="inv-num">${inv?.invoiceNumber || '—'}</div>
+    <div><span class="status-pill ${isPaid ? 'paid' : 'pending'}">${isPaid ? '✓ PAID' : 'PAYMENT PENDING'}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div>
+    <div class="section-title">Bill To</div>
+    <div class="bill-name">${c.clinic?.name || '—'}</div>
+    <div class="bill-sub">${c.clinic?.address || ''}${c.clinic?.phone ? '<br>' + c.clinic.phone : ''}${c.clinic?.email ? '<br>' + c.clinic.email : ''}</div>
+  </div>
+  <div class="dates">
+    <div><div class="section-title">Invoice Date</div><div class="date-val">${issued}</div></div>
+    <div><div class="section-title">Due Date</div><div class="date-val">${due}</div></div>
+    <div><div class="section-title">Case No.</div><div class="date-val date-mono">${c.caseNumber}</div></div>
+    <div><div class="section-title">Patient</div><div class="date-val">${c.patientName}</div></div>
+  </div>
+</div>
+
+<table>
+  <thead><tr><th>Description</th><th>Details</th><th style="text-align:right">Amount</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>${c.workType}</strong><br><span style="color:#888;font-size:11px">Dental Lab Work</span></td>
+      <td style="color:#666">${[c.toothNumbers ? 'Teeth: ' + c.toothNumbers : '', c.shade ? 'Shade: ' + c.shade : ''].filter(Boolean).join('<br>') || '—'}</td>
+      <td style="text-align:right;font-weight:700">₹${amount}</td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="2" style="text-align:right;font-size:13px">Total Amount</td>
+      <td class="total-amt">₹${amount}</td>
+    </tr>
+  </tbody>
+</table>
+
+${inv?.invoiceNotes ? `<div class="notes"><strong>Notes:</strong> ${inv.invoiceNotes}</div>` : ''}
+
+<div class="footer">
+  Thank you for choosing Ye-Almaz Dental Laboratory<br>
+  Please transfer to the provided bank account and upload your payment receipt in the clinic app.
+</div>
+</body></html>`;
+}
+
 function InfoRow({ label, value, valueColor }) {
   if (!value) return null;
   return (
@@ -31,46 +127,17 @@ function InfoRow({ label, value, valueColor }) {
   );
 }
 
-function ProgressBar({ status }) {
-  const currentStep = STAGES[status]?.step ?? 0;
-  const total = 15;
 
-  return (
-    <View style={styles.progressWrap}>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.max(5, (currentStep / total) * 100)}%` }]} />
-      </View>
-      <View style={styles.progressSteps}>
-        {STAGE_ORDER.map((s, i) => {
-          const stage = STAGES[s];
-          const done = i <= currentStep;
-          const current = s === status;
-          return (
-            <View key={s} style={styles.progressStep}>
-              <View style={[
-                styles.stepDot,
-                done && styles.stepDotDone,
-                current && styles.stepDotCurrent,
-              ]}>
-                <Text style={styles.stepIcon}>{done ? stage.icon : '○'}</Text>
-              </View>
-              <Text style={[styles.stepLabel, current && { color: stage.color, fontWeight: '700' }]} numberOfLines={2}>
-                {stage.label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
 
 export default function CaseDetailScreen({ navigation, route }) {
   const { caseId } = route.params;
-  const [caseData, setCaseData] = useState(null);
+  const [
+    
+    caseData, setCaseData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [screenshot, setScreenshot] = useState(null);
   const [loadError, setLoadError] = useState('');
 
@@ -151,6 +218,30 @@ export default function CaseDetailScreen({ navigation, route }) {
     }
   };
 
+  const downloadInvoice = async () => {
+    if (!caseData) return;
+    setGeneratingPdf(true);
+    try {
+      const html = buildInvoiceHTML(caseData);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Invoice ${caseData.payment?.invoiceNumber}`,
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('Saved', `Invoice saved to: ${uri}`);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not generate invoice PDF. Please try again.');
+      console.error('[Invoice PDF]', err);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -203,11 +294,6 @@ export default function CaseDetailScreen({ navigation, route }) {
           <Text style={styles.statusHeroCase}>{caseData.caseNumber}</Text>
         </View>
 
-        {/* ── Progress bar ── */}
-        <View style={[styles.card, { padding: Spacing.lg }]}>
-          <Text style={styles.sectionLabel}>PRODUCTION PROGRESS</Text>
-          <ProgressBar status={caseData.status} />
-        </View>
 
         {/* ── Case Info ── */}
         <View style={styles.card}>
@@ -276,9 +362,21 @@ export default function CaseDetailScreen({ navigation, route }) {
               </View>
             ) : null}
 
-            {/* Payment status inside invoice card */}
-            <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg, marginTop: Spacing.md }]}>
-              <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
+            {/* Payment status + PDF button */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md }}>
+              <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg, marginBottom: 0 }]}>
+                <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.pdfBtn, generatingPdf && { opacity: 0.6 }]}
+                onPress={downloadInvoice}
+                disabled={generatingPdf}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.pdfBtnText}>
+                  {generatingPdf ? 'Generating…' : '📄 View PDF'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         ) : caseData.totalAmount ? (
@@ -483,6 +581,12 @@ const styles = StyleSheet.create({
   invoiceRowValue: { fontSize: 13, color: Colors.text1, fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
   invoiceNotesBox: { backgroundColor: '#FFFBEB', borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.md },
   invoiceNotesText: { fontSize: 12, color: Colors.text2, lineHeight: 18 },
+  pdfBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.blue, borderRadius: Radius.md,
+    paddingVertical: 8, paddingHorizontal: 14,
+  },
+  pdfBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   // Payment
   payStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, marginBottom: Spacing.md },
