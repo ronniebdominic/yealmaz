@@ -2,12 +2,14 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View, ActivityIndicator } from 'react-native';
+import { Text } from 'react-native';
+import { useState, useEffect } from 'react';
 import Toast from 'react-native-toast-message';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/utils/theme';
+import SplashScreen from './src/screens/SplashScreen';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,13 +58,15 @@ function MainTabs() {
 
 function AppNavigator() {
   const { clinic, loading } = useAuth();
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.navy }}>
-        <Text style={{ fontSize: 40, marginBottom: 16 }}>🦷</Text>
-        <ActivityIndicator color={Colors.accent} size="large" />
-      </View>
-    );
+  const [minTimeDone, setMinTimeDone] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimeDone(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!minTimeDone || loading) {
+    return <SplashScreen />;
   }
   return (
     <NavigationContainer>
