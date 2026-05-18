@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, StatusBar, ActivityIndicator, Alert,
@@ -7,22 +7,174 @@ import {
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow } from '../../utils/theme';
 
+// ── Work Types ────────────────────────────────────────────
 const WORK_TYPES = [
-  'PFM Crown', 'Zirconia Crown', 'Full Denture', 'Partial Denture',
-  'Bridge', 'Veneer', 'Inlay / Onlay', 'Clear Aligner',
-  'Night Guard', 'Implant Crown', 'Other',
+  // Zirconia
+  'Zirconia Express',
+  'Full Contoured Zirconia',
+  'Layered Zirconia Aesthetic',
+  'Zirconia Screw Retained Crown',
+  'Zirconia Veneer',
+  'Zirconia Rest',
+  'Zirconia Coping',
+  'Custom Abutment',
+  'Screw Retained Aesthetic',
+  // Lithium Disilicate
+  'Lithium Disilicate Inlays / Onlays / Crown',
+  'Lithium Disilicate Veneers',
+  // PFM
+  'PFM Crown',
+  'PFM Crown with Metal Try-In',
+  'PFM Bridge',
+  // Metal
+  'Full Metal Crown',
+  'Full Metal Bridge',
+  'Metal Occlusal Crown',
+  // Implant
+  'Implant Crown PFM',
+  'Implant Crown Zirconia',
+  // Dentures
+  'Complete Denture',
+  'Flexible Denture',
+  'Cast Partial Denture',
+  // Temporary
+  'Temporary Crown PMMA',
+  'Temporary Bridge PMMA',
+  // Digital / CAD
+  'Surgical Guide',
+  'Implant Planning',
+  'Wax-Up Diagnostic',
+  'CAD Design Service',
+  '3D Printed Model',
+  // Guards & Appliances
+  'Orthodontic Retainer',
+  'Night Guard Soft',
+  'Night Guard Hard',
+  'Sports Guard',
+  'Bite Splint',
+  'Bleaching Tray',
+  'Clear Aligner Setup',
+  'Gingival Mask',
+  // Emax
+  'Emax Crown',
+  'Emax Veneer',
+  'Emax Bridge',
+  // Composite
+  'Composite Veneer',
+  'Composite Crown',
+  // Specialty Prosthetics
+  'Maryland Bridge',
+  'Precision Attachment',
+  'Telescopic Crown',
+  'Bar Attachment',
+  'Locator Housing',
+  // PEEK
+  'Peek Framework',
+  'Peek Crown',
+  // Implant Prosthetics
+  'Hybrid Denture',
+  'Implant Overdenture',
+  'Temporary Abutment',
+  'Healing Cap',
 ];
 
+// ── Odontogram ────────────────────────────────────────────
+const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
+const TOOTH_W = 26;
+const TOOTH_H = 36;
+
+function Odontogram({ selected, onToggle }) {
+  const renderRow = (teeth, isUpper) => {
+    const items = [];
+    for (const num of teeth) {
+      // Insert midline separator before tooth 21 (upper) and tooth 31 (lower)
+      if ((isUpper && num === 21) || (!isUpper && num === 31)) {
+        items.push(
+          <View key="mid" style={{ width: 8, height: TOOTH_H, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 1.5, height: TOOTH_H, backgroundColor: Colors.border2 }} />
+          </View>
+        );
+      }
+      const active = selected.includes(num);
+      items.push(
+        <TouchableOpacity
+          key={num}
+          onPress={() => onToggle(num)}
+          activeOpacity={0.65}
+          style={{
+            width: TOOTH_W,
+            height: TOOTH_H,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginHorizontal: 1,
+            borderWidth: 1.5,
+            borderColor: active ? Colors.blue : Colors.border,
+            backgroundColor: active ? Colors.blue : Colors.surface,
+            borderTopLeftRadius: isUpper ? 4 : 0,
+            borderTopRightRadius: isUpper ? 4 : 0,
+            borderBottomLeftRadius: isUpper ? 0 : 4,
+            borderBottomRightRadius: isUpper ? 0 : 4,
+          }}
+        >
+          <Text style={{ fontSize: 9, fontWeight: '700', color: active ? '#fff' : Colors.text3 }}>
+            {num}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    return <View style={{ flexDirection: 'row' }}>{items}</View>;
+  };
+
+  // Fixed inner width: 16 teeth × (TOOTH_W + 2 margin) + midline 8
+  const innerW = 16 * (TOOTH_W + 2) + 8;
+
+  return (
+    <View style={{ backgroundColor: Colors.surface2, borderRadius: Radius.md, padding: 10, borderWidth: 1, borderColor: Colors.border }}>
+      {/* Horizontal scroll so teeth never get squeezed */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
+        <View style={{ width: innerW }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.text3 }}>R</Text>
+            <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.text3 }}>L</Text>
+          </View>
+
+          {renderRow(UPPER_TEETH, true)}
+
+          {/* Arch divider */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', height: 18, marginVertical: 3, backgroundColor: Colors.bg, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Colors.border, paddingHorizontal: 6 }}>
+            <Text style={{ fontSize: 7, fontWeight: '700', color: Colors.text3, letterSpacing: 1 }}>UPPER</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: Colors.border, marginHorizontal: 8 }} />
+            <Text style={{ fontSize: 7, fontWeight: '700', color: Colors.text3, letterSpacing: 1 }}>LOWER</Text>
+          </View>
+
+          {renderRow(LOWER_TEETH, false)}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+
+// ── Screen ────────────────────────────────────────────────
 export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', workType: '',
-    toothNumbers: '', shade: '', notes: '',
-    dueDate: '', totalAmount: '',
+    shade: '', notes: '', dueDate: '', deliveryType: 'NORMAL',
   });
+  const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [showWorkTypes, setShowWorkTypes] = useState(false);
 
   const set = (field) => (val) => setForm(prev => ({ ...prev, [field]: val }));
+
+  const toggleTooth = (num) => {
+    setSelectedTeeth(prev =>
+      prev.includes(num)
+        ? prev.filter(t => t !== num)
+        : [...prev, num].sort((a, b) => a - b)
+    );
+  };
 
   const validate = () => {
     if (!form.patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return false; }
@@ -36,8 +188,8 @@ export default function NewCaseScreen({ navigation }) {
     try {
       const res = await api.post('/cases', {
         ...form,
+        toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
-        totalAmount: form.totalAmount ? parseFloat(form.totalAmount) : undefined,
       });
       Alert.alert(
         '✅ Case Submitted!',
@@ -69,73 +221,165 @@ export default function NewCaseScreen({ navigation }) {
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
-        {/* Patient Info */}
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Patient Information ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>PATIENT INFORMATION</Text>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Patient Name *</Text>
-            <TextInput style={styles.input} placeholder="e.g. Ahmed Al-Rashid" placeholderTextColor={Colors.text3} value={form.patientName} onChangeText={set('patientName')} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Ahmed Al-Rashid"
+              placeholderTextColor={Colors.text3}
+              value={form.patientName}
+              onChangeText={set('patientName')}
+            />
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Doctor Name</Text>
-            <TextInput style={styles.input} placeholder="e.g. Dr. Sarah Ahmed" placeholderTextColor={Colors.text3} value={form.doctorName} onChangeText={set('doctorName')} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Dr. Sarah Ahmed"
+              placeholderTextColor={Colors.text3}
+              value={form.doctorName}
+              onChangeText={set('doctorName')}
+            />
           </View>
 
           <View style={styles.row}>
             <View style={[styles.formGroup, { flex: 1 }]}>
               <Text style={styles.label}>Age</Text>
-              <TextInput style={styles.input} placeholder="e.g. 34" placeholderTextColor={Colors.text3} value={form.patientAge} onChangeText={set('patientAge')} keyboardType="numeric" />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 34"
+                placeholderTextColor={Colors.text3}
+                value={form.patientAge}
+                onChangeText={set('patientAge')}
+                keyboardType="numeric"
+              />
             </View>
             <View style={{ width: 12 }} />
             <View style={[styles.formGroup, { flex: 1 }]}>
               <Text style={styles.label}>Shade</Text>
-              <TextInput style={styles.input} placeholder="e.g. A2, B1" placeholderTextColor={Colors.text3} value={form.shade} onChangeText={set('shade')} />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. A2, B1"
+                placeholderTextColor={Colors.text3}
+                value={form.shade}
+                onChangeText={set('shade')}
+              />
             </View>
           </View>
         </View>
 
-        {/* Work Details */}
+        {/* ── Tooth Selection ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>TOOTH SELECTION</Text>
+          <Text style={styles.subHint}>Tap teeth to mark affected tooth/teeth (FDI numbering)</Text>
+
+          <View style={{ marginTop: 10 }}>
+            <Odontogram selected={selectedTeeth} onToggle={toggleTooth} />
+          </View>
+
+          <View style={styles.teethSummaryRow}>
+            {selectedTeeth.length > 0 ? (
+              <>
+                <Text style={styles.teethSelected}>
+                  Selected: <Text style={{ color: Colors.blue, fontWeight: '700' }}>{selectedTeeth.join(', ')}</Text>
+                </Text>
+                <TouchableOpacity onPress={() => setSelectedTeeth([])}>
+                  <Text style={styles.clearBtn}>Clear all</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={styles.teethNone}>No teeth selected</Text>
+            )}
+          </View>
+        </View>
+
+        {/* ── Work Details ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>WORK DETAILS</Text>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Work Type *</Text>
-            <TouchableOpacity style={[styles.input, styles.selectInput]} onPress={() => setShowWorkTypes(!showWorkTypes)}>
-              <Text style={form.workType ? styles.selectText : styles.selectPlaceholder}>
+            <TouchableOpacity
+              style={[styles.input, styles.selectInput]}
+              onPress={() => setShowWorkTypes(!showWorkTypes)}
+            >
+              <Text style={form.workType ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
                 {form.workType || 'Select work type…'}
               </Text>
               <Text style={styles.selectArrow}>{showWorkTypes ? '▲' : '▼'}</Text>
             </TouchableOpacity>
             {showWorkTypes && (
               <View style={styles.dropdown}>
-                {WORK_TYPES.map(w => (
-                  <TouchableOpacity key={w} style={[styles.dropdownItem, form.workType === w && styles.dropdownItemActive]}
-                    onPress={() => { set('workType')(w); setShowWorkTypes(false); }}>
-                    <Text style={[styles.dropdownText, form.workType === w && styles.dropdownTextActive]}>{w}</Text>
-                  </TouchableOpacity>
-                ))}
+                <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+                  {WORK_TYPES.map(w => (
+                    <TouchableOpacity
+                      key={w}
+                      style={[styles.dropdownItem, form.workType === w && styles.dropdownItemActive]}
+                      onPress={() => { set('workType')(w); setShowWorkTypes(false); }}
+                    >
+                      <Text style={[styles.dropdownText, form.workType === w && styles.dropdownTextActive]}>
+                        {w}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             )}
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Tooth Numbers</Text>
-            <TextInput style={styles.input} placeholder="e.g. 14, 15, 16" placeholderTextColor={Colors.text3} value={form.toothNumbers} onChangeText={set('toothNumbers')} />
+            <Text style={styles.label}>Due Date</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={Colors.text3}
+              value={form.dueDate}
+              onChangeText={set('dueDate')}
+            />
           </View>
 
-          <View style={styles.row}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Due Date</Text>
-              <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.text3} value={form.dueDate} onChangeText={set('dueDate')} />
-            </View>
-            <View style={{ width: 12 }} />
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Amount (₹)</Text>
-              <TextInput style={styles.input} placeholder="e.g. 2500" placeholderTextColor={Colors.text3} value={form.totalAmount} onChangeText={set('totalAmount')} keyboardType="numeric" />
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Delivery Type</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {[
+                { value: 'NORMAL',  label: 'Normal Delivery',  icon: '🚚', desc: 'Standard turnaround' },
+                { value: 'EXPRESS', label: 'Express Delivery', icon: '⚡', desc: 'Priority / urgent' },
+              ].map(opt => {
+                const active = form.deliveryType === opt.value;
+                const activeColor = opt.value === 'EXPRESS' ? Colors.amber : Colors.blue;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => set('deliveryType')(opt.value)}
+                    activeOpacity={0.8}
+                    style={{
+                      flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+                      padding: 12, borderRadius: Radius.md,
+                      borderWidth: 2,
+                      borderColor: active ? activeColor : Colors.border,
+                      backgroundColor: active ? activeColor + '12' : Colors.bg,
+                    }}
+                  >
+                    <Text style={{ fontSize: 22 }}>{opt.icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: active ? activeColor : Colors.text1 }}>
+                        {opt.label}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: Colors.text3 }}>{opt.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
@@ -154,7 +398,7 @@ export default function NewCaseScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Submit */}
+        {/* ── Submit ── */}
         <View style={styles.submitWrap}>
           <TouchableOpacity
             style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
@@ -164,7 +408,7 @@ export default function NewCaseScreen({ navigation }) {
           >
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.submitText}>🦷 Submit Case & Generate QR</Text>
+              : <Text style={styles.submitText}>Submit Case</Text>
             }
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
@@ -194,7 +438,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 11, fontWeight: '700', color: Colors.text3,
-    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14,
+    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4,
+  },
+  subHint: {
+    fontSize: 11, color: Colors.text3, marginBottom: 2,
   },
 
   formGroup: { marginBottom: Spacing.lg },
@@ -210,19 +457,31 @@ const styles = StyleSheet.create({
   textArea: { height: 100, paddingTop: Spacing.md },
   row: { flexDirection: 'row' },
 
-  // Select
+  // Teeth summary
+  teethSummaryRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginTop: 10,
+    paddingTop: 10, borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  teethSelected: { fontSize: 12, color: Colors.text2, flex: 1 },
+  teethNone: { fontSize: 12, color: Colors.text3, fontStyle: 'italic' },
+  clearBtn: { fontSize: 12, fontWeight: '700', color: Colors.red },
+
+  // Work type dropdown
   selectInput: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  selectText: { fontSize: 14, color: Colors.text1 },
-  selectPlaceholder: { fontSize: 14, color: Colors.text3 },
+  selectText: { fontSize: 14, color: Colors.text1, flex: 1 },
+  selectPlaceholder: { fontSize: 14, color: Colors.text3, flex: 1 },
   selectArrow: { fontSize: 12, color: Colors.text3 },
   dropdown: {
     backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
     borderRadius: Radius.md, marginTop: 4, ...Shadow.md,
-    maxHeight: 220, overflow: 'scroll',
   },
-  dropdownItem: { paddingHorizontal: Spacing.lg, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  dropdownItem: {
+    paddingHorizontal: Spacing.lg, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
   dropdownItemActive: { backgroundColor: Colors.blue + '10' },
   dropdownText: { fontSize: 14, color: Colors.text1 },
   dropdownTextActive: { color: Colors.blue, fontWeight: '700' },

@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Layout from '../components/Layout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const fetchBilling = () => api.get('/payments/billing').then(r => r.data.cases ?? r.data);
 
 const LAB = {
   name: 'Ye-Almaz Dental Laboratory',
@@ -334,38 +337,39 @@ const TABS = [
 ];
 
 export default function Billing() {
-  const [cases, setCases]       = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [tab, setTab]           = useState('to-invoice');
+  const [tab, setTab]               = useState('to-invoice');
   const [issueModal, setIssueModal] = useState(null);
   const [viewModal, setViewModal]   = useState(null);
   const [processing, setProcessing] = useState(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => { loadCases(); }, []);
+  const { data: cases = [], isLoading: loading } = useQuery({
+    queryKey: ['payments', 'billing'],
+    queryFn: fetchBilling,
+    staleTime: 60_000,
+  });
 
-  const loadCases = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/payments/billing');
-      setCases(res.data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  };
+  const verifyMutation = useMutation({
+    mutationFn: ({ caseId, action, rejectionReason }) =>
+      api.post(`/payments/${caseId}/verify`, { action, rejectionReason }),
+    onSuccess: (_, { action }) => {
+      toast.success(action === 'APPROVE' ? '✅ Payment approved — case ready for dispatch.' : '❌ Payment rejected.');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+    },
+    onError: () => toast.error('Action failed. Please try again.'),
+    onSettled: () => setProcessing(null),
+  });
 
-  const verify = async (caseId, action) => {
+  const verify = (caseId, action) => {
     let rejectionReason;
     if (action === 'REJECT') {
       rejectionReason = prompt('Reason for rejection (sent to clinic):');
       if (!rejectionReason) return;
     }
     setProcessing(caseId + action);
-    try {
-      await api.post(`/payments/${caseId}/verify`, { action, rejectionReason });
-      toast.success(action === 'APPROVE' ? '✅ Payment approved — case ready for dispatch.' : '❌ Payment rejected.');
-      loadCases();
-    } catch (err) {
-      toast.error('Action failed. Please try again.');
-    } finally { setProcessing(null); }
+    verifyMutation.mutate({ caseId, action, rejectionReason });
   };
 
   // Tab buckets
@@ -514,7 +518,7 @@ export default function Billing() {
       {issueModal && (
         <IssueInvoiceModal
           caseData={issueModal}
-          onDone={() => { setIssueModal(null); loadCases(); }}
+          onDone={() => { setIssueModal(null); queryClient.invalidateQueries({ queryKey: ['payments'] }); }}
           onClose={() => setIssueModal(null)}
         />
       )}

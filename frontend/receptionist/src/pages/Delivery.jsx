@@ -1,25 +1,17 @@
-import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import api from '../api';
 import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+
+const fetchAssigned = () => api.get('/delivery/assigned').then(r => r.data.cases ?? r.data);
 
 export default function Delivery() {
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { loadCases(); }, []);
-
-  const loadCases = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/delivery/assigned');
-      setCases(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: cases = [], isLoading } = useQuery({
+    queryKey: ['delivery', 'assigned'],
+    queryFn: fetchAssigned,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
 
   return (
     <Layout>
@@ -31,7 +23,7 @@ export default function Delivery() {
       </div>
 
       <div className="content">
-        {loading ? (
+        {isLoading ? (
           <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '60px' }}>Loading…</div>
         ) : cases.length === 0 ? (
           <div className="empty-state">
@@ -62,9 +54,7 @@ export default function Delivery() {
                       <td>{c.clinic?.name}</td>
                       <td style={{ fontSize: '12px', color: 'var(--text-3)' }}>{c.clinic?.address || '—'}</td>
                       <td>{c.workType}</td>
-                      <td>
-                        <span className="badge badge-pay-verified">✓ Verified</span>
-                      </td>
+                      <td><span className="badge badge-pay-verified">✓ Verified</span></td>
                       <td style={{ fontSize: '12px', color: 'var(--text-3)' }}>
                         {format(new Date(c.updatedAt), 'dd MMM, h:mm a')}
                       </td>

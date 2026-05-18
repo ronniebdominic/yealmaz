@@ -73,6 +73,9 @@ model Case {
   qrCodeUrl       String?     // URL of the generated QR image
   qrCodeData      String?     // The encoded URL in the QR
 
+  // Delivery
+  deliveryType    DeliveryType  @default(NORMAL)
+
   // Payment
   paymentStatus   PaymentStatus @default(PENDING)
   totalAmount     Float?
@@ -135,6 +138,11 @@ enum CaseStatus {
   CANCELLED
 }
 
+enum DeliveryType {
+  NORMAL
+  EXPRESS
+}
+
 enum PaymentStatus {
   PENDING           // No screenshot yet
   SCREENSHOT_UPLOADED // Clinic uploaded screenshot
@@ -195,6 +203,17 @@ model DeliveryLog {
   createdAt DateTime @default(now())
 
   @@map("delivery_logs")
+}
+
+// ── WORK TYPE PRICES ───────────────────────────────────
+model WorkTypePrice {
+  id        String   @id @default(uuid())
+  workType  String   @unique
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("work_type_prices")
 }
 
 // ── NOTIFICATIONS ──────────────────────────────────────

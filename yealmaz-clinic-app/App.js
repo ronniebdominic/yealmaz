@@ -4,9 +4,20 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, ActivityIndicator } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/utils/theme';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+    },
+  },
+});
 
 import LoginScreen from './src/screens/auth/LoginScreen';
 import HomeScreen from './src/screens/cases/HomeScreen';
@@ -72,9 +83,11 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppNavigator />
-      <Toast />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AppNavigator />
+        <Toast />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Layout from '../components/Layout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import CaseDetailModal from '../components/CaseDetailModal';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const FILTERS = [
   { label: 'All',            value: '' },
@@ -17,34 +18,33 @@ const FILTERS = [
   { label: 'Delivered',      value: 'DELIVERED' },
 ];
 
+const PAGE_SIZE = 20;
+
 export default function Cases() {
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [pagination, setPagination] = useState({});
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadCases();
-  }, [filter, search]);
-
-  const loadCases = async () => {
-    setLoading(true);
-    try {
-      const params = { limit: 50 };
+  const { data, isLoading } = useQuery({
+    queryKey: ['cases', filter, search, page],
+    queryFn: () => {
+      const params = { limit: PAGE_SIZE, page };
       if (filter) params.status = filter;
       if (search) params.search = search;
-      const res = await api.get('/cases', { params });
-      setCases(res.data.cases);
-      setPagination(res.data.pagination);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return api.get('/cases', { params }).then(r => r.data);
+    },
+    staleTime: 30_000,
+    keepPreviousData: true,
+  });
+
+  const cases = data?.cases || [];
+  const pagination = data?.pagination || {};
+
+  const changeFilter = (f) => { setFilter(f); setPage(1); };
+  const changeSearch = (s) => { setSearch(s); setPage(1); };
 
   return (
     <Layout>
@@ -58,14 +58,13 @@ export default function Cases() {
       </div>
 
       <div className="content">
-        {/* Search + Filters */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-input" style={{ flex: 1, minWidth: '200px' }}>
             <span className="icon">🔍</span>
             <input
               placeholder="Search patient name or case number…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => changeSearch(e.target.value)}
             />
           </div>
         </div>
@@ -75,7 +74,7 @@ export default function Cases() {
             <button
               key={f.value}
               className={`filter-chip ${filter === f.value ? 'active' : ''}`}
-              onClick={() => setFilter(f.value)}
+              onClick={() => changeFilter(f.value)}
             >
               {f.label}
             </button>
@@ -87,7 +86,7 @@ export default function Cases() {
 
         <div className="card">
           <div className="table-wrap">
-            {loading ? (
+            {isLoading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-3)' }}>Loading cases…</div>
             ) : cases.length === 0 ? (
               <div className="empty-state">
@@ -122,10 +121,7 @@ export default function Cases() {
                       <td><StatusBadge status={c.status} /></td>
                       <td><PaymentBadge status={c.paymentStatus} /></td>
                       <td>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => setSelectedCase(c)}
-                        >
+                        <button className="btn btn-ghost btn-sm" onClick={() => setSelectedCase(c)}>
                           View
                         </button>
                       </td>
@@ -136,12 +132,38 @@ export default function Cases() {
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+            >
+              ← Prev
+            </button>
+            <span style={{ fontSize: '13px', color: 'var(--text-3)' }}>
+              Page {page} of {pagination.totalPages}
+            </span>
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={page === pagination.totalPages}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Next →
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedCase && (
         <CaseDetailModal
           caseId={selectedCase.id}
-          onClose={() => { setSelectedCase(null); loadCases(); }}
+          onClose={() => {
+            setSelectedCase(null);
+            queryClient.invalidateQueries({ queryKey: ['cases'] });
+          }}
         />
       )}
     </Layout>

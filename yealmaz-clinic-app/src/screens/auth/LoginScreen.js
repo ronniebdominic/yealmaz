@@ -37,9 +37,11 @@ export default function LoginScreen() {
 
         {/* ── Hero Section ── */}
         <View style={styles.hero}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoEmoji}>🦷</Text>
-          </View>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="cover"
+          />
           <Text style={styles.labName}>Ye-Almaz</Text>
           <Text style={styles.labSub}>Dental Laboratory</Text>
           <View style={styles.tagline}>
@@ -124,14 +126,12 @@ const styles = StyleSheet.create({
 
   // Hero
   hero: { alignItems: 'center', paddingTop: 60, paddingBottom: 32 },
-  logoCircle: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 14,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)',
+  logoImage: {
+    width: 110, height: 110, borderRadius: 55,
+    marginBottom: 16,
+    borderWidth: 3, borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: '#fff',
   },
-  logoEmoji: { fontSize: 36 },
   labName: {
     fontSize: 32, fontWeight: '800', color: '#fff',
     letterSpacing: -0.5,

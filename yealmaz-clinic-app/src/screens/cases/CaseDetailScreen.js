@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, StatusBar, ActivityIndicator, Alert,
@@ -10,6 +10,7 @@ import * as Sharing from 'expo-sharing';
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
 import { format } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const STAGE_ORDER = [
   'CASE_ACCEPTED',
@@ -131,38 +132,19 @@ function InfoRow({ label, value, valueColor }) {
 
 export default function CaseDetailScreen({ navigation, route }) {
   const { caseId } = route.params;
-  const [
-    
-    caseData, setCaseData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [screenshot, setScreenshot] = useState(null);
-  const [loadError, setLoadError] = useState('');
 
-  const loadCase = useCallback(async () => {
-    try {
-      setLoadError('');
-      const res = await api.get(`/cases/${caseId}`);
-      setCaseData(res.data);
-    } catch (err) {
-      const msg = err.response
-        ? `Server error ${err.response.status}: ${err.response.data?.error || err.response.statusText}`
-        : 'Cannot reach server — check your network and API_BASE in client.js';
-      setLoadError(msg);
-      console.error('[CaseDetail] loadCase failed:', msg);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [caseId]);
+  const { data: caseData, isLoading: loading, isRefetching, error: loadError, refetch } = useQuery({
+    queryKey: ['case', caseId],
+    queryFn: () => api.get(`/cases/${caseId}`).then(r => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
 
-  useEffect(() => {
-    loadCase();
-    const interval = setInterval(loadCase, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  const refreshing = isRefetching && !loading;
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -210,7 +192,8 @@ export default function CaseDetailScreen({ navigation, route }) {
       });
       Alert.alert('✅ Uploaded!', 'Your payment screenshot has been submitted for verification.');
       setScreenshot(null);
-      loadCase();
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err) {
       Alert.alert('Upload Failed', err.response?.data?.error || 'Please try again.');
     } finally {
@@ -258,7 +241,9 @@ export default function CaseDetailScreen({ navigation, route }) {
           {loadError ? 'Failed to load case' : 'Case not found'}
         </Text>
         {loadError ? (
-          <Text style={{ color: '#ef9a9a', fontSize: 12, textAlign: 'center', paddingHorizontal: 32 }}>{loadError}</Text>
+          <Text style={{ color: '#ef9a9a', fontSize: 12, textAlign: 'center', paddingHorizontal: 32 }}>
+            Cannot reach server — check your network.
+          </Text>
         ) : null}
       </View>
     );
@@ -283,7 +268,7 @@ export default function CaseDetailScreen({ navigation, route }) {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCase(); }} tintColor={Colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={Colors.accent} />}
         showsVerticalScrollIndicator={false}
       >
 
@@ -377,20 +362,6 @@ export default function CaseDetailScreen({ navigation, route }) {
                   {generatingPdf ? 'Generating…' : '📄 View PDF'}
                 </Text>
               </TouchableOpacity>
-            </View>
-          </View>
-        ) : caseData.totalAmount ? (
-          /* Amount set but no invoice issued yet */
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Payment</Text>
-            <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg }]}>
-              <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
-            </View>
-            <View style={styles.invoiceRow}>
-              <Text style={styles.invoiceRowLabel}>Amount</Text>
-              <Text style={[styles.invoiceRowValue, { color: Colors.blue, fontWeight: '700' }]}>
-                ₹{caseData.totalAmount.toLocaleString('en-IN')}
-              </Text>
             </View>
           </View>
         ) : null}

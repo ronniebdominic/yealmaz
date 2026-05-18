@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.10",
     "axios": "^1.16.0",
     "date-fns": "^4.1.0",
     "html5-qrcode": "^2.3.8",
@@ -19,7 +20,8 @@
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

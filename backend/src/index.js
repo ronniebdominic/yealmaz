@@ -2,6 +2,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const http = require('http');
 const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
@@ -42,9 +44,19 @@ io.on('connection', (socket) => {
 });
 
 // ── Middleware ───────────────────────────────────────────
+app.use(compression());
 app.use(cors({ origin: '*', credentials: false }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/', apiLimiter);
 
 // ── Routes ───────────────────────────────────────────────
 app.use('/api/auth',          require('./routes/auth'));
@@ -56,6 +68,7 @@ app.use('/api/delivery',      require('./routes/delivery'));
 app.use('/api/dashboard',     require('./routes/dashboard'));
 app.use('/api/lab',           require('./routes/lab'));
 app.use('/api/scan',          require('./routes/scan'));      // Public QR scan endpoint
+app.use('/api/prices',        require('./routes/prices'));
 
 // ── Health check ─────────────────────────────────────────
 app.get('/', (req, res) => {

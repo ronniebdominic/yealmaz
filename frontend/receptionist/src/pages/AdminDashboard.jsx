@@ -1,6 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import api from '../api';
+import { useQuery } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
@@ -42,41 +44,89 @@ const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
 };
 
 export default function AdminDashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // Filters
   const [selectedClinic, setSelectedClinic] = useState('');
   const thisYear = new Date().getFullYear();
   const [fromDate, setFromDate] = useState(`${thisYear}-01-01`);
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
+  const { data, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['dashboard', 'analytics', fromDate, toDate, selectedClinic],
+    queryFn: () => {
       const params = { from: fromDate, to: toDate };
       if (selectedClinic) params.clinicId = selectedClinic;
-      const res = await api.get('/dashboard/admin-analytics', { params });
-      setData(res.data);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load analytics.');
-    } finally {
-      setLoading(false);
-    }
-  }, [fromDate, toDate, selectedClinic]);
+      return api.get('/dashboard/admin-analytics', { params }).then(r => r.data);
+    },
+    staleTime: 5 * 60_000,
+  });
 
-  useEffect(() => { load(); }, [load]);
-
+  const error = queryError ? (queryError.response?.data?.error || 'Failed to load analytics.') : '';
   const { kpi, monthlyTrend, revenueByClinic, revenueByWorkType, clinicList } = data || {};
+
+  const exportToExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1 — Summary KPIs
+    const summaryRows = [
+      ['Metric', 'Value'],
+      ['Period', `${fromDate} to ${toDate}`],
+      ['Clinic Filter', selectedClinic ? (clinicList?.find(c => c.id === selectedClinic)?.name || selectedClinic) : 'All Clinics'],
+      [],
+      ['Total Revenue (₹)', kpi?.totalRevenue ?? 0],
+      ['Total Cases', kpi?.totalCases ?? 0],
+      ['Active Cases', kpi?.activeCases ?? 0],
+      ['Delivered Cases', kpi?.deliveredCases ?? 0],
+      ['Pending Payments', kpi?.pendingPayments ?? 0],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
+
+    // Sheet 2 — Monthly Trend
+    const trendRows = [['Month', 'Cases', 'Revenue (₹)'],
+      ...(monthlyTrend || []).map(r => [r.month, r.cases, r.revenue])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(trendRows), 'Monthly Trend');
+
+    // Sheet 3 — By Work Type
+    const totalRev = (revenueByWorkType || []).reduce((s, r) => s + r.revenue, 0);
+    const workRows = [['#', 'Work Type', 'Cases', 'Revenue (₹)', 'Avg per Case (₹)', 'Share (%)'],
+      ...(revenueByWorkType || []).map((r, i) => [
+        i + 1, r.workType, r.count, r.revenue,
+        r.count > 0 ? Math.round(r.revenue / r.count) : 0,
+        totalRev > 0 ? ((r.revenue / totalRev) * 100).toFixed(1) : '0.0',
+      ])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(workRows), 'By Work Type');
+
+    // Sheet 4 — By Clinic
+    const clinicRows = [['Clinic', 'Total Cases', 'Paid Cases', 'Revenue (₹)', 'Avg per Paid Case (₹)'],
+      ...(revenueByClinic || []).map(c => [
+        c.name, c.totalCases, c.paidCases, c.revenue,
+        c.paidCases > 0 ? Math.round(c.revenue / c.paidCases) : 0,
+      ])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clinicRows), 'By Clinic');
+
+    XLSX.writeFile(wb, `YeAlmaz_Analytics_${fromDate}_to_${toDate}.xlsx`);
+  };
 
   return (
     <AdminLayout>
       <div className="topbar">
         <div className="topbar-title">Analytics Dashboard</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
-          <div className="live-dot" /> Live
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={exportToExcel}
+            disabled={loading || !data}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: loading || !data ? 'var(--border)' : '#16a34a',
+              color: '#fff', border: 'none', borderRadius: 8,
+              padding: '7px 16px', fontSize: 13, fontWeight: 600,
+              cursor: loading || !data ? 'not-allowed' : 'pointer',
+              transition: 'background 0.15s',
+            }}
+          >
+            <span>⬇</span> Export Excel
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
+            <div className="live-dot" /> Live
+          </div>
         </div>
       </div>
 

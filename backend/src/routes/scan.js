@@ -1,6 +1,7 @@
 // Ye-Almaz — QR Scan Route
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const { invalidate } = require('../cache');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -164,6 +165,8 @@ router.post('/:caseId', async (req, res) => {
       scannedAt: new Date().toISOString(),
       scannedBy
     };
+
+    invalidate(`case:${caseId}`, `case:lab:${caseId}`, 'lab:active:*', 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status');
 
     io.to('lab_staff').emit('stage_scanned', payload);
     io.to(`clinic_${caseData.clinic.id}`).emit('case_updated', payload);

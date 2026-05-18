@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, RefreshControl, StatusBar, ActivityIndicator,
@@ -6,57 +6,58 @@ import {
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
 import { format } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const FILTERS = [
-  { label: 'All', value: '' },
-  { label: 'Active', value: 'active' },
-  { label: 'Payment', value: 'payment' },
-  { label: 'Delivered', value: 'delivered' },
+  { label: 'All',      value: '' },
+  { label: 'Active',   value: 'active' },
+  { label: 'Payment',  value: 'payment' },
+  { label: 'Delivered',value: 'delivered' },
 ];
+
+const PAGE_SIZE = 20;
 
 export default function CasesScreen({ navigation, route }) {
   const initialFilter = route.params?.filter || '';
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(initialFilter);
-  const [apiError, setApiError] = useState('');
+  const [page, setPage] = useState(1);
+  const queryClient = useQueryClient();
 
-  const loadCases = useCallback(async () => {
-    try {
-      setApiError('');
-      const params = { limit: 100 };
-      if (search) params.search = search;
-      if (filter === 'delivered') params.status = 'DELIVERED';
+  const params = { limit: PAGE_SIZE, page };
+  if (search) params.search = search;
+  if (filter === 'delivered') params.status = 'DELIVERED';
+
+  const { data, isLoading, isRefetching, error } = useQuery({
+    queryKey: ['cases', 'list', filter, search, page],
+    queryFn: async () => {
       const res = await api.get('/cases', { params });
-      let data = res.data.cases || [];
-      if (filter === 'active') data = data.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
-      if (filter === 'payment') data = data.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
-      setCases(data);
-    } catch (err) {
-      const msg = err.response
-        ? `Server error ${err.response.status}: ${err.response.data?.error || err.response.statusText}`
-        : 'Cannot reach server — check your network and API_BASE in client.js';
-      setApiError(msg);
-      console.error('[CasesScreen] loadCases failed:', msg);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [search, filter]);
+      let cases = res.data.cases || [];
+      if (filter === 'active')   cases = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
+      if (filter === 'payment')  cases = cases.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
+      return { cases, pagination: res.data.pagination };
+    },
+    staleTime: 30_000,
+    keepPreviousData: true,
+  });
 
-  useEffect(() => { loadCases(); }, [loadCases]);
-
-  useEffect(() => {
-    const unsub = navigation.addListener('focus', loadCases);
+  React.useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      queryClient.invalidateQueries({ queryKey: ['cases', 'list'] });
+    });
     return unsub;
-  }, [navigation, loadCases]);
+  }, [navigation, queryClient]);
+
+  const cases = data?.cases || [];
+  const pagination = data?.pagination || {};
+  const refreshing = isRefetching && !isLoading;
+
+  const changeFilter = (f) => { setFilter(f); setPage(1); };
+  const changeSearch = (s) => { setSearch(s); setPage(1); };
 
   const renderCase = ({ item: c }) => {
     const stage = STAGES[c.status] || STAGES.CASE_ACCEPTED;
     const pay = PAYMENT_STATUS[c.paymentStatus];
-
     return (
       <TouchableOpacity
         style={[styles.card, Shadow.sm]}
@@ -89,18 +90,13 @@ export default function CasesScreen({ navigation, route }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.navy} />
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Cases</Text>
-        <TouchableOpacity
-          style={styles.newBtn}
-          onPress={() => navigation.navigate('NewCase')}
-        >
+        <TouchableOpacity style={styles.newBtn} onPress={() => navigation.navigate('NewCase')}>
           <Text style={styles.newBtnText}>+ New</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search */}
       <View style={styles.searchWrap}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -108,22 +104,21 @@ export default function CasesScreen({ navigation, route }) {
           placeholder="Search patient or case number…"
           placeholderTextColor={Colors.text3}
           value={search}
-          onChangeText={setSearch}
+          onChangeText={changeSearch}
         />
         {search ? (
-          <TouchableOpacity onPress={() => setSearch('')}>
+          <TouchableOpacity onPress={() => changeSearch('')}>
             <Text style={{ fontSize: 16, color: Colors.text3 }}>✕</Text>
           </TouchableOpacity>
         ) : null}
       </View>
 
-      {/* Filters */}
       <View style={styles.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity
             key={f.value}
             style={[styles.filterChip, filter === f.value && styles.filterChipActive]}
-            onPress={() => setFilter(f.value)}
+            onPress={() => changeFilter(f.value)}
           >
             <Text style={[styles.filterText, filter === f.value && styles.filterTextActive]}>
               {f.label}
@@ -132,30 +127,59 @@ export default function CasesScreen({ navigation, route }) {
         ))}
       </View>
 
-      {apiError ? (
+      {error ? (
         <View style={{ margin: Spacing.lg, backgroundColor: '#3d1a1a', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(198,40,40,0.4)' }}>
-          <Text style={{ fontSize: 12, color: '#ef9a9a', lineHeight: 17 }}>⚠️ {apiError}</Text>
+          <Text style={{ fontSize: 12, color: '#ef9a9a', lineHeight: 17 }}>⚠️ Cannot reach server — check your network.</Text>
         </View>
       ) : null}
 
-      {loading ? (
+      {isLoading ? (
         <ActivityIndicator color={Colors.blue} style={{ marginTop: 60 }} />
       ) : (
-        <FlatList
-          data={cases}
-          keyExtractor={c => c.id}
-          renderItem={renderCase}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCases(); }} tintColor={Colors.accent} />}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 40, marginBottom: 12 }}>📭</Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.text1 }}>No cases found</Text>
-              <Text style={{ fontSize: 13, color: Colors.text3, marginTop: 4 }}>Try a different filter or search</Text>
+        <>
+          <FlatList
+            data={cases}
+            keyExtractor={c => c.id}
+            renderItem={renderCase}
+            contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => queryClient.invalidateQueries({ queryKey: ['cases', 'list'] })}
+                tintColor={Colors.accent}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>📭</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.text1 }}>No cases found</Text>
+                <Text style={{ fontSize: 13, color: Colors.text3, marginTop: 4 }}>Try a different filter or search</Text>
+              </View>
+            }
+          />
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity
+                style={[styles.pageBtn, page === 1 && styles.pageBtnDisabled]}
+                onPress={() => setPage(p => p - 1)}
+                disabled={page === 1}
+              >
+                <Text style={styles.pageBtnText}>← Prev</Text>
+              </TouchableOpacity>
+              <Text style={styles.pageInfo}>{page} / {pagination.totalPages}</Text>
+              <TouchableOpacity
+                style={[styles.pageBtn, page === pagination.totalPages && styles.pageBtnDisabled]}
+                onPress={() => setPage(p => p + 1)}
+                disabled={page === pagination.totalPages}
+              >
+                <Text style={styles.pageBtnText}>Next →</Text>
+              </TouchableOpacity>
             </View>
-          }
-        />
+          )}
+        </>
       )}
     </View>
   );
@@ -172,7 +196,6 @@ const styles = StyleSheet.create({
   newBtn: { backgroundColor: Colors.accent, borderRadius: Radius.full, paddingHorizontal: 16, paddingVertical: 7 },
   newBtnText: { fontSize: 13, fontWeight: '700', color: Colors.navy },
 
-  // Search
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface, margin: Spacing.lg,
@@ -182,7 +205,6 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, height: 44, fontSize: 14, color: Colors.text1 },
 
-  // Filters
   filterRow: { flexDirection: 'row', paddingHorizontal: Spacing.lg, gap: 8, marginBottom: Spacing.md },
   filterChip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: Radius.full,
@@ -192,10 +214,8 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, fontWeight: '600', color: Colors.text2 },
   filterTextActive: { color: '#fff' },
 
-  // List
   list: { padding: Spacing.lg, paddingTop: 0, paddingBottom: 40 },
 
-  // Card
   card: {
     backgroundColor: Colors.surface, borderRadius: Radius.lg,
     flexDirection: 'row', marginBottom: 10, overflow: 'hidden',
@@ -215,4 +235,18 @@ const styles = StyleSheet.create({
   date: { fontSize: 11, color: Colors.text3 },
 
   empty: { alignItems: 'center', marginTop: 60 },
+
+  paginationRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 12, paddingVertical: 12, paddingHorizontal: Spacing.lg,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  pageBtn: {
+    paddingHorizontal: 16, paddingVertical: 8,
+    backgroundColor: Colors.blue, borderRadius: Radius.md,
+  },
+  pageBtnDisabled: { backgroundColor: Colors.border },
+  pageBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  pageInfo: { fontSize: 13, color: Colors.text3, fontWeight: '600' },
 });

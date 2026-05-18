@@ -23,8 +23,9 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <div className="tooth">🦷</div>
+          <img src="/logo.png" alt="Ye-Almaz Dental Laboratory" style={{ width: 110, height: 110, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, boxShadow: '0 4px 16px rgba(15,32,68,.15)' }} />
           <h1>Ye-Almaz Dental Lab</h1>
+          <p>Management System</p>
         </div>
 
         <form onSubmit={handleSubmit}>

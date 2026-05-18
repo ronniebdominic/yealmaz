@@ -1,34 +1,22 @@
-import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+
+const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
 
 export default function Dashboard() {
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [notification, setNotification] = useState(null);
   const navigate = useNavigate();
+  const { data: summary, isLoading } = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: fetchSummary,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
-  useEffect(() => {
-    loadSummary();
-    const interval = setInterval(loadSummary, 30000); // refresh every 30s
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadSummary = async () => {
-    try {
-      const res = await api.get('/dashboard/summary');
-      setSummary(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return (
+  if (isLoading) return (
     <Layout>
       <div className="topbar"><div className="topbar-title">Dashboard</div></div>
       <div className="content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
@@ -50,14 +38,6 @@ export default function Dashboard() {
       </div>
 
       <div className="content">
-        {notification && (
-          <div className="notification-banner">
-            🔔 {notification}
-            <button onClick={() => setNotification(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>×</button>
-          </div>
-        )}
-
-        {/* Stats */}
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
@@ -91,7 +71,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Cases */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">Recent Cases</div>

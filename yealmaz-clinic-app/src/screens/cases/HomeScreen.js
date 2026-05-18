@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, StatusBar, ActivityIndicator,
+  RefreshControl, StatusBar, ActivityIndicator, Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
 import { format } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 function StatCard({ value, label, color, icon, onPress }) {
   return (
@@ -56,46 +57,30 @@ function CaseCard({ c, onPress }) {
 
 export default function HomeScreen({ navigation }) {
   const { clinic } = useAuth();
-  const [cases, setCases] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [apiError, setApiError] = useState('');
+  const queryClient = useQueryClient();
 
-  const loadCases = useCallback(async () => {
-    try {
-      setApiError('');
-      const res = await api.get('/cases?limit=50');
-      setCases(res.data.cases || []);
-    } catch (err) {
-      const msg = err.response
-        ? `Server error ${err.response.status}: ${err.response.data?.error || err.response.statusText}`
-        : 'Cannot reach server — check your network and API_BASE in client.js';
-      setApiError(msg);
-      console.error('[HomeScreen] loadCases failed:', msg);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const { data, isLoading, isRefetching, error, refetch } = useQuery({
+    queryKey: ['cases', 'home'],
+    queryFn: () => api.get('/cases?limit=50').then(r => r.data.cases || []),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
 
-  useEffect(() => {
-    loadCases();
-    const interval = setInterval(loadCases, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  const cases = data || [];
+  const refreshing = isRefetching && !isLoading;
 
-  // Reload whenever this screen comes back into focus (e.g. after submitting a new case)
-  useEffect(() => {
-    const unsub = navigation.addListener('focus', loadCases);
+  // Reload whenever this screen comes back into focus
+  React.useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      queryClient.invalidateQueries({ queryKey: ['cases', 'home'] });
+    });
     return unsub;
-  }, [navigation, loadCases]);
+  }, [navigation, queryClient]);
 
-  const onRefresh = () => { setRefreshing(true); loadCases(); };
-
-  const active = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
-  const pending = cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED');
+  const active    = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
+  const pending   = cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED');
   const delivered = cases.filter(c => c.status === 'DELIVERED');
-  const recent = [...cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+  const recent    = [...cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -110,9 +95,12 @@ export default function HomeScreen({ navigation }) {
 
       {/* ── Header ── */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{greeting()},</Text>
-          <Text style={styles.clinicName}>{clinic?.name}</Text>
+        <View style={styles.headerLeft}>
+          <Image source={require('../../../assets/logo.png')} style={styles.headerLogo} />
+          <View>
+            <Text style={styles.greeting}>{greeting()},</Text>
+            <Text style={styles.clinicName}>{clinic?.name}</Text>
+          </View>
         </View>
         <View style={styles.avatarCircle}>
           <Text style={styles.avatarText}>{clinic?.name?.[0]?.toUpperCase() || 'C'}</Text>
@@ -122,14 +110,19 @@ export default function HomeScreen({ navigation }) {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.accent} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refetch}
+            tintColor={Colors.accent}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
-
         {/* ── API Error Banner ── */}
-        {apiError ? (
+        {error ? (
           <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>⚠️ {apiError}</Text>
+            <Text style={styles.errorBannerText}>⚠️ Cannot reach server — check your network.</Text>
           </View>
         ) : null}
 
@@ -171,7 +164,7 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {loading ? (
+        {isLoading ? (
           <ActivityIndicator color={Colors.blue} style={{ marginTop: 40 }} />
         ) : recent.length === 0 ? (
           <View style={styles.emptyState}>
@@ -187,7 +180,6 @@ export default function HomeScreen({ navigation }) {
             <CaseCard key={c.id} c={c} onPress={() => navigation.navigate('CaseDetail', { caseId: c.id })} />
           ))
         )}
-
       </ScrollView>
     </View>
   );
@@ -196,7 +188,6 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
 
-  // Header
   header: {
     backgroundColor: Colors.navy,
     paddingTop: 52, paddingBottom: 20,
@@ -211,11 +202,12 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '800', color: Colors.navy },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerLogo: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)', backgroundColor: '#fff' },
 
   scroll: { flex: 1 },
   scrollContent: { padding: Spacing.lg, paddingBottom: 40 },
 
-  // Stats
   statsRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl },
   statCard: {
     flex: 1, backgroundColor: Colors.surface,
@@ -226,7 +218,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 26, fontWeight: '800', lineHeight: 30 },
   statLabel: { fontSize: 11, fontWeight: '600', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  // Section
   sectionTitle: {
     fontSize: 11, fontWeight: '700', color: Colors.text3,
     letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10,
@@ -234,7 +225,6 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   seeAll: { fontSize: 13, color: Colors.blue, fontWeight: '600' },
 
-  // Actions
   actionsRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl },
   actionBtn: {
     flex: 1, borderRadius: Radius.lg, padding: Spacing.lg,
@@ -243,7 +233,6 @@ const styles = StyleSheet.create({
   actionIcon: { fontSize: 24 },
   actionLabel: { fontSize: 12, fontWeight: '700', color: '#fff', textAlign: 'center' },
 
-  // Case card
   caseCard: {
     backgroundColor: Colors.surface, borderRadius: Radius.lg,
     flexDirection: 'row', marginBottom: 10, overflow: 'hidden',
@@ -266,7 +255,6 @@ const styles = StyleSheet.create({
   overdueText: { fontSize: 10, fontWeight: '600', color: Colors.red },
   dueDate: { fontSize: 11, color: Colors.text3 },
 
-  // Error banner
   errorBanner: {
     backgroundColor: '#3d1a1a', borderRadius: Radius.md,
     padding: Spacing.md, marginBottom: Spacing.lg,
@@ -274,7 +262,6 @@ const styles = StyleSheet.create({
   },
   errorBannerText: { fontSize: 12, color: '#ef9a9a', lineHeight: 17 },
 
-  // Empty
   emptyState: { alignItems: 'center', paddingVertical: 48 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.text1, marginBottom: 6 },

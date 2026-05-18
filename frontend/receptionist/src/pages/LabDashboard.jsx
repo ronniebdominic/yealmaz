@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
@@ -241,8 +242,6 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department }) {
 export default function LabDashboard() {
   const { user, logout } = useAuth();
   const [department, setDepartment] = useState('');
-  const [activeCases, setActiveCases] = useState([]);
-  const [loadingCases, setLoadingCases] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -251,21 +250,16 @@ export default function LabDashboard() {
   const [tab, setTab] = useState('scan'); // scan | queue
 
   const selectedDept = DEPARTMENTS.find(d => d.code === department);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (department) loadActiveCases();
-    const interval = setInterval(() => { if (department) loadActiveCases(); }, 30000);
-    return () => clearInterval(interval);
-  }, [department]);
-
-  const loadActiveCases = async () => {
-    setLoadingCases(true);
-    try {
-      const res = await api.get('/lab/active');
-      setActiveCases(res.data);
-    } catch (err) { console.error(err); }
-    finally { setLoadingCases(false); }
-  };
+  const { data: labData, isFetching: loadingCases } = useQuery({
+    queryKey: ['lab', 'active'],
+    queryFn: () => api.get('/lab/active').then(r => r.data.cases ?? r.data),
+    enabled: !!department,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const activeCases = labData || [];
 
   const handleScan = async (caseId) => {
     setShowScanner(false);
@@ -293,7 +287,7 @@ export default function LabDashboard() {
       toast.success(`✅ ${res.data.statusLabel} — logged successfully!`);
       setRecentScans(prev => [{ ...scanResult, dept: selectedDept?.label, scannedAt: new Date(), newStatus: res.data.newStatus }, ...prev.slice(0, 9)]);
       setScanResult(null);
-      loadActiveCases();
+      queryClient.invalidateQueries({ queryKey: ['lab', 'active'] });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Scan failed');
     } finally {

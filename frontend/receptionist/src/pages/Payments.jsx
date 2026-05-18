@@ -1,49 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Layout from '../components/Layout';
 import { PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import CaseDetailModal from '../components/CaseDetailModal';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const fetchPending = () => api.get('/payments/pending').then(r => r.data.payments ?? r.data);
 
 export default function Payments() {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCase, setSelectedCase] = useState(null);
   const [processing, setProcessing] = useState(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadPayments();
-  }, []);
+  const { data: payments = [], isLoading } = useQuery({
+    queryKey: ['payments', 'pending'],
+    queryFn: fetchPending,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
 
-  const loadPayments = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/payments/pending');
-      setPayments(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const verifyMutation = useMutation({
+    mutationFn: ({ caseId, action, rejectionReason }) =>
+      api.post(`/payments/${caseId}/verify`, { action, rejectionReason }),
+    onSuccess: (_, { action }) => {
+      toast.success(action === 'APPROVE' ? '✅ Payment approved! Case ready to dispatch.' : '❌ Payment rejected.');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+    },
+    onError: () => toast.error('Action failed. Please try again.'),
+    onSettled: () => setProcessing(null),
+  });
 
-  const verify = async (caseId, action) => {
+  const verify = (caseId, action) => {
     let rejectionReason;
     if (action === 'REJECT') {
       rejectionReason = prompt('Reason for rejection (will be sent to clinic):');
       if (!rejectionReason) return;
     }
     setProcessing(caseId + action);
-    try {
-      await api.post(`/payments/${caseId}/verify`, { action, rejectionReason });
-      toast.success(action === 'APPROVE' ? '✅ Payment approved! Case ready to dispatch.' : '❌ Payment rejected.');
-      loadPayments();
-    } catch (err) {
-      toast.error('Action failed. Please try again.');
-    } finally {
-      setProcessing(null);
-    }
+    verifyMutation.mutate({ caseId, action, rejectionReason });
   };
 
   return (
@@ -56,7 +54,7 @@ export default function Payments() {
       </div>
 
       <div className="content">
-        {loading ? (
+        {isLoading ? (
           <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '60px' }}>Loading…</div>
         ) : payments.length === 0 ? (
           <div className="empty-state">
@@ -69,7 +67,6 @@ export default function Payments() {
             {payments.map(p => (
               <div className="card" key={p.id} style={{ overflow: 'hidden' }}>
                 <div style={{ display: 'flex', gap: '0' }}>
-                  {/* Screenshot preview */}
                   <div style={{ width: '180px', flexShrink: 0, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
                     {p.screenshotUrl ? (
                       <img
@@ -82,8 +79,6 @@ export default function Payments() {
                       <div style={{ color: 'var(--text-3)', textAlign: 'center', fontSize: '12px' }}>No image</div>
                     )}
                   </div>
-
-                  {/* Info */}
                   <div style={{ flex: 1, padding: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
                       <div>
@@ -94,7 +89,6 @@ export default function Payments() {
                       </div>
                       <PaymentBadge status={p.status} />
                     </div>
-
                     <div className="grid-2" style={{ marginBottom: '16px' }}>
                       <div style={{ fontSize: '13px' }}>
                         <span style={{ color: 'var(--text-3)' }}>Clinic: </span>
@@ -112,7 +106,6 @@ export default function Payments() {
                         Uploaded: {p.uploadedAt ? format(new Date(p.uploadedAt), 'dd MMM, h:mm a') : '—'}
                       </div>
                     </div>
-
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <button
                         className="btn btn-success"
@@ -146,7 +139,10 @@ export default function Payments() {
       {selectedCase && (
         <CaseDetailModal
           caseId={selectedCase.id}
-          onClose={() => { setSelectedCase(null); loadPayments(); }}
+          onClose={() => {
+            setSelectedCase(null);
+            queryClient.invalidateQueries({ queryKey: ['payments'] });
+          }}
         />
       )}
     </Layout>

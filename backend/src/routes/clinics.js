@@ -1,17 +1,23 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect } = require('../middleware/auth');
+const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 router.get('/', protect, async (req, res) => {
+  const cacheKey = 'clinics';
+  const cached = appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
     const clinics = await prisma.clinic.findMany({
       where: { isActive: true },
       select: { id: true, name: true, phone: true, address: true },
       orderBy: { name: 'asc' }
     });
+    appCache.set(cacheKey, clinics, 3600);
     res.json(clinics);
   } catch (err) {
     console.error(err);

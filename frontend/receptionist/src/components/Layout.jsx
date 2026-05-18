@@ -16,7 +16,7 @@ export default function Layout({ children, pendingPayments = 0, newCases = 0 }) 
       {/* ── Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <div className="tooth">🦷</div>
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
           <span className="role-badge">Receptionist</span>
         </div>
@@ -49,6 +49,8 @@ export default function Layout({ children, pendingPayments = 0, newCases = 0 }) 
           <button className={active('/delivery')} onClick={() => nav('/delivery')}>
             <span>🚚</span> Ready to Dispatch
           </button>
+
+
         </nav>
 
         <div className="sidebar-footer">

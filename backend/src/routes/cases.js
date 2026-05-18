@@ -3,11 +3,11 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
+const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Helper: generate case number e.g. YAL-2024-0042
 async function generateCaseNumber() {
   const year = new Date().getFullYear();
   const count = await prisma.case.count();
@@ -16,19 +16,13 @@ async function generateCaseNumber() {
 }
 
 // ── GET /api/cases ───────────────────────────────────────
-// Admin & Receptionist: all cases | Clinic: their own cases
 router.get('/', protect, async (req, res) => {
   try {
     const { status, paymentStatus, search, page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
-
-    // Clinics only see their own cases
-    if (req.user.role === 'CLINIC') {
-      where.clinicId = req.user.id;
-    }
-
+    if (req.user.role === 'CLINIC') where.clinicId = req.user.id;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
     if (search) {
@@ -38,6 +32,10 @@ router.get('/', protect, async (req, res) => {
         { workType: { contains: search, mode: 'insensitive' } }
       ];
     }
+
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, page, limit })}`;
+    const cached = appCache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     const [cases, total] = await Promise.all([
       prisma.case.findMany({
@@ -54,7 +52,7 @@ router.get('/', protect, async (req, res) => {
       prisma.case.count({ where })
     ]);
 
-    res.json({
+    const result = {
       cases,
       pagination: {
         total,
@@ -62,7 +60,10 @@ router.get('/', protect, async (req, res) => {
         limit: parseInt(limit),
         totalPages: Math.ceil(total / parseInt(limit))
       }
-    });
+    };
+
+    appCache.set(cacheKey, result, 30);
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch cases.' });
@@ -72,6 +73,15 @@ router.get('/', protect, async (req, res) => {
 // ── GET /api/cases/:id ───────────────────────────────────
 router.get('/:id', protect, async (req, res) => {
   try {
+    const cacheKey = `case:${req.params.id}`;
+    const cached = appCache.get(cacheKey);
+    if (cached) {
+      if (req.user.role === 'CLINIC' && cached.clinicId !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      return res.json(cached);
+    }
+
     const caseData = await prisma.case.findUnique({
       where: { id: req.params.id },
       include: {
@@ -83,12 +93,11 @@ router.get('/:id', protect, async (req, res) => {
     });
 
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
-
-    // Clinics can only see their own cases
     if (req.user.role === 'CLINIC' && caseData.clinicId !== req.user.id) {
       return res.status(403).json({ error: 'Access denied.' });
     }
 
+    appCache.set(cacheKey, caseData, 30);
     res.json(caseData);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch case.' });
@@ -96,12 +105,11 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // ── POST /api/cases ──────────────────────────────────────
-// Clinic creates a new case
 router.post('/', protect, async (req, res) => {
   try {
     const {
       patientName, patientAge, doctorName, workType,
-      toothNumbers, shade, notes, dueDate, totalAmount
+      toothNumbers, shade, notes, dueDate, totalAmount, deliveryType
     } = req.body;
 
     if (!patientName || !workType) {
@@ -110,10 +118,8 @@ router.post('/', protect, async (req, res) => {
 
     const caseNumber = await generateCaseNumber();
     const clinicId = req.user.role === 'CLINIC' ? req.user.id : req.body.clinicId;
-
     if (!clinicId) return res.status(400).json({ error: 'Clinic ID is required.' });
 
-    // Create case first to get the ID
     const newCase = await prisma.case.create({
       data: {
         caseNumber,
@@ -126,27 +132,24 @@ router.post('/', protect, async (req, res) => {
         notes,
         dueDate: dueDate ? new Date(dueDate) : null,
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+        deliveryType: deliveryType === 'EXPRESS' ? 'EXPRESS' : 'NORMAL',
         clinicId,
         status: 'CASE_ACCEPTED'
       }
     });
 
-    // Generate QR code pointing to scan endpoint
     const qrData = `${process.env.APP_URL}/api/scan/${newCase.id}`;
     const qrCodeUrl = await QRCode.toDataURL(qrData, {
-      width: 300,
-      margin: 2,
+      width: 300, margin: 2,
       color: { dark: '#1A56A0', light: '#FFFFFF' }
     });
 
-    // Update case with QR code
     const updatedCase = await prisma.case.update({
       where: { id: newCase.id },
       data: { qrCodeUrl, qrCodeData: qrData },
       include: { clinic: { select: { name: true } } }
     });
 
-    // Create initial stage record
     await prisma.caseStage.create({
       data: {
         caseId: newCase.id,
@@ -156,12 +159,13 @@ router.post('/', protect, async (req, res) => {
       }
     });
 
-    // Create initial payment record
     await prisma.payment.create({
       data: { caseId: newCase.id, status: 'PENDING', amount: totalAmount ? parseFloat(totalAmount) : null }
     });
 
-    // Notify lab staff via socket
+    // Invalidate list caches (single case is fresh so no need to bust it)
+    invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
+
     const io = req.app.get('io');
     io.to('lab_staff').emit('new_case', {
       caseId: updatedCase.id,
@@ -179,7 +183,6 @@ router.post('/', protect, async (req, res) => {
 });
 
 // ── PATCH /api/cases/:id/status ──────────────────────────
-// Receptionist / Admin updates case status
 router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
     const { status, notes } = req.body;
@@ -189,7 +192,6 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (r
       data: { status }
     });
 
-    // Log the stage change
     await prisma.caseStage.create({
       data: {
         caseId: req.params.id,
@@ -199,17 +201,14 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (r
       }
     });
 
-    // Notify clinic and lab staff
+    invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'lab:active');
+
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', {
-      caseId: updated.id,
-      caseNumber: updated.caseNumber,
-      status: updated.status
+      caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status
     });
     io.to('lab_staff').emit('case_updated', {
-      caseId: updated.id,
-      caseNumber: updated.caseNumber,
-      status: updated.status
+      caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status
     });
 
     res.json(updated);
