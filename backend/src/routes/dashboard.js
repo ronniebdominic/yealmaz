@@ -2,7 +2,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
-const { appCache } = require('../cache');
+const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // ── GET /api/dashboard/summary ───────────────────────────
 router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   const cacheKey = 'dashboard:summary';
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -44,7 +44,7 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
       recentCases
     };
 
-    appCache.set(cacheKey, result, 60);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     console.error(err);
@@ -55,7 +55,7 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
 // ── GET /api/dashboard/revenue ───────────────────────────
 router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
   const cacheKey = 'dashboard:revenue';
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -85,7 +85,7 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
       cases: results[i]._count,
     }));
 
-    appCache.set(cacheKey, months, 3600);
+    await appCache.set(cacheKey, months);
     res.json(months);
   } catch (err) {
     res.status(500).json({ error: 'Could not load revenue data.' });
@@ -95,7 +95,7 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
 // ── GET /api/dashboard/cases-by-status ──────────────────
 router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   const cacheKey = 'dashboard:cases-by-status';
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -117,7 +117,7 @@ router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async
       }))
     );
 
-    appCache.set(cacheKey, counts, 120);
+    await appCache.set(cacheKey, counts);
     res.json(counts);
   } catch (err) {
     res.status(500).json({ error: 'Could not load case stats.' });
@@ -129,7 +129,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
   try {
     const { from, to, clinicId } = req.query;
     const cacheKey = `dashboard:analytics:${from || ''}:${to || ''}:${clinicId || ''}`;
-    const cached = appCache.get(cacheKey);
+    const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
     const dateTo = to ? new Date(to) : new Date();
@@ -231,7 +231,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       clinicList: allClinics,
     };
 
-    appCache.set(cacheKey, result, 1800);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     console.error('[admin-analytics]', err);

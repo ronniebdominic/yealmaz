@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 
 router.get('/', protect, async (req, res) => {
   const cacheKey = 'clinics';
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -17,7 +17,7 @@ router.get('/', protect, async (req, res) => {
       select: { id: true, name: true, phone: true, address: true },
       orderBy: { name: 'asc' }
     });
-    appCache.set(cacheKey, clinics, 3600);
+    await appCache.set(cacheKey, clinics);
     res.json(clinics);
   } catch (err) {
     console.error(err);

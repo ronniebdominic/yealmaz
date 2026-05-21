@@ -8,14 +8,14 @@ const prisma = new PrismaClient();
 // GET /api/prices
 router.get('/', async (req, res) => {
   try {
-    const cached = appCache.get('prices');
+    const cached = await appCache.get('prices');
     if (cached) return res.json(cached);
 
     const prices = await prisma.workTypePrice.findMany({
       orderBy: { workType: 'asc' },
     });
 
-    appCache.set('prices', prices, 3600);
+    await appCache.set('prices', prices);
     res.json(prices);
   } catch (err) {
     console.error(err);
@@ -41,7 +41,7 @@ router.put('/', async (req, res) => {
       )
     );
 
-    invalidate('prices');
+    await invalidate('prices');
 
     const prices = await prisma.workTypePrice.findMany({ orderBy: { workType: 'asc' } });
     res.json(prices);

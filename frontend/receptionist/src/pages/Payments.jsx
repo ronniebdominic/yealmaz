@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
@@ -6,12 +6,16 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import CaseDetailModal from '../components/CaseDetailModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Pagination from '../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const fetchPending = () => api.get('/payments/pending').then(r => r.data.payments ?? r.data);
 
 export default function Payments() {
   const [selectedCase, setSelectedCase] = useState(null);
   const [processing, setProcessing] = useState(null);
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: payments = [], isLoading } = useQuery({
@@ -20,6 +24,12 @@ export default function Payments() {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+
+  const totalPages = Math.ceil(payments.length / PAGE_SIZE);
+  const paginated  = useMemo(
+    () => payments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [payments, page]
+  );
 
   const verifyMutation = useMutation({
     mutationFn: ({ caseId, action, rejectionReason }) =>
@@ -64,7 +74,7 @@ export default function Payments() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {payments.map(p => (
+            {paginated.map(p => (
               <div className="card" key={p.id} style={{ overflow: 'hidden' }}>
                 <div style={{ display: 'flex', gap: '0' }}>
                   <div style={{ width: '180px', flexShrink: 0, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
@@ -132,6 +142,12 @@ export default function Payments() {
                 </div>
               </div>
             ))}
+            <Pagination
+              page={page} totalPages={totalPages}
+              total={payments.length} pageSize={PAGE_SIZE}
+              onPrev={() => setPage(p => p - 1)}
+              onNext={() => setPage(p => p + 1)}
+            />
           </div>
         )}
       </div>

@@ -71,7 +71,7 @@ export default function DeliveryDashboard() {
   const loadCases = async () => {
     try {
       const res = await api.get('/delivery/assigned');
-      setCases(res.data);
+      setCases(res.data.cases ?? res.data);
     } catch (e) {
       console.error(e);
     } finally {

@@ -70,6 +70,18 @@ app.use('/api/lab',           require('./routes/lab'));
 app.use('/api/scan',          require('./routes/scan'));      // Public QR scan endpoint
 app.use('/api/prices',        require('./routes/prices'));
 
+// ── Cache management (admin only) ───────────────────────
+const { appCache, invalidate } = require('./cache');
+const { protect, restrict }    = require('./middleware/auth');
+app.get('/api/cache/stats', protect, restrict('ADMIN'), (req, res) => {
+  res.json(appCache.getStats());
+});
+app.post('/api/cache/flush', protect, restrict('ADMIN'), async (req, res) => {
+  const patterns = req.body?.patterns || ['*'];
+  await invalidate(...patterns);
+  res.json({ ok: true, flushed: patterns, stats: appCache.getStats() });
+});
+
 // ── Health check ─────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({

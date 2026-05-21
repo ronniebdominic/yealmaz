@@ -3,13 +3,17 @@ import AdminLayout from '../components/AdminLayout';
 import api from '../api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import Pagination from '../components/Pagination';
+
+const PAGE_SIZE = 15;
 
 const INR = (v) => '₹' + Number(v || 0).toLocaleString('en-IN');
 
 export default function AdminPricing() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [edits, setEdits] = useState({});   // { [workType]: newPrice }
+  const [edits, setEdits] = useState({});
+  const [page, setPage] = useState(1);   // { [workType]: newPrice }
 
   const { data: prices = [], isLoading } = useQuery({
     queryKey: ['prices'],
@@ -29,10 +33,15 @@ export default function AdminPricing() {
     },
   });
 
-  const filtered = useMemo(() =>
-    prices.filter(p =>
+  const filtered = useMemo(() => {
+    setPage(1);
+    return prices.filter(p =>
       p.workType.toLowerCase().includes(search.toLowerCase())
-    ), [prices, search]);
+    );
+  }, [prices, search]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const dirtyCount = Object.keys(edits).length;
 
@@ -107,6 +116,7 @@ export default function AdminPricing() {
             />
             <span style={{ fontSize: 13, color: 'var(--text-3)', marginLeft: 'auto' }}>
               {filtered.length} of {prices.length} work types
+              {search && ` matching "${search}"`}
             </span>
           </div>
         </div>
@@ -130,16 +140,17 @@ export default function AdminPricing() {
                       Loading prices…
                     </td>
                   </tr>
-                ) : filtered.length === 0 ? (
+                ) : paginated.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="empty-state">No work types match your search</td>
                   </tr>
-                ) : filtered.map((p, i) => {
+                ) : paginated.map((p, i) => {
                   const dirty = isDirty(p.workType);
                   const currentVal = getPrice(p);
+                  const globalIdx = (page - 1) * PAGE_SIZE + i;
                   return (
                     <tr key={p.workType} style={dirty ? { background: 'rgba(240,165,0,0.05)' } : {}}>
-                      <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{i + 1}</td>
+                      <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{globalIdx + 1}</td>
                       <td>
                         <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{p.workType}</span>
                       </td>
@@ -184,6 +195,12 @@ export default function AdminPricing() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              page={page} totalPages={totalPages}
+              total={filtered.length} pageSize={PAGE_SIZE}
+              onPrev={() => setPage(p => p - 1)}
+              onNext={() => setPage(p => p + 1)}
+            />
           </div>
         </div>
       </div>

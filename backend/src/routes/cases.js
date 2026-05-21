@@ -34,7 +34,7 @@ router.get('/', protect, async (req, res) => {
     }
 
     const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, page, limit })}`;
-    const cached = appCache.get(cacheKey);
+    const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
     const [cases, total] = await Promise.all([
@@ -62,7 +62,7 @@ router.get('/', protect, async (req, res) => {
       }
     };
 
-    appCache.set(cacheKey, result, 30);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     console.error(err);
@@ -74,7 +74,7 @@ router.get('/', protect, async (req, res) => {
 router.get('/:id', protect, async (req, res) => {
   try {
     const cacheKey = `case:${req.params.id}`;
-    const cached = appCache.get(cacheKey);
+    const cached = await appCache.get(cacheKey);
     if (cached) {
       if (req.user.role === 'CLINIC' && cached.clinicId !== req.user.id) {
         return res.status(403).json({ error: 'Access denied.' });
@@ -97,7 +97,7 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(403).json({ error: 'Access denied.' });
     }
 
-    appCache.set(cacheKey, caseData, 30);
+    await appCache.set(cacheKey, caseData);
     res.json(caseData);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch case.' });
@@ -163,8 +163,7 @@ router.post('/', protect, async (req, res) => {
       data: { caseId: newCase.id, status: 'PENDING', amount: totalAmount ? parseFloat(totalAmount) : null }
     });
 
-    // Invalidate list caches (single case is fresh so no need to bust it)
-    invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
+    await invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('new_case', {

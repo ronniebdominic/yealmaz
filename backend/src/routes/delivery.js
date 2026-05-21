@@ -12,7 +12,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `delivery:assigned:${page}:${limit}`;
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -42,7 +42,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     ]);
 
     const result = { cases, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } };
-    appCache.set(cacheKey, result, 60);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch delivery cases.' });
@@ -66,7 +66,7 @@ router.post('/:caseId/pickup', protect, restrict('DELIVERY', 'ADMIN'), async (re
       data: { caseId: req.params.caseId, stageName: 'OUT_FOR_DELIVERY', scannedBy: req.user.name, notes: 'Picked up for delivery' }
     });
 
-    invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dashboard:summary');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to(`clinic_${caseData.clinicId}`).emit('case_updated', {
@@ -96,7 +96,7 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
 
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
 
-    invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${caseData.clinicId}`).emit('case_updated', {

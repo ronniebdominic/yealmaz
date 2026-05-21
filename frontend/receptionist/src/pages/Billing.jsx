@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Pagination from '../components/Pagination';
+
+const PAGE_SIZE = 15;
 
 const fetchBilling = () => api.get('/payments/billing').then(r => r.data.cases ?? r.data);
 
@@ -341,7 +344,10 @@ export default function Billing() {
   const [issueModal, setIssueModal] = useState(null);
   const [viewModal, setViewModal]   = useState(null);
   const [processing, setProcessing] = useState(null);
+  const [page, setPage]             = useState(1);
   const queryClient = useQueryClient();
+
+  const changeTab = (t) => { setTab(t); setPage(1); };
 
   const { data: cases = [], isLoading: loading } = useQuery({
     queryKey: ['payments', 'billing'],
@@ -380,6 +386,11 @@ export default function Billing() {
 
   const buckets = { 'to-invoice': toInvoice, awaiting, uploaded, verified };
   const shown   = buckets[tab] || [];
+  const totalPages = Math.ceil(shown.length / PAGE_SIZE);
+  const paginated  = useMemo(
+    () => shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [shown, page]
+  );
 
   const counts = { 'to-invoice': toInvoice.length, awaiting: awaiting.length, uploaded: uploaded.length, verified: verified.length };
 
@@ -396,7 +407,7 @@ export default function Billing() {
         {/* Tabs */}
         <div className="filters" style={{ marginBottom: 20 }}>
           {TABS.map(t => (
-            <button key={t.id} className={`filter-chip ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            <button key={t.id} className={`filter-chip ${tab === t.id ? 'active' : ''}`} onClick={() => changeTab(t.id)}>
               {t.icon} {t.label}
               {counts[t.id] > 0 && <span className="badge-count">{counts[t.id]}</span>}
             </button>
@@ -438,7 +449,7 @@ export default function Billing() {
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map(c => (
+                  {paginated.map(c => (
                     <tr key={c.id}>
                       <td>
                         <span className="case-number">{c.caseNumber}</span>
@@ -510,6 +521,12 @@ export default function Billing() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                page={page} totalPages={totalPages}
+                total={shown.length} pageSize={PAGE_SIZE}
+                onPrev={() => setPage(p => p - 1)}
+                onNext={() => setPage(p => p + 1)}
+              />
             </div>
           </div>
         )}

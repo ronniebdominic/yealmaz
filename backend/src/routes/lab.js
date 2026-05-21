@@ -12,7 +12,7 @@ router.get('/active', protect, async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `lab:active:${page}:${limit}`;
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -31,7 +31,7 @@ router.get('/active', protect, async (req, res) => {
     ]);
 
     const result = { cases, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } };
-    appCache.set(cacheKey, result, 30);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     console.error(err);
@@ -42,7 +42,7 @@ router.get('/active', protect, async (req, res) => {
 // GET /api/lab/case/:caseId — case details for QR scan result
 router.get('/case/:caseId', protect, async (req, res) => {
   const cacheKey = `case:lab:${req.params.caseId}`;
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -54,7 +54,7 @@ router.get('/case/:caseId', protect, async (req, res) => {
       }
     });
     if (!c) return res.status(404).json({ error: 'Case not found.' });
-    appCache.set(cacheKey, c, 30);
+    await appCache.set(cacheKey, c);
     res.json(c);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch case.' });

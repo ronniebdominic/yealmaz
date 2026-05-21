@@ -1,17 +1,27 @@
+import { useState, useMemo } from 'react';
 import Layout from '../components/Layout';
 import api from '../api';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
+import Pagination from '../components/Pagination';
 
+const PAGE_SIZE = 15;
 const fetchAssigned = () => api.get('/delivery/assigned').then(r => r.data.cases ?? r.data);
 
 export default function Delivery() {
+  const [page, setPage] = useState(1);
   const { data: cases = [], isLoading } = useQuery({
     queryKey: ['delivery', 'assigned'],
     queryFn: fetchAssigned,
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
+
+  const totalPages = Math.ceil(cases.length / PAGE_SIZE);
+  const paginated  = useMemo(
+    () => cases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [cases, page]
+  );
 
   return (
     <Layout>
@@ -47,7 +57,7 @@ export default function Delivery() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cases.map(c => (
+                  {paginated.map(c => (
                     <tr key={c.id}>
                       <td><span className="case-number">{c.caseNumber}</span></td>
                       <td><span className="patient-name">{c.patientName}</span></td>
@@ -62,6 +72,12 @@ export default function Delivery() {
                   ))}
                 </tbody>
               </table>
+              <Pagination
+                page={page} totalPages={totalPages}
+                total={cases.length} pageSize={PAGE_SIZE}
+                onPrev={() => setPage(p => p - 1)}
+                onNext={() => setPage(p => p + 1)}
+              />
             </div>
           </div>
         )}

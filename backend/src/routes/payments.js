@@ -52,7 +52,7 @@ router.post('/:caseId/upload', protect, upload.single('screenshot'), async (req,
       data: { paymentStatus: 'SCREENSHOT_UPLOADED' }
     });
 
-    invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('payment_uploaded', {
@@ -109,7 +109,7 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST'), async
       });
     }
 
-    invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${updatedCase.clinicId}`).emit('payment_verified', {
@@ -134,13 +134,13 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:billing:${page}:${limit}`;
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
     const where = {
       OR: [
-        { status: 'PAYMENT_INVOICING' },
+        { status: { in: ['PAYMENT_INVOICING'] } },
         { totalAmount: { not: null }, paymentStatus: { in: ['PENDING', 'SCREENSHOT_UPLOADED', 'REJECTED'] } }
       ]
     };
@@ -160,7 +160,7 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
     ]);
 
     const result = { cases, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } };
-    appCache.set(cacheKey, result, 60);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     console.error(err);
@@ -195,7 +195,7 @@ router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST'), asyn
       data: { totalAmount: parseFloat(amount) }
     });
 
-    invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${caseData.clinic.id}`).emit('invoice_issued', {
@@ -219,7 +219,7 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:pending:${page}:${limit}`;
-  const cached = appCache.get(cacheKey);
+  const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
@@ -236,7 +236,7 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
     ]);
 
     const result = { payments, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } };
-    appCache.set(cacheKey, result, 30);
+    await appCache.set(cacheKey, result);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch pending payments.' });
