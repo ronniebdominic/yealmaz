@@ -18,7 +18,7 @@ export default function Layout({ children, pendingPayments = 0, newCases = 0 }) 
         <div className="sidebar-logo">
           <img src="/logo.png" alt="Ye-Almaz" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge">Receptionist</span>
+          <span className="role-badge">{user?.role === 'ADMIN' ? 'Admin' : 'Receptionist'}</span>
         </div>
 
         <nav className="sidebar-nav">
@@ -50,7 +50,17 @@ export default function Layout({ children, pendingPayments = 0, newCases = 0 }) 
             <span>🚚</span> Ready to Dispatch
           </button>
 
-
+          {user?.role === 'ADMIN' && (
+            <>
+              <div className="nav-section-label">Admin</div>
+              <button className={active('/admin')} onClick={() => nav('/admin')}>
+                <span>📊</span> Analytics Dashboard
+              </button>
+              <button className={active('/admin/pricing')} onClick={() => nav('/admin/pricing')}>
+                <span>💰</span> Work Type Pricing
+              </button>
+            </>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -58,7 +68,7 @@ export default function Layout({ children, pendingPayments = 0, newCases = 0 }) 
             <div className="user-avatar">{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
-              <div className="user-role">Receptionist</div>
+              <div className="user-role">{user?.role === 'ADMIN' ? 'Administrator' : 'Receptionist'}</div>
             </div>
             <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
           </div>
