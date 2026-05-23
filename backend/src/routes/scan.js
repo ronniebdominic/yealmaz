@@ -238,7 +238,7 @@ router.get('/:caseId', async (req, res) => {
           </div>
           <div class="recent">
             <strong>Recent Activity</strong>
-            ${caseData.stages.map(s => `<div class="r-item"><span>${STAGE_LABELS[s.stageName]}</span><span>${new Date(s.scannedAt).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>`).join('')}
+            ${caseData.stages.map(s => `<div class="r-item"><span>${STAGE_LABELS[s.stageName]}</span><span>${new Date(s.scannedAt).toLocaleString('en-US',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span></div>`).join('')}
           </div>
         </div>
       </body>

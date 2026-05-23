@@ -8,7 +8,7 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 // ── GET /api/dashboard/summary ───────────────────────────
-router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   const cacheKey = 'dashboard:summary';
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
@@ -65,7 +65,7 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
       return {
         start: new Date(d.getFullYear(), d.getMonth(), 1),
         end: new Date(d.getFullYear(), d.getMonth() + 1, 0),
-        label: new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+        label: new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
       };
     });
 
@@ -145,7 +145,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       const end   = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
       trendBuckets.push({
         start, end,
-        label: start.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+        label: start.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
         revenue: 0, cases: 0,
       });
     }

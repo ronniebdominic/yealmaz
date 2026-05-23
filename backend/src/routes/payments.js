@@ -70,7 +70,7 @@ router.post('/:caseId/upload', protect, upload.single('screenshot'), async (req,
 });
 
 // ── POST /api/payments/:caseId/verify ───────────────────
-router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   try {
     const { action, rejectionReason } = req.body;
     if (!['APPROVE', 'REJECT'].includes(action)) {
@@ -130,7 +130,7 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST'), async
 });
 
 // ── GET /api/payments/billing ────────────────────────────
-router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:billing:${page}:${limit}`;
@@ -169,7 +169,7 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
 });
 
 // ── POST /api/payments/:caseId/invoice ───────────────────
-router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   try {
     const { amount, notes } = req.body;
     if (!amount || parseFloat(amount) <= 0) {
@@ -204,7 +204,7 @@ router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST'), asyn
       patientName: caseData.patientName,
       invoiceNumber,
       amount: parseFloat(amount),
-      message: `Invoice issued: ₹${parseFloat(amount).toLocaleString('en-IN')}`
+      message: `Invoice issued: Br ${parseFloat(amount).toLocaleString('en-US')}`
     });
 
     res.json({ success: true, payment });
@@ -214,8 +214,141 @@ router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST'), asyn
   }
 });
 
+// ── POST /api/payments/:caseId/collect ──────────────────
+// Admin manually marks payment as collected (cash, bank transfer, etc.) — no screenshot needed
+router.post('/:caseId/collect', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { amount, notes } = req.body;
+
+    const caseData = await prisma.case.findUnique({
+      where: { id: req.params.caseId },
+      include: { clinic: { select: { id: true, name: true } } }
+    });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    const paymentData = {
+      status: 'VERIFIED',
+      verifiedById: req.user.id,
+      verifiedAt: new Date(),
+      rejectionReason: null,
+    };
+    if (amount) paymentData.amount = parseFloat(amount);
+    if (notes)  paymentData.invoiceNotes = notes;
+
+    const payment = await prisma.payment.upsert({
+      where:  { caseId: req.params.caseId },
+      update: paymentData,
+      create: { caseId: req.params.caseId, ...paymentData }
+    });
+
+    const caseUpdate = { paymentStatus: 'VERIFIED' };
+    if (amount) caseUpdate.totalAmount = parseFloat(amount);
+
+    await prisma.case.update({ where: { id: req.params.caseId }, data: caseUpdate });
+
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+
+    const io = req.app.get('io');
+    io.to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
+      caseId: caseData.id,
+      caseNumber: caseData.caseNumber,
+      action: 'APPROVE',
+      message: 'Payment has been confirmed by the lab.'
+    });
+
+    res.json({ success: true, payment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not collect payment.' });
+  }
+});
+
+// ── POST /api/payments/:caseId/override ─────────────────
+// Admin force-sets payment status to any value with a mandatory reason (audit-logged)
+router.post('/:caseId/override', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { status, amount, reason } = req.body;
+
+    const VALID = ['PENDING', 'VERIFIED', 'REJECTED'];
+    if (!status || !VALID.includes(status)) {
+      return res.status(400).json({ error: `Status must be one of: ${VALID.join(', ')}.` });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A reason is required for payment overrides.' });
+    }
+
+    const caseData = await prisma.case.findUnique({
+      where: { id: req.params.caseId },
+      include: { clinic: { select: { id: true, name: true } } }
+    });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    // Build payment patch
+    const paymentPatch = {
+      status,
+      rejectionReason: status === 'REJECTED' ? reason.trim() : null,
+    };
+    if (status === 'VERIFIED') {
+      paymentPatch.verifiedById = req.user.id;
+      paymentPatch.verifiedAt   = new Date();
+    }
+    if (status === 'PENDING') {
+      // Reset verification fields
+      paymentPatch.verifiedById    = null;
+      paymentPatch.verifiedAt      = null;
+      paymentPatch.screenshotUrl   = null;
+      paymentPatch.uploadedAt      = null;
+    }
+    if (amount !== undefined && amount !== null && amount !== '') {
+      paymentPatch.amount = parseFloat(amount);
+    }
+
+    const payment = await prisma.payment.upsert({
+      where:  { caseId: req.params.caseId },
+      update: paymentPatch,
+      create: { caseId: req.params.caseId, ...paymentPatch }
+    });
+
+    const casePatch = { paymentStatus: status };
+    if (amount !== undefined && amount !== null && amount !== '') {
+      casePatch.totalAmount = parseFloat(amount);
+    }
+    await prisma.case.update({ where: { id: req.params.caseId }, data: casePatch });
+
+    // Audit trail — record in case stages so it shows in timeline
+    await prisma.caseStage.create({
+      data: {
+        caseId:    req.params.caseId,
+        stageName: caseData.status,   // keep current stage, just log the note
+        scannedBy: req.user.name,
+        notes: `[PAYMENT OVERRIDE → ${status}] ${reason.trim()}`,
+      }
+    });
+
+    await invalidate(
+      `case:${req.params.caseId}`, 'cases:*', 'payments:*',
+      'dashboard:summary', 'dashboard:analytics:*'
+    );
+
+    const io = req.app.get('io');
+    io.to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
+      caseId:       caseData.id,
+      caseNumber:   caseData.caseNumber,
+      action:       status === 'VERIFIED' ? 'APPROVE' : 'UPDATE',
+      message:      status === 'VERIFIED'
+        ? 'Your payment status has been updated by the lab.'
+        : `Payment status updated to ${status}.`,
+    });
+
+    res.json({ success: true, payment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not override payment.' });
+  }
+});
+
 // ── GET /api/payments/pending ────────────────────────────
-router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:pending:${page}:${limit}`;
@@ -240,6 +373,43 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, r
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch pending payments.' });
+  }
+});
+
+// ── GET /api/payments/history ────────────────────────────
+router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const cacheKey = `payments:history:${page}:${limit}`;
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const where = { status: 'VERIFIED' };
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        include: {
+          case: {
+            include: { clinic: { select: { name: true } } }
+          }
+        },
+        orderBy: { verifiedAt: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.payment.count({ where })
+    ]);
+
+    const result = {
+      payments,
+      pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) }
+    };
+    await appCache.set(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch payment history.' });
   }
 });
 

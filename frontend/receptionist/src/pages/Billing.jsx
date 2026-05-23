@@ -117,11 +117,11 @@ function buildInvoiceHTML(c) {
         ${c.toothNumbers ? 'Teeth: ' + c.toothNumbers + '<br>' : ''}
         ${c.shade ? 'Shade: ' + c.shade : ''}
       </td>
-      <td style="text-align:right;font-weight:700">₹${amount.toLocaleString('en-IN')}</td>
+      <td style="text-align:right;font-weight:700">Br ${amount.toLocaleString('en-US')}</td>
     </tr>
     <tr class="total-row">
       <td colspan="2" style="text-align:right;font-size:14px">Total Amount</td>
-      <td style="text-align:right;color:#1565C0;font-size:18px">₹${amount.toLocaleString('en-IN')}</td>
+      <td style="text-align:right;color:#1565C0;font-size:18px">Br ${amount.toLocaleString('en-US')}</td>
     </tr>
   </tbody>
 </table>
@@ -180,7 +180,7 @@ function IssueInvoiceModal({ caseData, onDone, onClose }) {
           {/* Amount */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-              Invoice Amount (₹) *
+              Invoice Amount (Br) *
             </label>
             <input
               type="number"
@@ -299,11 +299,11 @@ function InvoiceViewModal({ caseData, onClose }) {
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-2)' }}>
                     {[caseData.toothNumbers && `Teeth: ${caseData.toothNumbers}`, caseData.shade && `Shade: ${caseData.shade}`].filter(Boolean).join(' · ') || '—'}
                   </td>
-                  <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 700, fontSize: 14 }}>₹{amount.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 700, fontSize: 14 }}>Br {amount.toLocaleString('en-US')}</td>
                 </tr>
                 <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
                   <td colSpan={2} style={{ padding: '12px 20px', fontWeight: 700, textAlign: 'right' }}>Total</td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 800, fontSize: 18, color: 'var(--blue)' }}>₹{amount.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 800, fontSize: 18, color: 'var(--blue)' }}>Br {amount.toLocaleString('en-US')}</td>
                 </tr>
               </tbody>
             </table>
@@ -471,7 +471,7 @@ export default function Billing() {
                         )}
                       </td>
                       <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>
-                        {c.totalAmount ? `₹${c.totalAmount.toLocaleString('en-IN')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
                       <td>
                         <StatusBadge status={c.status} />

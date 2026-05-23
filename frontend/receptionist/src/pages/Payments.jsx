@@ -106,7 +106,7 @@ export default function Payments() {
                       </div>
                       <div style={{ fontSize: '13px' }}>
                         <span style={{ color: 'var(--text-3)' }}>Amount: </span>
-                        <strong>{p.amount ? `₹${p.amount.toLocaleString('en-IN')}` : '—'}</strong>
+                        <strong>{p.amount ? `Br ${p.amount.toLocaleString('en-US')}` : '—'}</strong>
                       </div>
                       <div style={{ fontSize: '13px' }}>
                         <span style={{ color: 'var(--text-3)' }}>Work: </span>

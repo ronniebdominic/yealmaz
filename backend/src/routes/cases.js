@@ -181,6 +181,33 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
+// ── DELETE /api/cases/:id ────────────────────────────────
+router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    // Cascade delete in dependency order
+    await prisma.$transaction([
+      prisma.caseStage.deleteMany({ where: { caseId: req.params.id } }),
+      prisma.deliveryLog.deleteMany({ where: { caseId: req.params.id } }),
+      prisma.notification.deleteMany({ where: { caseId: req.params.id } }),
+      prisma.payment.deleteMany({ where: { caseId: req.params.id } }),
+      prisma.case.delete({ where: { id: req.params.id } }),
+    ]);
+
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('case_deleted', { caseId: req.params.id, caseNumber: existing.caseNumber });
+
+    res.json({ success: true, message: `Case ${existing.caseNumber} deleted.` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not delete case.' });
+  }
+});
+
 // ── PATCH /api/cases/:id/status ──────────────────────────
 router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {

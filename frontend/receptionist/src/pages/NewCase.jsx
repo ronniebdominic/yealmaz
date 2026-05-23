@@ -323,21 +323,21 @@ export default function NewCase() {
                   <input type="date" value={form.dueDate} onChange={set('dueDate')} />
                 </div>
                 <div className="form-group">
-                  <label>Amount (₹)
+                  <label>Amount (Br)
                     {form.workType && priceMap[form.workType] !== undefined && (
                       FLAT_PRICE_TYPES.has(form.workType) ? (
                         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
                           flat rate —{' '}
                           <strong style={{ color: 'var(--green)' }}>
-                            ₹{priceMap[form.workType].toLocaleString('en-IN')}
+                            Br {priceMap[form.workType].toLocaleString('en-US')}
                           </strong>
                         </span>
                       ) : (
                         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                          ₹{priceMap[form.workType].toLocaleString('en-IN')} × {Math.max(1, selectedTeeth.length)} {selectedTeeth.length > 1 ? 'teeth' : 'tooth'}
+                          Br {priceMap[form.workType].toLocaleString('en-US')} × {Math.max(1, selectedTeeth.length)} {selectedTeeth.length > 1 ? 'teeth' : 'tooth'}
                           {' = '}
                           <strong style={{ color: 'var(--green)' }}>
-                            ₹{(priceMap[form.workType] * Math.max(1, selectedTeeth.length)).toLocaleString('en-IN')}
+                            Br {(priceMap[form.workType] * Math.max(1, selectedTeeth.length)).toLocaleString('en-US')}
                           </strong>
                         </span>
                       )

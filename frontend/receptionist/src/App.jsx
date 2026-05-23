@@ -7,12 +7,12 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPricing from './pages/AdminPricing';
+import AdminCases from './pages/AdminCases';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
-import Payments from './pages/Payments';
-import Billing from './pages/Billing';
 import Delivery from './pages/Delivery';
 import DeliveryDashboard from './pages/DeliveryDashboard';
+import FinanceDashboard from './pages/FinanceDashboard';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -26,12 +26,11 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children, allowedRoles }) {
+function ProtectedRoute({ children, allowedRoles, allowedEmail }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
-  }
+  if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
+  if (allowedEmail && user.email !== allowedEmail) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -40,6 +39,7 @@ function RoleHome() {
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'DELIVERY') return <DeliveryDashboard />;
   if (user.role === 'LAB_TECH') return <LabDashboard />;
+  if (user.role === 'FINANCE') return <FinanceDashboard />;
   if (user.role === 'ADMIN' && user.email === 'admindashboard@yealmaz.com') return <Navigate to="/admin" replace />;
   return <Dashboard />;
 }
@@ -52,11 +52,10 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><RoleHome /></ProtectedRoute>} />
       <Route path="/cases" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Cases /></ProtectedRoute>} />
       <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><NewCase /></ProtectedRoute>} />
-      <Route path="/billing" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Billing /></ProtectedRoute>} />
-      <Route path="/payments" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Payments /></ProtectedRoute>} />
       <Route path="/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Delivery /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboard /></ProtectedRoute>} />
-      <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminPricing /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminPricing /></ProtectedRoute>} />
+      <Route path="/admin/cases" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminCases /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

@@ -28,7 +28,7 @@ export default function Dashboard() {
   const { stats, recentCases } = summary || {};
 
   return (
-    <Layout pendingPayments={stats?.pendingPayments}>
+    <Layout>
       <div className="topbar">
         <div className="topbar-title">Dashboard</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-3)' }}>
@@ -52,15 +52,16 @@ export default function Dashboard() {
             <div className="stat-sub">Active in lab</div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>💳</div>
-            <div className="stat-label">Pending Payments</div>
-            <div className="stat-value" style={{ color: stats?.pendingPayments > 0 ? 'var(--blue)' : 'var(--text-1)' }}>
-              {stats?.pendingPayments ?? '—'}
+            <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>🚚</div>
+            <div className="stat-label">Ready to Dispatch</div>
+            <div className="stat-value" style={{ color: stats?.activeCases > 0 ? 'var(--accent)' : 'var(--text-1)' }}>
+              {stats?.activeCases ?? '—'}
             </div>
             <div className="stat-sub">
-              {stats?.pendingPayments > 0
-                ? <span style={{ color: 'var(--blue)', cursor: 'pointer', fontWeight: 600 }} onClick={() => navigate('/payments')}>Review now →</span>
-                : 'All clear'}
+              <span
+                style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}
+                onClick={() => navigate('/delivery')}
+              >View dispatch →</span>
             </div>
           </div>
           <div className="stat-card">

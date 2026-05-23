@@ -8,7 +8,7 @@ import {
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from 'recharts';
 
-const INR = (v) => '₹' + Number(v || 0).toLocaleString('en-IN');
+const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
 
 const WORK_TYPE_COLORS = [
   '#1A56A0', '#00C4B4', '#F0A500', '#16A34A', '#E53E3E',
@@ -36,7 +36,7 @@ const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
       <div style={{ fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i} style={{ color: p.color || 'var(--blue)' }}>
-          {p.name}: {prefix}{Number(p.value).toLocaleString('en-IN')}
+          {p.name}: {prefix}{Number(p.value).toLocaleString('en-US')}
         </div>
       ))}
     </div>
@@ -71,7 +71,7 @@ export default function AdminDashboard() {
       ['Period', `${fromDate} to ${toDate}`],
       ['Clinic Filter', selectedClinic ? (clinicList?.find(c => c.id === selectedClinic)?.name || selectedClinic) : 'All Clinics'],
       [],
-      ['Total Revenue (₹)', kpi?.totalRevenue ?? 0],
+      ['Total Revenue (Br)', kpi?.totalRevenue ?? 0],
       ['Total Cases', kpi?.totalCases ?? 0],
       ['Active Cases', kpi?.activeCases ?? 0],
       ['Delivered Cases', kpi?.deliveredCases ?? 0],
@@ -80,13 +80,13 @@ export default function AdminDashboard() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
 
     // Sheet 2 — Monthly Trend
-    const trendRows = [['Month', 'Cases', 'Revenue (₹)'],
+    const trendRows = [['Month', 'Cases', 'Revenue (Br)'],
       ...(monthlyTrend || []).map(r => [r.month, r.cases, r.revenue])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(trendRows), 'Monthly Trend');
 
     // Sheet 3 — By Work Type
     const totalRev = (revenueByWorkType || []).reduce((s, r) => s + r.revenue, 0);
-    const workRows = [['#', 'Work Type', 'Cases', 'Revenue (₹)', 'Avg per Case (₹)', 'Share (%)'],
+    const workRows = [['#', 'Work Type', 'Cases', 'Revenue (Br)', 'Avg per Case (Br)', 'Share (%)'],
       ...(revenueByWorkType || []).map((r, i) => [
         i + 1, r.workType, r.count, r.revenue,
         r.count > 0 ? Math.round(r.revenue / r.count) : 0,
@@ -95,7 +95,7 @@ export default function AdminDashboard() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(workRows), 'By Work Type');
 
     // Sheet 4 — By Clinic
-    const clinicRows = [['Clinic', 'Total Cases', 'Paid Cases', 'Revenue (₹)', 'Avg per Paid Case (₹)'],
+    const clinicRows = [['Clinic', 'Total Cases', 'Paid Cases', 'Revenue (Br)', 'Avg per Paid Case (Br)'],
       ...(revenueByClinic || []).map(c => [
         c.name, c.totalCases, c.paidCases, c.revenue,
         c.paidCases > 0 ? Math.round(c.revenue / c.paidCases) : 0,
@@ -184,7 +184,7 @@ export default function AdminDashboard() {
           <>
             {/* ── KPI Cards ── */}
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
-              <KpiCard icon="💰" label="Total Revenue" value={INR(kpi?.totalRevenue)} bg="var(--green-dim)" color="var(--green)" sub="Verified payments" />
+              <KpiCard icon="💰" label="Total Revenue" value={ETB(kpi?.totalRevenue)} bg="var(--green-dim)" color="var(--green)" sub="Verified payments" />
               <KpiCard icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'} bg="#EEF2FF" color="var(--blue)" sub="All time" />
               <KpiCard icon="⚙️" label="Active Cases" value={kpi?.activeCases ?? '—'} bg="var(--amber-dim)" color="var(--amber)" sub="In production" />
               <KpiCard icon="✅" label="Delivered" value={kpi?.deliveredCases ?? '—'} bg="var(--green-dim)" color="var(--green)" sub="Completed" />
@@ -201,8 +201,8 @@ export default function AdminDashboard() {
                   <BarChart data={monthlyTrend} margin={{ top: 4, right: 16, left: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-3)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} tickFormatter={v => '₹' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
-                    <Tooltip content={<CustomTooltip prefix="₹" />} />
+                    <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
+                    <Tooltip content={<CustomTooltip prefix="Br " />} />
                     <Bar dataKey="revenue" name="Revenue" fill="var(--blue)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -243,10 +243,10 @@ export default function AdminDashboard() {
                         margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                         <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-3)' }}
-                          tickFormatter={v => '₹' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
+                          tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
                         <YAxis type="category" dataKey="workType" width={110}
                           tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                        <Tooltip content={<CustomTooltip prefix="₹" />} />
+                        <Tooltip content={<CustomTooltip prefix="Br " />} />
                         <Bar dataKey="revenue" name="Revenue" radius={[0, 4, 4, 0]}>
                           {revenueByWorkType?.map((_, i) => (
                             <Cell key={i} fill={WORK_TYPE_COLORS[i % WORK_TYPE_COLORS.length]} />
@@ -333,9 +333,9 @@ export default function AdminDashboard() {
                               padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                             }}>{row.count}</span>
                           </td>
-                          <td style={{ fontWeight: 700, color: 'var(--green)' }}>{INR(row.revenue)}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(row.revenue)}</td>
                           <td style={{ color: 'var(--text-2)' }}>
-                            {row.count > 0 ? INR(Math.round(row.revenue / row.count)) : '—'}
+                            {row.count > 0 ? ETB(Math.round(row.revenue / row.count)) : '—'}
                           </td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -370,10 +370,10 @@ export default function AdminDashboard() {
                       margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                       <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-3)' }}
-                        tickFormatter={v => '₹' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
+                        tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
                       <YAxis type="category" dataKey="name" width={130}
                         tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                      <Tooltip content={<CustomTooltip prefix="₹" />} />
+                      <Tooltip content={<CustomTooltip prefix="Br " />} />
                       <Bar dataKey="revenue" name="Revenue" fill="var(--navy)" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -416,9 +416,9 @@ export default function AdminDashboard() {
                         </td>
                         <td>{c.totalCases}</td>
                         <td>{c.paidCases}</td>
-                        <td style={{ fontWeight: 700, color: 'var(--green)' }}>{INR(c.revenue)}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(c.revenue)}</td>
                         <td style={{ color: 'var(--text-2)' }}>
-                          {c.paidCases > 0 ? INR(Math.round(c.revenue / c.paidCases)) : '—'}
+                          {c.paidCases > 0 ? ETB(Math.round(c.revenue / c.paidCases)) : '—'}
                         </td>
                       </tr>
                     ))}

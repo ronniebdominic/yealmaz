@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import api from '../api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,7 +7,7 @@ import Pagination from '../components/Pagination';
 
 const PAGE_SIZE = 15;
 
-const INR = (v) => '₹' + Number(v || 0).toLocaleString('en-IN');
+const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
 
 export default function AdminPricing() {
   const queryClient = useQueryClient();
@@ -34,11 +34,14 @@ export default function AdminPricing() {
   });
 
   const filtered = useMemo(() => {
-    setPage(1);
     return prices.filter(p =>
       p.workType.toLowerCase().includes(search.toLowerCase())
     );
   }, [prices, search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -129,7 +132,7 @@ export default function AdminPricing() {
                 <tr>
                   <th style={{ width: 48 }}>#</th>
                   <th>Work Type</th>
-                  <th style={{ width: 200 }}>Price (₹)</th>
+                  <th style={{ width: 200 }}>Price (Br)</th>
                   <th style={{ width: 120, textAlign: 'center' }}>Status</th>
                 </tr>
               </thead>
@@ -156,7 +159,7 @@ export default function AdminPricing() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ color: 'var(--text-3)', fontSize: 13 }}>₹</span>
+                          <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
                           <input
                             type="number"
                             min="0"

@@ -38,6 +38,7 @@ enum Role {
   CLINIC
   DELIVERY
   LAB_TECH
+  FINANCE
 }
 
 // ── CLINICS ────────────────────────────────────────────

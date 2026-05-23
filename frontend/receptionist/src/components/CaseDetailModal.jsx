@@ -80,17 +80,185 @@ export default function CaseDetailModal({ caseId, onClose }) {
 
   const printQR = () => {
     if (!data?.qrCodeUrl) return;
+    const due = data.dueDate ? new Date(data.dueDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
     const w = window.open('', '_blank');
-    w.document.write(`
-      <html><body style="text-align:center;padding:40px;font-family:Arial">
-        <h2>🦷 Ye-Almaz Dental Lab</h2>
-        <h3>${data.caseNumber}</h3>
-        <p>${data.patientName} — ${data.workType}</p>
-        <img src="${data.qrCodeUrl}" style="width:200px;margin:20px auto;display:block"/>
-        <p style="font-size:12px;color:#888">Scan to update production stage</p>
-        <script>window.print()</script>
-      </body></html>
-    `);
+    w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>QR — ${data.caseNumber}</title>
+  <style>
+    @page {
+      size: A6 portrait;
+      margin: 0;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 105mm;
+      height: 148mm;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1a1a2e;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 5mm;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-bottom: 4mm;
+      border-bottom: 2px solid #1A56A0;
+      margin-bottom: 4mm;
+    }
+    .header-icon { font-size: 20px; }
+    .header-text { flex: 1; }
+    .lab-name {
+      font-size: 11px;
+      font-weight: 800;
+      color: #1A56A0;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
+    .lab-sub { font-size: 8px; color: #888; margin-top: 1px; }
+
+    /* ── QR block ── */
+    .qr-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 4mm;
+    }
+    .qr-wrap img {
+      width: 52mm;
+      height: 52mm;
+      border: 1.5px solid #ddd;
+      border-radius: 4px;
+      display: block;
+    }
+
+    /* ── Case info ── */
+    .case-number {
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 800;
+      color: #1A56A0;
+      letter-spacing: 1px;
+      margin-bottom: 3mm;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2mm 3mm;
+      margin-bottom: 3mm;
+    }
+    .info-cell {
+      background: #F4F7FF;
+      border-radius: 3px;
+      padding: 2mm 2.5mm;
+    }
+    .info-label {
+      font-size: 7px;
+      font-weight: 700;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 1px;
+    }
+    .info-value {
+      font-size: 9px;
+      font-weight: 700;
+      color: #1a1a2e;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .info-cell.full { grid-column: 1 / -1; }
+
+    /* ── Delivery badge ── */
+    .delivery-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .badge-express { background: #FEF3C7; color: #92400E; }
+    .badge-normal  { background: #EFF6FF; color: #1A56A0; }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: auto;
+      padding-top: 3mm;
+      border-top: 1px solid #eee;
+      text-align: center;
+      font-size: 7px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-icon">🦷</div>
+    <div class="header-text">
+      <div class="lab-name">Ye-Almaz Dental Laboratory</div>
+      <div class="lab-sub">Addis Ababa, Ethiopia &nbsp;·&nbsp; Production Tracking Label</div>
+    </div>
+  </div>
+
+  <div class="qr-wrap">
+    <img src="${data.qrCodeUrl}" alt="QR Code" />
+  </div>
+
+  <div class="case-number">${data.caseNumber}</div>
+
+  <div class="info-grid">
+    <div class="info-cell full">
+      <div class="info-label">Patient</div>
+      <div class="info-value">${data.patientName}${data.patientAge ? ' · Age ' + data.patientAge : ''}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Work Type</div>
+      <div class="info-value">${data.workType}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Clinic</div>
+      <div class="info-value">${data.clinic?.name || '—'}</div>
+    </div>
+    ${data.toothNumbers ? `
+    <div class="info-cell">
+      <div class="info-label">Teeth</div>
+      <div class="info-value">${data.toothNumbers}</div>
+    </div>` : ''}
+    ${data.shade ? `
+    <div class="info-cell">
+      <div class="info-label">Shade</div>
+      <div class="info-value">${data.shade}</div>
+    </div>` : ''}
+    ${due ? `
+    <div class="info-cell">
+      <div class="info-label">Due Date</div>
+      <div class="info-value">${due}</div>
+    </div>` : ''}
+    <div class="info-cell">
+      <div class="info-label">Delivery</div>
+      <div class="info-value">
+        <span class="delivery-badge ${data.deliveryType === 'EXPRESS' ? 'badge-express' : 'badge-normal'}">
+          ${data.deliveryType === 'EXPRESS' ? '⚡ Express' : '🚚 Normal'}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Scan QR to update production stage &nbsp;·&nbsp; yealmaz.com</div>
+
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`);
+    w.document.close();
   };
 
   if (loading) return (
@@ -121,7 +289,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ['Tooth Numbers', data.toothNumbers || '—'],
               ['Shade', data.shade || '—'],
               ['Due Date', data.dueDate ? format(new Date(data.dueDate), 'dd MMM yyyy') : '—'],
-              ['Amount', data.totalAmount ? `₹${data.totalAmount.toLocaleString('en-IN')}` : '—'],
+              ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
             ].map(([label, val]) => (
               <div key={label} style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: 600, marginBottom: '2px' }}>{label}</div>

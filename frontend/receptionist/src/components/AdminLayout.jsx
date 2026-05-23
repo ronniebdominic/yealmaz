@@ -25,6 +25,9 @@ export default function AdminLayout({ children }) {
           </button>
 
           <div className="nav-section-label">Management</div>
+          <button className={active('/admin/cases')} onClick={() => navigate('/admin/cases')}>
+            <span>📋</span> Case Management
+          </button>
           <button className={active('/admin/pricing')} onClick={() => navigate('/admin/pricing')}>
             <span>💰</span> Work Type Pricing
           </button>
