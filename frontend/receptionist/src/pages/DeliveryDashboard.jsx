@@ -68,6 +68,19 @@ export default function DeliveryDashboard() {
     return () => clearInterval(t);
   }, []);
 
+  // Join personal socket room for real-time assignment notifications
+  useEffect(() => {
+    if (!user?.id) return;
+    // Dynamically import socket if available
+    import('../api').then(mod => {
+      const socket = mod.socket;
+      if (!socket) return;
+      socket.emit('join_delivery', user.id);
+      socket.on('case_assigned', () => loadCases());
+      return () => socket.off('case_assigned');
+    }).catch(() => {});
+  }, [user?.id]);
+
   const loadCases = async () => {
     try {
       const res = await api.get('/delivery/assigned');

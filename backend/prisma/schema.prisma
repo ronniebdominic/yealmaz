@@ -28,6 +28,7 @@ model User {
   payments            Payment[]      @relation("VerifiedPayments")
   deliveries          DeliveryLog[]
   notifications       Notification[]
+  assignedDeliveries  Case[]         @relation("AssignedDeliveries")
 
   @@map("users")
 }
@@ -37,6 +38,7 @@ enum Role {
   RECEPTIONIST
   CLINIC
   DELIVERY
+  DISPATCH
   LAB_TECH
   FINANCE
 }
@@ -86,6 +88,8 @@ model Case {
   clinic          Clinic      @relation(fields: [clinicId], references: [id])
   receptionistId  String?
   receptionist    User?       @relation("ReceptionistCases", fields: [receptionistId], references: [id])
+  assignedDeliveryId String?
+  assignedDelivery   User?    @relation("AssignedDeliveries", fields: [assignedDeliveryId], references: [id])
 
   stages          CaseStage[]
   payment         Payment?

@@ -38,6 +38,12 @@ io.on('connection', (socket) => {
     console.log('Staff member joined lab room');
   });
 
+  // Delivery executive joins their personal room
+  socket.on('join_delivery', (userId) => {
+    socket.join(`delivery_${userId}`);
+    console.log(`Delivery exec ${userId} joined their room`);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
@@ -65,6 +71,7 @@ app.use('/api/cases',         require('./routes/cases'));
 app.use('/api/stages',        require('./routes/stages'));
 app.use('/api/payments',      require('./routes/payments'));
 app.use('/api/delivery',      require('./routes/delivery'));
+app.use('/api/dispatch',      require('./routes/dispatch'));
 app.use('/api/dashboard',     require('./routes/dashboard'));
 app.use('/api/lab',           require('./routes/lab'));
 app.use('/api/scan',          require('./routes/scan'));      // Public QR scan endpoint

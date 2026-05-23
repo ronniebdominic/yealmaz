@@ -11,7 +11,9 @@ const prisma = new PrismaClient();
 router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const cacheKey = `delivery:assigned:${page}:${limit}`;
+  // DELIVERY role sees only their own assigned cases; ADMIN sees all
+  const isDeliveryExec = req.user.role === 'DELIVERY';
+  const cacheKey = `delivery:assigned:${isDeliveryExec ? req.user.id : 'admin'}:${page}:${limit}`;
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
@@ -20,6 +22,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     todayStart.setHours(0, 0, 0, 0);
 
     const where = {
+      ...(isDeliveryExec ? { assignedDeliveryId: req.user.id } : {}),
       OR: [
         { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
         { status: 'DELIVERED', deliveryLogs: { some: { deliveredAt: { gte: todayStart } } } }
@@ -42,7 +45,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     ]);
 
     const result = { cases, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } };
-    await appCache.set(cacheKey, result);
+    await appCache.set(cacheKey, result, 15);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch delivery cases.' });

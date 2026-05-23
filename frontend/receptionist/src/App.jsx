@@ -12,6 +12,7 @@ import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Delivery from './pages/Delivery';
 import DeliveryDashboard from './pages/DeliveryDashboard';
+import DispatchDashboard from './pages/DispatchDashboard';
 import FinanceDashboard from './pages/FinanceDashboard';
 import './index.css';
 
@@ -38,6 +39,7 @@ function RoleHome() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'DELIVERY') return <DeliveryDashboard />;
+  if (user.role === 'DISPATCH') return <DispatchDashboard />;
   if (user.role === 'LAB_TECH') return <LabDashboard />;
   if (user.role === 'FINANCE') return <FinanceDashboard />;
   if (user.role === 'ADMIN' && user.email === 'admindashboard@yealmaz.com') return <Navigate to="/admin" replace />;
