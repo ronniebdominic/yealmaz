@@ -87,6 +87,7 @@ router.post('/clinic/login', async (req, res) => {
       token,
       clinic: {
         id: clinic.id,
+        code: clinic.code,
         name: clinic.name,
         email: clinic.email,
         phone: clinic.phone,
@@ -106,7 +107,7 @@ router.get('/me', protect, async (req, res) => {
     if (req.user.role === 'CLINIC') {
       const clinic = await prisma.clinic.findUnique({
         where: { id: req.user.id },
-        select: { id: true, name: true, email: true, phone: true, address: true }
+        select: { id: true, code: true, name: true, email: true, phone: true, address: true }
       });
       return res.json({ ...clinic, role: 'CLINIC' });
     }

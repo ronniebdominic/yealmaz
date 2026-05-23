@@ -35,6 +35,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.avatarText}>{clinic?.name?.[0]?.toUpperCase() || 'C'}</Text>
         </View>
         <Text style={styles.clinicName}>{clinic?.name}</Text>
+        {clinic?.code && <Text style={styles.clinicCode}>#{clinic.code}</Text>}
         <Text style={styles.clinicEmail}>{clinic?.email}</Text>
         {clinic?.phone && <Text style={styles.clinicPhone}>📞 {clinic.phone}</Text>}
         {clinic?.address && <Text style={styles.clinicAddress}>📍 {clinic.address}</Text>}
@@ -89,6 +90,7 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 30, fontWeight: '800', color: Colors.navy },
   clinicName: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
+  clinicCode: { fontSize: 13, fontWeight: '700', color: Colors.accent, marginBottom: 4 },
   clinicEmail: { fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 4 },
   clinicPhone: { fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 2 },
   clinicAddress: { fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center' },

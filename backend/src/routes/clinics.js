@@ -14,7 +14,7 @@ router.get('/', protect, async (req, res) => {
   try {
     const clinics = await prisma.clinic.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, phone: true, address: true },
+      select: { id: true, code: true, name: true, phone: true, address: true },
       orderBy: { name: 'asc' }
     });
     await appCache.set(cacheKey, clinics);

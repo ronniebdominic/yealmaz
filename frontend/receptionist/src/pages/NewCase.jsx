@@ -231,7 +231,7 @@ export default function NewCase() {
                 <label>Clinic *</label>
                 <select value={form.clinicId} onChange={set('clinicId')} required>
                   <option value="">— Select clinic —</option>
-                  {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {clinics.map(c => <option key={c.id} value={c.id}>{c.code ? `[${c.code}] ` : ''}{c.name}</option>)}
                 </select>
                 <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
                   New clinic? Ask them to register via the clinic app first.
