@@ -3,11 +3,10 @@ import { useAuth } from '../AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
-  { code: 'RECEPTION',    label: 'Reception',            short: 'REC', color: '#3949AB', bg: '#3949AB18', icon: '📥',  nextDept: 'Plaster Department' },
   { code: 'PLASTER',      label: 'Plaster Department',   short: 'PLS', color: '#6A1B9A', bg: '#6A1B9A18', icon: '🏺',  nextDept: 'Margin Department' },
   { code: 'MARGIN',       label: 'Margin Department',    short: 'MRG', color: '#7B1FA2', bg: '#7B1FA218', icon: '✂️',  nextDept: 'Scanning' },
   { code: 'SCANNING',     label: 'Scanning',             short: 'SCN', color: '#1565C0', bg: '#1565C018', icon: '🔬',  nextDept: 'Designing' },
@@ -22,9 +21,7 @@ const DEPARTMENTS = [
   { code: 'GLAZING',      label: 'Glazing',              short: 'GLZ', color: '#00838F', bg: '#00838F18', icon: '✨',  nextDept: 'Quality Control' },
   { code: 'THERMO',       label: 'Thermo Press',         short: 'THP', color: '#C62828', bg: '#C6282818', icon: '🔥',  nextDept: 'Quality Control' },
   { code: 'TRIMMING',     label: 'Trimming',             short: 'TRM', color: '#558B2F', bg: '#558B2F18', icon: '✂️',  nextDept: 'Quality Control' },
-  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: '#15803D', bg: '#15803D18', icon: '🔍',  nextDept: 'Payment / Invoicing' },
-  { code: 'PAYMENT',      label: 'Payment / Invoicing',  short: 'PAY', color: '#00695C', bg: '#00695C18', icon: '💰',  nextDept: 'Dispatch' },
-  { code: 'DISPATCH',     label: 'Dispatch',             short: 'DSP', color: '#B45309', bg: '#B4530918', icon: '📦',  nextDept: 'Out for Delivery' },
+  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: '#15803D', bg: '#15803D18', icon: '🔍',  nextDept: 'Ready to Dispatch' },
 ];
 
 const STAGE_LABELS = {
@@ -49,52 +46,68 @@ const STAGE_COLORS = {
   ON_HOLD: '#B71C1C', REMAKE: '#6A1B9A', CANCELLED: '#424242',
 };
 
-// ── QR Scanner component ──────────────────────────────────
+// ── QR Scanner component (native getUserMedia + jsQR) ────────
 function QRScanner({ onScan, onClose }) {
-  const scannerInstance = useRef(null);
+  const videoRef   = useRef(null);
+  const streamRef  = useRef(null);
+  const rafRef     = useRef(null);
+  const doneRef    = useRef(false);
 
   useEffect(() => {
-    const containerId = 'qr-reader';
+    let active = true;
+    const canvas = document.createElement('canvas');
+    const ctx    = canvas.getContext('2d');
 
-    const init = async () => {
+    const stop = () => {
+      active = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    };
+
+    const tick = (jsQR) => {
+      if (!active || !videoRef.current) return;
+      const video = videoRef.current;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code && !doneRef.current) {
+          doneRef.current = true;
+          stop();
+          let caseId = code.data;
+          const match = code.data.match(/\/scan\/([a-f0-9-]{36})/i);
+          if (match) caseId = match[1];
+          onScan(caseId);
+          return;
+        }
+      }
+      rafRef.current = requestAnimationFrame(() => tick(jsQR));
+    };
+
+    const start = async () => {
       try {
-        // Wipe any stale elements left by a previous instance
-        const container = document.getElementById(containerId);
-        if (container) container.innerHTML = '';
-
-        const { Html5Qrcode } = await import('html5-qrcode');
-        const scanner = new Html5Qrcode(containerId, { verbose: false });
-        scannerInstance.current = scanner;
-
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 240, height: 240 }, disableFlip: false },
-          (decodedText) => {
-            let caseId = decodedText;
-            const match = decodedText.match(/\/scan\/([a-f0-9-]{36})/i);
-            if (match) caseId = match[1];
-            onScan(caseId);
-          },
-          () => {}
-        );
+        const { default: jsQR } = await import('jsqr');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          rafRef.current = requestAnimationFrame(() => tick(jsQR));
+        }
       } catch (err) {
-        console.error('Scanner error:', err);
+        console.error('Camera error:', err);
         toast.error('Could not access camera. Please allow camera permission.');
       }
     };
 
-    init();
-
-    return () => {
-      const s = scannerInstance.current;
-      if (!s) return;
-      scannerInstance.current = null;
-      // stop() pauses the stream; clear() removes all injected DOM elements
-      s.stop()
-        .catch(() => {})
-        .finally(() => { try { s.clear(); } catch (_) {} });
-    };
-  }, []);
+    start();
+    return stop;
+  }, [onScan]);
 
   return (
     <div style={{
@@ -102,19 +115,48 @@ function QRScanner({ onScan, onClose }) {
       backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20,
     }}>
-      <div style={{ width: '100%', maxWidth: 380, background: '#fff', borderRadius: 20, overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 380, background: '#000', borderRadius: 20, overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ padding: '16px 20px', background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>📷 Scan QR Code</div>
+        <div style={{ padding: '14px 18px', background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Scan QR Code</div>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
             Cancel
           </button>
         </div>
 
-        {/* Scanner — single container, no extra overlay so only one video renders */}
-        <div id="qr-reader" style={{ width: '100%' }} />
+        {/* Single clean video feed */}
+        <div style={{ position: 'relative', width: '100%', aspectRatio: '4/3', background: '#000' }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+          {/* Targeting overlay */}
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
+          }}>
+            <div style={{
+              width: 200, height: 200, border: '2px solid rgba(255,255,255,0.8)', borderRadius: 12,
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
+            }}>
+              {/* Corner marks */}
+              {[['0','0','auto','auto'],['0','auto','auto','0'],['auto','0','0','auto'],['auto','auto','0','0']].map((pos, i) => (
+                <div key={i} style={{
+                  position: 'absolute', width: 20, height: 20,
+                  top: pos[0], right: pos[1], bottom: pos[2], left: pos[3],
+                  borderTop:    (i < 2)  ? '3px solid #fff' : 'none',
+                  borderBottom: (i >= 2) ? '3px solid #fff' : 'none',
+                  borderLeft:   (i === 0 || i === 2) ? '3px solid #fff' : 'none',
+                  borderRight:  (i === 1 || i === 3) ? '3px solid #fff' : 'none',
+                }} />
+              ))}
+            </div>
+          </div>
+        </div>
 
-        <div style={{ padding: '14px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-2)' }}>
+        <div style={{ padding: '12px 18px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.6)', background: '#111' }}>
           Point camera at the case QR code
         </div>
       </div>
@@ -230,7 +272,7 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department }) {
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
           <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={onConfirm} disabled={loading}>
-            {loading ? 'Processing…' : `${dept?.icon} Confirm — ${dept?.label}`}
+            {loading ? 'Processing…' : `Confirm — ${dept?.label}`}
           </button>
         </div>
       </div>
@@ -247,24 +289,20 @@ export default function LabDashboard() {
   const [scanResult, setScanResult] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
-  const [tab, setTab] = useState('scan'); // scan | queue
+  const confirmingRef = useRef(false); // guard: prevents double-submit
 
-  const selectedDept = DEPARTMENTS.find(d => d.code === department);
+  // Auto-select dept from login if user has one assigned
+  const lockedDept = user?.department || null;
   const queryClient = useQueryClient();
 
-  const { data: labData, isFetching: loadingCases } = useQuery({
-    queryKey: ['lab', 'active'],
-    queryFn: () => api.get('/lab/active').then(r => r.data.cases ?? r.data),
-    enabled: !!department,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-  });
-  const activeCases = labData || [];
+  // If locked dept from login, use it; otherwise use manually selected
+  const activeDept = lockedDept || department;
+  const selectedDept = DEPARTMENTS.find(d => d.code === activeDept);
 
   const handleScan = async (caseId) => {
     setShowScanner(false);
     setShowManual(false);
-    if (!department) {
+    if (!activeDept) {
       toast.error('Please select your department first');
       return;
     }
@@ -277,11 +315,13 @@ export default function LabDashboard() {
   };
 
   const confirmScan = async () => {
-    if (!scanResult || !department) return;
+    if (!scanResult || !activeDept) return;
+    if (confirmingRef.current) return;   // block if already in-flight
+    confirmingRef.current = true;
     setProcessing(true);
     try {
       const res = await api.post(`/scan/${scanResult.id}`, {
-        department,
+        department: activeDept,
         techName: user?.name
       });
       toast.success(`✅ ${res.data.statusLabel} — logged successfully!`);
@@ -292,6 +332,7 @@ export default function LabDashboard() {
       toast.error(err.response?.data?.error || 'Scan failed');
     } finally {
       setProcessing(false);
+      confirmingRef.current = false;     // release after request completes
     }
   };
 
@@ -310,7 +351,7 @@ export default function LabDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {selectedDept && (
             <div style={{ background: selectedDept.bg, border: `1px solid ${selectedDept.color}40`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: selectedDept.color }}>
-              {selectedDept.icon} {selectedDept.short}
+              {selectedDept.label}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
@@ -322,45 +363,48 @@ export default function LabDashboard() {
 
       <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
 
-        {/* ── Department Selector ── */}
-        <div className="card" style={{ marginBottom: 16, padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-            Select Your Department
+        {/* ── Department — locked from login OR selectable ── */}
+        {lockedDept ? (
+          // Locked: dept comes from this account's login
+          <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Your Department
+            </div>
+            <div style={{
+              background: selectedDept?.bg, border: `2px solid ${selectedDept?.color}40`,
+              borderRadius: 12, padding: '14px 16px',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: selectedDept?.color }}>{selectedDept?.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Next → {selectedDept?.nextDept}</div>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            {DEPARTMENTS.map(d => (
-              <button key={d.code} onClick={() => setDepartment(d.code)}
-                style={{
-                  padding: '10px 8px', borderRadius: 10, border: `2px solid ${department === d.code ? d.color : 'var(--border)'}`,
-                  background: department === d.code ? d.bg : 'var(--surface)',
-                  cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4
-                }}>
-                <span style={{ fontSize: 20 }}>{d.icon}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: department === d.code ? d.color : 'var(--text-2)', lineHeight: 1.2 }}>{d.short}</span>
-                <span style={{ fontSize: 10, color: 'var(--text-3)', lineHeight: 1.2 }}>{d.label}</span>
-              </button>
-            ))}
+        ) : (
+          // No dept on account — show selector
+          <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              Select Your Department
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {DEPARTMENTS.map(d => (
+                <button key={d.code} onClick={() => setDepartment(d.code)}
+                  style={{
+                    padding: '10px 8px', borderRadius: 10,
+                    border: `2px solid ${department === d.code ? d.color : 'var(--border)'}`,
+                    background: department === d.code ? d.bg : 'var(--surface)',
+                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: department === d.code ? d.color : 'var(--text-2)', lineHeight: 1.3 }}>{d.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* ── Tab switcher ── */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setTab('scan')} className={`filter-chip ${tab === 'scan' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
-            📷 Scan QR
-          </button>
-          <button onClick={() => setTab('queue')} className={`filter-chip ${tab === 'queue' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
-            📋 Case Queue {activeCases.length > 0 && `(${activeCases.length})`}
-          </button>
-          <button onClick={() => setTab('history')} className={`filter-chip ${tab === 'history' ? 'active' : ''}`} style={{ flex: 1, textAlign: 'center' }}>
-            🕐 History
-          </button>
-        </div>
 
-        {/* ── SCAN TAB ── */}
-        {tab === 'scan' && (
-          <div>
-            {!department ? (
+        {/* ── SCAN ── */}
+        <div>
+            {!activeDept ? (
               <div className="empty-state">
                 <div className="empty-icon">☝️</div>
                 <div className="empty-title" style={{ fontSize: 16 }}>Select Department First</div>
@@ -370,15 +414,6 @@ export default function LabDashboard() {
               </div>
             ) : (
               <>
-                {/* Selected dept banner */}
-                <div style={{ background: selectedDept.bg, border: `1px solid ${selectedDept.color}30`, borderRadius: 12, padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 28 }}>{selectedDept.icon}</span>
-                  <div>
-                    <div style={{ fontWeight: 700, color: selectedDept.color, fontSize: 15 }}>{selectedDept.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Next stage → {selectedDept.nextDept}</div>
-                  </div>
-                </div>
-
                 {/* Scan buttons */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                   <button className="btn btn-primary" style={{ flexDirection: 'column', gap: 6, padding: '20px 12px', height: 'auto' }}
@@ -396,86 +431,42 @@ export default function LabDashboard() {
                 </div>
 
                 {/* Quick tip */}
-                <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6 }}>
+                <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 24 }}>
                   💡 Scan the QR code attached to the physical case. Each scan advances the case to <strong style={{ color: 'var(--text-2)' }}>{selectedDept.label}</strong> stage and notifies the clinic.
                 </div>
+
+                {/* ── Scan History ── */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                  Today's Scans
+                </div>
+                {recentScans.length === 0 ? (
+                  <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '28px 16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans yet this session</div>
+                  </div>
+                ) : (
+                  recentScans.map((s, i) => (
+                    <div key={i} style={{
+                      background: 'var(--surface)', borderRadius: 10, padding: '12px 14px', marginBottom: 8,
+                      border: '1px solid var(--border)', borderLeft: `3px solid ${STAGE_COLORS[s.newStatus] || 'var(--accent)'}`,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{s.caseNumber}</div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>{s.patientName}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{s.workType} · {s.clinic?.name}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
+                          <div style={{ fontSize: 11, background: 'var(--green-dim)', color: 'var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700, marginBottom: 4 }}>✓ Scanned</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'h:mm a')}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </>
             )}
-          </div>
-        )}
-
-        {/* ── QUEUE TAB ── */}
-        {tab === 'queue' && (
-          <div>
-            {loadingCases ? (
-              <div className="empty-state"><div className="empty-icon">⏳</div><div style={{ fontSize: 14, color: 'var(--text-3)' }}>Loading cases…</div></div>
-            ) : activeCases.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">🎉</div>
-                <div className="empty-title" style={{ fontSize: 16 }}>Queue is clear!</div>
-                <p style={{ color: 'var(--text-3)', fontSize: 13 }}>No active cases in production</p>
-              </div>
-            ) : (
-              activeCases.map(c => (
-                <div key={c.id} className="card" style={{ marginBottom: 10, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${STAGE_COLORS[c.status] || 'var(--border)'}` }}>
-                  <div style={{ padding: '12px 14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                      <div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace' }}>{c.caseNumber}</div>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>{c.patientName}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.workType} · {c.clinic?.name}</div>
-                      </div>
-                      <span style={{ fontSize: 11, background: STAGE_COLORS[c.status] + '20', color: STAGE_COLORS[c.status], padding: '3px 10px', borderRadius: 20, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        {STAGE_LABELS[c.status]}
-                      </span>
-                    </div>
-                    {c.dueDate && (
-                      <div style={{ fontSize: 11, color: new Date(c.dueDate) < new Date() ? 'var(--red)' : 'var(--text-3)' }}>
-                        Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}
-                        {new Date(c.dueDate) < new Date() && ' ⚠️ Overdue'}
-                      </div>
-                    )}
-                    {department && (
-                      <button className="btn btn-ghost btn-sm" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}
-                        onClick={() => handleScan(c.id)}>
-                        {selectedDept?.icon} Mark as {selectedDept?.label}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ── HISTORY TAB ── */}
-        {tab === 'history' && (
-          <div>
-            {recentScans.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📭</div>
-                <div className="empty-title" style={{ fontSize: 16 }}>No scans yet</div>
-                <p style={{ color: 'var(--text-3)', fontSize: 13 }}>Your scans this session will appear here</p>
-              </div>
-            ) : (
-              recentScans.map((s, i) => (
-                <div key={i} className="card" style={{ marginBottom: 10, padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace' }}>{s.caseNumber}</div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{s.patientName}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-2)' }}>{s.dept}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 11, background: 'var(--green-dim)', color: 'var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>✓ Scanned</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{format(new Date(s.scannedAt), 'h:mm a')}</div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        </div>
 
       </div>
 
@@ -485,7 +476,7 @@ export default function LabDashboard() {
       {scanResult && (
         <ScanResultModal
           result={scanResult}
-          department={department}
+          department={activeDept}
           onConfirm={confirmScan}
           onClose={() => setScanResult(null)}
           loading={processing}

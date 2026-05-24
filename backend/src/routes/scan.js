@@ -133,6 +133,21 @@ router.post('/:caseId', async (req, res) => {
     const dept = DEPARTMENTS[department];
     const scannedBy = techName ? `${techName} (${dept.short})` : dept.label;
 
+    // Deduplication: reject if same case+stage scanned within the last 60 seconds
+    const sixtySecondsAgo = new Date(Date.now() - 60 * 1000);
+    const recentDup = await prisma.caseStage.findFirst({
+      where: {
+        caseId,
+        stageName: newStatus,
+        scannedAt: { gte: sixtySecondsAgo },
+      },
+    });
+    if (recentDup) {
+      return res.status(409).json({
+        error: 'Duplicate scan — this case was already scanned at this department just now.',
+      });
+    }
+
     // Update case status
     await prisma.case.update({
       where: { id: caseId },

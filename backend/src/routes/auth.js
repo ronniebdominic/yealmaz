@@ -40,7 +40,8 @@ router.post('/login', async (req, res) => {
       id: user.id,
       email: user.email,
       role: user.role,
-      name: user.name
+      name: user.name,
+      department: user.department || null,
     });
 
     res.json({
@@ -50,7 +51,8 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        phone: user.phone
+        phone: user.phone,
+        department: user.department || null,
       }
     });
   } catch (err) {

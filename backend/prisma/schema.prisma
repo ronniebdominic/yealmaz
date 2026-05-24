@@ -17,9 +17,10 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      Role
-  phone     String?
-  isActive  Boolean  @default(true)
+  role       Role
+  department String?  // For LAB_TECH: locks them to a specific department
+  phone      String?
+  isActive   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -52,9 +53,10 @@ model Clinic {
   phone     String?
   address   String?
   password  String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(true)
+  isExcluded  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   cases Case[]
 
