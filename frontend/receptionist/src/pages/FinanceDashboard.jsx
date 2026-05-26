@@ -907,11 +907,8 @@ const MAIN_TABS = [
 
 export default function FinanceDashboard() {
   const { user, logout } = useAuth();
-  const [tab, setTab]       = useState('screenshots');
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const queryClient         = useQueryClient();
-
-  const switchTab = (t) => { setTab(t); setDrawerOpen(false); };
+  const [tab, setTab]    = useState('screenshots');
+  const queryClient      = useQueryClient();
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'FN';
 
@@ -965,7 +962,7 @@ export default function FinanceDashboard() {
           <div className="nav-section-label">Payments</div>
           <button
             className={`nav-item ${tab === 'screenshots' ? 'active' : ''}`}
-            onClick={() => switchTab('screenshots')}
+            onClick={() => setTab('screenshots')}
           >
             <span>💳</span> Screenshot Approvals
             {(pending.length + uploadedCount) > 0 && (
@@ -976,21 +973,21 @@ export default function FinanceDashboard() {
           <div className="nav-section-label">Billing</div>
           <button
             className={`nav-item ${tab === 'billing' ? 'active' : ''}`}
-            onClick={() => switchTab('billing')}
+            onClick={() => setTab('billing')}
           >
             <span>📄</span> Billing & Invoicing
             {toInvoiceCount > 0 && <span className="badge-count">{toInvoiceCount}</span>}
           </button>
           <button
             className={`nav-item ${tab === 'trusted' ? 'active' : ''}`}
-            onClick={() => switchTab('trusted')}
+            onClick={() => setTab('trusted')}
           >
             <span>🤝</span> Trusted Partners
             {trustedCount > 0 && <span className="badge-count">{trustedCount}</span>}
           </button>
           <button
             className={`nav-item ${tab === 'history' ? 'active' : ''}`}
-            onClick={() => switchTab('history')}
+            onClick={() => setTab('history')}
           >
             <span>✅</span> Verified History
           </button>
@@ -1008,66 +1005,8 @@ export default function FinanceDashboard() {
         </div>
       </aside>
 
-      {/* ── Mobile drawer overlay ───────────────────────── */}
-      <div className={`drawer-overlay ${drawerOpen ? 'open' : ''}`} onClick={() => setDrawerOpen(false)} />
-
-      {/* ── Mobile drawer ───────────────────────────────── */}
-      <div className={`drawer ${drawerOpen ? 'open' : ''}`}>
-        <div className="drawer-head">
-          <div className="drawer-logo">
-            <img src="/logo.png" alt="Ye-Almaz" />
-            <div>
-              <div className="drawer-lab-name">Ye-Almaz Dental Lab</div>
-              <div className="drawer-role" style={{ color: '#16A34A' }}>Finance</div>
-            </div>
-          </div>
-          <button className="drawer-close" onClick={() => setDrawerOpen(false)}>×</button>
-        </div>
-
-        <nav className="drawer-nav">
-          <div className="nav-section-label">Payments</div>
-          <button className={`nav-item ${tab === 'screenshots' ? 'active' : ''}`} onClick={() => switchTab('screenshots')}>
-            <span>💳</span> Screenshot Approvals
-            {(pending.length + uploadedCount) > 0 && <span className="badge-count">{pending.length + uploadedCount}</span>}
-          </button>
-
-          <div className="nav-section-label">Billing</div>
-          <button className={`nav-item ${tab === 'billing' ? 'active' : ''}`} onClick={() => switchTab('billing')}>
-            <span>📄</span> Billing & Invoicing
-            {toInvoiceCount > 0 && <span className="badge-count">{toInvoiceCount}</span>}
-          </button>
-          <button className={`nav-item ${tab === 'trusted' ? 'active' : ''}`} onClick={() => switchTab('trusted')}>
-            <span>🤝</span> Trusted Partners
-            {trustedCount > 0 && <span className="badge-count">{trustedCount}</span>}
-          </button>
-          <button className={`nav-item ${tab === 'history' ? 'active' : ''}`} onClick={() => switchTab('history')}>
-            <span>✅</span> Verified History
-          </button>
-        </nav>
-
-        <div className="drawer-foot">
-          <div className="drawer-user">
-            <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
-            <div>
-              <div className="drawer-user-name">{user?.name}</div>
-              <div className="drawer-user-role">Finance</div>
-            </div>
-            <button className="drawer-logout" onClick={logout} title="Logout">⏻</button>
-          </div>
-        </div>
-      </div>
-
       {/* ── Main content ────────────────────────────────── */}
       <main className="main">
-        {/* Mobile top bar */}
-        <div className="mobile-topbar">
-          <button className="hamburger-btn" onClick={() => setDrawerOpen(true)} aria-label="Open menu">☰</button>
-          <span className="mobile-topbar-title">
-            {MAIN_TABS.find(t => t.id === tab)?.icon} {MAIN_TABS.find(t => t.id === tab)?.label}
-          </span>
-          <div className="mobile-avatar" style={{ background: '#16A34A' }}>{initials}</div>
-        </div>
-
         {/* Topbar */}
         <div className="topbar">
           <div className="topbar-title">
