@@ -28,6 +28,19 @@
       "permissions": ["CAMERA","READ_EXTERNAL_STORAGE","WRITE_EXTERNAL_STORAGE","INTERNET","ACCESS_NETWORK_STATE"],
       "versionCode": 1
     },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "Ye-Almaz Clinic",
+      "shortName": "Ye-Almaz",
+      "description": "Ye-Almaz Dental Laboratory — Clinic Portal",
+      "themeColor": "#0B1D3A",
+      "backgroundColor": "#0B1D3A",
+      "display": "standalone",
+      "orientation": "portrait",
+      "lang": "en",
+      "startUrl": "/"
+    },
     "plugins": [
       ["expo-image-picker", {
         "photosPermission": "Allow Ye-Almaz Clinic to access your photos to upload payment screenshots.",
