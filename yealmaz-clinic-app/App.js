@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Colors } from './src/utils/theme';
+import { usePushNotifications } from './src/hooks/usePushNotifications';
 import SplashScreen from './src/screens/SplashScreen';
 
 const queryClient = new QueryClient({
@@ -58,6 +59,9 @@ function MainTabs() {
 
 function AppNavigator() {
   const { clinic, loading } = useAuth();
+
+  // Subscribe to push notifications once the clinic is logged in (web only)
+  usePushNotifications(!!clinic);
   const [minTimeDone, setMinTimeDone] = useState(false);
 
   useEffect(() => {

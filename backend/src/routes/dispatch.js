@@ -3,6 +3,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { sendPushToClinic } = require('../utils/webpush');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -103,6 +104,13 @@ router.post('/:caseId/assign', protect, restrict('DISPATCH', 'ADMIN'), async (re
       caseId: updated.id,
       caseNumber: updated.caseNumber,
       message: `New case assigned: ${updated.caseNumber} — ${updated.patientName}`
+    });
+
+    // Push notification to the clinic
+    sendPushToClinic(prisma, updated.clinicId, {
+      title: '🚚 Delivery Partner Assigned',
+      body: `Case ${updated.caseNumber} (${updated.patientName}) has been assigned to a delivery partner.`,
+      data: { caseId: updated.id, caseNumber: updated.caseNumber, screen: 'CaseDetail' },
     });
 
     res.json({ success: true, case: updated });

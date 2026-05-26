@@ -3,6 +3,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { sendPushToClinic } = require('../utils/webpush');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -107,6 +108,13 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
       status: 'DELIVERED', message: 'Your case has been delivered!'
     });
     io.to('lab_staff').emit('case_delivered', { caseId: caseData.id, caseNumber: caseData.caseNumber });
+
+    // Push notification to the clinic
+    sendPushToClinic(prisma, caseData.clinicId, {
+      title: '✅ Case Delivered',
+      body: `Case ${caseData.caseNumber} (${caseData.patientName}) has been delivered successfully.`,
+      data: { caseId: caseData.id, caseNumber: caseData.caseNumber, screen: 'CaseDetail' },
+    });
 
     res.json({ success: true, message: 'Delivery confirmed.' });
   } catch (err) {

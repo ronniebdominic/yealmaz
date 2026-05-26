@@ -58,7 +58,8 @@ model Clinic {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  cases Case[]
+  cases             Case[]
+  pushSubscriptions PushSubscription[]
 
   @@map("clinics")
 }
@@ -222,6 +223,20 @@ model WorkTypePrice {
   updatedAt DateTime @updatedAt
 
   @@map("work_type_prices")
+}
+
+// ── PUSH SUBSCRIPTIONS ─────────────────────────────────
+model PushSubscription {
+  id        String   @id @default(uuid())
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("push_subscriptions")
 }
 
 // ── NOTIFICATIONS ──────────────────────────────────────

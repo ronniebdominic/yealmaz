@@ -98,6 +98,60 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// ── Push notifications ───────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'Ye-Almaz Clinic', body: event.data.text() };
+  }
+
+  const { title, body, icon = '/assets/icon.png', data = {} } = payload;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: '/assets/icon.png',
+      vibrate: [200, 100, 200],
+      data,
+      // Keep the notification on screen until the user interacts
+      requireInteraction: false,
+    })
+  );
+});
+
+// ── Notification click: open / focus the app ────────────────────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const caseId = event.notification.data?.caseId;
+  // Build a URL that React Navigation can deep-link into
+  const url = caseId ? `/?caseId=${caseId}` : '/';
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        // If the app is already open, focus it
+        for (const client of windowClients) {
+          if ('focus' in client) {
+            client.focus();
+            client.postMessage({ type: 'OPEN_CASE', caseId });
+            return;
+          }
+        }
+        // Otherwise open a new tab
+        if (clients.openWindow) {
+          return clients.openWindow(url);
+        }
+      })
+  );
+});
+
 // ── Background sync: retry failed uploads when back online ──────────────────
 self.addEventListener('sync', (event) => {
   if (event.tag === 'retry-uploads') {

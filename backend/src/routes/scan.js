@@ -2,6 +2,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { invalidate } = require('../cache');
+const { sendPushToClinic } = require('../utils/webpush');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -185,6 +186,15 @@ router.post('/:caseId', async (req, res) => {
 
     io.to('lab_staff').emit('stage_scanned', payload);
     io.to(`clinic_${caseData.clinic.id}`).emit('case_updated', payload);
+
+    // Push notification for payment-ready milestone
+    if (newStatus === 'PAYMENT_INVOICING') {
+      sendPushToClinic(prisma, caseData.clinic.id, {
+        title: '💳 Payment Invoice Ready',
+        body: `Case ${caseData.caseNumber} (${caseData.patientName}) is ready — please arrange payment.`,
+        data: { caseId, caseNumber: caseData.caseNumber, screen: 'CaseDetail' },
+      });
+    }
 
     res.json({ success: true, ...payload });
   } catch (err) {
