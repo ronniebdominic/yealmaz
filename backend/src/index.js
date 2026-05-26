@@ -20,9 +20,13 @@ const ALLOWED_ORIGINS = process.env.FRONTEND_URL
   : null; // null = allow all (development fallback)
 
 const corsOriginHandler = (origin, callback) => {
-  // Allow requests with no origin (mobile apps, Postman, curl)
+  // Allow requests with no origin (mobile apps, curl, Postman)
   if (!origin) return callback(null, true);
-  if (!ALLOWED_ORIGINS) return callback(null, true); // dev: allow all
+  // No FRONTEND_URL set → allow everything (dev / first-run)
+  if (!ALLOWED_ORIGINS) return callback(null, true);
+  // Allow any Vercel deployment URL (covers preview + production deployments)
+  if (origin.endsWith('.vercel.app')) return callback(null, true);
+  // Allow explicitly listed origins
   if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
   callback(new Error(`CORS: origin ${origin} not allowed`));
 };
@@ -30,7 +34,7 @@ const corsOriginHandler = (origin, callback) => {
 // ── Socket.io setup ──────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: ALLOWED_ORIGINS || '*',
+    origin: corsOriginHandler,
     methods: ['GET', 'POST'],
     credentials: true,
   }
