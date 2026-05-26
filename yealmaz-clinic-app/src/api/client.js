@@ -1,8 +1,13 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ── Production backend ──
-export const API_BASE = 'https://yealmaz-production.up.railway.app/api';
+// ── API base ─────────────────────────────────────────────────────────────────
+// Web (Vercel):  set EXPO_PUBLIC_API_URL in Vercel → Environment Variables
+// Native (EAS):  set in eas.json → build → env → EXPO_PUBLIC_API_URL
+// Local dev:     set in yealmaz-clinic-app/.env
+export const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL ||
+  'https://yealmaz-production.up.railway.app/api';
 
 console.log('[API] Base URL:', API_BASE);
 
