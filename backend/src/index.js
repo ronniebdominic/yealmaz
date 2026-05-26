@@ -12,31 +12,11 @@ const app = express();
 const server = http.createServer(app);
 const prisma = new PrismaClient();
 
-// ── Allowed origins ──────────────────────────────────────
-// FRONTEND_URL can be a single URL or comma-separated list
-// e.g. "https://yealmaz.vercel.app,https://yealmaz-clinic.vercel.app"
-const ALLOWED_ORIGINS = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean)
-  : null; // null = allow all (development fallback)
-
-const corsOriginHandler = (origin, callback) => {
-  // Allow requests with no origin (mobile apps, curl, Postman)
-  if (!origin) return callback(null, true);
-  // No FRONTEND_URL set → allow everything (dev / first-run)
-  if (!ALLOWED_ORIGINS) return callback(null, true);
-  // Allow any Vercel deployment URL (covers preview + production deployments)
-  if (origin.endsWith('.vercel.app')) return callback(null, true);
-  // Allow explicitly listed origins
-  if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-  callback(new Error(`CORS: origin ${origin} not allowed`));
-};
-
 // ── Socket.io setup ──────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: corsOriginHandler,
+    origin: '*',
     methods: ['GET', 'POST'],
-    credentials: true,
   }
 });
 
@@ -71,7 +51,7 @@ io.on('connection', (socket) => {
 
 // ── Middleware ───────────────────────────────────────────
 app.use(compression());
-app.use(cors({ origin: corsOriginHandler, credentials: true }));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
