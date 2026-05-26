@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd frontend/receptionist && npm install && npm run build",
+  "outputDirectory": "frontend/receptionist/dist",
+  "installCommand": "echo 'skip root install'",
+  "framework": null
+}
