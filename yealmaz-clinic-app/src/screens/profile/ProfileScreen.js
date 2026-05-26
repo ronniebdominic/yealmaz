@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, StatusBar, Alert,
+  TouchableOpacity, StatusBar, Alert, Platform,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Colors, Spacing, Radius, Shadow } from '../../utils/theme';
@@ -20,10 +20,17 @@ export default function ProfileScreen({ navigation }) {
   const { clinic, logout } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: logout },
-    ]);
+    if (Platform.OS === 'web') {
+      // Alert.alert doesn't render on web — use browser confirm instead
+      if (window.confirm('Sign out of Ye-Almaz Clinic?')) {
+        logout();
+      }
+    } else {
+      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: logout },
+      ]);
+    }
   };
 
   return (
@@ -60,11 +67,10 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.menuCard}>
-            <MenuItem icon="🚪" label="Sign Out" onPress={handleLogout} danger />
-          </View>
-        </View>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.8}>
+          <Text style={styles.logoutIcon}>🚪</Text>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.footerLogo}>🦷 Ye-Almaz Dental Lab</Text>
@@ -113,6 +119,15 @@ const styles = StyleSheet.create({
   menuIcon: { fontSize: 18, width: 32 },
   menuLabel: { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.text1 },
   menuArrow: { fontSize: 20, color: Colors.text3 },
+
+  logoutButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5',
+    borderRadius: Radius.lg, paddingVertical: 15, marginBottom: Spacing.lg,
+    gap: 8,
+  },
+  logoutIcon: { fontSize: 18 },
+  logoutText: { fontSize: 16, fontWeight: '700', color: Colors.red },
 
   footer: { alignItems: 'center', marginTop: 20 },
   footerLogo: { fontSize: 14, fontWeight: '700', color: Colors.text2, marginBottom: 4 },
