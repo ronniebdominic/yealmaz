@@ -2,8 +2,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
-import { useState, useEffect } from 'react';
+import { Text, View, Platform, Animated, StyleSheet } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 import Toast from 'react-native-toast-message';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -85,10 +85,51 @@ function AppNavigator() {
   );
 }
 
+// ── Offline banner (web + native) ────────────────────────────────────────────
+function OfflineBanner() {
+  const [offline, setOffline] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-48)).current;
+
+  useEffect(() => {
+    const show = () => {
+      setOffline(true);
+      Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    };
+    const hide = () => {
+      Animated.timing(slideAnim, { toValue: -48, duration: 300, useNativeDriver: true }).start(() =>
+        setOffline(false)
+      );
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('offline', show);
+      window.addEventListener('online', hide);
+      return () => { window.removeEventListener('offline', show); window.removeEventListener('online', hide); };
+    }
+  }, []);
+
+  if (!offline) return null;
+  return (
+    <Animated.View style={[offlineStyles.bar, { transform: [{ translateY: slideAnim }] }]}>
+      <Text style={offlineStyles.text}>⚡ You're offline — showing cached data</Text>
+    </Animated.View>
+  );
+}
+
+const offlineStyles = StyleSheet.create({
+  bar: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 9999,
+    backgroundColor: '#1a1a2e', paddingVertical: 12, paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  text: { color: '#FFD166', fontSize: 13, fontWeight: '600' },
+});
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <OfflineBanner />
         <AppNavigator />
         <Toast />
       </AuthProvider>
