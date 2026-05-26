@@ -97,7 +97,7 @@ function OfflineBanner() {
   useEffect(() => {
     const show = () => {
       setOffline(true);
-      Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: false }).start();
     };
     const hide = () => {
       Animated.timing(slideAnim, { toValue: -48, duration: 300, useNativeDriver: true }).start(() =>
