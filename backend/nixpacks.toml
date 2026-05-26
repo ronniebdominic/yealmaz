@@ -1,0 +1,12 @@
+# Ye-Almaz Backend — Nixpacks build config
+# Prevents Nixpacks from auto-running `prisma db push` (needs port 5432, blocked on Railway).
+# Schema changes are applied manually via Supabase SQL Editor.
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npx prisma generate"]
+
+[start]
+cmd = "node src/index.js"
