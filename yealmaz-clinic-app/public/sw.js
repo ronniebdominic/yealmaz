@@ -7,7 +7,6 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS))
   );
-  // Take over immediately — no need to wait for old tabs to close
   self.skipWaiting();
 });
 
@@ -28,44 +27,54 @@ self.addEventListener('activate', (event) => {
 // ── Fetch strategy ───────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // ── Guard: skip anything that isn't http/https ───────────────────────────
+  // chrome-extension://, data:, blob:, etc. can't be cached and must be
+  // handled by the browser natively.
+  if (!request.url.startsWith('http')) return;
+
   const url = new URL(request.url);
 
-  // 1. API calls (Railway backend) — Network-first, never cache
-  //    If offline, return a structured JSON error so the app can show a banner
+  // 1. API calls (Railway backend) — let the browser handle them directly.
+  //    We only intercept when offline to return a readable JSON error instead
+  //    of a silent network failure.
   if (url.hostname.includes('railway.app') || url.pathname.startsWith('/api')) {
     event.respondWith(
-      fetch(request).catch(() =>
-        new Response(
-          JSON.stringify({ error: 'You are offline. Please check your connection.' }),
-          {
-            status: 503,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Offline': 'true',
-            },
-          }
+      fetch(request)
+        .catch(() =>
+          new Response(
+            JSON.stringify({ error: 'You are offline. Please check your connection.' }),
+            {
+              status: 503,
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Offline': 'true',
+              },
+            }
+          )
         )
-      )
     );
     return;
   }
 
-  // 2. Static assets (JS bundles, images, fonts) — Cache-first, update in background
+  // 2. Static assets (JS bundles, images, fonts) — Cache-first, update in bg
+  //    Only cache same-origin or CDN assets (http/https already guaranteed above)
   if (
     request.destination === 'script' ||
-    request.destination === 'style' ||
-    request.destination === 'image' ||
+    request.destination === 'style'  ||
+    request.destination === 'image'  ||
     request.destination === 'font'
   ) {
     event.respondWith(
       caches.match(request).then((cached) => {
         const networkFetch = fetch(request).then((response) => {
-          if (response.ok) {
+          // Only cache successful same-origin responses
+          if (response.ok && response.type !== 'opaque') {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        });
+        }).catch(() => cached); // if network fails, cached is already the fallback
         return cached || networkFetch;
       })
     );
@@ -73,7 +82,6 @@ self.addEventListener('fetch', (event) => {
   }
 
   // 3. Navigation (page loads) — Network-first, fall back to cached shell
-  //    This keeps the app launchable when offline
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -85,16 +93,25 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() =>
-          // Offline: serve the cached index.html so React Navigation can render
           caches.match('/index.html').then((cached) => cached || caches.match('/'))
         )
     );
     return;
   }
 
-  // 4. Everything else — network with cache fallback
+  // 4. Everything else — network with graceful cache fallback
+  //    Always resolve to a real Response (never undefined).
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    fetch(request).catch(() =>
+      caches.match(request).then(
+        (cached) =>
+          cached ||
+          new Response('', {
+            status: 503,
+            statusText: 'Service Unavailable',
+          })
+      )
+    )
   );
 });
 
@@ -118,7 +135,6 @@ self.addEventListener('push', (event) => {
       badge: '/assets/icon.png',
       vibrate: [200, 100, 200],
       data,
-      // Keep the notification on screen until the user interacts
       requireInteraction: false,
     })
   );
@@ -129,14 +145,12 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const caseId = event.notification.data?.caseId;
-  // Build a URL that React Navigation can deep-link into
   const url = caseId ? `/?caseId=${caseId}` : '/';
 
   event.waitUntil(
     clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {
-        // If the app is already open, focus it
         for (const client of windowClients) {
           if ('focus' in client) {
             client.focus();
@@ -144,7 +158,6 @@ self.addEventListener('notificationclick', (event) => {
             return;
           }
         }
-        // Otherwise open a new tab
         if (clients.openWindow) {
           return clients.openWindow(url);
         }
@@ -156,8 +169,8 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('sync', (event) => {
   if (event.tag === 'retry-uploads') {
     event.waitUntil(
-      self.clients.matchAll().then((clients) =>
-        clients.forEach((client) =>
+      self.clients.matchAll().then((clientList) =>
+        clientList.forEach((client) =>
           client.postMessage({ type: 'RETRY_UPLOADS' })
         )
       )
