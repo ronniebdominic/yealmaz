@@ -1,11 +1,19 @@
 // Ye-Almaz — Web Push Helper
 const webpush = require('web-push');
 
-webpush.setVapidDetails(
-  `mailto:${process.env.VAPID_EMAIL || 'admin@yealmaz.com'}`,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  try {
+    webpush.setVapidDetails(
+      `mailto:${process.env.VAPID_EMAIL || 'admin@yealmaz.com'}`,
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  } catch (err) {
+    console.error('[Push] Invalid VAPID keys — push notifications disabled:', err.message);
+  }
+} else {
+  console.warn('[Push] VAPID keys not set — push notifications disabled.');
+}
 
 /**
  * Send a push notification to all subscribed devices of a clinic.
