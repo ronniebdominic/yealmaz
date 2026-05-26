@@ -908,6 +908,7 @@ const MAIN_TABS = [
 export default function FinanceDashboard() {
   const { user, logout } = useAuth();
   const [tab, setTab]    = useState('screenshots');
+  const [open, setOpen]  = useState(false);
   const queryClient      = useQueryClient();
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'FN';
@@ -945,9 +946,61 @@ export default function FinanceDashboard() {
   const stats          = summary?.stats || {};
   const revenueGrowth  = stats.revenueGrowth ?? null;
 
+  const currentTab = MAIN_TABS.find(t => t.id === tab);
+
+  const setTabAndClose = (id) => { setTab(id); setOpen(false); };
+
   return (
     <div className="app">
-      {/* ── Sidebar ─────────────────────────────────────── */}
+      {/* ── Mobile topbar ───────────────────────────────── */}
+      <div className="mobile-topbar">
+        <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
+        <span className="mobile-topbar-title">{currentTab?.icon} {currentTab?.label}</span>
+        <div className="live-dot" />
+      </div>
+
+      {/* ── Drawer overlay ──────────────────────────────── */}
+      <div className={`drawer-overlay${open ? ' open' : ''}`} onClick={() => setOpen(false)} />
+
+      {/* ── Drawer ──────────────────────────────────────── */}
+      <div className={`drawer${open ? ' open' : ''}`}>
+        <div className="drawer-logo">
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <div className="lab-name">Ye-Almaz Dental Lab</div>
+          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>Finance</span>
+        </div>
+        <nav className="sidebar-nav">
+          <div className="nav-section-label">Payments</div>
+          <button className={`nav-item${tab === 'screenshots' ? ' active' : ''}`} onClick={() => setTabAndClose('screenshots')}>
+            <span>💳</span> Screenshot Approvals
+            {(pending.length + uploadedCount) > 0 && <span className="badge-count">{pending.length + uploadedCount}</span>}
+          </button>
+          <div className="nav-section-label">Billing</div>
+          <button className={`nav-item${tab === 'billing' ? ' active' : ''}`} onClick={() => setTabAndClose('billing')}>
+            <span>📄</span> Billing & Invoicing
+            {toInvoiceCount > 0 && <span className="badge-count">{toInvoiceCount}</span>}
+          </button>
+          <button className={`nav-item${tab === 'trusted' ? ' active' : ''}`} onClick={() => setTabAndClose('trusted')}>
+            <span>🤝</span> Trusted Partners
+            {trustedCount > 0 && <span className="badge-count">{trustedCount}</span>}
+          </button>
+          <button className={`nav-item${tab === 'history' ? ' active' : ''}`} onClick={() => setTabAndClose('history')}>
+            <span>✅</span> Verified History
+          </button>
+        </nav>
+        <div className="drawer-footer">
+          <div className="user-info">
+            <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
+            <div>
+              <div className="user-name">{user?.name}</div>
+              <div className="user-role">Finance</div>
+            </div>
+            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sidebar (desktop only) ───────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <img

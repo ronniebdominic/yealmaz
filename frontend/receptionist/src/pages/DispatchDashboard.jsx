@@ -98,6 +98,7 @@ export default function DispatchDashboard() {
   const [processing, setProcessing] = useState(false);
   const [tab, setTab]               = useState('queue'); // queue | enroute | delivered
   const [search, setSearch]         = useState('');
+  const [open, setOpen]             = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -162,11 +163,50 @@ export default function DispatchDashboard() {
   const unassigned = queue.filter(c => !c.assignedDeliveryId);
   const shown = tab === 'queue' ? queue : tab === 'enroute' ? enRoute : delivered;
 
+  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DS';
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* ── Drawer overlay ──────────────────────────────── */}
+      <div className={`drawer-overlay${open ? ' open' : ''}`} onClick={() => setOpen(false)} />
+
+      {/* ── Drawer ──────────────────────────────────────── */}
+      <div className={`drawer${open ? ' open' : ''}`}>
+        <div className="drawer-logo">
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <div className="lab-name">Ye-Almaz Dental Lab</div>
+          <span className="role-badge" style={{ background: 'rgba(0,196,180,0.15)', color: 'var(--accent)' }}>Dispatch</span>
+        </div>
+        <nav className="sidebar-nav">
+          <div className="nav-section-label">Queue</div>
+          <button className={`nav-item${tab === 'queue' ? ' active' : ''}`} onClick={() => { setTab('queue'); setOpen(false); }}>
+            <span>📦</span> Ready to Dispatch
+            {queue.length > 0 && <span className="badge-count">{queue.length}</span>}
+          </button>
+          <button className={`nav-item${tab === 'enroute' ? ' active' : ''}`} onClick={() => { setTab('enroute'); setOpen(false); }}>
+            <span>🚚</span> En Route
+            {enRoute.length > 0 && <span className="badge-count">{enRoute.length}</span>}
+          </button>
+          <button className={`nav-item${tab === 'delivered' ? ' active' : ''}`} onClick={() => { setTab('delivered'); setOpen(false); }}>
+            <span>✅</span> Delivered
+          </button>
+        </nav>
+        <div className="drawer-footer">
+          <div className="user-info">
+            <div className="user-avatar">{initials}</div>
+            <div>
+              <div className="user-name">{user?.name}</div>
+              <div className="user-role">Dispatch</div>
+            </div>
+            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+          </div>
+        </div>
+      </div>
+
       {/* Topbar */}
       <div className="topbar">
+        <button className="hamburger-topbar" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
         <div className="topbar-title">📋 Dispatch Dashboard</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
           <div className="live-dot" />
