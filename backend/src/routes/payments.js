@@ -149,7 +149,7 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
       prisma.case.findMany({
         where,
         include: {
-          clinic: { select: { name: true, phone: true, email: true, address: true } },
+          clinic: { select: { name: true, phone: true, email: true, address: true, isExcluded: true } },
           payment: true
         },
         orderBy: { updatedAt: 'desc' },
@@ -216,7 +216,7 @@ router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
 
 // ── POST /api/payments/:caseId/collect ──────────────────
 // Admin manually marks payment as collected (cash, bank transfer, etc.) — no screenshot needed
-router.post('/:caseId/collect', protect, restrict('ADMIN'), async (req, res) => {
+router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
   try {
     const { amount, notes } = req.body;
 
@@ -250,9 +250,9 @@ router.post('/:caseId/collect', protect, restrict('ADMIN'), async (req, res) => 
 
     const io = req.app.get('io');
     io.to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
-      caseId: caseData.id,
+      caseId:  caseData.id,
       caseNumber: caseData.caseNumber,
-      action: 'APPROVE',
+      action:  'APPROVE',
       message: 'Payment has been confirmed by the lab.'
     });
 
@@ -410,6 +410,47 @@ router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch payment history.' });
+  }
+});
+
+// ── GET /api/payments/trusted ────────────────────────────
+// Pending cases from isExcluded clinics — collected in person by finance
+router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  const cacheKey = `payments:trusted:${page}:${limit}`;
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const where = {
+      paymentStatus: 'PENDING',
+      clinic: { isExcluded: true },
+    };
+
+    const [cases, total] = await Promise.all([
+      prisma.case.findMany({
+        where,
+        include: {
+          clinic: { select: { name: true, phone: true, address: true, isExcluded: true } },
+          payment: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: parseInt(limit),
+      }),
+      prisma.case.count({ where }),
+    ]);
+
+    const result = {
+      cases,
+      pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) },
+    };
+    await appCache.set(cacheKey, result, 30);
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch trusted partner cases.' });
   }
 });
 

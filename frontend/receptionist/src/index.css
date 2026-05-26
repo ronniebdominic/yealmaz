@@ -75,6 +75,7 @@ tr:hover td{background:var(--surface-2)}
 .badge-pay-uploaded{background:#EFF6FF;color:var(--blue)}
 .badge-pay-verified{background:var(--green-dim);color:var(--green)}
 .badge-pay-rejected{background:var(--red-dim);color:var(--red)}
+.badge-trusted{background:#F5F3FF;color:#6D28D9}.badge-trusted::before{background:#7C3AED}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
 .btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--navy-mid)}
 .btn-success{background:var(--green);color:#fff}.btn-success:hover{background:#15803d}

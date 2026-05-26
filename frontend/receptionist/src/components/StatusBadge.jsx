@@ -36,7 +36,10 @@ export function StatusBadge({ status }) {
   return <span className={`badge ${s.cls}`}>{s.label}</span>;
 }
 
-export function PaymentBadge({ status }) {
+export function PaymentBadge({ status, isExcluded }) {
+  if (isExcluded && status === 'PENDING') {
+    return <span className="badge badge-trusted">🤝 Trusted Partner</span>;
+  }
   const s = PAY_MAP[status] || { label: status, cls: '' };
   return <span className={`badge ${s.cls}`}>{s.label}</span>;
 }

@@ -20,6 +20,8 @@ const fetchPending = () => api.get('/payments/pending').then(r => r.data.payment
 const fetchBilling = () => api.get('/payments/billing').then(r => r.data.cases    ?? r.data);
 const fetchHistory = (page) =>
   api.get(`/payments/history?page=${page}&limit=${HIST_SIZE}`).then(r => r.data);
+const fetchTrusted = (page) =>
+  api.get(`/payments/trusted?page=${page}&limit=${HIST_SIZE}`).then(r => r.data);
 
 // ── Lab info constant ─────────────────────────────────────
 const LAB = {
@@ -621,6 +623,209 @@ function BillingTab({ queryClient }) {
   );
 }
 
+// ── Trusted Partners Tab ─────────────────────────────────
+function CollectModal({ caseData, onDone, onClose }) {
+  const [amount, setAmount] = useState(caseData.totalAmount?.toString() || '');
+  const [notes,  setNotes]  = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await api.post(`/payments/${caseData.id}/collect`, {
+        amount: amount ? parseFloat(amount) : undefined,
+        notes:  notes  || undefined,
+      });
+      toast.success(`✅ Payment collected — ${caseData.caseNumber}`);
+      onDone();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to record payment');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">💰 Mark as Collected</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Trusted partner — cash / bank collection</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{caseData.patientName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'monospace', marginTop: 2 }}>{caseData.caseNumber}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
+              {caseData.workType}{caseData.toothNumbers ? ` · Teeth ${caseData.toothNumbers}` : ''}
+            </div>
+            <div style={{ fontSize: 12, marginTop: 2 }}>🏥 {caseData.clinic?.name}</div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+              Amount Collected (Br)
+              {caseData.totalAmount && (
+                <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                  Invoice: Br {caseData.totalAmount.toLocaleString('en-US')}
+                </span>
+              )}
+            </label>
+            <input
+              type="number" min="0"
+              placeholder={caseData.totalAmount ? String(caseData.totalAmount) : 'Enter amount…'}
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              autoFocus
+              style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 15, fontWeight: 600, background: 'var(--surface)', color: 'var(--text-1)' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Notes (optional)</label>
+            <input
+              type="text"
+              placeholder="e.g. Cash at delivery, Bank transfer ref…"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button
+              onClick={submit} disabled={saving}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: saving ? 'var(--border)' : 'var(--green)',
+                color: '#fff', border: 'none', borderRadius: 8,
+                padding: '10px 18px', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {saving ? 'Saving…' : '✓ Confirm Collected'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrustedPartnersTab({ queryClient }) {
+  const [page, setPage]         = useState(1);
+  const [collectCase, setCollect] = useState(null);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['payments', 'trusted', page],
+    queryFn:  () => fetchTrusted(page),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const cases      = data?.cases      || [];
+  const pagination = data?.pagination || {};
+
+  if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading…</div>;
+  if (isError)   return <ErrorState message="Could not load trusted partner cases." onRetry={refetch} />;
+
+  if (cases.length === 0 && page === 1) return (
+    <div className="empty-state">
+      <div className="empty-icon">🤝</div>
+      <div className="empty-title">All collected!</div>
+      <p>No pending payments from trusted partner clinics.</p>
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#6D28D9', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 16 }}>🤝</span>
+        <span>
+          <strong>{pagination.total ?? cases.length} cases</strong> from trusted partner clinics awaiting collection.
+          These clinics pay on delivery — mark each case as collected once payment is received.
+        </span>
+      </div>
+
+      <div className="card">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Case #</th>
+                <th>Patient</th>
+                <th>Clinic</th>
+                <th>Work Type</th>
+                <th>Invoice #</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cases.map(c => (
+                <tr key={c.id}>
+                  <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{c.caseNumber}</td>
+                  <td style={{ fontWeight: 600 }}>{c.patientName}</td>
+                  <td>
+                    <div style={{ fontSize: 13 }}>{c.clinic?.name}</div>
+                    <span className="badge badge-trusted" style={{ fontSize: 10, marginTop: 3 }}>🤝 Trusted Partner</span>
+                  </td>
+                  <td style={{ fontSize: 13 }}>
+                    {c.workType}
+                    {c.toothNumbers && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>#{c.toothNumbers}</div>}
+                  </td>
+                  <td style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>
+                    {c.payment?.invoiceNumber || <span style={{ color: 'var(--text-3)' }}>—</span>}
+                  </td>
+                  <td style={{ fontWeight: 700, fontSize: 14 }}>
+                    {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                  </td>
+                  <td><StatusBadge status={c.status} /></td>
+                  <td>
+                    <button
+                      onClick={() => setCollect(c)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        background: 'var(--green-dim)', color: 'var(--green)',
+                        border: '1px solid rgba(22,163,74,0.3)',
+                        borderRadius: 6, padding: '5px 11px',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      💰 Mark Collected
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Pagination
+            page={page} totalPages={pagination.totalPages || 1}
+            total={pagination.total || 0} pageSize={HIST_SIZE}
+            onPrev={() => setPage(p => p - 1)}
+            onNext={() => setPage(p => p + 1)}
+          />
+        </div>
+      </div>
+
+      {collectCase && (
+        <CollectModal
+          caseData={collectCase}
+          onDone={() => {
+            setCollect(null);
+            queryClient.invalidateQueries({ queryKey: ['payments', 'trusted'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+          }}
+          onClose={() => setCollect(null)}
+        />
+      )}
+    </>
+  );
+}
+
 // ── Verified History Tab ──────────────────────────────────
 function HistoryTab() {
   const [page, setPage] = useState(1);
@@ -696,6 +901,7 @@ function HistoryTab() {
 const MAIN_TABS = [
   { id: 'screenshots', label: 'Screenshot Approvals', icon: '💳' },
   { id: 'billing',     label: 'Billing & Invoicing',   icon: '📄' },
+  { id: 'trusted',     label: 'Trusted Partners',      icon: '🤝' },
   { id: 'history',     label: 'Verified History',      icon: '✅' },
 ];
 
@@ -725,6 +931,14 @@ export default function FinanceDashboard() {
     queryFn: fetchBilling,
     staleTime: 60_000,
   });
+
+  const { data: trustedData } = useQuery({
+    queryKey: ['payments', 'trusted', 1],
+    queryFn: () => fetchTrusted(1),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+  const trustedCount = trustedData?.pagination?.total ?? 0;
 
   const toInvoiceCount = billing.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount).length;
   const uploadedCount  = billing.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED').length;
@@ -765,6 +979,13 @@ export default function FinanceDashboard() {
             {toInvoiceCount > 0 && <span className="badge-count">{toInvoiceCount}</span>}
           </button>
           <button
+            className={`nav-item ${tab === 'trusted' ? 'active' : ''}`}
+            onClick={() => setTab('trusted')}
+          >
+            <span>🤝</span> Trusted Partners
+            {trustedCount > 0 && <span className="badge-count">{trustedCount}</span>}
+          </button>
+          <button
             className={`nav-item ${tab === 'history' ? 'active' : ''}`}
             onClick={() => setTab('history')}
           >
@@ -800,7 +1021,7 @@ export default function FinanceDashboard() {
 
         <div className="content">
           {/* ── KPI row ─────────────────────────────────── */}
-          <div className="stats-grid" style={{ marginBottom: 24 }}>
+          <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(5,1fr)' }}>
             <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
               <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📸</div>
               <div className="stat-label">Pending Approvals</div>
@@ -814,6 +1035,12 @@ export default function FinanceDashboard() {
               <div className="stat-label">To Invoice</div>
               <div className="stat-value" style={{ color: 'var(--blue)' }}>{toInvoiceCount}</div>
               <div className="stat-sub">Need invoice issued</div>
+            </div>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
+              <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
+              <div className="stat-label">Trusted Partners</div>
+              <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedCount}</div>
+              <div className="stat-sub">Pending collection</div>
             </div>
             <div className="stat-card">
               <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
@@ -836,6 +1063,7 @@ export default function FinanceDashboard() {
           {/* ── Tab content ─────────────────────────────── */}
           {tab === 'screenshots' && <ScreenshotsTab queryClient={queryClient} />}
           {tab === 'billing'     && <BillingTab queryClient={queryClient} />}
+          {tab === 'trusted'     && <TrustedPartnersTab queryClient={queryClient} />}
           {tab === 'history'     && <HistoryTab />}
         </div>
       </main>

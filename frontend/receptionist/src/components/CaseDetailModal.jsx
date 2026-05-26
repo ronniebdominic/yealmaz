@@ -320,7 +320,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
               </div>
               <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <StatusBadge status={data.status} />
-                <PaymentBadge status={data.paymentStatus} />
+                <PaymentBadge status={data.paymentStatus} isExcluded={data.clinic?.isExcluded} />
               </div>
             </div>
 

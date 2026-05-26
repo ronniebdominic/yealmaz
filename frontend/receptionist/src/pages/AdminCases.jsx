@@ -523,7 +523,7 @@ export default function AdminCases() {
                           : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
                       <td><StatusBadge status={c.status} /></td>
-                      <td><PaymentBadge status={c.paymentStatus} /></td>
+                      <td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
                       </td>

@@ -475,7 +475,7 @@ export default function Billing() {
                       </td>
                       <td>
                         <StatusBadge status={c.status} />
-                        <div style={{ marginTop: 4 }}><PaymentBadge status={c.paymentStatus} /></div>
+                        <div style={{ marginTop: 4 }}><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></div>
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
