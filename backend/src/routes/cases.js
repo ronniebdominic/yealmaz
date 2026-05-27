@@ -15,6 +15,20 @@ async function generateCaseNumber() {
   return `YAL-${year}-${padded}`;
 }
 
+// ── Auto due-date rules (days from creation) ─────────────
+function getDueDays(workType) {
+  const w = (workType || '').toLowerCase();
+  if (w.includes('coping'))    return 3;  // Coping / Zirconia Coping — checked first
+  if (w.includes('aligner'))   return 6;  // Clear Aligner Setup
+  if (w.includes('zirconia'))  return 4;  // all Zirconia variants
+  if (w.includes('ceramic'))   return 6;  // Ceramic Layering, PFM Ceramic, etc.
+  if (w.includes('emax'))      return 6;  // Emax Crown / Veneer / Bridge
+  // Other appliances: guards, splints, retainers, bleaching trays, gingival masks
+  if (w.includes('guard') || w.includes('splint') || w.includes('retainer') ||
+      w.includes('bleaching') || w.includes('gingival')) return 4;
+  return 5; // everything else
+}
+
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
@@ -120,6 +134,12 @@ router.post('/', protect, async (req, res) => {
     const clinicId = req.user.role === 'CLINIC' ? req.user.id : req.body.clinicId;
     if (!clinicId) return res.status(400).json({ error: 'Clinic ID is required.' });
 
+    // Auto-calculate due date from work type; use manual value only if explicitly provided
+    const autoDays = getDueDays(workType);
+    const autoDate = new Date();
+    autoDate.setDate(autoDate.getDate() + autoDays);
+    const resolvedDueDate = dueDate ? new Date(dueDate) : autoDate;
+
     const newCase = await prisma.case.create({
       data: {
         caseNumber,
@@ -130,7 +150,7 @@ router.post('/', protect, async (req, res) => {
         toothNumbers,
         shade,
         notes,
-        dueDate: dueDate ? new Date(dueDate) : null,
+        dueDate: resolvedDueDate,
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
         deliveryType: deliveryType === 'EXPRESS' ? 'EXPRESS' : 'NORMAL',
         clinicId,

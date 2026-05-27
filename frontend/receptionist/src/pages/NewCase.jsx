@@ -133,6 +133,24 @@ function Odontogram({ selected, onToggle, onClear }) {
   );
 }
 
+// ── Auto due-date rules ───────────────────────────────────
+function getDueDays(workType) {
+  const w = (workType || '').toLowerCase();
+  if (w.includes('coping'))    return 3;
+  if (w.includes('aligner'))   return 6;
+  if (w.includes('zirconia'))  return 4;
+  if (w.includes('ceramic'))   return 6;
+  if (w.includes('emax'))      return 6;
+  if (w.includes('guard') || w.includes('splint') || w.includes('retainer') ||
+      w.includes('bleaching') || w.includes('gingival')) return 4;
+  return 5;
+}
+function calcDueDate(workType) {
+  const d = new Date();
+  d.setDate(d.getDate() + getDueDays(workType));
+  return d.toISOString().split('T')[0]; // yyyy-mm-dd for <input type="date">
+}
+
 // Work types priced per full dentition — never multiplied by tooth count
 const FLAT_PRICE_TYPES = new Set([
   'Orthodontic Retainer', 'Night Guard Soft', 'Night Guard Hard',
@@ -171,6 +189,13 @@ export default function NewCase() {
     setForm(prev => ({ ...prev, totalAmount: String(unitPrice * count) }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.workType, selectedTeeth.length, priceMap]);
+
+  // Auto-set due date whenever work type changes
+  useEffect(() => {
+    if (!form.workType) return;
+    setForm(prev => ({ ...prev, dueDate: calcDueDate(form.workType) }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.workType]);
 
   useEffect(() => { loadClinics(); }, []);
 
@@ -319,7 +344,14 @@ export default function NewCase() {
 
               <div className="grid-2">
                 <div className="form-group">
-                  <label>Due Date</label>
+                  <label>
+                    Due Date
+                    {form.workType && (
+                      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                        auto · {getDueDays(form.workType)} days from today
+                      </span>
+                    )}
+                  </label>
                   <input type="date" value={form.dueDate} onChange={set('dueDate')} />
                 </div>
                 <div className="form-group">
