@@ -108,7 +108,11 @@ model Case {
 }
 
 enum CaseStatus {
-  // Case received
+  // Intake — pickup from clinic
+  PENDING_PICKUP      // case submitted; waiting for dispatch to assign pickup
+  PICKUP_ASSIGNED     // delivery exec assigned to collect impression from clinic
+
+  // Case received at lab
   CASE_ACCEPTED
 
   // Model preparation

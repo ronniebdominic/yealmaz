@@ -1,4 +1,6 @@
 const STATUS_MAP = {
+  PENDING_PICKUP:            { label: 'Awaiting Pickup',          cls: 'badge-pickup' },
+  PICKUP_ASSIGNED:           { label: 'Pickup Assigned',          cls: 'badge-pickup-assigned' },
   CASE_ACCEPTED:             { label: 'Case Accepted',            cls: 'badge-received' },
   PLASTER_DEPARTMENT:        { label: 'Plaster Department',       cls: 'badge-impression' },
   MARGIN_DEPARTMENT:         { label: 'Margin Department',        cls: 'badge-impression' },
@@ -45,6 +47,7 @@ export function PaymentBadge({ status, isExcluded }) {
 }
 
 export const STAGE_ICONS = {
+  PENDING_PICKUP: '🛵', PICKUP_ASSIGNED: '🏍️',
   CASE_ACCEPTED: '📥', PLASTER_DEPARTMENT: '🏺', MARGIN_DEPARTMENT: '✂️',
   SCANNING: '🔬', DESIGNING: '🖥️',
   MILLING_SINTERING: '⚙️', RESIN_3D_PRINTING: '🖨️', METAL_3D_PRINTING: '🔩',

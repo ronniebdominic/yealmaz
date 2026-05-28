@@ -62,6 +62,8 @@ tr:hover td{background:var(--surface-2)}
 .case-number{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-3)}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
 .badge::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.badge-pickup{background:#FFF7ED;color:#EA580C}.badge-pickup::before{background:#EA580C}
+.badge-pickup-assigned{background:#FEF9C3;color:#854D0E}.badge-pickup-assigned::before{background:#CA8A04}
 .badge-received{background:#EEF2FF;color:#4F46E5}.badge-received::before{background:#4F46E5}
 .badge-impression{background:#FFF7ED;color:#C2410C}.badge-impression::before{background:#C2410C}
 .badge-casting{background:#FEF3C7;color:#92400E}.badge-casting::before{background:#92400E}

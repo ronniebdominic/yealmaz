@@ -46,6 +46,12 @@ export default function Dashboard() {
             <div className="stat-sub">All time</div>
           </div>
           <div className="stat-card">
+            <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
+            <div className="stat-label">Awaiting Pickup</div>
+            <div className="stat-value" style={{ color: '#EA580C' }}>{stats?.pendingPickups ?? '—'}</div>
+            <div className="stat-sub">Impression collection</div>
+          </div>
+          <div className="stat-card">
             <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
             <div className="stat-label">In Production</div>
             <div className="stat-value" style={{ color: 'var(--amber)' }}>{stats?.pendingCases ?? '—'}</div>

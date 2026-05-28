@@ -20,13 +20,14 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
     const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
 
     const [
-      totalCases, pendingCases, completedCases, activeCases,
+      totalCases, pendingCases, completedCases, activeCases, pendingPickups,
       pendingPayments, thisMonthRevenue, lastMonthRevenue, recentCases
     ] = await Promise.all([
       prisma.case.count(),
-      prisma.case.count({ where: { status: { notIn: ['DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED'] } } }),
+      prisma.case.count({ where: { status: { notIn: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED'] } } }),
       prisma.case.count({ where: { status: 'DELIVERED' } }),
       prisma.case.count({ where: { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } } }),
+      prisma.case.count({ where: { status: { in: ['PENDING_PICKUP', 'PICKUP_ASSIGNED'] } } }),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
       prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfMonth } }, _sum: { amount: true } }),
       prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
@@ -40,7 +41,7 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
       : null;
 
     const result = {
-      stats: { totalCases, pendingCases, completedCases, activeCases, pendingPayments, thisMonthRevenue: thisMonthAmt, lastMonthRevenue: lastMonthAmt, revenueGrowth },
+      stats: { totalCases, pendingCases, completedCases, activeCases, pendingPickups, pendingPayments, thisMonthRevenue: thisMonthAmt, lastMonthRevenue: lastMonthAmt, revenueGrowth },
       recentCases
     };
 
@@ -100,6 +101,7 @@ router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async
 
   try {
     const statuses = [
+      'PENDING_PICKUP', 'PICKUP_ASSIGNED',
       'CASE_ACCEPTED', 'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
       'SCANNING', 'DESIGNING',
       'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING',

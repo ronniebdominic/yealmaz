@@ -154,7 +154,7 @@ router.post('/', protect, async (req, res) => {
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
         deliveryType: deliveryType === 'EXPRESS' ? 'EXPRESS' : 'NORMAL',
         clinicId,
-        status: 'CASE_ACCEPTED'
+        status: 'PENDING_PICKUP'
       }
     });
 
@@ -173,9 +173,9 @@ router.post('/', protect, async (req, res) => {
     await prisma.caseStage.create({
       data: {
         caseId: newCase.id,
-        stageName: 'CASE_ACCEPTED',
+        stageName: 'PENDING_PICKUP',
         scannedBy: req.user.name,
-        notes: 'Case received and registered'
+        notes: 'Case registered — awaiting impression pickup'
       }
     });
 

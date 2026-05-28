@@ -9,6 +9,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const FILTERS = [
   { label: 'All',            value: '' },
+  { label: 'Awaiting Pickup', value: 'PENDING_PICKUP' },
+  { label: 'Pickup Assigned', value: 'PICKUP_ASSIGNED' },
   { label: 'Accepted',       value: 'CASE_ACCEPTED' },
   { label: 'CAD/CAM',        value: 'DESIGNING' },
   { label: 'Manufacturing',  value: 'MILLING_SINTERING' },

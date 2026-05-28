@@ -25,7 +25,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     const where = {
       ...(isDeliveryExec ? { assignedDeliveryId: req.user.id } : {}),
       OR: [
-        { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
+        { status: { in: ['PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
         { status: 'DELIVERED', deliveryLogs: { some: { deliveredAt: { gte: todayStart } } } }
       ]
     };
@@ -50,6 +50,56 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch delivery cases.' });
+  }
+});
+
+// ── POST /api/delivery/:caseId/collect-impression ────────
+// Delivery exec confirms impression collected from clinic → case enters production
+router.post('/:caseId/collect-impression', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (caseData.status !== 'PICKUP_ASSIGNED') {
+      return res.status(400).json({ error: 'Case is not in PICKUP_ASSIGNED status.' });
+    }
+
+    await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { status: 'CASE_ACCEPTED', assignedDeliveryId: null }
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'CASE_ACCEPTED',
+        scannedBy: req.user.name,
+        notes: 'Impression collected from clinic — case handed to lab'
+      }
+    });
+
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('new_case', {
+      caseId: caseData.id, caseNumber: caseData.caseNumber,
+      patientName: caseData.patientName, workType: caseData.workType,
+      message: 'Impression received — ready for production'
+    });
+    io.to(`clinic_${caseData.clinicId}`).emit('case_updated', {
+      caseId: caseData.id, caseNumber: caseData.caseNumber,
+      status: 'CASE_ACCEPTED', message: 'Impression received at lab — production started!'
+    });
+
+    sendPushToClinic(prisma, caseData.clinicId, {
+      title: '🏭 Impression Received at Lab',
+      body: `Case ${caseData.caseNumber} (${caseData.patientName}) impression received. Production has started!`,
+      data: { caseId: caseData.id, caseNumber: caseData.caseNumber, screen: 'CaseDetail' },
+    });
+
+    res.json({ success: true, message: 'Impression collected. Case entered production.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not confirm impression collection.' });
   }
 });
 

@@ -74,6 +74,8 @@ const NEXT_DEPT_LABEL = {
 };
 
 const STAGE_LABELS = {
+  PENDING_PICKUP:            'Awaiting Impression Pickup',
+  PICKUP_ASSIGNED:           'Pickup Assigned',
   CASE_ACCEPTED:             'Case Accepted',
   PLASTER_DEPARTMENT:        'Plaster Department',
   MARGIN_DEPARTMENT:         'Margin Department',

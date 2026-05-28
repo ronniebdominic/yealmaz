@@ -17,7 +17,7 @@ router.get('/executives', protect, restrict('DISPATCH', 'ADMIN'), async (req, re
       select: {
         id: true, name: true, email: true, phone: true,
         assignedDeliveries: {
-          where: { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
+          where: { status: { in: ['PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
           select: { id: true, caseNumber: true, status: true, patientName: true, clinic: { select: { name: true } } }
         }
       },
@@ -44,7 +44,7 @@ router.get('/queue', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) =>
     const cases = await prisma.case.findMany({
       where: {
         OR: [
-          { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
+          { status: { in: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
           { status: 'DELIVERED', updatedAt: { gte: todayStart } }
         ]
       },
@@ -148,6 +148,58 @@ router.post('/:caseId/unassign', protect, restrict('DISPATCH', 'ADMIN'), async (
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not unassign case.' });
+  }
+});
+
+// ── POST /api/dispatch/:caseId/assign-pickup ─────────────
+// Assign a delivery executive to collect the impression from the clinic
+router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  const { executiveId } = req.body;
+  if (!executiveId) return res.status(400).json({ error: 'executiveId is required.' });
+
+  try {
+    const executive = await prisma.user.findUnique({ where: { id: executiveId } });
+    if (!executive || executive.role !== 'DELIVERY') {
+      return res.status(400).json({ error: 'Invalid delivery executive.' });
+    }
+
+    const updated = await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { assignedDeliveryId: executiveId, status: 'PICKUP_ASSIGNED' },
+      include: {
+        clinic: { select: { name: true } },
+        assignedDelivery: { select: { id: true, name: true } }
+      }
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'PICKUP_ASSIGNED',
+        scannedBy: req.user.name,
+        notes: `Pickup assigned to ${executive.name} by dispatch`
+      }
+    });
+
+    await invalidate('dispatch:queue', 'delivery:*', `case:${req.params.caseId}`);
+
+    const io = req.app.get('io');
+    io.to(`delivery_${executiveId}`).emit('case_assigned', {
+      caseId: updated.id,
+      caseNumber: updated.caseNumber,
+      message: `Pickup assigned: ${updated.caseNumber} — collect impression from ${updated.clinic?.name}`
+    });
+
+    sendPushToClinic(prisma, updated.clinicId, {
+      title: '🛵 Pickup Partner on the Way',
+      body: `A delivery partner has been assigned to collect the impression for case ${updated.caseNumber} (${updated.patientName}).`,
+      data: { caseId: updated.id, caseNumber: updated.caseNumber, screen: 'CaseDetail' },
+    });
+
+    res.json({ success: true, case: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not assign pickup.' });
   }
 });
 

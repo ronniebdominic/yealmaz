@@ -6,8 +6,9 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
 // ── Assign Modal ─────────────────────────────────────────────────────────────
-function AssignModal({ caseData, executives, onConfirm, onClose, loading }) {
+function AssignModal({ caseData, executives, onConfirm, onClose, loading, mode }) {
   const [selectedExecId, setSelectedExecId] = useState('');
+  const isPickup = mode === 'pickup';
 
   const current = caseData.assignedDelivery;
 
@@ -15,7 +16,7 @@ function AssignModal({ caseData, executives, onConfirm, onClose, loading }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">🚚 Assign Delivery Executive</div>
+          <div className="modal-title">{isPickup ? '🛵 Assign Pickup Executive' : '🚚 Assign Delivery Executive'}</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
@@ -79,7 +80,7 @@ function AssignModal({ caseData, executives, onConfirm, onClose, loading }) {
               onClick={() => onConfirm(selectedExecId)}
               disabled={loading || !selectedExecId}
             >
-              {loading ? 'Assigning…' : '✓ Assign'}
+              {loading ? 'Assigning…' : isPickup ? '🛵 Assign Pickup' : '✓ Assign Delivery'}
             </button>
           </div>
         </div>
@@ -94,9 +95,9 @@ export default function DispatchDashboard() {
   const [cases, setCases]           = useState([]);
   const [executives, setExecutives] = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [modal, setModal]           = useState(null);   // { case }
+  const [modal, setModal]           = useState(null);   // { case, mode: 'pickup'|'delivery' }
   const [processing, setProcessing] = useState(false);
-  const [tab, setTab]               = useState('queue'); // queue | enroute | delivered
+  const [tab, setTab]               = useState('pickups'); // pickups | queue | enroute | delivered
   const [search, setSearch]         = useState('');
   const [open, setOpen]             = useState(false);
 
@@ -125,8 +126,11 @@ export default function DispatchDashboard() {
     if (!modal || !executiveId) return;
     setProcessing(true);
     try {
-      await api.post(`/dispatch/${modal.case.id}/assign`, { executiveId });
-      toast.success('✓ Case assigned!');
+      const endpoint = modal.mode === 'pickup'
+        ? `/dispatch/${modal.case.id}/assign-pickup`
+        : `/dispatch/${modal.case.id}/assign`;
+      await api.post(endpoint, { executiveId });
+      toast.success(modal.mode === 'pickup' ? '🛵 Pickup assigned!' : '✓ Delivery assigned!');
       setModal(null);
       load();
     } catch (err) {
@@ -157,11 +161,13 @@ export default function DispatchDashboard() {
     c.assignedDelivery?.name?.toLowerCase().includes(q)
   );
 
+  const pickups   = filtered.filter(c => c.status === 'PENDING_PICKUP' || c.status === 'PICKUP_ASSIGNED');
   const queue     = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
   const enRoute   = filtered.filter(c => c.status === 'OUT_FOR_DELIVERY');
   const delivered = filtered.filter(c => c.status === 'DELIVERED');
+  const unassignedPickups = pickups.filter(c => c.status === 'PENDING_PICKUP');
   const unassigned = queue.filter(c => !c.assignedDeliveryId);
-  const shown = tab === 'queue' ? queue : tab === 'enroute' ? enRoute : delivered;
+  const shown = tab === 'pickups' ? pickups : tab === 'queue' ? queue : tab === 'enroute' ? enRoute : delivered;
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DS';
 
@@ -179,7 +185,12 @@ export default function DispatchDashboard() {
           <span className="role-badge" style={{ background: 'rgba(0,196,180,0.15)', color: 'var(--accent)' }}>Dispatch</span>
         </div>
         <nav className="sidebar-nav">
-          <div className="nav-section-label">Queue</div>
+          <div className="nav-section-label">Pickups</div>
+          <button className={`nav-item${tab === 'pickups' ? ' active' : ''}`} onClick={() => { setTab('pickups'); setOpen(false); }}>
+            <span>🛵</span> Impression Pickups
+            {pickups.length > 0 && <span className="badge-count">{pickups.length}</span>}
+          </button>
+          <div className="nav-section-label">Delivery</div>
           <button className={`nav-item${tab === 'queue' ? ' active' : ''}`} onClick={() => { setTab('queue'); setOpen(false); }}>
             <span>📦</span> Ready to Dispatch
             {queue.length > 0 && <span className="badge-count">{queue.length}</span>}
@@ -218,7 +229,15 @@ export default function DispatchDashboard() {
 
         {/* Stats */}
         <div className="stats-grid stats-4" style={{ '--cols': 4 }}>
-          <div className="stat-card">
+          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('pickups')}>
+            <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
+            <div className="stat-label">Impression Pickups</div>
+            <div className="stat-value" style={{ color: '#EA580C' }}>{pickups.length}</div>
+            <div className="stat-sub" style={{ color: unassignedPickups.length > 0 ? 'var(--red)' : 'var(--green)' }}>
+              {unassignedPickups.length > 0 ? `⚠ ${unassignedPickups.length} unassigned` : pickups.length > 0 ? '✓ All assigned' : 'None pending'}
+            </div>
+          </div>
+          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('queue')}>
             <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
             <div className="stat-label">Ready to Dispatch</div>
             <div className="stat-value" style={{ color: 'var(--accent)' }}>{queue.length}</div>
@@ -237,12 +256,6 @@ export default function DispatchDashboard() {
             <div className="stat-label">Delivered Today</div>
             <div className="stat-value" style={{ color: 'var(--green)' }}>{delivered.length}</div>
             <div className="stat-sub">Completed</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--surface-2)' }}>👥</div>
-            <div className="stat-label">Executives</div>
-            <div className="stat-value">{executives.length}</div>
-            <div className="stat-sub">{executives.filter(e => (e.assignedDeliveries?.length || 0) > 0).length} active</div>
           </div>
         </div>
 
@@ -287,6 +300,10 @@ export default function DispatchDashboard() {
         {/* Tabs + Search */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <div className="filters" style={{ margin: 0, flex: 1 }}>
+            <button className={`filter-chip ${tab === 'pickups' ? 'active' : ''}`} onClick={() => setTab('pickups')}>
+              🛵 Pickups {pickups.length > 0 && `(${pickups.length})`}
+              {unassignedPickups.length > 0 && <span style={{ marginLeft: 4, color: 'var(--red)', fontWeight: 700 }}>⚠{unassignedPickups.length}</span>}
+            </button>
             <button className={`filter-chip ${tab === 'queue' ? 'active' : ''}`} onClick={() => setTab('queue')}>
               📦 Queue {queue.length > 0 && `(${queue.length})`}
               {unassigned.length > 0 && <span style={{ marginLeft: 4, color: 'var(--red)', fontWeight: 700 }}>⚠{unassigned.length}</span>}
@@ -313,16 +330,17 @@ export default function DispatchDashboard() {
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
           ) : shown.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">{tab === 'queue' ? '🎉' : tab === 'enroute' ? '📭' : '📋'}</div>
+              <div className="empty-icon">{tab === 'pickups' ? '🛵' : tab === 'queue' ? '🎉' : tab === 'enroute' ? '📭' : '📋'}</div>
               <div className="empty-title">
-                {tab === 'queue' ? 'Queue is Empty' : tab === 'enroute' ? 'None En Route' : 'No Deliveries Today'}
+                {tab === 'pickups' ? 'No Pickups Pending' : tab === 'queue' ? 'Queue is Empty' : tab === 'enroute' ? 'None En Route' : 'No Deliveries Today'}
               </div>
-              <p>{tab === 'queue' ? 'No cases waiting for dispatch.' : tab === 'enroute' ? 'No cases currently out for delivery.' : 'Completed deliveries will appear here.'}</p>
+              <p>{tab === 'pickups' ? 'New cases will appear here for pickup assignment.' : tab === 'queue' ? 'No cases waiting for dispatch.' : tab === 'enroute' ? 'No cases currently out for delivery.' : 'Completed deliveries will appear here.'}</p>
             </div>
           ) : shown.map(c => {
             const isUnassigned = !c.assignedDeliveryId;
-            const accentColor = c.status === 'READY_TO_DISPATCH'
-              ? (isUnassigned ? 'var(--red)' : 'var(--accent)')
+            const accentColor = c.status === 'PENDING_PICKUP' ? 'var(--red)'
+              : c.status === 'PICKUP_ASSIGNED' ? '#CA8A04'
+              : c.status === 'READY_TO_DISPATCH' ? (isUnassigned ? 'var(--red)' : 'var(--accent)')
               : c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--green)';
             return (
               <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${accentColor}`, padding: '14px 18px' }}>
@@ -363,10 +381,19 @@ export default function DispatchDashboard() {
 
                     {/* Action buttons */}
                     <div style={{ display: 'flex', gap: 6 }}>
+                      {(c.status === 'PENDING_PICKUP' || c.status === 'PICKUP_ASSIGNED') && (
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }}
+                          onClick={() => setModal({ case: c, mode: 'pickup' })}
+                        >
+                          {c.assignedDelivery ? '↻ Reassign Pickup' : '🛵 Assign Pickup'}
+                        </button>
+                      )}
                       {(c.status === 'READY_TO_DISPATCH' || c.status === 'OUT_FOR_DELIVERY') && (
                         <button
                           className="btn btn-primary btn-sm"
-                          onClick={() => setModal({ case: c })}
+                          onClick={() => setModal({ case: c, mode: 'delivery' })}
                         >
                           {c.assignedDelivery ? '↻ Reassign' : '+ Assign'}
                         </button>
@@ -404,6 +431,7 @@ export default function DispatchDashboard() {
           onConfirm={handleAssign}
           onClose={() => setModal(null)}
           loading={processing}
+          mode={modal.mode}
         />
       )}
 
