@@ -356,80 +356,71 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ── Revenue by Clinic (hidden when a specific clinic is selected) ── */}
-            {!selectedClinic && (
-              <div className="card" style={{ marginBottom: 20 }}>
-                <div className="card-header">
-                  <div className="card-title">Revenue by Clinic</div>
-                </div>
-                <div style={{ padding: '20px 20px 12px' }}>
-                  {revenueByClinic?.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>No data</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={Math.max(200, (revenueByClinic?.length || 1) * 44)}>
-                      <BarChart layout="vertical" data={revenueByClinic}
-                        margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-3)' }}
-                          tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
-                        <YAxis type="category" dataKey="name" width={130}
-                          tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                        <Tooltip content={<CustomTooltip prefix="Br " />} />
-                        <Bar dataKey="revenue" name="Revenue" fill="var(--navy)" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Clinic table (hidden when a specific clinic is selected) ── */}
-            {!selectedClinic && (
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Clinic Performance</div>
-                </div>
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Clinic</th>
-                        <th>Total Cases</th>
-                        <th>Paid Cases</th>
-                        <th>Revenue (Verified)</th>
-                        <th>Avg per Case</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {revenueByClinic?.length === 0 ? (
-                        <tr><td colSpan={5} className="empty-state">No clinics found</td></tr>
-                      ) : revenueByClinic?.map(c => (
-                        <tr key={c.id}>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{
-                                width: 28, height: 28, borderRadius: 8, background: 'var(--blue)',
-                                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 12, fontWeight: 700, flexShrink: 0,
-                              }}>
-                                {c.name[0]?.toUpperCase()}
-                              </div>
-                              <span className="patient-name">{c.name}</span>
-                            </div>
-                          </td>
-                          <td>{c.totalCases}</td>
-                          <td>{c.paidCases}</td>
-                          <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(c.revenue)}</td>
-                          <td style={{ color: 'var(--text-2)' }}>
-                            {c.paidCases > 0 ? ETB(Math.round(c.revenue / c.paidCases)) : '—'}
-                          </td>
+            {/* ── Clinic Performance (hidden when a specific clinic is selected) ── */}
+            {!selectedClinic && (() => {
+              const maxRevenue = Math.max(...(revenueByClinic || []).map(c => c.revenue || 0), 1);
+              return (
+                <div className="card">
+                  <div className="card-header">
+                    <div className="card-title">Clinic Performance</div>
+                  </div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Clinic</th>
+                          <th>Total Cases</th>
+                          <th>Paid Cases</th>
+                          <th>Revenue (Verified)</th>
+                          <th>Avg per Case</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {revenueByClinic?.length === 0 ? (
+                          <tr><td colSpan={5} className="empty-state">No clinics found</td></tr>
+                        ) : revenueByClinic?.map(c => {
+                          const pct = Math.round(((c.revenue || 0) / maxRevenue) * 100);
+                          return (
+                            <tr key={c.id}>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div style={{
+                                    width: 28, height: 28, borderRadius: 8, background: 'var(--blue)',
+                                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 12, fontWeight: 700, flexShrink: 0,
+                                  }}>
+                                    {c.name[0]?.toUpperCase()}
+                                  </div>
+                                  <span className="patient-name">{c.name}</span>
+                                </div>
+                              </td>
+                              <td>{c.totalCases}</td>
+                              <td>{c.paidCases}</td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border)', minWidth: 60 }}>
+                                    <div style={{
+                                      width: `${pct}%`, height: '100%', borderRadius: 999,
+                                      background: 'var(--blue)', transition: 'width 0.4s ease',
+                                    }} />
+                                  </div>
+                                  <span style={{ fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>
+                                    {ETB(c.revenue)}
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ color: 'var(--text-2)' }}>
+                                {c.paidCases > 0 ? ETB(Math.round(c.revenue / c.paidCases)) : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
       </div>
