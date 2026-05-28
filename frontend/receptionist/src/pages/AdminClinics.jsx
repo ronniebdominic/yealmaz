@@ -1,29 +1,14 @@
 // Ye-Almaz — Admin Clinic Management
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
 
-// ── Helpers ───────────────────────────────────────────────
-function generatePassword(length = 12) {
-  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lower  = 'abcdefghjkmnpqrstuvwxyz';
-  const digits = '23456789';
-  const all    = upper + lower + digits;
-  let pass = [
-    upper [Math.floor(Math.random() * upper.length)],
-    lower [Math.floor(Math.random() * lower.length)],
-    digits[Math.floor(Math.random() * digits.length)],
-  ];
-  for (let i = pass.length; i < length; i++) {
-    pass.push(all[Math.floor(Math.random() * all.length)]);
-  }
-  return pass.sort(() => Math.random() - 0.5).join('');
-}
-
+// ── Clinic-specific Helpers ───────────────────────────────
 function slugify(name) {
   return name
     .toLowerCase()
@@ -46,30 +31,6 @@ const EMPTY_FORM = {
   phone: '', address: '', password: '', isExcluded: false,
 };
 
-const inputStyle = {
-  width: '100%', padding: '9px 12px',
-  border: '1.5px solid var(--border)', borderRadius: 8,
-  fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)',
-  fontFamily: 'DM Sans, sans-serif', outline: 'none', boxSizing: 'border-box',
-};
-
-const labelStyle = {
-  fontSize: 12, fontWeight: 700, color: 'var(--text-2)',
-  display: 'block', marginBottom: 5,
-};
-
-function Field({ label, hint, children }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={labelStyle}>
-        {label}
-        {hint && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{hint}</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
 // ── Create / Edit Form Modal ───────────────────────────────
 function ClinicFormModal({ initial, onSaved, onClose }) {
   const isEdit = !!initial?.id;
@@ -83,8 +44,9 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
     password:   '',
     isExcluded: initial.isExcluded ?? false,
   } : { ...EMPTY_FORM });
-  const [showPass, setShowPass] = useState(false);
-  const [saving,   setSaving]   = useState(false);
+  const [showPass,           setShowPass]           = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [saving,             setSaving]             = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -215,27 +177,48 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
             </div>
 
             <div style={{ gridColumn: '1 / -1' }}>
-              <Field label="Password" hint={isEdit ? 'leave blank to keep current password' : 'required'}>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    style={{ ...inputStyle, paddingRight: 80 }}
-                    type={showPass ? 'text' : 'password'}
-                    placeholder={isEdit ? 'Enter new password to change…' : 'Generated or custom password'}
+              {isEdit ? (
+                !showPasswordChange ? (
+                  <button
+                    type="button"
+                    onClick={() => { setShowPasswordChange(true); set('password', generatePassword()); setShowPass(true); }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      background: 'var(--surface-2)', border: '1.5px dashed var(--border)',
+                      borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600,
+                      color: 'var(--text-2)', cursor: 'pointer', marginBottom: 14,
+                    }}
+                  >
+                    🔑 Change Password
+                  </button>
+                ) : (
+                  <Field label="New Password">
+                    <PasswordInput
+                      value={form.password}
+                      onChange={v => set('password', v)}
+                      showPass={showPass}
+                      onToggleShow={() => setShowPass(s => !s)}
+                      onRegenerate={() => set('password', generatePassword())}
+                      autoFocus
+                    />
+                    <button type="button"
+                      onClick={() => { setShowPasswordChange(false); set('password', ''); }}
+                      style={{ marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)', padding: 0 }}>
+                      ✕ Cancel password change
+                    </button>
+                  </Field>
+                )
+              ) : (
+                <Field label="Password" hint="required">
+                  <PasswordInput
                     value={form.password}
-                    onChange={e => set('password', e.target.value)}
+                    onChange={v => set('password', v)}
+                    showPass={showPass}
+                    onToggleShow={() => setShowPass(s => !s)}
+                    onRegenerate={() => set('password', generatePassword())}
                   />
-                  <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
-                    <button type="button" onClick={() => setShowPass(s => !s)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
-                      {showPass ? '🙈' : '👁'}
-                    </button>
-                    <button type="button" onClick={() => set('password', generatePassword())}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>
-                      ↺ New
-                    </button>
-                  </div>
-                </div>
-              </Field>
+                </Field>
+              )}
             </div>
           </div>
 
@@ -362,101 +345,11 @@ function CredsCard({ clinic, password, onClose }) {
   );
 }
 
-// ── Reset Password Modal ──────────────────────────────────
-function ResetPasswordModal({ clinic, onDone, onClose }) {
-  const [password, setPassword] = useState(() => generatePassword());
-  const [showPass, setShowPass] = useState(true);
-  const [saving,   setSaving]   = useState(false);
-
-  const apply = async () => {
-    setSaving(true);
-    try {
-      await api.patch(`/clinics/${clinic.id}`, { password });
-      toast.success(`Password reset for ${clinic.name}`);
-      onDone(clinic, password);
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Reset failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 420 }}>
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">🔑 Reset Password</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-              {clinic.name}
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>
-              New Password
-              <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>
-                — copy before applying
-              </span>
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                style={{ ...inputStyle, paddingRight: 80, fontFamily: showPass ? 'DM Mono, monospace' : 'inherit' }}
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
-              <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
-                <button type="button" onClick={() => setShowPass(s => !s)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
-                  {showPass ? '🙈' : '👁'}
-                </button>
-                <button type="button" onClick={() => setPassword(generatePassword())}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>
-                  ↺ New
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText(password).then(() => toast.success('Password copied'))}
-              style={{
-                marginTop: 8, background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 12, color: 'var(--blue)', fontWeight: 600, padding: 0,
-              }}
-            >
-              📋 Copy to clipboard
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button
-              onClick={apply} disabled={saving || !password.trim()}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: saving ? 'var(--border)' : 'var(--blue)',
-                color: '#fff', border: 'none', borderRadius: 8,
-                padding: '10px 18px', fontSize: 13, fontWeight: 700,
-                cursor: saving ? 'not-allowed' : 'pointer', transition: 'background .15s',
-              }}
-            >
-              {saving ? 'Applying…' : '✓ Apply New Password'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────
 export default function AdminClinics() {
   const queryClient = useQueryClient();
   const [showForm,   setShowForm]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [resetTarget,setResetTarget]= useState(null);
   const [newCreds,   setNewCreds]   = useState(null); // { clinic, password }
   const [search,     setSearch]     = useState('');
 
@@ -618,18 +511,6 @@ export default function AdminClinics() {
                             ✏️ Edit
                           </button>
                           <button
-                            onClick={() => setResetTarget(c)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 3,
-                              background: 'rgba(124,58,237,0.07)', color: '#7C3AED',
-                              border: '1px solid rgba(124,58,237,0.2)',
-                              borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                            }}
-                          >
-                            🔑 Reset PW
-                          </button>
-                          <button
                             onClick={() => {
                               api.patch(`/clinics/${c.id}`, { isActive: !c.isActive })
                                 .then(() => {
@@ -695,18 +576,6 @@ export default function AdminClinics() {
           initial={editTarget}
           onSaved={handleSaved}
           onClose={() => setEditTarget(null)}
-        />
-      )}
-
-      {/* Reset password modal */}
-      {resetTarget && (
-        <ResetPasswordModal
-          clinic={resetTarget}
-          onDone={(clinic, password) => {
-            setResetTarget(null);
-            setNewCreds({ clinic, password });
-          }}
-          onClose={() => setResetTarget(null)}
         />
       )}
 

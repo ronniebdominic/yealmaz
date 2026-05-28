@@ -6,6 +6,7 @@ import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
 
 // ── Constants ─────────────────────────────────────────────
 const ROLES = [
@@ -44,45 +45,6 @@ const ROLE_COLORS = {
   FINANCE:      { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
 };
 
-// ── Helpers ───────────────────────────────────────────────
-function generatePassword(length = 12) {
-  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lower  = 'abcdefghjkmnpqrstuvwxyz';
-  const digits = '23456789';
-  const all    = upper + lower + digits;
-  let pass = [
-    upper [Math.floor(Math.random() * upper.length)],
-    lower [Math.floor(Math.random() * lower.length)],
-    digits[Math.floor(Math.random() * digits.length)],
-  ];
-  for (let i = pass.length; i < length; i++)
-    pass.push(all[Math.floor(Math.random() * all.length)]);
-  return pass.sort(() => Math.random() - 0.5).join('');
-}
-
-const inputStyle = {
-  width: '100%', padding: '9px 12px',
-  border: '1.5px solid var(--border)', borderRadius: 8,
-  fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)',
-  fontFamily: 'DM Sans, sans-serif', outline: 'none', boxSizing: 'border-box',
-};
-
-const labelStyle = {
-  fontSize: 12, fontWeight: 700, color: 'var(--text-2)',
-  display: 'block', marginBottom: 5,
-};
-
-function Field({ label, hint, children }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={labelStyle}>
-        {label}
-        {hint && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{hint}</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 // ── User Form Modal ───────────────────────────────────────
 function UserFormModal({ initial, onSaved, onClose }) {
@@ -98,8 +60,9 @@ function UserFormModal({ initial, onSaved, onClose }) {
     name: '', email: '', phone: '',
     role: 'RECEPTIONIST', department: '', password: generatePassword(),
   });
-  const [showPass, setShowPass] = useState(!isEdit);
-  const [saving,   setSaving]   = useState(false);
+  const [showPass,           setShowPass]           = useState(!isEdit);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [saving,             setSaving]             = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -209,27 +172,48 @@ function UserFormModal({ initial, onSaved, onClose }) {
 
             {/* Password */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <Field label="Password" hint={isEdit ? 'leave blank to keep current' : 'required'}>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    style={{ ...inputStyle, paddingRight: 80, fontFamily: showPass ? 'DM Mono, monospace' : 'inherit' }}
-                    type={showPass ? 'text' : 'password'}
-                    placeholder={isEdit ? 'Enter new password to change…' : ''}
+              {isEdit ? (
+                !showPasswordChange ? (
+                  <button
+                    type="button"
+                    onClick={() => { setShowPasswordChange(true); set('password', generatePassword()); setShowPass(true); }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      background: 'var(--surface-2)', border: '1.5px dashed var(--border)',
+                      borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600,
+                      color: 'var(--text-2)', cursor: 'pointer', marginBottom: 14,
+                    }}
+                  >
+                    🔑 Change Password
+                  </button>
+                ) : (
+                  <Field label="New Password">
+                    <PasswordInput
+                      value={form.password}
+                      onChange={v => set('password', v)}
+                      showPass={showPass}
+                      onToggleShow={() => setShowPass(s => !s)}
+                      onRegenerate={() => { set('password', generatePassword()); setShowPass(true); }}
+                      autoFocus
+                    />
+                    <button type="button"
+                      onClick={() => { setShowPasswordChange(false); set('password', ''); }}
+                      style={{ marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)', padding: 0 }}>
+                      ✕ Cancel password change
+                    </button>
+                  </Field>
+                )
+              ) : (
+                <Field label="Password" hint="required">
+                  <PasswordInput
                     value={form.password}
-                    onChange={e => set('password', e.target.value)}
+                    onChange={v => set('password', v)}
+                    showPass={showPass}
+                    onToggleShow={() => setShowPass(s => !s)}
+                    onRegenerate={() => { set('password', generatePassword()); setShowPass(true); }}
                   />
-                  <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
-                    <button type="button" onClick={() => setShowPass(s => !s)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
-                      {showPass ? '🙈' : '👁'}
-                    </button>
-                    <button type="button" onClick={() => { set('password', generatePassword()); setShowPass(true); }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>
-                      ↺ New
-                    </button>
-                  </div>
-                </div>
-              </Field>
+                </Field>
+              )}
             </div>
           </div>
 
@@ -307,65 +291,6 @@ function CredsCard({ user, password, onClose }) {
   );
 }
 
-// ── Reset Password Modal ──────────────────────────────────
-function ResetPasswordModal({ user, onDone, onClose }) {
-  const [password, setPassword] = useState(() => generatePassword());
-  const [saving,   setSaving]   = useState(false);
-
-  const apply = async () => {
-    setSaving(true);
-    try {
-      await api.patch(`/users/${user.id}`, { password });
-      toast.success(`Password reset for ${user.name}`);
-      onDone(user, password);
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Reset failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 400 }}>
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">🔑 Reset Password</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{user.name}</div>
-          </div>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>New Password <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>— copy before applying</span></label>
-            <div style={{ position: 'relative' }}>
-              <input
-                style={{ ...inputStyle, paddingRight: 72, fontFamily: 'DM Mono, monospace' }}
-                value={password} onChange={e => setPassword(e.target.value)}
-              />
-              <button type="button" onClick={() => setPassword(generatePassword())}
-                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>
-                ↺ New
-              </button>
-            </div>
-            <button type="button" onClick={() => navigator.clipboard.writeText(password).then(() => toast.success('Copied'))}
-              style={{ marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--blue)', fontWeight: 600, padding: 0 }}>
-              📋 Copy to clipboard
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button onClick={apply} disabled={saving || !password.trim()}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: saving ? 'var(--border)' : 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? 'Applying…' : '✓ Apply New Password'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────
 const ROLE_FILTERS = [{ label: 'All', value: '' }, ...ROLES.map(r => ({ label: r.label, value: r.value }))];
 
@@ -373,7 +298,6 @@ export default function AdminUsers() {
   const queryClient = useQueryClient();
   const [showForm,     setShowForm]     = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
-  const [resetTarget,  setResetTarget]  = useState(null);
   const [newCreds,     setNewCreds]     = useState(null);
   const [roleFilter,   setRoleFilter]   = useState('');
   const [search,       setSearch]       = useState('');
@@ -509,12 +433,6 @@ export default function AdminUsers() {
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(u)}>✏️ Edit</button>
                             <button
-                              onClick={() => setResetTarget(u)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(124,58,237,0.07)', color: '#7C3AED', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                            >
-                              🔑 Reset PW
-                            </button>
-                            <button
                               onClick={() => {
                                 api.patch(`/users/${u.id}`, { isActive: !u.isActive })
                                   .then(() => { toast.success(`${u.name} ${u.isActive ? 'deactivated' : 'activated'}`); refresh(); })
@@ -538,14 +456,6 @@ export default function AdminUsers() {
 
       {showForm    && <UserFormModal onSaved={handleSaved} onClose={() => setShowForm(false)} />}
       {editTarget  && <UserFormModal initial={editTarget} onSaved={handleSaved} onClose={() => setEditTarget(null)} />}
-
-      {resetTarget && (
-        <ResetPasswordModal
-          user={resetTarget}
-          onDone={(user, password) => { setResetTarget(null); setNewCreds({ user, password }); }}
-          onClose={() => setResetTarget(null)}
-        />
-      )}
 
       {newCreds && (
         <CredsCard
