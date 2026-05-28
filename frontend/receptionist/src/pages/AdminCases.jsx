@@ -10,6 +10,7 @@ import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 
 const PAGE_SIZE = 20;
 
@@ -391,6 +392,7 @@ export default function AdminCases() {
   const [collectTarget,  setCollectTarget] = useState(null);
   const [overrideTarget, setOverrideTarget]= useState(null);
   const [deleting,       setDeleting]      = useState(false);
+  const [exporting,      setExporting]     = useState(false);
 
   const { data: clinicList = [] } = useQuery({
     queryKey: ['clinics'],
@@ -423,6 +425,76 @@ export default function AdminCases() {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   };
 
+  const exportToExcel = async () => {
+    setExporting(true);
+    try {
+      // Fetch all matching cases (no pagination limit)
+      const exportParams = { limit: 9999, page: 1, sortDir };
+      if (statusFilter) exportParams.status        = statusFilter;
+      if (payFilter)    exportParams.paymentStatus = payFilter;
+      if (search)       exportParams.search        = search;
+      if (clinicId)     exportParams.clinicId      = clinicId;
+
+      const { data } = await api.get('/cases', { params: exportParams });
+      const rows = data.cases || [];
+
+      const STATUS_LABELS = {
+        CASE_ACCEPTED:      'Case Accepted',
+        MILLING_SINTERING:  'In Production',
+        QUALITY_CHECK:      'Quality Check',
+        READY_TO_DISPATCH:  'Ready to Ship',
+        OUT_FOR_DELIVERY:   'Out for Delivery',
+        DELIVERED:          'Delivered',
+        CANCELLED:          'Cancelled',
+      };
+      const PAYMENT_LABELS = {
+        PENDING:             'Unpaid',
+        SCREENSHOT_UPLOADED: 'Screenshot Uploaded',
+        VERIFIED:            'Verified / Paid',
+        REJECTED:            'Rejected',
+      };
+
+      const sheetData = [
+        ['Case #', 'Clinic', 'Patient', 'Doctor', 'Work Type', 'Amount (Br)', 'Status', 'Payment', 'Date'],
+        ...rows.map(c => [
+          c.caseNumber,
+          c.clinic?.name || '',
+          c.patientName  || '',
+          c.doctorName   || '',
+          c.workType     || '',
+          c.totalAmount  ?? '',
+          STATUS_LABELS[c.status]        || c.status,
+          PAYMENT_LABELS[c.paymentStatus] || c.paymentStatus,
+          format(new Date(c.createdAt), 'dd MMM yyyy'),
+        ]),
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      // Column widths
+      ws['!cols'] = [14, 22, 20, 18, 20, 14, 20, 22, 14].map(w => ({ wch: w }));
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Cases');
+
+      // Build a descriptive filename from active filters
+      const parts = ['YAL-Cases'];
+      if (clinicId) {
+        const clinic = clinicList.find(c => c.id === clinicId);
+        if (clinic) parts.push(clinic.name.replace(/\s+/g, '-'));
+      }
+      if (statusFilter) parts.push(STATUS_LABELS[statusFilter] || statusFilter);
+      if (payFilter)    parts.push(PAYMENT_LABELS[payFilter]   || payFilter);
+      parts.push(format(new Date(), 'yyyy-MM-dd'));
+
+      XLSX.writeFile(wb, `${parts.join('_')}.xlsx`);
+      toast.success(`Exported ${rows.length} case${rows.length !== 1 ? 's' : ''}`);
+    } catch (err) {
+      toast.error('Export failed — please try again');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // Delete
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -448,8 +520,24 @@ export default function AdminCases() {
     <AdminLayout>
       <div className="topbar">
         <div className="topbar-title">Case Management</div>
-        <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-          {pagination.total ?? 0} total cases
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
+            {pagination.total ?? 0} total cases
+          </div>
+          <button
+            onClick={exportToExcel}
+            disabled={exporting}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: exporting ? 'var(--border)' : 'var(--green)',
+              color: '#fff', border: 'none', borderRadius: 8,
+              padding: '7px 14px', fontSize: 13, fontWeight: 700,
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              transition: 'background .15s',
+            }}
+          >
+            {exporting ? '⏳ Exporting…' : '⬇️ Export Excel'}
+          </button>
         </div>
       </div>
 
