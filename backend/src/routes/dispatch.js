@@ -8,6 +8,31 @@ const { sendPushToClinic } = require('../utils/webpush');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// ── GET /api/dispatch/stations ───────────────────────────
+// All active cases (not delivered/cancelled) grouped by clinic — for dispatch & delivery overview
+router.get('/stations', protect, restrict('DISPATCH', 'ADMIN', 'DELIVERY'), async (req, res) => {
+  const cacheKey = 'dispatch:stations';
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const cases = await prisma.case.findMany({
+      where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+      include: {
+        clinic: { select: { id: true, name: true, address: true, phone: true } },
+        assignedDelivery: { select: { id: true, name: true } },
+      },
+      orderBy: [{ clinic: { name: 'asc' } }, { dueDate: 'asc' }]
+    });
+
+    await appCache.set(cacheKey, cases, 30);
+    res.json(cases);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch stations.' });
+  }
+});
+
 // ── GET /api/dispatch/executives ─────────────────────────
 // Returns all active DELIVERY role users + their current load
 router.get('/executives', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
@@ -96,7 +121,7 @@ router.post('/:caseId/assign', protect, restrict('DISPATCH', 'ADMIN'), async (re
       }
     });
 
-    await invalidate('dispatch:queue', 'delivery:*', `case:${req.params.caseId}`);
+    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
 
     // Notify delivery executive via socket
     const io = req.app.get('io');
@@ -143,7 +168,7 @@ router.post('/:caseId/unassign', protect, restrict('DISPATCH', 'ADMIN'), async (
       }
     });
 
-    await invalidate('dispatch:queue', 'delivery:*', `case:${req.params.caseId}`);
+    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -181,7 +206,7 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
       }
     });
 
-    await invalidate('dispatch:queue', 'delivery:*', `case:${req.params.caseId}`);
+    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
 
     const io = req.app.get('io');
     io.to(`delivery_${executiveId}`).emit('case_assigned', {

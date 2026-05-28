@@ -32,15 +32,17 @@ function getDueDays(workType) {
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, page = 1, limit = 20 } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {};
     if (req.user.role === 'CLINIC') where.clinicId = req.user.id;
+    else if (clinicId) where.clinicId = clinicId;
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
     if (search) {
       where.OR = [
+        { clinic: { name: { contains: search, mode: 'insensitive' } } },
         { patientName: { contains: search, mode: 'insensitive' } },
         { caseNumber: { contains: search, mode: 'insensitive' } },
         { workType: { contains: search, mode: 'insensitive' } }

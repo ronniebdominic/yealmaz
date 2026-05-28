@@ -370,12 +370,20 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
   );
 }
 
+const selectStyle = {
+  border: '1px solid var(--border)', borderRadius: 8,
+  padding: '7px 12px', fontSize: 13, color: 'var(--text-1)',
+  background: 'var(--surface)', outline: 'none',
+  fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
+};
+
 // ── Main Page ─────────────────────────────────────────────
 export default function AdminCases() {
   const queryClient = useQueryClient();
   const [search,         setSearch]        = useState('');
   const [statusFilter,   setStatusFilter]  = useState('');
   const [payFilter,      setPayFilter]     = useState('');
+  const [clinicId,       setClinicId]      = useState('');
   const [page,           setPage]          = useState(1);
   const [viewCase,       setViewCase]      = useState(null);
   const [deleteTarget,   setDeleteTarget]  = useState(null);
@@ -383,13 +391,20 @@ export default function AdminCases() {
   const [overrideTarget, setOverrideTarget]= useState(null);
   const [deleting,       setDeleting]      = useState(false);
 
+  const { data: clinicList = [] } = useQuery({
+    queryKey: ['clinics'],
+    queryFn: () => api.get('/clinics').then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
+
   const params = useMemo(() => {
     const p = { limit: PAGE_SIZE, page };
     if (statusFilter) p.status        = statusFilter;
     if (payFilter)    p.paymentStatus = payFilter;
     if (search)       p.search        = search;
+    if (clinicId)     p.clinicId      = clinicId;
     return p;
-  }, [statusFilter, payFilter, search, page]);
+  }, [statusFilter, payFilter, search, clinicId, page]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'cases', params],
@@ -438,16 +453,35 @@ export default function AdminCases() {
       </div>
 
       <div className="content">
-        {/* Search */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+        {/* Search + clinic selector */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
             <span className="icon">🔍</span>
             <input
-              placeholder="Search by patient name or case number…"
+              placeholder="Search by clinic, patient name or case number…"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
+          <select
+            value={clinicId}
+            onChange={e => { setClinicId(e.target.value); setPage(1); }}
+            style={{ ...selectStyle, minWidth: 180 }}
+          >
+            <option value="">All Clinics</option>
+            {clinicList.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {(statusFilter || payFilter || search || clinicId) && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}
+              onClick={() => { setStatusFilter(''); setPayFilter(''); setSearch(''); setClinicId(''); setPage(1); }}
+            >
+              ✕ Clear All
+            </button>
+          )}
         </div>
 
         {/* Status filters */}
@@ -468,15 +502,6 @@ export default function AdminCases() {
               {f.label}
             </button>
           ))}
-          {(statusFilter || payFilter || search) && (
-            <button
-              className="filter-chip"
-              style={{ marginLeft: 'auto', color: 'var(--red)' }}
-              onClick={() => { setStatusFilter(''); setPayFilter(''); setSearch(''); setPage(1); }}
-            >
-              ✕ Clear
-            </button>
-          )}
         </div>
 
         {/* Table */}

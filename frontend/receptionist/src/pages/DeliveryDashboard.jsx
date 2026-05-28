@@ -60,8 +60,10 @@ export default function DeliveryDashboard() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal]     = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [tab, setTab]         = useState('active');
+  const [tab, setTab]           = useState('active');
   const [scanMode, setScanMode] = useState(false);
+  const [search, setSearch]     = useState('');
+  const [clinicFilter, setClinicFilter] = useState('');
 
   useEffect(() => {
     loadCases();
@@ -129,9 +131,19 @@ export default function DeliveryDashboard() {
 
   const active      = cases.filter(c => c.status !== 'DELIVERED');
   const done        = cases.filter(c => c.status === 'DELIVERED');
-  const shown       = tab === 'active' ? active : done;
   const toPickUp    = active.filter(c => c.status === 'PICKUP_ASSIGNED').length;
   const ready       = active.filter(c => c.status === 'READY_TO_DISPATCH').length;
+
+  // Apply search + clinic filter
+  const sq = search.toLowerCase();
+  const applyFilter = (arr) => arr.filter(c =>
+    (!clinicFilter || c.clinic?.name === clinicFilter) &&
+    (!sq || c.clinic?.name?.toLowerCase().includes(sq) || c.caseNumber?.toLowerCase().includes(sq) || c.patientName?.toLowerCase().includes(sq))
+  );
+  const shown = applyFilter(tab === 'active' ? active : done);
+
+  // Unique clinic names for dropdown
+  const clinicNames = [...new Set(cases.map(c => c.clinic?.name).filter(Boolean))].sort();
   const enRoute     = active.filter(c => c.status === 'OUT_FOR_DELIVERY').length;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -176,18 +188,12 @@ export default function DeliveryDashboard() {
         </div>
 
         {/* Tabs + Scan QR */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
           <div className="filters" style={{ margin: 0, flex: 1 }}>
-            <button
-              className={`filter-chip ${tab === 'active' ? 'active' : ''}`}
-              onClick={() => setTab('active')}
-            >
+            <button className={`filter-chip ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>
               Active{active.length ? ` (${active.length})` : ''}
             </button>
-            <button
-              className={`filter-chip ${tab === 'done' ? 'active' : ''}`}
-              onClick={() => setTab('done')}
-            >
+            <button className={`filter-chip ${tab === 'done' ? 'active' : ''}`} onClick={() => setTab('done')}>
               Delivered{done.length ? ` (${done.length})` : ''}
             </button>
           </div>
@@ -196,79 +202,116 @@ export default function DeliveryDashboard() {
           </button>
         </div>
 
-        {/* Case list */}
-        <div className="card">
-          {loading ? (
-            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
-          ) : shown.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">{tab === 'active' ? '🎉' : '📭'}</div>
-              <div className="empty-title">{tab === 'active' ? 'All Clear!' : 'No Deliveries Yet'}</div>
-              <p>{tab === 'active' ? 'No cases waiting for pickup or delivery.' : "Completed deliveries appear here."}</p>
-            </div>
-          ) : shown.map(c => {
-            const deliveredAt = c.deliveryLogs?.[0]?.deliveredAt || c.updatedAt;
-            const accentColor = c.status === 'READY_TO_DISPATCH' ? 'var(--accent)'
-              : c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--green)';
-            return (
-              <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${accentColor}`, padding: '16px 18px' }}>
-                {/* Header row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div>
-                    <span className="case-number">{c.caseNumber}</span>
-                    <div className="patient-name" style={{ marginTop: 4 }}>{c.patientName}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 2 }}>{c.workType}</div>
-                  </div>
-                  <StatusBadge status={c.status} />
-                </div>
+        {/* Search + clinic filter */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search-input" style={{ flex: 1, minWidth: 160 }}>
+            <span className="icon">🔍</span>
+            <input
+              placeholder="Search clinic, case or patient…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          {clinicNames.length > 1 && (
+            <select
+              value={clinicFilter}
+              onChange={e => setClinicFilter(e.target.value)}
+              style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer', minWidth: 150 }}
+            >
+              <option value="">All Clinics</option>
+              {clinicNames.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          )}
+          {(search || clinicFilter) && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); }} style={{ color: 'var(--red)' }}>✕</button>
+          )}
+        </div>
 
-                {/* Clinic row */}
-                <div style={{ fontSize: 13, color: 'var(--text-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span>🏥 <strong>{c.clinic?.name}</strong></span>
-                  {c.clinic?.phone && (
-                    <a href={`tel:${c.clinic.phone}`} style={{ color: 'var(--accent)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>📞 Call</a>
+        {/* Case list — grouped by clinic */}
+        {loading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+        ) : shown.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">{tab === 'active' ? '🎉' : '📭'}</div>
+            <div className="empty-title">{tab === 'active' ? 'All Clear!' : 'No Deliveries Yet'}</div>
+            <p>{tab === 'active' ? 'No cases waiting.' : 'Completed deliveries appear here.'}</p>
+          </div>
+        ) : (() => {
+          // Group shown cases by clinic
+          const grouped = {};
+          for (const c of shown) {
+            const key = c.clinic?.name || 'Unknown Clinic';
+            if (!grouped[key]) grouped[key] = { clinic: c.clinic, cases: [] };
+            grouped[key].cases.push(c);
+          }
+          return Object.values(grouped).map(g => (
+            <div key={g.clinic?.id || g.clinic?.name} className="card" style={{ marginBottom: 14 }}>
+              {/* Clinic header */}
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-2)', borderRadius: '10px 10px 0 0' }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                  {g.clinic?.name?.[0]?.toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>🏥 {g.clinic?.name}</div>
+                  {g.clinic?.address && (
+                    <a href={`https://maps.google.com/?q=${encodeURIComponent(g.clinic.address)}`} target="_blank" rel="noreferrer"
+                      style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none' }}>
+                      📍 {g.clinic.address}
+                    </a>
                   )}
                 </div>
-
-                {/* Address */}
-                {c.clinic?.address && (
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text-2)', display: 'flex', gap: 8, marginBottom: 10 }}>
-                    <span>📍</span>
-                    <a href={`https://maps.google.com/?q=${encodeURIComponent(c.clinic.address)}`} target="_blank" rel="noreferrer" style={{ color: 'var(--text-2)', textDecoration: 'none' }}>
-                      {c.clinic.address}
-                    </a>
-                  </div>
+                {g.clinic?.phone && (
+                  <a href={`tel:${g.clinic.phone}`} style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>📞 Call</a>
                 )}
-
-                {/* Action buttons */}
-                {c.status === 'PICKUP_ASSIGNED' && (
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }}
-                    onClick={() => setModal({ case: c, action: 'collect' })}
-                  >
-                    🛵 Impression Collected from Clinic
-                  </button>
-                )}
-                {c.status === 'READY_TO_DISPATCH' && (
-                  <button className="btn btn-primary btn-sm" onClick={() => setModal({ case: c, action: 'pickup' })}>
-                    📦 Confirm Pickup from Lab
-                  </button>
-                )}
-                {c.status === 'OUT_FOR_DELIVERY' && (
-                  <button className="btn btn-success btn-sm" onClick={() => setModal({ case: c, action: 'deliver' })}>
-                    ✅ Mark Delivered
-                  </button>
-                )}
-                {c.status === 'DELIVERED' && (
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                    ✅ Delivered · {format(new Date(deliveredAt), 'dd MMM, h:mm a')}
-                  </div>
-                )}
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)', flexShrink: 0 }}>
+                  {g.cases.length}
+                </span>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Cases under this clinic */}
+              {g.cases.map(c => {
+                const deliveredAt = c.deliveryLogs?.[0]?.deliveredAt || c.updatedAt;
+                const accentColor = c.status === 'PICKUP_ASSIGNED' ? '#CA8A04'
+                  : c.status === 'READY_TO_DISPATCH' ? 'var(--accent)'
+                  : c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--green)';
+                return (
+                  <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${accentColor}`, padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div>
+                        <span className="case-number">{c.caseNumber}</span>
+                        <div className="patient-name" style={{ marginTop: 4 }}>{c.patientName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{c.workType}</div>
+                      </div>
+                      <StatusBadge status={c.status} />
+                    </div>
+                    {c.status === 'PICKUP_ASSIGNED' && (
+                      <button className="btn btn-sm" style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }} onClick={() => setModal({ case: c, action: 'collect' })}>
+                        🛵 Impression Collected from Clinic
+                      </button>
+                    )}
+                    {c.status === 'READY_TO_DISPATCH' && (
+                      <button className="btn btn-primary btn-sm" onClick={() => setModal({ case: c, action: 'pickup' })}>
+                        📦 Confirm Pickup from Lab
+                      </button>
+                    )}
+                    {c.status === 'OUT_FOR_DELIVERY' && (
+                      <button className="btn btn-success btn-sm" onClick={() => setModal({ case: c, action: 'deliver' })}>
+                        ✅ Mark Delivered
+                      </button>
+                    )}
+                    {c.status === 'DELIVERED' && (
+                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                        ✅ Delivered · {format(new Date(deliveredAt), 'dd MMM, h:mm a')}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ));
+        })()}
       </div>
 
       {/* Confirm modal */}

@@ -97,8 +97,11 @@ export default function DispatchDashboard() {
   const [loading, setLoading]       = useState(true);
   const [modal, setModal]           = useState(null);   // { case, mode: 'pickup'|'delivery' }
   const [processing, setProcessing] = useState(false);
-  const [tab, setTab]               = useState('pickups'); // pickups | queue | enroute | delivered
+  const [tab, setTab]               = useState('pickups'); // pickups | queue | enroute | delivered | stations
   const [search, setSearch]         = useState('');
+  const [clinicFilter, setClinicFilter] = useState('');
+  const [stations, setStations]     = useState([]);
+  const [stationsLoading, setStationsLoading] = useState(false);
   const [open, setOpen]             = useState(false);
 
   const load = useCallback(async () => {
@@ -116,11 +119,27 @@ export default function DispatchDashboard() {
     }
   }, []);
 
+  const loadStations = useCallback(async () => {
+    setStationsLoading(true);
+    try {
+      const res = await api.get('/dispatch/stations');
+      setStations(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setStationsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
     const t = setInterval(load, 20000);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    if (tab === 'stations') loadStations();
+  }, [tab, loadStations]);
 
   const handleAssign = async (executiveId) => {
     if (!modal || !executiveId) return;
@@ -154,12 +173,16 @@ export default function DispatchDashboard() {
   // Derived lists
   const q = search.toLowerCase();
   const filtered = cases.filter(c =>
-    !q ||
-    c.caseNumber?.toLowerCase().includes(q) ||
-    c.patientName?.toLowerCase().includes(q) ||
-    c.clinic?.name?.toLowerCase().includes(q) ||
-    c.assignedDelivery?.name?.toLowerCase().includes(q)
+    (!clinicFilter || c.clinic?.name === clinicFilter) &&
+    (!q ||
+      c.clinic?.name?.toLowerCase().includes(q) ||
+      c.caseNumber?.toLowerCase().includes(q) ||
+      c.patientName?.toLowerCase().includes(q) ||
+      c.assignedDelivery?.name?.toLowerCase().includes(q))
   );
+
+  // Unique clinic names for the dropdown (from all fetched cases)
+  const clinicNames = [...new Set(cases.map(c => c.clinic?.name).filter(Boolean))].sort();
 
   const pickups   = filtered.filter(c => c.status === 'PENDING_PICKUP' || c.status === 'PICKUP_ASSIGNED');
   const queue     = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
@@ -201,6 +224,10 @@ export default function DispatchDashboard() {
           </button>
           <button className={`nav-item${tab === 'delivered' ? ' active' : ''}`} onClick={() => { setTab('delivered'); setOpen(false); }}>
             <span>✅</span> Delivered
+          </button>
+          <div className="nav-section-label">Overview</div>
+          <button className={`nav-item${tab === 'stations' ? ' active' : ''}`} onClick={() => { setTab('stations'); setOpen(false); }}>
+            <span>🏭</span> Stations by Clinic
           </button>
         </nav>
         <div className="drawer-footer">
@@ -297,9 +324,9 @@ export default function DispatchDashboard() {
           </div>
         </div>
 
-        {/* Tabs + Search */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div className="filters" style={{ margin: 0, flex: 1 }}>
+        {/* Tabs + Search + Clinic filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div className="filters" style={{ margin: 0, flex: 1, flexWrap: 'wrap' }}>
             <button className={`filter-chip ${tab === 'pickups' ? 'active' : ''}`} onClick={() => setTab('pickups')}>
               🛵 Pickups {pickups.length > 0 && `(${pickups.length})`}
               {unassignedPickups.length > 0 && <span style={{ marginLeft: 4, color: 'var(--red)', fontWeight: 700 }}>⚠{unassignedPickups.length}</span>}
@@ -314,18 +341,88 @@ export default function DispatchDashboard() {
             <button className={`filter-chip ${tab === 'delivered' ? 'active' : ''}`} onClick={() => setTab('delivered')}>
               ✅ Delivered {delivered.length > 0 && `(${delivered.length})`}
             </button>
+            <button className={`filter-chip ${tab === 'stations' ? 'active' : ''}`} onClick={() => setTab('stations')}>
+              🏭 By Clinic
+            </button>
           </div>
-          <input
-            className="search-input"
-            placeholder="Search case, patient, clinic…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ maxWidth: 240 }}
-          />
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search-input" style={{ flex: 1, minWidth: 180 }}>
+            <span className="icon">🔍</span>
+            <input
+              placeholder="Search clinic, case, patient…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <select
+            value={clinicFilter}
+            onChange={e => setClinicFilter(e.target.value)}
+            style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer', minWidth: 160 }}
+          >
+            <option value="">All Clinics</option>
+            {clinicNames.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          {(search || clinicFilter) && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); }} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>✕ Clear</button>
+          )}
         </div>
 
+        {/* Stations view — all active cases grouped by clinic */}
+        {tab === 'stations' && (
+          stationsLoading ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading stations…</div>
+          ) : stations.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">🏭</div><div className="empty-title">No active cases</div></div>
+          ) : (() => {
+            // Group by clinic, apply search/clinic filter
+            const sq = search.toLowerCase();
+            const grouped = {};
+            for (const c of stations) {
+              if (clinicFilter && c.clinic?.name !== clinicFilter) continue;
+              if (sq && !c.clinic?.name?.toLowerCase().includes(sq) && !c.caseNumber?.toLowerCase().includes(sq) && !c.patientName?.toLowerCase().includes(sq)) continue;
+              const key = c.clinic?.name || 'Unknown Clinic';
+              if (!grouped[key]) grouped[key] = { clinic: c.clinic, cases: [] };
+              grouped[key].cases.push(c);
+            }
+            const groups = Object.values(grouped);
+            if (groups.length === 0) return <div className="empty-state"><div className="empty-title">No cases match filter</div></div>;
+            return groups.map(g => (
+              <div key={g.clinic?.id || g.clinic?.name} className="card" style={{ marginBottom: 16 }}>
+                <div style={{ padding: '12px 18px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {g.clinic?.name?.[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{g.clinic?.name}</div>
+                    {g.clinic?.address && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>📍 {g.clinic.address}</div>}
+                  </div>
+                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+                    {g.cases.length} case{g.cases.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                {g.cases.map(c => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
+                    <span className="case-number" style={{ minWidth: 110 }}>{c.caseNumber}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>{c.patientName}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 120 }}>{c.workType}</span>
+                    <StatusBadge status={c.status} />
+                    {c.assignedDelivery && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        👤 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Exec ')}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ));
+          })()
+        )}
+
         {/* Case list */}
-        <div className="card">
+        {tab !== 'stations' && <div className="card">
           {loading ? (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
           ) : shown.length === 0 ? (
@@ -420,7 +517,7 @@ export default function DispatchDashboard() {
               </div>
             );
           })}
-        </div>
+        </div>}
       </div>
 
       {/* Assign Modal */}
