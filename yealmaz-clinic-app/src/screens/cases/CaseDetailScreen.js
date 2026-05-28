@@ -183,42 +183,57 @@ export default function CaseDetailScreen({ navigation, route }) {
     setUploading(true);
     try {
       const token = await AsyncStorage.getItem('ya_clinic_token');
+      if (!token) throw new Error('Not logged in. Please log out and log back in.');
+
       const formData = new FormData();
 
       if (Platform.OS === 'web') {
-        // On web, expo-image-picker provides a real File object on the asset.
+        // On web, expo-image-picker may provide a real File object on the asset.
         // Appending the RN { uri, type, name } object would just serialize as "[object Object]".
         if (screenshot.file) {
-          // Preferred path: expo-image-picker gave us a proper File
           formData.append('screenshot', screenshot.file, `payment_${caseId}.jpg`);
         } else {
-          // Fallback: fetch the blob from the data/blob URI ourselves
           const resp = await fetch(screenshot.uri);
           const blob = await resp.blob();
           formData.append('screenshot', blob, `payment_${caseId}.jpg`);
         }
       } else {
-        // Native (iOS / Android): RN's fetch understands the { uri, type, name } shorthand
+        // On native iOS/Android: use React Native's file-object syntax
         formData.append('screenshot', {
           uri: screenshot.uri,
-          type: screenshot.mimeType || 'image/jpeg',
+          type: screenshot.mimeType || screenshot.type || 'image/jpeg',
           name: `payment_${caseId}.jpg`,
         });
       }
 
-      // Use native fetch — Axios does not reliably handle FormData multipart in React Native
-      const res = await fetch(`${API_BASE}/payments/${caseId}/upload`, {
+      const url = `${API_BASE}/payments/${caseId}/upload`;
+      console.log('[Upload] POST', url, '| platform:', Platform.OS);
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      console.log('[Upload] response status:', res.status);
+
+      // Read as text first — res.json() throws if server returns HTML (e.g. 502)
+      const text = await res.text();
+      console.log('[Upload] response body:', text.slice(0, 300));
+
+      let data = {};
+      try { data = JSON.parse(text); } catch { /* non-JSON response */ }
+
+      if (!res.ok) {
+        throw new Error(data.error || `Server error ${res.status}`);
+      }
+
       Alert.alert('✅ Uploaded!', 'Your payment screenshot has been submitted for verification.');
       setScreenshot(null);
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err) {
+      console.error('[Upload] failed:', err);
       Alert.alert('Upload Failed', err.message || 'Please try again.');
     } finally {
       setUploading(false);
