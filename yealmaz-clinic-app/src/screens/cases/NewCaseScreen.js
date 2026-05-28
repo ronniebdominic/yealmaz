@@ -7,6 +7,32 @@ import {
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow } from '../../utils/theme';
 
+// ── Due-date rules (mirrors backend getDueDays) ──────────
+function getDueDays(workType) {
+  const w = (workType || '').toLowerCase();
+  if (w.includes('coping'))   return 3;
+  if (w.includes('aligner'))  return 6;
+  if (w.includes('zirconia')) return 4;
+  if (w.includes('ceramic'))  return 6;
+  if (w.includes('emax'))     return 6;
+  if (w.includes('guard') || w.includes('splint') || w.includes('retainer') ||
+      w.includes('bleaching') || w.includes('gingival')) return 4;
+  return 5;
+}
+
+function calcDueDate(workType) {
+  const days = getDueDays(workType);
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return { iso: d.toISOString().slice(0, 10), days };
+}
+
+function formatDueDate(isoDate) {
+  if (!isoDate) return '';
+  const d = new Date(isoDate + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 // ── Work Types ────────────────────────────────────────────
 const WORK_TYPES = [
   // Zirconia
@@ -165,8 +191,18 @@ export default function NewCaseScreen({ navigation }) {
   const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [showWorkTypes, setShowWorkTypes] = useState(false);
+  const [autoCalcDays, setAutoCalcDays] = useState(null); // days used for auto calc
+  const [overrideDue, setOverrideDue]   = useState(false); // show manual override input
 
   const set = (field) => (val) => setForm(prev => ({ ...prev, [field]: val }));
+
+  const selectWorkType = (w) => {
+    const { iso, days } = calcDueDate(w);
+    setForm(prev => ({ ...prev, workType: w, dueDate: iso }));
+    setAutoCalcDays(days);
+    setOverrideDue(false);
+    setShowWorkTypes(false);
+  };
 
   const toggleTooth = (num) => {
     setSelectedTeeth(prev =>
@@ -325,7 +361,7 @@ export default function NewCaseScreen({ navigation }) {
                     <TouchableOpacity
                       key={w}
                       style={[styles.dropdownItem, form.workType === w && styles.dropdownItemActive]}
-                      onPress={() => { set('workType')(w); setShowWorkTypes(false); }}
+                      onPress={() => selectWorkType(w)}
                     >
                       <Text style={[styles.dropdownText, form.workType === w && styles.dropdownTextActive]}>
                         {w}
@@ -339,13 +375,66 @@ export default function NewCaseScreen({ navigation }) {
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Due Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.text3}
-              value={form.dueDate}
-              onChangeText={set('dueDate')}
-            />
+
+            {/* Auto-calculated display */}
+            {autoCalcDays && !overrideDue ? (
+              <View style={{
+                backgroundColor: Colors.blue + '10',
+                borderWidth: 1.5, borderColor: Colors.blue + '40',
+                borderRadius: Radius.md, padding: Spacing.md,
+                flexDirection: 'row', alignItems: 'center',
+              }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.blue }}>
+                    📅 {formatDueDate(form.dueDate)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 2 }}>
+                    Auto-calculated · {autoCalcDays} working day{autoCalcDays !== 1 ? 's' : ''} for {form.workType}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setOverrideDue(true)}
+                  style={{ paddingLeft: 12 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.blue }}>
+                    Override
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              /* Manual / override input */
+              <View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={Colors.text3}
+                  value={form.dueDate}
+                  onChangeText={set('dueDate')}
+                  autoFocus={overrideDue}
+                />
+                {overrideDue && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (form.workType) {
+                        const { iso } = calcDueDate(form.workType);
+                        set('dueDate')(iso);
+                      }
+                      setOverrideDue(false);
+                    }}
+                    style={{ marginTop: 6, alignSelf: 'flex-start' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.blue }}>
+                      ↩ Reset to auto-calculated
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {!form.workType && (
+                  <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 4 }}>
+                    Select a work type to auto-fill this date
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={styles.formGroup}>
