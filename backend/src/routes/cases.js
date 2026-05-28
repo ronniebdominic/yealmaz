@@ -15,18 +15,29 @@ async function generateCaseNumber() {
   return `YAL-${year}-${padded}`;
 }
 
-// ── Auto due-date rules (days from creation) ─────────────
-function getDueDays(workType) {
+// ── Auto due-date rules ───────────────────────────────────
+// DB-stored durationDays takes priority; pattern matching is the fallback.
+function patternDays(workType) {
   const w = (workType || '').toLowerCase();
-  if (w.includes('coping'))    return 3;  // Coping / Zirconia Coping — checked first
-  if (w.includes('aligner'))   return 6;  // Clear Aligner Setup
-  if (w.includes('zirconia'))  return 4;  // all Zirconia variants
-  if (w.includes('ceramic'))   return 6;  // Ceramic Layering, PFM Ceramic, etc.
-  if (w.includes('emax'))      return 6;  // Emax Crown / Veneer / Bridge
-  // Other appliances: guards, splints, retainers, bleaching trays, gingival masks
+  if (w.includes('coping'))   return 3;
+  if (w.includes('aligner'))  return 6;
+  if (w.includes('zirconia')) return 4;
+  if (w.includes('ceramic'))  return 6;
+  if (w.includes('emax'))     return 6;
   if (w.includes('guard') || w.includes('splint') || w.includes('retainer') ||
       w.includes('bleaching') || w.includes('gingival')) return 4;
-  return 5; // everything else
+  return 5;
+}
+
+async function getDueDays(workType) {
+  try {
+    const record = await prisma.workTypePrice.findUnique({
+      where: { workType },
+      select: { durationDays: true },
+    });
+    if (record?.durationDays) return record.durationDays;
+  } catch (_) {}
+  return patternDays(workType);
 }
 
 // ── GET /api/cases ───────────────────────────────────────
@@ -138,7 +149,7 @@ router.post('/', protect, async (req, res) => {
     if (!clinicId) return res.status(400).json({ error: 'Clinic ID is required.' });
 
     // Auto-calculate due date from work type; use manual value only if explicitly provided
-    const autoDays = getDueDays(workType);
+    const autoDays = await getDueDays(workType);
     const autoDate = new Date();
     autoDate.setDate(autoDate.getDate() + autoDays);
     const resolvedDueDate = dueDate ? new Date(dueDate) : autoDate;

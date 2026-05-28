@@ -32,11 +32,20 @@ router.put('/', async (req, res) => {
     }
 
     await Promise.all(
-      updates.map(({ workType, price }) =>
+      updates.map(({ workType, price, durationDays }) =>
         prisma.workTypePrice.upsert({
           where: { workType },
-          update: { price: parseFloat(price) },
-          create: { workType, price: parseFloat(price) },
+          update: {
+            price: parseFloat(price),
+            ...(durationDays !== undefined
+              ? { durationDays: durationDays ? parseInt(durationDays) : null }
+              : {}),
+          },
+          create: {
+            workType,
+            price: parseFloat(price),
+            durationDays: durationDays ? parseInt(durationDays) : null,
+          },
         })
       )
     );

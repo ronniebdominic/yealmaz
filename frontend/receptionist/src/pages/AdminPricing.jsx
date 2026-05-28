@@ -14,9 +14,11 @@ export default function AdminPricing() {
   const [search, setSearch] = useState('');
   const [edits, setEdits]   = useState({});
   const [page, setPage]     = useState(1);
+  const [durationEdits, setDurationEdits] = useState({});
   const [showAdd, setShowAdd] = useState(false);
   const [newType, setNewType] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newDays, setNewDays] = useState('');
 
   const { data: prices = [], isLoading } = useQuery({
     queryKey: ['prices'],
@@ -29,6 +31,7 @@ export default function AdminPricing() {
     onSuccess: (updated) => {
       queryClient.setQueryData(['prices'], updated);
       setEdits({});
+      setDurationEdits({});
       toast.success('Prices saved successfully');
     },
     onError: (err) => {
@@ -49,21 +52,32 @@ export default function AdminPricing() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const dirtyCount = Object.keys(edits).length;
+  const dirtyCount = new Set([...Object.keys(edits), ...Object.keys(durationEdits)]).size;
 
   const handleChange = (workType, val) => {
     setEdits(prev => ({ ...prev, [workType]: val }));
   };
 
+  const handleDurationChange = (workType, val) => {
+    setDurationEdits(prev => ({ ...prev, [workType]: val }));
+  };
+
   const handleSave = () => {
-    const updates = Object.entries(edits)
-      .map(([workType, price]) => ({ workType, price: parseFloat(price) || 0 }))
-      .filter(u => u.price >= 0);
-    if (updates.length === 0) return;
+    const dirtyTypes = new Set([...Object.keys(edits), ...Object.keys(durationEdits)]);
+    if (dirtyTypes.size === 0) return;
+    const updates = [...dirtyTypes].map(workType => {
+      const original = prices.find(p => p.workType === workType);
+      const price = edits[workType] !== undefined ? parseFloat(edits[workType]) : original?.price || 0;
+      const durVal = durationEdits[workType];
+      const durationDays = durVal !== undefined
+        ? (durVal === '' ? null : parseInt(durVal))
+        : original?.durationDays;
+      return { workType, price, durationDays };
+    }).filter(u => u.price >= 0);
     saveAll(updates);
   };
 
-  const handleReset = () => setEdits({});
+  const handleReset = () => { setEdits({}); setDurationEdits({}); };
 
   const handleAddNew = () => {
     const trimmed = newType.trim();
@@ -74,16 +88,21 @@ export default function AdminPricing() {
       toast.error('This work type already exists — edit its price in the table');
       return;
     }
-    saveAll([{ workType: trimmed, price }]);
+    const durationDays = newDays ? parseInt(newDays) : null;
+    saveAll([{ workType: trimmed, price, durationDays }]);
     setShowAdd(false);
     setNewType('');
     setNewPrice('');
+    setNewDays('');
   };
 
   const getPrice = (p) =>
     edits[p.workType] !== undefined ? edits[p.workType] : p.price;
 
-  const isDirty = (workType) => edits[workType] !== undefined;
+  const getDuration = (p) =>
+    durationEdits[p.workType] !== undefined ? durationEdits[p.workType] : (p.durationDays ?? '');
+
+  const isDirty = (workType) => edits[workType] !== undefined || durationEdits[workType] !== undefined;
 
   return (
     <AdminLayout>
@@ -194,6 +213,21 @@ export default function AdminPricing() {
                   />
                 </div>
               </div>
+              <div style={{ flex: 0, minWidth: 110 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                  DURATION (days)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="auto"
+                  value={newDays}
+                  onChange={e => setNewDays(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddNew()}
+                  style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
+                />
+              </div>
               <button
                 onClick={handleAddNew}
                 disabled={saving}
@@ -221,23 +255,27 @@ export default function AdminPricing() {
                   <th style={{ width: 48 }}>#</th>
                   <th>Work Type</th>
                   <th style={{ width: 200 }}>Price (Br)</th>
+                  <th style={{ width: 160 }}>Duration (days)</th>
                   <th style={{ width: 120, textAlign: 'center' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
                       Loading prices…
                     </td>
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="empty-state">No work types match your search</td>
+                    <td colSpan={5} className="empty-state">No work types match your search</td>
                   </tr>
                 ) : paginated.map((p, i) => {
                   const dirty = isDirty(p.workType);
+                  const priceDirty = edits[p.workType] !== undefined;
+                  const durDirty = durationEdits[p.workType] !== undefined;
                   const currentVal = getPrice(p);
+                  const currentDur = getDuration(p);
                   const globalIdx = (page - 1) * PAGE_SIZE + i;
                   return (
                     <tr key={p.workType} style={dirty ? { background: 'rgba(240,165,0,0.05)' } : {}}>
@@ -257,12 +295,27 @@ export default function AdminPricing() {
                             style={{
                               ...inputStyle,
                               width: 140,
-                              fontWeight: dirty ? 700 : 400,
-                              borderColor: dirty ? 'var(--amber)' : 'var(--border)',
-                              color: dirty ? 'var(--text-1)' : 'var(--text-1)',
+                              fontWeight: priceDirty ? 700 : 400,
+                              borderColor: priceDirty ? 'var(--amber)' : 'var(--border)',
                             }}
                           />
                         </div>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          placeholder="auto"
+                          value={currentDur}
+                          onChange={e => handleDurationChange(p.workType, e.target.value)}
+                          style={{
+                            ...inputStyle,
+                            width: 100,
+                            fontWeight: durDirty ? 700 : 400,
+                            borderColor: durDirty ? 'var(--amber)' : 'var(--border)',
+                          }}
+                        />
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {dirty ? (
