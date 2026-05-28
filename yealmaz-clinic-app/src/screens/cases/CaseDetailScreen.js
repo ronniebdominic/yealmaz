@@ -184,11 +184,28 @@ export default function CaseDetailScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem('ya_clinic_token');
       const formData = new FormData();
-      formData.append('screenshot', {
-        uri: screenshot.uri,
-        type: screenshot.mimeType || 'image/jpeg',
-        name: `payment_${caseId}.jpg`,
-      });
+
+      if (Platform.OS === 'web') {
+        // On web, expo-image-picker provides a real File object on the asset.
+        // Appending the RN { uri, type, name } object would just serialize as "[object Object]".
+        if (screenshot.file) {
+          // Preferred path: expo-image-picker gave us a proper File
+          formData.append('screenshot', screenshot.file, `payment_${caseId}.jpg`);
+        } else {
+          // Fallback: fetch the blob from the data/blob URI ourselves
+          const resp = await fetch(screenshot.uri);
+          const blob = await resp.blob();
+          formData.append('screenshot', blob, `payment_${caseId}.jpg`);
+        }
+      } else {
+        // Native (iOS / Android): RN's fetch understands the { uri, type, name } shorthand
+        formData.append('screenshot', {
+          uri: screenshot.uri,
+          type: screenshot.mimeType || 'image/jpeg',
+          name: `payment_${caseId}.jpg`,
+        });
+      }
+
       // Use native fetch — Axios does not reliably handle FormData multipart in React Native
       const res = await fetch(`${API_BASE}/payments/${caseId}/upload`, {
         method: 'POST',
