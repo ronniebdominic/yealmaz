@@ -1,0 +1,559 @@
+// Ye-Almaz — Admin User Management
+
+import { useState } from 'react';
+import AdminLayout from '../components/AdminLayout';
+import api from '../api';
+import { format } from 'date-fns';
+import toast from 'react-hot-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+// ── Constants ─────────────────────────────────────────────
+const ROLES = [
+  { value: 'RECEPTIONIST', label: 'Receptionist',   icon: '🗂️' },
+  { value: 'LAB_TECH',     label: 'Lab Technician', icon: '🔬' },
+  { value: 'DELIVERY',     label: 'Delivery',       icon: '🚚' },
+  { value: 'DISPATCH',     label: 'Dispatch',       icon: '📦' },
+  { value: 'FINANCE',      label: 'Finance',        icon: '💰' },
+];
+
+const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.value, r]));
+
+const DEPARTMENTS = [
+  { code: 'PLASTER',      label: 'Plaster Department'   },
+  { code: 'MARGIN',       label: 'Margin Department'    },
+  { code: 'SCANNING',     label: 'Scanning'             },
+  { code: 'DESIGNING',    label: 'Designing'            },
+  { code: 'MILLING',      label: 'Milling / Sintering'  },
+  { code: 'RESIN_PRINT',  label: 'Resin 3D Printing'    },
+  { code: 'METAL_PRINT',  label: 'Metal 3D Printing'    },
+  { code: 'METAL_FINISH', label: 'Metal Finishing'      },
+  { code: 'OPAQUE',       label: 'Opaque Application'   },
+  { code: 'CERAMIC',      label: 'Ceramic Layering'     },
+  { code: 'ZIRCONIA',     label: 'Zirconia Fitting'     },
+  { code: 'GLAZING',      label: 'Glazing'              },
+  { code: 'THERMO',       label: 'Thermo Press'         },
+  { code: 'TRIMMING',     label: 'Trimming'             },
+  { code: 'QC',           label: 'Quality Control'      },
+];
+
+const ROLE_COLORS = {
+  RECEPTIONIST: { bg: 'rgba(26,86,160,0.1)',   color: 'var(--blue)' },
+  LAB_TECH:     { bg: 'rgba(124,58,237,0.1)',  color: '#7C3AED'     },
+  DELIVERY:     { bg: 'rgba(217,119,6,0.1)',   color: '#D97706'     },
+  DISPATCH:     { bg: 'rgba(14,165,233,0.1)',  color: '#0EA5E9'     },
+  FINANCE:      { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
+};
+
+// ── Helpers ───────────────────────────────────────────────
+function generatePassword(length = 12) {
+  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower  = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const all    = upper + lower + digits;
+  let pass = [
+    upper [Math.floor(Math.random() * upper.length)],
+    lower [Math.floor(Math.random() * lower.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+  ];
+  for (let i = pass.length; i < length; i++)
+    pass.push(all[Math.floor(Math.random() * all.length)]);
+  return pass.sort(() => Math.random() - 0.5).join('');
+}
+
+const inputStyle = {
+  width: '100%', padding: '9px 12px',
+  border: '1.5px solid var(--border)', borderRadius: 8,
+  fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)',
+  fontFamily: 'DM Sans, sans-serif', outline: 'none', boxSizing: 'border-box',
+};
+
+const labelStyle = {
+  fontSize: 12, fontWeight: 700, color: 'var(--text-2)',
+  display: 'block', marginBottom: 5,
+};
+
+function Field({ label, hint, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={labelStyle}>
+        {label}
+        {hint && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ── User Form Modal ───────────────────────────────────────
+function UserFormModal({ initial, onSaved, onClose }) {
+  const isEdit = !!initial?.id;
+  const [form, setForm] = useState(initial ? {
+    name:       initial.name       || '',
+    email:      initial.email      || '',
+    phone:      initial.phone      || '',
+    role:       initial.role       || 'RECEPTIONIST',
+    department: initial.department || '',
+    password:   '',
+  } : {
+    name: '', email: '', phone: '',
+    role: 'RECEPTIONIST', department: '', password: generatePassword(),
+  });
+  const [showPass, setShowPass] = useState(!isEdit);
+  const [saving,   setSaving]   = useState(false);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    if (!form.name.trim())  { toast.error('Name is required');  return; }
+    if (!form.email.trim()) { toast.error('Email is required'); return; }
+    if (!isEdit && !form.password.trim()) { toast.error('Password is required'); return; }
+
+    setSaving(true);
+    try {
+      const payload = {
+        name:  form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim() || undefined,
+        role:  form.role,
+        department: form.role === 'LAB_TECH' ? (form.department || undefined) : undefined,
+      };
+      if (form.password.trim()) payload.password = form.password.trim();
+
+      let saved;
+      if (isEdit) {
+        const { data } = await api.patch(`/users/${initial.id}`, payload);
+        saved = data;
+        toast.success(`${saved.name} updated`);
+      } else {
+        const { data } = await api.post('/users', payload);
+        saved = data;
+        toast.success(`${saved.name} created`);
+      }
+      onSaved(saved, !isEdit ? form.password : null);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{isEdit ? '✏️ Edit User' : '👤 New User'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              {isEdit ? 'Update details — leave password blank to keep existing' : 'Fill in details or regenerate the password'}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+            {/* Name */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Full Name" hint="required">
+                <input style={inputStyle} placeholder="e.g. Biruk Alemu"
+                  value={form.name} onChange={e => set('name', e.target.value)} autoFocus />
+              </Field>
+            </div>
+
+            {/* Role */}
+            <Field label="Role" hint="required">
+              <select
+                style={{ ...inputStyle, cursor: 'pointer' }}
+                value={form.role}
+                onChange={e => { set('role', e.target.value); set('department', ''); }}
+              >
+                {ROLES.map(r => (
+                  <option key={r.value} value={r.value}>{r.icon} {r.label}</option>
+                ))}
+              </select>
+            </Field>
+
+            {/* Department — LAB_TECH only */}
+            <Field
+              label="Department"
+              hint={form.role === 'LAB_TECH' ? 'locks them to one dept' : 'only for Lab Technician'}
+            >
+              <select
+                style={{ ...inputStyle, cursor: 'pointer', opacity: form.role === 'LAB_TECH' ? 1 : 0.4 }}
+                value={form.department}
+                onChange={e => set('department', e.target.value)}
+                disabled={form.role !== 'LAB_TECH'}
+              >
+                <option value="">— None / Flexible —</option>
+                {DEPARTMENTS.map(d => (
+                  <option key={d.code} value={d.code}>{d.label}</option>
+                ))}
+              </select>
+            </Field>
+
+            {/* Email */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Email" hint="used to log in">
+                <input style={inputStyle} type="email" placeholder="user@yealmaz.com"
+                  value={form.email} onChange={e => set('email', e.target.value)} />
+              </Field>
+            </div>
+
+            {/* Phone */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Phone" hint="optional">
+                <input style={inputStyle} placeholder="+251 9…"
+                  value={form.phone} onChange={e => set('phone', e.target.value)} />
+              </Field>
+            </div>
+
+            {/* Password */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Password" hint={isEdit ? 'leave blank to keep current' : 'required'}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    style={{ ...inputStyle, paddingRight: 80, fontFamily: showPass ? 'DM Mono, monospace' : 'inherit' }}
+                    type={showPass ? 'text' : 'password'}
+                    placeholder={isEdit ? 'Enter new password to change…' : ''}
+                    value={form.password}
+                    onChange={e => set('password', e.target.value)}
+                  />
+                  <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
+                    <button type="button" onClick={() => setShowPass(s => !s)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-3)' }}>
+                      {showPass ? '🙈' : '👁'}
+                    </button>
+                    <button type="button" onClick={() => { set('password', generatePassword()); setShowPass(true); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>
+                      ↺ New
+                    </button>
+                  </div>
+                </div>
+              </Field>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button
+              onClick={submit} disabled={saving}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: saving ? 'var(--border)' : 'var(--blue)',
+                color: '#fff', border: 'none', borderRadius: 8,
+                padding: '10px 18px', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer', transition: 'background .15s',
+              }}
+            >
+              {saving ? 'Saving…' : isEdit ? '✓ Save Changes' : '✓ Create User'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Credentials Card ──────────────────────────────────────
+function CredsCard({ user, password, onClose }) {
+  const copy = (text, label) =>
+    navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied`));
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: 'var(--green)' }}>✅ User Created</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              Save these credentials — password won't be shown again
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
+            {[
+              { label: 'Name',     value: user.name },
+              { label: 'Role',     value: ROLE_MAP[user.role]?.label || user.role },
+              { label: 'Email',    value: user.email, copy: true },
+              { label: 'Password', value: password,   copy: true, mono: true },
+            ].map((row, i, arr) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+              }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{row.label}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, fontFamily: row.mono ? 'DM Mono, monospace' : 'inherit', color: row.mono ? 'var(--blue)' : 'var(--text-1)' }}>
+                    {row.value}
+                  </div>
+                </div>
+                {row.copy && (
+                  <button onClick={() => copy(row.value, row.label)}
+                    style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 12, cursor: 'pointer', color: 'var(--text-2)', fontWeight: 600 }}>
+                    Copy
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ width: '100%', background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reset Password Modal ──────────────────────────────────
+function ResetPasswordModal({ user, onDone, onClose }) {
+  const [password, setPassword] = useState(() => generatePassword());
+  const [saving,   setSaving]   = useState(false);
+
+  const apply = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/users/${user.id}`, { password });
+      toast.success(`Password reset for ${user.name}`);
+      onDone(user, password);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Reset failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 400 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">🔑 Reset Password</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{user.name}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>New Password <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>— copy before applying</span></label>
+            <div style={{ position: 'relative' }}>
+              <input
+                style={{ ...inputStyle, paddingRight: 72, fontFamily: 'DM Mono, monospace' }}
+                value={password} onChange={e => setPassword(e.target.value)}
+              />
+              <button type="button" onClick={() => setPassword(generatePassword())}
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 700 }}>
+                ↺ New
+              </button>
+            </div>
+            <button type="button" onClick={() => navigator.clipboard.writeText(password).then(() => toast.success('Copied'))}
+              style={{ marginTop: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--blue)', fontWeight: 600, padding: 0 }}>
+              📋 Copy to clipboard
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button onClick={apply} disabled={saving || !password.trim()}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: saving ? 'var(--border)' : 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Applying…' : '✓ Apply New Password'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────
+const ROLE_FILTERS = [{ label: 'All', value: '' }, ...ROLES.map(r => ({ label: r.label, value: r.value }))];
+
+export default function AdminUsers() {
+  const queryClient = useQueryClient();
+  const [showForm,     setShowForm]     = useState(false);
+  const [editTarget,   setEditTarget]   = useState(null);
+  const [resetTarget,  setResetTarget]  = useState(null);
+  const [newCreds,     setNewCreds]     = useState(null);
+  const [roleFilter,   setRoleFilter]   = useState('');
+  const [search,       setSearch]       = useState('');
+
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: () => api.get('/users').then(r => r.data),
+    staleTime: 30_000,
+  });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+
+  const filtered = users.filter(u => {
+    const matchRole = !roleFilter || u.role === roleFilter;
+    const matchSearch = !search.trim() ||
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.department || '').toLowerCase().includes(search.toLowerCase());
+    return matchRole && matchSearch;
+  });
+
+  const handleSaved = (user, plainPassword) => {
+    refresh();
+    setShowForm(false);
+    setEditTarget(null);
+    if (plainPassword) setNewCreds({ user, password: plainPassword });
+  };
+
+  return (
+    <AdminLayout>
+      <div className="topbar">
+        <div className="topbar-title">Users</div>
+        <button
+          onClick={() => setShowForm(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        >
+          + New User
+        </button>
+      </div>
+
+      <div className="content">
+        {/* Search + role filters */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
+            <span className="icon">🔍</span>
+            <input
+              placeholder="Search by name, email or department…"
+              value={search} onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="filters" style={{ marginBottom: 20 }}>
+          {ROLE_FILTERS.map(f => (
+            <button key={f.value} className={`filter-chip ${roleFilter === f.value ? 'active' : ''}`}
+              onClick={() => setRoleFilter(f.value)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Table */}
+        <div className="card">
+          <div className="table-wrap">
+            {isLoading ? (
+              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading users…</div>
+            ) : filtered.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">👤</div>
+                <div className="empty-title">No users found</div>
+                <p>{search || roleFilter ? 'Try adjusting your search or filter' : 'Add the first user with the button above'}</p>
+              </div>
+            ) : (
+              <table style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: 200 }} />
+                  <col style={{ width: 210 }} />
+                  <col style={{ width: 120 }} />
+                  <col style={{ width: 160 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 230 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Department</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Added</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(u => {
+                    const roleInfo  = ROLE_MAP[u.role] || {};
+                    const roleColor = ROLE_COLORS[u.role] || { bg: 'var(--surface-2)', color: 'var(--text-2)' };
+                    return (
+                      <tr key={u.id} style={{ opacity: u.isActive ? 1 : 0.5 }}>
+                        <td style={{ padding: '8px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 26, height: 26, borderRadius: 7, background: roleColor.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              {u.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                            </div>
+                            <div style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className="patient-name" title={u.name}>
+                              {u.name}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.email}</td>
+                        <td style={{ padding: '8px 16px' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap' }}>
+                            {roleInfo.icon} {roleInfo.label || u.role}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {u.role === 'LAB_TECH'
+                            ? (DEPARTMENTS.find(d => d.code === u.department)?.label || (u.department ? u.department : <span style={{ color: 'var(--text-3)' }}>Flexible</span>))
+                            : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
+                        <td style={{ padding: '8px 16px' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: u.isActive ? 'rgba(22,163,74,0.1)' : 'rgba(229,62,62,0.1)', color: u.isActive ? 'var(--green)' : 'var(--red)', whiteSpace: 'nowrap' }}>
+                            {u.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                          {format(new Date(u.createdAt), 'dd MMM yyyy')}
+                        </td>
+                        <td style={{ padding: '8px 16px' }}>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(u)}>✏️ Edit</button>
+                            <button
+                              onClick={() => setResetTarget(u)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 3, background: 'rgba(124,58,237,0.07)', color: '#7C3AED', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              🔑 Reset PW
+                            </button>
+                            <button
+                              onClick={() => {
+                                api.patch(`/users/${u.id}`, { isActive: !u.isActive })
+                                  .then(() => { toast.success(`${u.name} ${u.isActive ? 'deactivated' : 'activated'}`); refresh(); })
+                                  .catch(() => toast.error('Update failed'));
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 3, background: u.isActive ? 'rgba(229,62,62,0.07)' : 'rgba(22,163,74,0.08)', color: u.isActive ? 'var(--red)' : 'var(--green)', border: `1px solid ${u.isActive ? 'rgba(229,62,62,0.2)' : 'rgba(22,163,74,0.25)'}`, borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              {u.isActive ? '⏸ Deactivate' : '▶ Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showForm    && <UserFormModal onSaved={handleSaved} onClose={() => setShowForm(false)} />}
+      {editTarget  && <UserFormModal initial={editTarget} onSaved={handleSaved} onClose={() => setEditTarget(null)} />}
+
+      {resetTarget && (
+        <ResetPasswordModal
+          user={resetTarget}
+          onDone={(user, password) => { setResetTarget(null); setNewCreds({ user, password }); }}
+          onClose={() => setResetTarget(null)}
+        />
+      )}
+
+      {newCreds && (
+        <CredsCard
+          user={newCreds.user}
+          password={newCreds.password}
+          onClose={() => setNewCreds(null)}
+        />
+      )}
+    </AdminLayout>
+  );
+}

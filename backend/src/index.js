@@ -66,6 +66,7 @@ app.use('/api/', apiLimiter);
 
 // ── Routes ───────────────────────────────────────────────
 app.use('/api/auth',          require('./routes/auth'));
+app.use('/api/users',         require('./routes/users'));
 app.use('/api/clinics',       require('./routes/clinics'));
 app.use('/api/cases',         require('./routes/cases'));
 app.use('/api/stages',        require('./routes/stages'));

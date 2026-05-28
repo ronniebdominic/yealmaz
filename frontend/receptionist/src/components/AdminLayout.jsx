@@ -17,11 +17,11 @@ function NavItems({ active, onNav }) {
       <button className={active('/admin/clinics')} onClick={() => onNav('/admin/clinics')}>
         <span>🏥</span> Clinics
       </button>
+      <button className={active('/admin/users')} onClick={() => onNav('/admin/users')}>
+        <span>👥</span> Users
+      </button>
       <button className={active('/admin/pricing')} onClick={() => onNav('/admin/pricing')}>
         <span>💰</span> Work Type Pricing
-      </button>
-      <button className={active('/')} onClick={() => onNav('/')}>
-        <span>🏠</span> Receptionist View
       </button>
     </>
   );
