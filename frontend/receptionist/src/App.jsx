@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPricing from './pages/AdminPricing';
 import AdminCases from './pages/AdminCases';
+import AdminClinics from './pages/AdminClinics';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Delivery from './pages/Delivery';
@@ -58,6 +59,7 @@ function AppRoutes() {
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminPricing /></ProtectedRoute>} />
       <Route path="/admin/cases" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminCases /></ProtectedRoute>} />
+      <Route path="/admin/clinics" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminClinics /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

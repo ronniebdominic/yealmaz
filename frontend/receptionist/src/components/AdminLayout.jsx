@@ -14,6 +14,9 @@ function NavItems({ active, onNav }) {
       <button className={active('/admin/cases')} onClick={() => onNav('/admin/cases')}>
         <span>📋</span> Case Management
       </button>
+      <button className={active('/admin/clinics')} onClick={() => onNav('/admin/clinics')}>
+        <span>🏥</span> Clinics
+      </button>
       <button className={active('/admin/pricing')} onClick={() => onNav('/admin/pricing')}>
         <span>💰</span> Work Type Pricing
       </button>
