@@ -356,30 +356,32 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* ── Revenue by Clinic ── */}
-            <div className="card" style={{ marginBottom: 20 }}>
-              <div className="card-header">
-                <div className="card-title">Revenue by Clinic</div>
+            {/* ── Revenue by Clinic (hidden when a specific clinic is selected) ── */}
+            {!selectedClinic && (
+              <div className="card" style={{ marginBottom: 20 }}>
+                <div className="card-header">
+                  <div className="card-title">Revenue by Clinic</div>
+                </div>
+                <div style={{ padding: '20px 20px 12px' }}>
+                  {revenueByClinic?.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>No data</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={Math.max(200, (revenueByClinic?.length || 1) * 44)}>
+                      <BarChart layout="vertical" data={revenueByClinic}
+                        margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-3)' }}
+                          tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
+                        <YAxis type="category" dataKey="name" width={130}
+                          tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
+                        <Tooltip content={<CustomTooltip prefix="Br " />} />
+                        <Bar dataKey="revenue" name="Revenue" fill="var(--navy)" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
-              <div style={{ padding: '20px 20px 12px' }}>
-                {revenueByClinic?.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>No data</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={Math.max(200, (revenueByClinic?.length || 1) * 44)}>
-                    <BarChart layout="vertical" data={revenueByClinic}
-                      margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-3)' }}
-                        tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
-                      <YAxis type="category" dataKey="name" width={130}
-                        tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                      <Tooltip content={<CustomTooltip prefix="Br " />} />
-                      <Bar dataKey="revenue" name="Revenue" fill="var(--navy)" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
+            )}
 
             {/* ── Clinic table ── */}
             <div className="card">
