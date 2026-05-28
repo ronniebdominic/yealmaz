@@ -5,8 +5,6 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-const getStation = (name) => name?.match(/\(([^)]+)\)\s*$/)?.[1]?.toUpperCase() || null;
-
 // ── Assign Modal ─────────────────────────────────────────────────────────────
 function AssignModal({ caseData, executives, onConfirm, onClose, loading, mode }) {
   const [selectedExecId, setSelectedExecId] = useState('');
@@ -399,9 +397,9 @@ export default function DispatchDashboard() {
                   </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{g.clinic?.name}</div>
-                    {getStation(g.clinic?.name) && (
+                    {g.clinic?.station && (
                       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginTop: 1 }}>
-                        {getStation(g.clinic.name)}
+                        {g.clinic.station.toUpperCase()}
                       </div>
                     )}
                     {g.clinic?.address && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>📍 {g.clinic.address}</div>}
@@ -460,9 +458,9 @@ export default function DispatchDashboard() {
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{c.patientName}</div>
                     <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>{c.workType} · 🏥 {c.clinic?.name}</div>
-                    {getStation(c.clinic?.name) && (
+                    {c.clinic?.station && (
                       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginBottom: 4 }}>
-                        {getStation(c.clinic.name)}
+                        {c.clinic.station.toUpperCase()}
                       </div>
                     )}
                     {c.clinic?.address && (

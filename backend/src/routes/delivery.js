@@ -34,7 +34,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
       prisma.case.findMany({
         where,
         include: {
-          clinic: { select: { code: true, name: true, address: true, phone: true } },
+          clinic: { select: { code: true, name: true, station: true, address: true, phone: true } },
           payment: true,
           deliveryLogs: { orderBy: { deliveredAt: 'desc' }, take: 1 }
         },
