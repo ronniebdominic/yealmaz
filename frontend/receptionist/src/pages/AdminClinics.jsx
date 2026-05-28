@@ -526,11 +526,12 @@ export default function AdminClinics() {
             ) : (
               <table style={{ tableLayout: 'fixed' }}>
                 <colgroup>
-                  <col style={{ width: 220 }} />
+                  <col style={{ width: 200 }} />
                   <col style={{ width: 80 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 210 }} />
-                  <col style={{ width: 130 }} />
+                  <col style={{ width: 100 }} />
+                  <col style={{ width: 200 }} />
+                  <col style={{ width: 120 }} />
+                  <col style={{ width: 100 }} />
                   <col style={{ width: 80 }} />
                   <col style={{ width: 90 }} />
                   <col style={{ width: 200 }} />
@@ -542,6 +543,7 @@ export default function AdminClinics() {
                     <th>Station</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Partner</th>
                     <th>Status</th>
                     <th>Added</th>
                     <th>Actions</th>
@@ -567,11 +569,6 @@ export default function AdminClinics() {
                             >
                               {c.name}
                             </div>
-                            {c.isExcluded && (
-                              <div style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 700, marginTop: 1 }}>
-                                PARTNER
-                              </div>
-                            )}
                           </div>
                         </div>
                       </td>
@@ -583,6 +580,34 @@ export default function AdminClinics() {
                       <td style={{ padding: '8px 16px', fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.station || '—'}</td>
                       <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.email || ''}>{c.email || '—'}</td>
                       <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{c.phone || '—'}</td>
+                      <td style={{ padding: '8px 16px' }}>
+                        <button
+                          title={c.isExcluded ? 'Trusted partner — click to remove' : 'Standard clinic — click to mark as partner'}
+                          onClick={() => {
+                            api.patch(`/clinics/${c.id}`, { isExcluded: !c.isExcluded })
+                              .then(() => {
+                                toast.success(`${c.name} ${c.isExcluded ? 'removed from' : 'marked as'} trusted partner`);
+                                queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
+                              })
+                              .catch(() => toast.error('Update failed'));
+                          }}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            background: c.isExcluded ? 'rgba(26,86,160,0.1)' : 'var(--surface-2)',
+                            color: c.isExcluded ? 'var(--blue)' : 'var(--text-3)',
+                            border: `1px solid ${c.isExcluded ? 'rgba(26,86,160,0.25)' : 'var(--border)'}`,
+                            borderRadius: 999, padding: '3px 10px',
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            whiteSpace: 'nowrap', transition: 'all .15s',
+                          }}
+                        >
+                          <span style={{
+                            width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                            background: c.isExcluded ? 'var(--blue)' : 'var(--border)',
+                          }} />
+                          {c.isExcluded ? 'Partner' : 'Standard'}
+                        </button>
+                      </td>
                       <td style={{ padding: '8px 16px' }}>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
