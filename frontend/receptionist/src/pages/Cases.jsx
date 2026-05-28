@@ -99,8 +99,8 @@ export default function Cases() {
                 <thead>
                   <tr>
                     <th>Case #</th>
-                    <th>Patient</th>
                     <th>Clinic</th>
+                    <th>Patient</th>
                     <th>Work Type</th>
                     <th>Due Date</th>
                     <th>Status</th>
@@ -112,8 +112,8 @@ export default function Cases() {
                   {cases.map(c => (
                     <tr key={c.id}>
                       <td><span className="case-number">{c.caseNumber}</span></td>
-                      <td><span className="patient-name">{c.patientName}</span></td>
                       <td>{c.clinic?.name}</td>
+                      <td><span className="patient-name">{c.patientName}</span></td>
                       <td>{c.workType}</td>
                       <td style={{ fontSize: '12px', color: 'var(--text-3)' }}>
                         {c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}

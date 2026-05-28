@@ -755,8 +755,8 @@ function TrustedPartnersTab({ queryClient }) {
             <thead>
               <tr>
                 <th>Case #</th>
-                <th>Patient</th>
                 <th>Clinic</th>
+                <th>Patient</th>
                 <th>Work Type</th>
                 <th>Invoice #</th>
                 <th>Amount</th>
@@ -768,11 +768,11 @@ function TrustedPartnersTab({ queryClient }) {
               {cases.map(c => (
                 <tr key={c.id}>
                   <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{c.caseNumber}</td>
-                  <td style={{ fontWeight: 600 }}>{c.patientName}</td>
                   <td>
                     <div style={{ fontSize: 13 }}>{c.clinic?.name}</div>
                     <span className="badge badge-trusted" style={{ fontSize: 10, marginTop: 3 }}>🤝 Trusted Partner</span>
                   </td>
+                  <td style={{ fontWeight: 600 }}>{c.patientName}</td>
                   <td style={{ fontSize: 13 }}>
                     {c.workType}
                     {c.toothNumbers && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>#{c.toothNumbers}</div>}
@@ -858,8 +858,8 @@ function HistoryTab() {
           <thead>
             <tr>
               <th>Case #</th>
-              <th>Patient</th>
               <th>Clinic</th>
+              <th>Patient</th>
               <th>Work Type</th>
               <th>Invoice #</th>
               <th>Amount</th>
@@ -870,8 +870,8 @@ function HistoryTab() {
             {payments.map(p => (
               <tr key={p.id}>
                 <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{p.case?.caseNumber}</td>
-                <td style={{ fontWeight: 600 }}>{p.case?.patientName}</td>
                 <td style={{ fontSize: 13 }}>{p.case?.clinic?.name}</td>
+                <td style={{ fontWeight: 600 }}>{p.case?.patientName}</td>
                 <td style={{ fontSize: 13 }}>{p.case?.workType}</td>
                 <td style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>
                   {p.invoiceNumber || '—'}

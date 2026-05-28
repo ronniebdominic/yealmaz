@@ -495,8 +495,8 @@ export default function AdminCases() {
                 <thead>
                   <tr>
                     <th>Case #</th>
-                    <th>Patient</th>
                     <th>Clinic</th>
+                    <th>Patient</th>
                     <th>Work Type</th>
                     <th>Amount</th>
                     <th>Status</th>
@@ -509,13 +509,13 @@ export default function AdminCases() {
                   {cases.map(c => (
                     <tr key={c.id}>
                       <td><span className="case-number">{c.caseNumber}</span></td>
+                      <td style={{ fontSize: 13 }}>{c.clinic?.name}</td>
                       <td>
                         <span className="patient-name">{c.patientName}</span>
                         {c.doctorName && (
                           <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>Dr. {c.doctorName}</div>
                         )}
                       </td>
-                      <td style={{ fontSize: 13 }}>{c.clinic?.name}</td>
                       <td style={{ fontSize: 13 }}>{c.workType}</td>
                       <td style={{ fontWeight: 600, fontSize: 13 }}>
                         {c.totalAmount

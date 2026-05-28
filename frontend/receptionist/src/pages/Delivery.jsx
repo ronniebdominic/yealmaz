@@ -48,8 +48,8 @@ export default function Delivery() {
                 <thead>
                   <tr>
                     <th>Case #</th>
-                    <th>Patient</th>
                     <th>Clinic</th>
+                    <th>Patient</th>
                     <th>Address</th>
                     <th>Work Type</th>
                     <th>Payment</th>
@@ -60,8 +60,8 @@ export default function Delivery() {
                   {paginated.map(c => (
                     <tr key={c.id}>
                       <td><span className="case-number">{c.caseNumber}</span></td>
-                      <td><span className="patient-name">{c.patientName}</span></td>
                       <td>{c.clinic?.name}</td>
+                      <td><span className="patient-name">{c.patientName}</span></td>
                       <td style={{ fontSize: '12px', color: 'var(--text-3)' }}>{c.clinic?.address || '—'}</td>
                       <td>{c.workType}</td>
                       <td><span className="badge badge-pay-verified">✓ Verified</span></td>

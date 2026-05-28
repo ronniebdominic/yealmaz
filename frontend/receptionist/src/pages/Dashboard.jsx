@@ -82,8 +82,8 @@ export default function Dashboard() {
               <thead>
                 <tr>
                   <th>Case #</th>
-                  <th>Patient</th>
                   <th>Clinic</th>
+                  <th>Patient</th>
                   <th>Work Type</th>
                   <th>Status</th>
                   <th>Payment</th>
@@ -96,8 +96,8 @@ export default function Dashboard() {
                 ) : recentCases?.map(c => (
                   <tr key={c.id} style={{ cursor: 'pointer' }}>
                     <td><span className="case-number">{c.caseNumber}</span></td>
-                    <td><span className="patient-name">{c.patientName}</span></td>
                     <td>{c.clinic?.name}</td>
+                    <td><span className="patient-name">{c.patientName}</span></td>
                     <td>{c.workType}</td>
                     <td><StatusBadge status={c.status} /></td>
                     <td><PaymentBadge status={c.paymentStatus} /></td>
