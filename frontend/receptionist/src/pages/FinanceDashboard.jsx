@@ -18,10 +18,10 @@ const HIST_SIZE = 20;
 const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
 const fetchPending = () => api.get('/payments/pending').then(r => r.data.payments ?? r.data);
 const fetchBilling = () => api.get('/payments/billing').then(r => r.data.cases    ?? r.data);
-const fetchHistory = (page) =>
-  api.get(`/payments/history?page=${page}&limit=${HIST_SIZE}`).then(r => r.data);
-const fetchTrusted = (page) =>
-  api.get(`/payments/trusted?page=${page}&limit=${HIST_SIZE}`).then(r => r.data);
+const fetchHistory = (page, search = '') =>
+  api.get(`/payments/history?page=${page}&limit=${HIST_SIZE}${search ? `&search=${encodeURIComponent(search)}` : ''}`).then(r => r.data);
+const fetchTrusted = (page, search = '') =>
+  api.get(`/payments/trusted?page=${page}&limit=${HIST_SIZE}${search ? `&search=${encodeURIComponent(search)}` : ''}`).then(r => r.data);
 
 // ── Lab info constant ─────────────────────────────────────
 const LAB = {
@@ -449,8 +449,10 @@ function BillingTab({ queryClient }) {
   const [viewModal, setViewModal]   = useState(null);
   const [processing, setProcessing] = useState(null);
   const [page, setPage]             = useState(1);
+  const [search, setSearch]         = useState('');
 
   const changeSubTab = (t) => { setSubTab(t); setPage(1); };
+  const handleSearch = (v) => { setSearch(v); setPage(1); };
 
   const { data: cases = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['payments', 'billing'],
@@ -480,9 +482,16 @@ function BillingTab({ queryClient }) {
     verifyMutation.mutate({ caseId, action, rejectionReason });
   };
 
-  const toInvoice = useMemo(() => cases.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount), [cases]);
-  const awaiting  = useMemo(() => cases.filter(c => c.totalAmount && c.paymentStatus === 'PENDING'), [cases]);
-  const uploaded  = useMemo(() => cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED'), [cases]);
+  const sq = search.toLowerCase();
+  const matchSearch = (c) => !sq ||
+    c.clinic?.name?.toLowerCase().includes(sq) ||
+    c.patientName?.toLowerCase().includes(sq) ||
+    c.caseNumber?.toLowerCase().includes(sq) ||
+    c.payment?.invoiceNumber?.toLowerCase().includes(sq);
+
+  const toInvoice = useMemo(() => cases.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount && matchSearch(c)), [cases, sq]);
+  const awaiting  = useMemo(() => cases.filter(c => c.totalAmount && c.paymentStatus === 'PENDING' && matchSearch(c)), [cases, sq]);
+  const uploaded  = useMemo(() => cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED' && matchSearch(c)), [cases, sq]);
 
   const buckets    = { 'to-invoice': toInvoice, awaiting, uploaded };
   const shown      = buckets[subTab] || [];
@@ -496,14 +505,27 @@ function BillingTab({ queryClient }) {
 
   return (
     <>
-      {/* Sub-tabs */}
-      <div className="filters" style={{ marginBottom: 20 }}>
-        {BILLING_SUB_TABS.map(t => (
-          <button key={t.id} className={`filter-chip ${subTab === t.id ? 'active' : ''}`} onClick={() => changeSubTab(t.id)}>
-            {t.icon} {t.label}
-            {counts[t.id] > 0 && <span className="badge-count">{counts[t.id]}</span>}
-          </button>
-        ))}
+      {/* Sub-tabs + search */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+        <div className="filters" style={{ margin: 0, flex: 1, flexWrap: 'wrap' }}>
+          {BILLING_SUB_TABS.map(t => (
+            <button key={t.id} className={`filter-chip ${subTab === t.id ? 'active' : ''}`} onClick={() => changeSubTab(t.id)}>
+              {t.icon} {t.label}
+              {counts[t.id] > 0 && <span className="badge-count">{counts[t.id]}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="search-input" style={{ minWidth: 200 }}>
+          <span className="icon">🔍</span>
+          <input
+            placeholder="Search clinic, case, patient…"
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+          />
+        </div>
+        {search && (
+          <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
+        )}
       </div>
 
       {shown.length === 0 ? (
@@ -715,12 +737,15 @@ function CollectModal({ caseData, onDone, onClose }) {
 }
 
 function TrustedPartnersTab({ queryClient }) {
-  const [page, setPage]         = useState(1);
+  const [page, setPage]           = useState(1);
+  const [search, setSearch]       = useState('');
   const [collectCase, setCollect] = useState(null);
 
+  const handleSearch = (v) => { setSearch(v); setPage(1); };
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['payments', 'trusted', page],
-    queryFn:  () => fetchTrusted(page),
+    queryKey: ['payments', 'trusted', page, search],
+    queryFn:  () => fetchTrusted(page, search),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
   });
@@ -741,6 +766,20 @@ function TrustedPartnersTab({ queryClient }) {
 
   return (
     <>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+        <div className="search-input" style={{ flex: 1 }}>
+          <span className="icon">🔍</span>
+          <input
+            placeholder="Search clinic, case or patient…"
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+          />
+        </div>
+        {search && (
+          <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
+        )}
+      </div>
+
       <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#6D28D9', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 16 }}>🤝</span>
         <span>
@@ -828,11 +867,14 @@ function TrustedPartnersTab({ queryClient }) {
 
 // ── Verified History Tab ──────────────────────────────────
 function HistoryTab() {
-  const [page, setPage] = useState(1);
+  const [page, setPage]     = useState(1);
+  const [search, setSearch] = useState('');
+
+  const handleSearch = (v) => { setSearch(v); setPage(1); };
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['payments', 'history', page],
-    queryFn: () => fetchHistory(page),
+    queryKey: ['payments', 'history', page, search],
+    queryFn: () => fetchHistory(page, search),
     staleTime: 120_000,
     placeholderData: keepPreviousData,
   });
@@ -852,6 +894,20 @@ function HistoryTab() {
   );
 
   return (
+    <>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+        <div className="search-input" style={{ flex: 1 }}>
+          <span className="icon">🔍</span>
+          <input
+            placeholder="Search clinic, case, patient or invoice…"
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+          />
+        </div>
+        {search && (
+          <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
+        )}
+      </div>
     <div className="card">
       <div className="table-wrap">
         <table>
@@ -894,6 +950,7 @@ function HistoryTab() {
         />
       </div>
     </div>
+    </>
   );
 }
 

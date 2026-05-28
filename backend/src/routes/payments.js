@@ -378,14 +378,24 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 
 // ── GET /api/payments/history ────────────────────────────
 router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const { page = 1, limit = 20, search = '' } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const cacheKey = `payments:history:${page}:${limit}`;
+  const cacheKey = `payments:history:${page}:${limit}:${search}`;
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
-    const where = { status: 'VERIFIED' };
+    const where = {
+      status: 'VERIFIED',
+      ...(search ? {
+        OR: [
+          { case: { clinic: { name: { contains: search, mode: 'insensitive' } } } },
+          { case: { patientName: { contains: search, mode: 'insensitive' } } },
+          { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
+          { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        ]
+      } : {})
+    };
     const [payments, total] = await Promise.all([
       prisma.payment.findMany({
         where,
@@ -416,9 +426,9 @@ router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 // ── GET /api/payments/trusted ────────────────────────────
 // Pending cases from isExcluded clinics — collected in person by finance
 router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const { page = 1, limit = 20, search = '' } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const cacheKey = `payments:trusted:${page}:${limit}`;
+  const cacheKey = `payments:trusted:${page}:${limit}:${search}`;
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
@@ -426,6 +436,13 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
     const where = {
       paymentStatus: 'PENDING',
       clinic: { isExcluded: true },
+      ...(search ? {
+        OR: [
+          { clinic: { name: { contains: search, mode: 'insensitive' } } },
+          { patientName: { contains: search, mode: 'insensitive' } },
+          { caseNumber: { contains: search, mode: 'insensitive' } },
+        ]
+      } : {})
     };
 
     const [cases, total] = await Promise.all([
