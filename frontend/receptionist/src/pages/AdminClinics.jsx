@@ -524,7 +524,17 @@ export default function AdminClinics() {
                 <p>{search ? 'Try a different search term' : 'Create the first clinic using the button above'}</p>
               </div>
             ) : (
-              <table>
+              <table style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: 220 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 210 }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 80 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 200 }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Clinic</th>
@@ -540,17 +550,23 @@ export default function AdminClinics() {
                 <tbody>
                   {filtered.map(c => (
                     <tr key={c.id} style={{ opacity: c.isActive ? 1 : 0.5 }}>
-                      <td>
+                      <td style={{ padding: '8px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <div style={{
-                            width: 30, height: 30, borderRadius: 8, background: 'var(--blue)',
+                            width: 26, height: 26, borderRadius: 7, background: 'var(--blue)',
                             color: '#fff', display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0,
+                            justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0,
                           }}>
                             {c.name[0]?.toUpperCase()}
                           </div>
-                          <div>
-                            <div className="patient-name">{c.name}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              className="patient-name"
+                              title={c.name}
+                              style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            >
+                              {c.name}
+                            </div>
                             {c.isExcluded && (
                               <div style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 700, marginTop: 1 }}>
                                 PARTNER
@@ -559,28 +575,29 @@ export default function AdminClinics() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td style={{ padding: '8px 16px', whiteSpace: 'nowrap' }}>
                         {c.code
-                          ? <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px' }}>{c.code}</span>
+                          ? <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px' }}>{c.code}</span>
                           : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
-                      <td style={{ fontSize: 13, color: 'var(--text-2)' }}>{c.station || '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.email || '—'}</td>
-                      <td style={{ fontSize: 13 }}>{c.phone || '—'}</td>
-                      <td>
+                      <td style={{ padding: '8px 16px', fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.station || '—'}</td>
+                      <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.email || ''}>{c.email || '—'}</td>
+                      <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{c.phone || '—'}</td>
+                      <td style={{ padding: '8px 16px' }}>
                         <span style={{
                           fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
                           background: c.isActive ? 'rgba(22,163,74,0.1)' : 'rgba(229,62,62,0.1)',
                           color: c.isActive ? 'var(--green)' : 'var(--red)',
+                          whiteSpace: 'nowrap',
                         }}>
                           {c.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                      <td style={{ padding: '8px 16px' }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
                           <button
                             className="btn btn-ghost btn-sm"
                             onClick={() => setEditTarget(c)}
