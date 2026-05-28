@@ -383,51 +383,53 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* ── Clinic table ── */}
-            <div className="card">
-              <div className="card-header">
-                <div className="card-title">Clinic Performance</div>
-              </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Clinic</th>
-                      <th>Total Cases</th>
-                      <th>Paid Cases</th>
-                      <th>Revenue (Verified)</th>
-                      <th>Avg per Case</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {revenueByClinic?.length === 0 ? (
-                      <tr><td colSpan={5} className="empty-state">No clinics found</td></tr>
-                    ) : revenueByClinic?.map(c => (
-                      <tr key={c.id}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                              width: 28, height: 28, borderRadius: 8, background: 'var(--blue)',
-                              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: 12, fontWeight: 700, flexShrink: 0,
-                            }}>
-                              {c.name[0]?.toUpperCase()}
-                            </div>
-                            <span className="patient-name">{c.name}</span>
-                          </div>
-                        </td>
-                        <td>{c.totalCases}</td>
-                        <td>{c.paidCases}</td>
-                        <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(c.revenue)}</td>
-                        <td style={{ color: 'var(--text-2)' }}>
-                          {c.paidCases > 0 ? ETB(Math.round(c.revenue / c.paidCases)) : '—'}
-                        </td>
+            {/* ── Clinic table (hidden when a specific clinic is selected) ── */}
+            {!selectedClinic && (
+              <div className="card">
+                <div className="card-header">
+                  <div className="card-title">Clinic Performance</div>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Clinic</th>
+                        <th>Total Cases</th>
+                        <th>Paid Cases</th>
+                        <th>Revenue (Verified)</th>
+                        <th>Avg per Case</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {revenueByClinic?.length === 0 ? (
+                        <tr><td colSpan={5} className="empty-state">No clinics found</td></tr>
+                      ) : revenueByClinic?.map(c => (
+                        <tr key={c.id}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{
+                                width: 28, height: 28, borderRadius: 8, background: 'var(--blue)',
+                                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 12, fontWeight: 700, flexShrink: 0,
+                              }}>
+                                {c.name[0]?.toUpperCase()}
+                              </div>
+                              <span className="patient-name">{c.name}</span>
+                            </div>
+                          </td>
+                          <td>{c.totalCases}</td>
+                          <td>{c.paidCases}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(c.revenue)}</td>
+                          <td style={{ color: 'var(--text-2)' }}>
+                            {c.paidCases > 0 ? ETB(Math.round(c.revenue / c.paidCases)) : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
