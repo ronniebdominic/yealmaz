@@ -187,9 +187,7 @@ export default function CaseDetailScreen({ navigation, route }) {
         type: 'image/jpeg',
         name: `payment_${caseId}.jpg`,
       });
-      await api.post(`/payments/${caseId}/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await api.post(`/payments/${caseId}/upload`, formData);
       Alert.alert('✅ Uploaded!', 'Your payment screenshot has been submitted for verification.');
       setScreenshot(null);
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
