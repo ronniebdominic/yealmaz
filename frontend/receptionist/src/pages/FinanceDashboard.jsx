@@ -2,7 +2,7 @@
 // Standalone page (no Layout wrapper) for FINANCE role users
 // Tabs: Screenshot Approvals · Billing & Invoicing · Verified History
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
@@ -645,6 +645,262 @@ function BillingTab({ queryClient }) {
   );
 }
 
+// ── Monthly Statement HTML ────────────────────────────────
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function buildStatementHTML(clinic, cases, month, year, allOutstanding) {
+  const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const period = allOutstanding ? 'All Outstanding' : `${MONTHS[month]} ${year}`;
+
+  const rows = cases.map((c, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td style="font-family:monospace;font-size:12px">${c.caseNumber}</td>
+      <td>${c.patientName}</td>
+      <td>${c.workType}</td>
+      <td style="font-family:monospace">${c.payment?.invoiceNumber || '—'}</td>
+      <td style="text-align:right;font-weight:700">Br ${(c.totalAmount || 0).toLocaleString('en-US')}</td>
+    </tr>`).join('');
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Statement — ${clinic.name} — ${period}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:40px;font-size:13px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #1565C0}
+  .lab-name{font-size:20px;font-weight:800;color:#1565C0;margin-bottom:4px}
+  .lab-sub{font-size:11px;color:#666;line-height:1.7}
+  .doc-title{text-align:right}
+  .doc-title h1{font-size:22px;font-weight:800;color:#1565C0;letter-spacing:2px}
+  .doc-title .period{font-size:13px;color:#444;margin-top:4px;font-weight:600}
+  .badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;background:#FEF3C7;color:#92400E;margin-top:6px}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}
+  .section-label{font-size:9px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+  .clinic-name{font-size:15px;font-weight:700;margin-bottom:3px}
+  .clinic-sub{font-size:12px;color:#555;line-height:1.6}
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .mi-label{font-size:9px;font-weight:700;color:#999;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
+  .mi-value{font-size:12px;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  thead tr{background:#1565C0;color:#fff}
+  th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.5px}
+  td{padding:10px 12px;border-bottom:1px solid #eee;font-size:12px}
+  tbody tr:last-child td{border-bottom:2px solid #1565C0}
+  .total-row td{padding:13px 12px;font-weight:700;font-size:14px;background:#F0F7FF}
+  .total-amount{color:#1565C0;font-size:19px;font-weight:800;text-align:right}
+  .footer{margin-top:32px;padding-top:14px;border-top:1px solid #eee;font-size:10px;color:#999;text-align:center;line-height:1.8}
+  @media print{body{padding:20px}button{display:none}}
+</style></head>
+<body>
+<div class="header">
+  <div>
+    <div class="lab-name">🦷 Ye-Almaz Dental Laboratory</div>
+    <div class="lab-sub">Addis Ababa, Ethiopia<br>+251 911 000 000 · info@yealmaz.com</div>
+  </div>
+  <div class="doc-title">
+    <h1>STATEMENT</h1>
+    <div class="period">${period}</div>
+    <div><span class="badge">⏳ Outstanding</span></div>
+  </div>
+</div>
+
+<div class="meta">
+  <div>
+    <div class="section-label">Bill To</div>
+    <div class="clinic-name">${clinic.name}</div>
+    <div class="clinic-sub">
+      ${clinic.address ? clinic.address + '<br>' : ''}
+      ${clinic.phone || ''}
+    </div>
+  </div>
+  <div class="meta-grid">
+    <div><div class="mi-label">Statement Date</div><div class="mi-value">${today}</div></div>
+    <div><div class="mi-label">Period</div><div class="mi-value">${period}</div></div>
+    <div><div class="mi-label">Cases</div><div class="mi-value">${cases.length}</div></div>
+    <div><div class="mi-label">Total Due</div><div class="mi-value" style="color:#1565C0;font-size:14px">Br ${total.toLocaleString('en-US')}</div></div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Case Number</th><th>Patient</th><th>Work Type</th><th>Invoice #</th><th style="text-align:right">Amount (Br)</th></tr>
+  </thead>
+  <tbody>
+    ${rows || '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">No outstanding cases for this period</td></tr>'}
+    <tr class="total-row">
+      <td colspan="5" style="text-align:right">Total Outstanding</td>
+      <td class="total-amount">Br ${total.toLocaleString('en-US')}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="footer">
+  Ye-Almaz Dental Laboratory &nbsp;·&nbsp; Payment Collection Statement &nbsp;·&nbsp; ${period}<br>
+  Please settle the outstanding amount at the earliest convenience. For queries contact info@yealmaz.com
+</div>
+<script>window.onload=()=>window.print()</script>
+</body></html>`;
+}
+
+// ── Statement Modal ───────────────────────────────────────
+function StatementModal({ clinicId, clinic, onClose }) {
+  const now = new Date();
+  const [month, setMonth]               = useState(now.getMonth());
+  const [year, setYear]                 = useState(now.getFullYear());
+  const [allOutstanding, setAllOutstanding] = useState(false);
+  const [cases, setCases]               = useState([]);
+  const [loading, setLoading]           = useState(false);
+
+  const load = async (m, y, all) => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (!all) {
+        params.dateFrom = new Date(y, m, 1).toISOString().slice(0, 10);
+        params.dateTo   = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+      }
+      const res = await api.get(`/payments/statement/${clinicId}`, { params });
+      setCases(res.data);
+    } catch {
+      toast.error('Failed to load statement data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(month, year, allOutstanding); }, [month, year, allOutstanding]);
+
+  const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
+
+  const print = () => {
+    const w = window.open('', '_blank');
+    w.document.write(buildStatementHTML(clinic, cases, month, year, allOutstanding));
+    w.document.close();
+  };
+
+  const yearOptions = [];
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 2; y--) yearOptions.push(y);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 600, width: '100%' }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">📄 Monthly Statement</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              🏥 {clinic.name}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={print}
+              disabled={loading || cases.length === 0}
+            >
+              🖨️ Print / Save PDF
+            </button>
+            <button className="modal-close" onClick={onClose}>×</button>
+          </div>
+        </div>
+
+        <div className="modal-body">
+          {/* Period controls */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+            <select
+              value={month}
+              onChange={e => { setAllOutstanding(false); setMonth(Number(e.target.value)); }}
+              disabled={allOutstanding}
+              style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', cursor: 'pointer', opacity: allOutstanding ? 0.4 : 1 }}
+            >
+              {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+            </select>
+            <select
+              value={year}
+              onChange={e => { setAllOutstanding(false); setYear(Number(e.target.value)); }}
+              disabled={allOutstanding}
+              style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', cursor: 'pointer', opacity: allOutstanding ? 0.4 : 1 }}
+            >
+              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={allOutstanding}
+                onChange={e => setAllOutstanding(e.target.checked)}
+                style={{ width: 15, height: 15, cursor: 'pointer' }}
+              />
+              Show all outstanding
+            </label>
+            {loading && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Loading…</span>}
+          </div>
+
+          {/* Summary banner */}
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', textTransform: 'uppercase' }}>Cases</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)' }}>{cases.length}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', textTransform: 'uppercase' }}>Total Outstanding</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--blue)' }}>Br {total.toLocaleString('en-US')}</div>
+            </div>
+            <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                {allOutstanding ? 'All outstanding cases' : `${MONTHS[month]} ${year}`}
+              </div>
+            </div>
+          </div>
+
+          {/* Case preview table */}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)' }}>Loading cases…</div>
+          ) : cases.length === 0 ? (
+            <div className="empty-state" style={{ padding: 32 }}>
+              <div className="empty-icon">📭</div>
+              <div className="empty-title">No outstanding cases</div>
+              <p>No pending cases found for this period.</p>
+            </div>
+          ) : (
+            <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+                    {['Case #', 'Patient', 'Work Type', 'Invoice #', 'Amount'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', fontWeight: 700, fontSize: 11, color: 'var(--text-3)', textAlign: h === 'Amount' ? 'right' : 'left', borderBottom: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cases.map(c => (
+                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '9px 12px', fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{c.caseNumber}</td>
+                      <td style={{ padding: '9px 12px', fontWeight: 600 }}>{c.patientName}</td>
+                      <td style={{ padding: '9px 12px', color: 'var(--text-2)' }}>{c.workType}</td>
+                      <td style={{ padding: '9px 12px', fontFamily: 'DM Mono, monospace', color: 'var(--blue)', fontSize: 11 }}>{c.payment?.invoiceNumber || '—'}</td>
+                      <td style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'right' }}>
+                        {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
+                    <td colSpan={4} style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', fontSize: 13 }}>Total</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 800, fontSize: 15, color: 'var(--blue)', textAlign: 'right' }}>
+                      Br {total.toLocaleString('en-US')}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Trusted Partners Tab ─────────────────────────────────
 function CollectModal({ caseData, onDone, onClose }) {
   const [amount, setAmount] = useState(caseData.totalAmount?.toString() || '');
@@ -737,9 +993,10 @@ function CollectModal({ caseData, onDone, onClose }) {
 }
 
 function TrustedPartnersTab({ queryClient }) {
-  const [page, setPage]           = useState(1);
-  const [search, setSearch]       = useState('');
-  const [collectCase, setCollect] = useState(null);
+  const [page, setPage]             = useState(1);
+  const [search, setSearch]         = useState('');
+  const [collectCase, setCollect]   = useState(null);
+  const [statement, setStatement]   = useState(null); // { clinicId, clinic }
 
   const handleSearch = (v) => { setSearch(v); setPage(1); };
 
@@ -824,18 +1081,32 @@ function TrustedPartnersTab({ queryClient }) {
                   </td>
                   <td><StatusBadge status={c.status} /></td>
                   <td>
-                    <button
-                      onClick={() => setCollect(c)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        background: 'var(--green-dim)', color: 'var(--green)',
-                        border: '1px solid rgba(22,163,74,0.3)',
-                        borderRadius: 6, padding: '5px 11px',
-                        fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      💰 Mark Collected
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => setCollect(c)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          background: 'var(--green-dim)', color: 'var(--green)',
+                          border: '1px solid rgba(22,163,74,0.3)',
+                          borderRadius: 6, padding: '5px 11px',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        💰 Mark Collected
+                      </button>
+                      <button
+                        onClick={() => setStatement({ clinicId: c.clinicId, clinic: c.clinic })}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          background: '#EFF6FF', color: 'var(--blue)',
+                          border: '1px solid rgba(37,99,235,0.25)',
+                          borderRadius: 6, padding: '5px 11px',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        📄 Statement
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -859,6 +1130,14 @@ function TrustedPartnersTab({ queryClient }) {
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
           }}
           onClose={() => setCollect(null)}
+        />
+      )}
+
+      {statement && (
+        <StatementModal
+          clinicId={statement.clinicId}
+          clinic={statement.clinic}
+          onClose={() => setStatement(null)}
         />
       )}
     </>

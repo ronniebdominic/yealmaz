@@ -449,7 +449,7 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
       prisma.case.findMany({
         where,
         include: {
-          clinic: { select: { name: true, phone: true, address: true, isExcluded: true } },
+          clinic: { select: { id: true, name: true, phone: true, address: true, isExcluded: true } },
           payment: true,
         },
         orderBy: { updatedAt: 'desc' },
@@ -468,6 +468,45 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch trusted partner cases.' });
+  }
+});
+
+// ── GET /api/payments/statement/:clinicId ────────────────
+// All outstanding (PENDING) cases for a trusted clinic, optionally filtered by month
+router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const { clinicId } = req.params;
+  const { dateFrom, dateTo } = req.query;
+
+  try {
+    const where = {
+      clinicId,
+      clinic: { isExcluded: true },
+      paymentStatus: 'PENDING',
+    };
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const cases = await prisma.case.findMany({
+      where,
+      include: {
+        clinic: { select: { name: true, phone: true, address: true } },
+        payment: { select: { invoiceNumber: true, amount: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json(cases);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch statement.' });
   }
 });
 
