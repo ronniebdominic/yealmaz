@@ -581,32 +581,20 @@ export default function AdminClinics() {
                       <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.email || ''}>{c.email || '—'}</td>
                       <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{c.phone || '—'}</td>
                       <td style={{ padding: '8px 16px' }}>
-                        <button
-                          title={c.isExcluded ? 'Trusted partner — click to remove' : 'Standard clinic — click to mark as partner'}
-                          onClick={() => {
-                            api.patch(`/clinics/${c.id}`, { isExcluded: !c.isExcluded })
-                              .then(() => {
-                                toast.success(`${c.name} ${c.isExcluded ? 'removed from' : 'marked as'} trusted partner`);
-                                queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
-                              })
-                              .catch(() => toast.error('Update failed'));
-                          }}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            background: c.isExcluded ? 'rgba(26,86,160,0.1)' : 'var(--surface-2)',
-                            color: c.isExcluded ? 'var(--blue)' : 'var(--text-3)',
-                            border: `1px solid ${c.isExcluded ? 'rgba(26,86,160,0.25)' : 'var(--border)'}`,
-                            borderRadius: 999, padding: '3px 10px',
-                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                            whiteSpace: 'nowrap', transition: 'all .15s',
-                          }}
-                        >
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 5,
+                          background: c.isExcluded ? 'rgba(26,86,160,0.1)' : 'var(--surface-2)',
+                          color: c.isExcluded ? 'var(--blue)' : 'var(--text-3)',
+                          border: `1px solid ${c.isExcluded ? 'rgba(26,86,160,0.25)' : 'var(--border)'}`,
+                          borderRadius: 999, padding: '3px 10px',
+                          fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                        }}>
                           <span style={{
                             width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                             background: c.isExcluded ? 'var(--blue)' : 'var(--border)',
                           }} />
                           {c.isExcluded ? 'Partner' : 'Standard'}
-                        </button>
+                        </span>
                       </td>
                       <td style={{ padding: '8px 16px' }}>
                         <span style={{
@@ -661,6 +649,26 @@ export default function AdminClinics() {
                             }}
                           >
                             {c.isActive ? '⏸ Deactivate' : '▶ Activate'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              api.patch(`/clinics/${c.id}`, { isExcluded: !c.isExcluded })
+                                .then(() => {
+                                  toast.success(`${c.name} ${c.isExcluded ? 'removed from partners' : 'marked as trusted partner'}`);
+                                  queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
+                                })
+                                .catch(() => toast.error('Update failed'));
+                            }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 3,
+                              background: c.isExcluded ? 'rgba(229,62,62,0.07)' : 'rgba(26,86,160,0.07)',
+                              color: c.isExcluded ? 'var(--red)' : 'var(--blue)',
+                              border: `1px solid ${c.isExcluded ? 'rgba(229,62,62,0.2)' : 'rgba(26,86,160,0.2)'}`,
+                              borderRadius: 6, padding: '4px 9px',
+                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {c.isExcluded ? '✕ Remove Partner' : '🤝 Mark Partner'}
                           </button>
                         </div>
                       </td>
