@@ -32,8 +32,9 @@ function getDueDays(workType) {
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, page = 1, limit = 20 } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc' } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const dateOrder = sortDir === 'asc' ? 'asc' : 'desc';
 
     const where = {};
     if (req.user.role === 'CLINIC') where.clinicId = req.user.id;
@@ -49,7 +50,7 @@ router.get('/', protect, async (req, res) => {
       ];
     }
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, page, limit })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, page, limit, sortDir })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -61,7 +62,7 @@ router.get('/', protect, async (req, res) => {
           stages: { orderBy: { scannedAt: 'desc' }, take: 1 },
           payment: true
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: dateOrder },
         skip,
         take: parseInt(limit)
       }),

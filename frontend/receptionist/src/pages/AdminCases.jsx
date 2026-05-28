@@ -384,6 +384,7 @@ export default function AdminCases() {
   const [statusFilter,   setStatusFilter]  = useState('');
   const [payFilter,      setPayFilter]     = useState('');
   const [clinicId,       setClinicId]      = useState('');
+  const [sortDir,        setSortDir]       = useState('desc');
   const [page,           setPage]          = useState(1);
   const [viewCase,       setViewCase]      = useState(null);
   const [deleteTarget,   setDeleteTarget]  = useState(null);
@@ -398,13 +399,13 @@ export default function AdminCases() {
   });
 
   const params = useMemo(() => {
-    const p = { limit: PAGE_SIZE, page };
+    const p = { limit: PAGE_SIZE, page, sortDir };
     if (statusFilter) p.status        = statusFilter;
     if (payFilter)    p.paymentStatus = payFilter;
     if (search)       p.search        = search;
     if (clinicId)     p.clinicId      = clinicId;
     return p;
-  }, [statusFilter, payFilter, search, clinicId, page]);
+  }, [statusFilter, payFilter, search, clinicId, sortDir, page]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'cases', params],
@@ -526,7 +527,19 @@ export default function AdminCases() {
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Payment</th>
-                    <th>Date</th>
+                    <th>
+                      <button
+                        onClick={() => { setSortDir(d => d === 'desc' ? 'asc' : 'desc'); setPage(1); }}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          fontWeight: 700, fontSize: 'inherit', color: 'var(--text-2)',
+                          padding: 0, fontFamily: 'inherit',
+                        }}
+                      >
+                        Date {sortDir === 'desc' ? '↓' : '↑'}
+                      </button>
+                    </th>
                     <th style={{ minWidth: 200 }}>Actions</th>
                   </tr>
                 </thead>
