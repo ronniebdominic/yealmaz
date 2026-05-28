@@ -255,9 +255,14 @@ export default function DeliveryDashboard() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>🏥 {g.clinic?.name}</div>
+                  {g.clinic?.code && (
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginTop: 1 }}>
+                      {g.clinic.code.toUpperCase()}
+                    </div>
+                  )}
                   {g.clinic?.address && (
                     <a href={`https://maps.google.com/?q=${encodeURIComponent(g.clinic.address)}`} target="_blank" rel="noreferrer"
-                      style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none' }}>
+                      style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none', marginTop: 2, display: 'block' }}>
                       📍 {g.clinic.address}
                     </a>
                   )}
