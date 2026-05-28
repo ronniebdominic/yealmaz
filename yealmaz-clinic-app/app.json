@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ye-Almaz Clinic",
     "slug": "yealmaz-clinic",
-    "version": "1.0.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,7 +26,7 @@
       },
       "package": "com.yealmaz.clinic",
       "permissions": ["CAMERA","READ_EXTERNAL_STORAGE","WRITE_EXTERNAL_STORAGE","INTERNET","ACCESS_NETWORK_STATE"],
-      "versionCode": 1
+      "versionCode": 3
     },
     "web": {
       "bundler": "metro",

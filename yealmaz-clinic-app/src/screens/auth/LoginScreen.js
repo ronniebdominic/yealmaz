@@ -5,6 +5,7 @@ import {
   StatusBar, Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { version } from '../../../package.json';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../utils/theme';
 
 export default function LoginScreen() {
@@ -114,7 +115,7 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        <Text style={styles.version}>Ye-Almaz Clinic App v1.0</Text>
+        <Text style={styles.version}>Ye-Almaz Clinic App v{version}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

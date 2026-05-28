@@ -1,6 +1,6 @@
 {
   "name": "yealmaz-backend",
-  "version": "1.0.0",
+  "version": "1.8.0",
   "description": "Ye-Almaz Dental Lab — Backend API",
   "main": "src/index.js",
   "type": "commonjs",

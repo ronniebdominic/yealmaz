@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { version } from '../../package.json';
 
 export default function Login() {
   const { login, loading } = useAuth();
@@ -63,7 +64,7 @@ export default function Login() {
         </form>
 
         <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-3)', marginTop: '20px' }}>
-          Ye-Almaz Dental Lab Management System v1.0
+          Ye-Almaz Dental Lab Management System v{version}
         </p>
       </div>
     </div>
