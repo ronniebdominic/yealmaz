@@ -7,7 +7,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import api from '../../api/client';
+import api, { API_BASE } from '../../api/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -181,19 +182,27 @@ export default function CaseDetailScreen({ navigation, route }) {
     if (!screenshot) return;
     setUploading(true);
     try {
+      const token = await AsyncStorage.getItem('ya_clinic_token');
       const formData = new FormData();
       formData.append('screenshot', {
         uri: screenshot.uri,
-        type: 'image/jpeg',
+        type: screenshot.mimeType || 'image/jpeg',
         name: `payment_${caseId}.jpg`,
       });
-      await api.post(`/payments/${caseId}/upload`, formData);
+      // Use native fetch — Axios does not reliably handle FormData multipart in React Native
+      const res = await fetch(`${API_BASE}/payments/${caseId}/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
       Alert.alert('✅ Uploaded!', 'Your payment screenshot has been submitted for verification.');
       setScreenshot(null);
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err) {
-      Alert.alert('Upload Failed', err.response?.data?.error || 'Please try again.');
+      Alert.alert('Upload Failed', err.message || 'Please try again.');
     } finally {
       setUploading(false);
     }
