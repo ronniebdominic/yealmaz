@@ -50,7 +50,7 @@ router.get('/', protect, async (req, res) => {
       ];
     }
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, page, limit, sortDir })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
