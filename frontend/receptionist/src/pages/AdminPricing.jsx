@@ -12,8 +12,11 @@ const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
 export default function AdminPricing() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [edits, setEdits] = useState({});
-  const [page, setPage] = useState(1);   // { [workType]: newPrice }
+  const [edits, setEdits]   = useState({});
+  const [page, setPage]     = useState(1);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newType, setNewType] = useState('');
+  const [newPrice, setNewPrice] = useState('');
 
   const { data: prices = [], isLoading } = useQuery({
     queryKey: ['prices'],
@@ -62,6 +65,21 @@ export default function AdminPricing() {
 
   const handleReset = () => setEdits({});
 
+  const handleAddNew = () => {
+    const trimmed = newType.trim();
+    if (!trimmed) { toast.error('Enter a work type name'); return; }
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < 0) { toast.error('Enter a valid price'); return; }
+    if (prices.some(p => p.workType.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('This work type already exists — edit its price in the table');
+      return;
+    }
+    saveAll([{ workType: trimmed, price }]);
+    setShowAdd(false);
+    setNewType('');
+    setNewPrice('');
+  };
+
   const getPrice = (p) =>
     edits[p.workType] !== undefined ? edits[p.workType] : p.price;
 
@@ -89,6 +107,19 @@ export default function AdminPricing() {
               </button>
             </>
           )}
+          <button
+            onClick={() => { setShowAdd(v => !v); setNewType(''); setNewPrice(''); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: showAdd ? 'var(--surface-2)' : 'var(--accent-dim)',
+              color: showAdd ? 'var(--text-2)' : 'var(--accent)',
+              border: `1px solid ${showAdd ? 'var(--border)' : 'rgba(0,196,180,0.3)'}`,
+              borderRadius: 8, padding: '7px 14px',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            {showAdd ? '✕ Cancel' : '+ Add Work Type'}
+          </button>
           <button
             onClick={handleSave}
             disabled={saving || dirtyCount === 0}
@@ -123,6 +154,63 @@ export default function AdminPricing() {
             </span>
           </div>
         </div>
+
+        {/* Add new work type */}
+        {showAdd && (
+          <div className="card" style={{ marginBottom: 20, padding: '18px 20px', borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14 }}>
+              New Work Type
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ flex: 2, minWidth: 200 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                  WORK TYPE NAME
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Zirconia Implant Crown"
+                  value={newType}
+                  onChange={e => setNewType(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddNew()}
+                  autoFocus
+                  style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                  PRICE (Br)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Br</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    placeholder="0"
+                    value={newPrice}
+                    onChange={e => setNewPrice(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddNew()}
+                    style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleAddNew}
+                disabled={saving}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'var(--accent)', color: '#fff',
+                  border: 'none', borderRadius: 8,
+                  padding: '8px 20px', fontSize: 13, fontWeight: 700,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap', alignSelf: 'flex-end',
+                }}
+              >
+                {saving ? 'Adding…' : '+ Add'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Table */}
         <div className="card">
