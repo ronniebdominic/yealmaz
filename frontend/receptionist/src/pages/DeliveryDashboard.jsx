@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import QRScanner from '../components/QRScanner';
 
+const getStation = (name) => name?.match(/\(([^)]+)\)\s*$/)?.[1]?.toUpperCase() || null;
+
 // ── Confirm modal ────────────────────────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   const isCollect  = action === 'collect';
@@ -255,9 +257,14 @@ export default function DeliveryDashboard() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>🏥 {g.clinic?.name}</div>
+                  {getStation(g.clinic?.name) && (
+                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginTop: 1 }}>
+                      {getStation(g.clinic.name)}
+                    </div>
+                  )}
                   {g.clinic?.address && (
                     <a href={`https://maps.google.com/?q=${encodeURIComponent(g.clinic.address)}`} target="_blank" rel="noreferrer"
-                      style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none' }}>
+                      style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none', marginTop: 2, display: 'block' }}>
                       📍 {g.clinic.address}
                     </a>
                   )}

@@ -19,7 +19,7 @@ router.get('/stations', protect, restrict('DISPATCH', 'ADMIN', 'DELIVERY'), asyn
     const cases = await prisma.case.findMany({
       where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } },
       include: {
-        clinic: { select: { id: true, name: true, address: true, phone: true } },
+        clinic: { select: { id: true, code: true, name: true, address: true, phone: true } },
         assignedDelivery: { select: { id: true, name: true } },
       },
       orderBy: [{ clinic: { name: 'asc' } }, { dueDate: 'asc' }]
@@ -74,7 +74,7 @@ router.get('/queue', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) =>
         ]
       },
       include: {
-        clinic: { select: { name: true, address: true, phone: true } },
+        clinic: { select: { id: true, code: true, name: true, address: true, phone: true } },
         payment: { select: { status: true, amount: true } },
         assignedDelivery: { select: { id: true, name: true, email: true } },
         deliveryLogs: { orderBy: { deliveredAt: 'desc' }, take: 1 }
