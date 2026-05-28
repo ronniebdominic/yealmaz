@@ -121,8 +121,8 @@ ${inv?.invoiceNotes ? `<div class="notes"><strong>Notes:</strong> ${inv.invoiceN
 </body></html>`;
 }
 
-// ── Issue Invoice Modal ───────────────────────────────────
-function IssueInvoiceModal({ caseData, onDone, onClose }) {
+// ── Send Payment Request Modal ────────────────────────────
+function SendPaymentRequestModal({ caseData, onDone, onClose }) {
   const [amount, setAmount]   = useState(caseData.totalAmount?.toString() || '');
   const [notes, setNotes]     = useState(caseData.payment?.invoiceNotes || '');
   const [loading, setLoading] = useState(false);
@@ -132,11 +132,11 @@ function IssueInvoiceModal({ caseData, onDone, onClose }) {
     if (!num || num <= 0) { toast.error('Enter a valid amount'); return; }
     setLoading(true);
     try {
-      await api.post(`/payments/${caseData.id}/invoice`, { amount: num, notes });
-      toast.success(`Invoice issued — INV-${caseData.caseNumber}`);
+      await api.post(`/payments/${caseData.id}/request`, { amount: num, notes });
+      toast.success(`Payment request sent to ${caseData.clinic?.name}`);
       onDone();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to issue invoice');
+      toast.error(err.response?.data?.error || 'Failed to send request');
     } finally { setLoading(false); }
   };
 
@@ -145,9 +145,9 @@ function IssueInvoiceModal({ caseData, onDone, onClose }) {
       <div className="modal">
         <div className="modal-header">
           <div>
-            <div className="modal-title">Issue Invoice</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'DM Mono, monospace', marginTop: 2 }}>
-              INV-{caseData.caseNumber}
+            <div className="modal-title">Send Payment Request</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              Clinic will be notified to upload their payment receipt
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -162,18 +162,19 @@ function IssueInvoiceModal({ caseData, onDone, onClose }) {
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>🏥 {caseData.clinic?.name}</div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Invoice Amount (Br) *</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Amount Due (Br) *</label>
             <input
               type="number" min="1" placeholder="e.g. 12500" value={amount}
               onChange={e => setAmount(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 15, fontWeight: 700 }}
               autoFocus
             />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Notes (optional)</label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Payment Instructions (optional)</label>
             <textarea
-              rows={3} placeholder="Payment instructions, bank details, etc." value={notes}
+              rows={3} placeholder="Bank account details, transfer instructions, etc." value={notes}
               onChange={e => setNotes(e.target.value)}
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
             />
@@ -181,7 +182,7 @@ function IssueInvoiceModal({ caseData, onDone, onClose }) {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={loading}>
-              {loading ? 'Issuing…' : '📄 Issue Invoice'}
+              {loading ? 'Sending…' : '📨 Send Payment Request'}
             </button>
           </div>
         </div>
@@ -437,14 +438,13 @@ function ScreenshotsTab({ queryClient }) {
 
 // ── Billing & Invoicing Tab ───────────────────────────────
 const BILLING_SUB_TABS = [
-  { id: 'awaiting',   label: 'Awaiting Payment',    icon: '⏳' },
+  { id: 'to-request', label: 'Send Request',        icon: '📨' },
+  { id: 'requested',  label: 'Request Sent',        icon: '⏳' },
   { id: 'uploaded',   label: 'Screenshot Uploaded', icon: '📸' },
-  { id: 'to-invoice', label: 'To Invoice',          icon: '📄' },
 ];
 
 function BillingTab({ queryClient }) {
-  // Default to 'awaiting' — that's where active cases live
-  const [subTab, setSubTab]         = useState('awaiting');
+  const [subTab, setSubTab]         = useState('to-request');
   const [issueModal, setIssueModal] = useState(null);
   const [viewModal, setViewModal]   = useState(null);
   const [processing, setProcessing] = useState(null);
@@ -489,16 +489,16 @@ function BillingTab({ queryClient }) {
     c.caseNumber?.toLowerCase().includes(sq) ||
     c.payment?.invoiceNumber?.toLowerCase().includes(sq);
 
-  const toInvoice = useMemo(() => cases.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount && matchSearch(c)), [cases, sq]);
-  const awaiting  = useMemo(() => cases.filter(c => c.totalAmount && c.paymentStatus === 'PENDING' && matchSearch(c)), [cases, sq]);
+  const toRequest = useMemo(() => cases.filter(c => c.status === 'PAYMENT_INVOICING' && c.paymentStatus === 'PENDING' && matchSearch(c)), [cases, sq]);
+  const requested = useMemo(() => cases.filter(c => ['PAYMENT_REQUESTED', 'REJECTED'].includes(c.paymentStatus) && matchSearch(c)), [cases, sq]);
   const uploaded  = useMemo(() => cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED' && matchSearch(c)), [cases, sq]);
 
-  const buckets    = { 'to-invoice': toInvoice, awaiting, uploaded };
+  const buckets    = { 'to-request': toRequest, requested, uploaded };
   const shown      = buckets[subTab] || [];
   const totalPages = Math.ceil(shown.length / PAGE_SIZE);
   const paginated  = useMemo(() => shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [shown, page]);
 
-  const counts = { 'to-invoice': toInvoice.length, awaiting: awaiting.length, uploaded: uploaded.length };
+  const counts = { 'to-request': toRequest.length, requested: requested.length, uploaded: uploaded.length };
 
   if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading…</div>;
   if (isError)   return <ErrorState message="Could not load billing data." onRetry={refetch} />;
@@ -532,14 +532,14 @@ function BillingTab({ queryClient }) {
         <div className="empty-state">
           <div className="empty-icon">{BILLING_SUB_TABS.find(t => t.id === subTab)?.icon}</div>
           <div className="empty-title">
-            {subTab === 'awaiting'   ? 'No cases awaiting payment'
-              : subTab === 'uploaded' ? 'No screenshots to review'
-              : 'No cases awaiting invoice'}
+            {subTab === 'to-request' ? 'No cases awaiting payment request'
+              : subTab === 'requested' ? 'No pending payment requests'
+              : 'No screenshots to review'}
           </div>
           <p>
-            {subTab === 'awaiting'   ? 'Cases with issued invoices waiting for the clinic to upload a payment screenshot appear here.'
-              : subTab === 'uploaded' ? 'After a clinic uploads a payment screenshot, it appears here to approve or reject.'
-              : 'Cases reach here after completing all lab work and entering the Payment / Invoicing stage.'}
+            {subTab === 'to-request' ? 'Cases that have completed all lab work and need a payment request sent to the clinic appear here.'
+              : subTab === 'requested' ? 'Cases where a payment request has been sent, waiting for the clinic to upload their receipt.'
+              : 'After a clinic uploads a payment receipt, it appears here for you to approve or reject.'}
           </p>
         </div>
       ) : (
@@ -588,12 +588,9 @@ function BillingTab({ queryClient }) {
                     </td>
                     <td>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <button className="btn btn-primary btn-sm" onClick={() => setIssueModal(c)}>
-                          {c.payment?.invoiceNumber ? '✏️ Edit Invoice' : '📄 Issue Invoice'}
-                        </button>
-                        {c.payment?.invoiceNumber && (
-                          <button className="btn btn-ghost btn-sm" onClick={() => setViewModal(c)}>
-                            🖨️ View / Print
+                        {['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'].includes(c.paymentStatus) && (
+                          <button className="btn btn-primary btn-sm" onClick={() => setIssueModal(c)}>
+                            {c.paymentStatus === 'PENDING' ? '📨 Send Request' : '✏️ Edit Request'}
                           </button>
                         )}
                         {c.paymentStatus === 'SCREENSHOT_UPLOADED' && (
@@ -632,14 +629,11 @@ function BillingTab({ queryClient }) {
       )}
 
       {issueModal && (
-        <IssueInvoiceModal
+        <SendPaymentRequestModal
           caseData={issueModal}
           onDone={() => { setIssueModal(null); queryClient.invalidateQueries({ queryKey: ['payments'] }); }}
           onClose={() => setIssueModal(null)}
         />
-      )}
-      {viewModal && (
-        <InvoiceViewModal caseData={viewModal} onClose={() => setViewModal(null)} />
       )}
     </>
   );

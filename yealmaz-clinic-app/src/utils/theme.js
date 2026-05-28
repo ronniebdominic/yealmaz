@@ -117,8 +117,9 @@ export const STAGES = {
 };
 
 export const PAYMENT_STATUS = {
-  PENDING:             { label: 'Payment Pending',   color: Colors.amber, bg: Colors.amberDim },
-  SCREENSHOT_UPLOADED: { label: 'Awaiting Review',   color: Colors.blue,  bg: 'rgba(21,101,192,0.10)' },
+  PENDING:             { label: 'No Request Yet',    color: Colors.text3, bg: Colors.surface2 },
+  PAYMENT_REQUESTED:   { label: 'Payment Requested', color: Colors.blue,  bg: 'rgba(21,101,192,0.10)' },
+  SCREENSHOT_UPLOADED: { label: 'Awaiting Review',   color: Colors.amber, bg: Colors.amberDim },
   VERIFIED:            { label: 'Payment Verified',  color: Colors.green, bg: Colors.greenDim },
   REJECTED:            { label: 'Payment Rejected',  color: Colors.red,   bg: Colors.redDim },
 };

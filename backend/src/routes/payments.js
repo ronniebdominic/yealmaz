@@ -77,8 +77,20 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
       return res.status(400).json({ error: 'Action must be APPROVE or REJECT.' });
     }
 
+    const caseData = await prisma.case.findUnique({
+      where: { id: req.params.caseId },
+      select: { caseNumber: true, clinicId: true }
+    });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
     const newPaymentStatus = action === 'APPROVE' ? 'VERIFIED' : 'REJECTED';
     const newCaseStatus = action === 'APPROVE' ? 'READY_TO_DISPATCH' : undefined;
+
+    // On approval: auto-issue the invoice
+    const invoicePatch = action === 'APPROVE' ? {
+      invoiceNumber: `INV-${caseData.caseNumber}`,
+      invoiceIssuedAt: new Date(),
+    } : {};
 
     const payment = await prisma.payment.update({
       where: { caseId: req.params.caseId },
@@ -86,7 +98,8 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
         status: newPaymentStatus,
         verifiedById: req.user.id,
         verifiedAt: new Date(),
-        rejectionReason: action === 'REJECT' ? rejectionReason : null
+        rejectionReason: action === 'REJECT' ? rejectionReason : null,
+        ...invoicePatch,
       }
     });
 
@@ -104,7 +117,7 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
           caseId: req.params.caseId,
           stageName: 'READY_TO_DISPATCH',
           scannedBy: req.user.name,
-          notes: 'Payment verified — case ready for dispatch'
+          notes: `Payment verified — invoice ${invoicePatch.invoiceNumber} issued — case ready for dispatch`
         }
       });
     }
@@ -139,9 +152,10 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 
   try {
     const where = {
+      clinic: { isExcluded: false },
       OR: [
-        { status: { in: ['PAYMENT_INVOICING'] } },
-        { totalAmount: { not: null }, paymentStatus: { in: ['PENDING', 'SCREENSHOT_UPLOADED', 'REJECTED'] } }
+        { status: 'PAYMENT_INVOICING', paymentStatus: 'PENDING' },
+        { paymentStatus: { in: ['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'REJECTED'] } }
       ]
     };
 
@@ -168,8 +182,9 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
   }
 });
 
-// ── POST /api/payments/:caseId/invoice ───────────────────
-router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+// ── POST /api/payments/:caseId/request ──────────────────
+// Finance sends payment request (with amount) to clinic app — no invoice yet
+router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   try {
     const { amount, notes } = req.body;
     if (!amount || parseFloat(amount) <= 0) {
@@ -182,35 +197,41 @@ router.post('/:caseId/invoice', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
 
-    const invoiceNumber = `INV-${caseData.caseNumber}`;
+    const amt = parseFloat(amount);
 
-    const payment = await prisma.payment.upsert({
+    await prisma.payment.upsert({
       where: { caseId: req.params.caseId },
-      update: { amount: parseFloat(amount), invoiceNumber, invoiceIssuedAt: new Date(), invoiceNotes: notes || null },
-      create: { caseId: req.params.caseId, amount: parseFloat(amount), invoiceNumber, invoiceIssuedAt: new Date(), invoiceNotes: notes || null, status: 'PENDING' }
+      update: { amount: amt, status: 'PAYMENT_REQUESTED', invoiceNotes: notes || null },
+      create: { caseId: req.params.caseId, amount: amt, status: 'PAYMENT_REQUESTED', invoiceNotes: notes || null }
     });
 
     await prisma.case.update({
       where: { id: req.params.caseId },
-      data: { totalAmount: parseFloat(amount) }
+      data: { paymentStatus: 'PAYMENT_REQUESTED', totalAmount: amt }
     });
 
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*');
 
     const io = req.app.get('io');
-    io.to(`clinic_${caseData.clinic.id}`).emit('invoice_issued', {
+    io.to(`clinic_${caseData.clinic.id}`).emit('payment_requested', {
       caseId: caseData.id,
       caseNumber: caseData.caseNumber,
       patientName: caseData.patientName,
-      invoiceNumber,
-      amount: parseFloat(amount),
-      message: `Invoice issued: Br ${parseFloat(amount).toLocaleString('en-US')}`
+      amount: amt,
+      message: `Payment request: Br ${amt.toLocaleString('en-US')} — please upload your payment receipt`
     });
 
-    res.json({ success: true, payment });
+    const { sendPushToClinic } = require('../utils/webpush');
+    await sendPushToClinic(prisma, caseData.clinic.id, {
+      title: '💳 Payment Request — Ye-Almaz Lab',
+      body: `${caseData.caseNumber}: Br ${amt.toLocaleString('en-US')} due for ${caseData.workType}. Please upload your payment receipt.`,
+      data: { caseId: caseData.id, type: 'payment_request' }
+    });
+
+    res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Could not issue invoice.' });
+    res.status(500).json({ error: 'Could not send payment request.' });
   }
 });
 

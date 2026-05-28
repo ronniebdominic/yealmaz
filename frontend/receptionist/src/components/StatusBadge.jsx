@@ -27,7 +27,8 @@ const STATUS_MAP = {
 };
 
 const PAY_MAP = {
-  PENDING:             { label: 'Payment Pending',   cls: 'badge-pay-pending' },
+  PENDING:             { label: 'No Request Yet',    cls: 'badge-pay-pending' },
+  PAYMENT_REQUESTED:   { label: 'Request Sent',      cls: 'badge-pay-uploaded' },
   SCREENSHOT_UPLOADED: { label: 'Awaiting Review',   cls: 'badge-pay-uploaded' },
   VERIFIED:            { label: 'Payment Verified',  cls: 'badge-pay-verified' },
   REJECTED:            { label: 'Payment Rejected',  cls: 'badge-pay-rejected' },

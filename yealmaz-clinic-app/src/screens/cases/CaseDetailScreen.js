@@ -251,7 +251,9 @@ export default function CaseDetailScreen({ navigation, route }) {
 
   const stage = STAGES[caseData.status] || STAGES.CASE_ACCEPTED;
   const pay = PAYMENT_STATUS[caseData.paymentStatus];
-  const canUploadPayment = !['VERIFIED'].includes(caseData.paymentStatus);
+  const canUploadPayment = ['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus);
+  const hasPaymentRequest = ['PAYMENT_REQUESTED', 'REJECTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(caseData.paymentStatus);
+  const amountDue = caseData.payment?.amount ?? caseData.totalAmount ?? 0;
 
   return (
     <View style={styles.container}>
@@ -296,142 +298,153 @@ export default function CaseDetailScreen({ navigation, route }) {
           )}
         </View>
 
-        {/* ── Invoice Card ── */}
-        {caseData.payment?.invoiceNumber ? (
-          <View style={styles.card}>
-            <View style={styles.invoiceHeader}>
-              <View>
-                <Text style={styles.invoiceTitle}>Invoice</Text>
-                <Text style={styles.invoiceNumber}>{caseData.payment.invoiceNumber}</Text>
-              </View>
-              <View style={[styles.invoiceAmountBadge, { backgroundColor: Colors.blue + '15' }]}>
-                <Text style={styles.invoiceAmountLabel}>Amount Due</Text>
-                <Text style={styles.invoiceAmount}>
-                  ₹{(caseData.payment.amount ?? caseData.totalAmount ?? 0).toLocaleString('en-IN')}
-                </Text>
-              </View>
+        {/* ── Payment Section ── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Payment</Text>
+
+          {/* No payment request yet */}
+          {!hasPaymentRequest && (
+            <View style={[styles.invoiceNotesBox, { backgroundColor: Colors.surface2 }]}>
+              <Text style={{ fontSize: 13, color: Colors.text3, textAlign: 'center', lineHeight: 19 }}>
+                The lab will send you a payment request once your work is ready for collection.
+              </Text>
             </View>
+          )}
 
-            <View style={styles.invoiceDivider} />
-
-            <View style={styles.invoiceRows}>
-              <View style={styles.invoiceRow}>
-                <Text style={styles.invoiceRowLabel}>Work Type</Text>
-                <Text style={styles.invoiceRowValue}>{caseData.workType}</Text>
-              </View>
-              {caseData.toothNumbers ? (
-                <View style={styles.invoiceRow}>
-                  <Text style={styles.invoiceRowLabel}>Tooth Numbers</Text>
-                  <Text style={styles.invoiceRowValue}>{caseData.toothNumbers}</Text>
-                </View>
-              ) : null}
-              {caseData.shade ? (
-                <View style={styles.invoiceRow}>
-                  <Text style={styles.invoiceRowLabel}>Shade</Text>
-                  <Text style={styles.invoiceRowValue}>{caseData.shade}</Text>
-                </View>
-              ) : null}
-              {caseData.payment.invoiceIssuedAt ? (
-                <View style={styles.invoiceRow}>
-                  <Text style={styles.invoiceRowLabel}>Issued</Text>
-                  <Text style={styles.invoiceRowValue}>
-                    {format(new Date(caseData.payment.invoiceIssuedAt), 'dd MMM yyyy')}
+          {/* Payment request received (PAYMENT_REQUESTED or REJECTED) + upload */}
+          {hasPaymentRequest && caseData.paymentStatus !== 'VERIFIED' && (
+            <>
+              {/* Amount due card */}
+              <View style={{
+                backgroundColor: Colors.blue + '10', borderWidth: 1.5,
+                borderColor: Colors.blue + '30', borderRadius: Radius.md,
+                padding: Spacing.md, marginBottom: Spacing.md,
+                flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Amount Due</Text>
+                  <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.blue }}>
+                    Br {amountDue.toLocaleString('en-US')}
                   </Text>
                 </View>
-              ) : null}
-            </View>
-
-            {caseData.payment.invoiceNotes ? (
-              <View style={styles.invoiceNotesBox}>
-                <Text style={styles.invoiceNotesText}>{caseData.payment.invoiceNotes}</Text>
-              </View>
-            ) : null}
-
-            {/* Payment status + PDF button */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md }}>
-              <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg, marginBottom: 0 }]}>
-                <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.pdfBtn, generatingPdf && { opacity: 0.6 }]}
-                onPress={downloadInvoice}
-                disabled={generatingPdf}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.pdfBtnText}>
-                  {generatingPdf ? 'Generating…' : '📄 View PDF'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        {/* ── Payment Upload Section ── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Payment Proof</Text>
-          {!caseData.payment?.invoiceNumber && (
-            <View style={[styles.invoiceNotesBox, { marginBottom: Spacing.md }]}>
-              <Text style={{ fontSize: 13, color: Colors.text3, textAlign: 'center' }}>
-                Invoice not yet issued by the lab. You'll be able to upload payment once an invoice is sent.
-              </Text>
-            </View>
-          )}
-
-          {caseData.paymentStatus === 'REJECTED' && caseData.payment?.rejectionReason && (
-            <View style={styles.rejectionBox}>
-              <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
-              <Text style={styles.rejectionText}>{caseData.payment.rejectionReason}</Text>
-            </View>
-          )}
-
-          {caseData.payment?.screenshotUrl && (
-            <View style={styles.screenshotWrap}>
-              <Text style={styles.screenshotLabel}>Uploaded Screenshot</Text>
-              <Image source={{ uri: caseData.payment.screenshotUrl }} style={styles.screenshotImg} resizeMode="cover" />
-            </View>
-          )}
-
-          {canUploadPayment && caseData.payment?.invoiceNumber && (
-            <View style={styles.uploadSection}>
-              <Text style={styles.uploadTitle}>
-                {caseData.paymentStatus === 'REJECTED' ? '🔄 Re-upload Payment' : '📤 Upload Payment Screenshot'}
-              </Text>
-              <Text style={styles.uploadSub}>
-                Upload a screenshot of your bank transfer or payment receipt to unlock delivery.
-              </Text>
-
-              {screenshot ? (
-                <View style={styles.previewWrap}>
-                  <Image source={{ uri: screenshot.uri }} style={styles.previewImg} resizeMode="cover" />
-                  <View style={styles.previewActions}>
-                    <TouchableOpacity style={styles.changeBtn} onPress={() => setScreenshot(null)}>
-                      <Text style={styles.changeBtnText}>Change</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.uploadBtn, uploading && { opacity: 0.6 }]}
-                      onPress={uploadPayment}
-                      disabled={uploading}
-                    >
-                      {uploading
-                        ? <ActivityIndicator color="#fff" size="small" />
-                        : <Text style={styles.uploadBtnText}>✓ Submit Payment</Text>
-                      }
-                    </TouchableOpacity>
-                  </View>
+                <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg, marginBottom: 0 }]}>
+                  <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
                 </View>
-              ) : (
-                <View style={styles.uploadBtns}>
-                  <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} activeOpacity={0.85}>
-                    <Text style={styles.photoBtnIcon}>📷</Text>
-                    <Text style={styles.photoBtnText}>Take Photo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.photoBtn} onPress={pickImage} activeOpacity={0.85}>
-                    <Text style={styles.photoBtnIcon}>🖼️</Text>
-                    <Text style={styles.photoBtnText}>Gallery</Text>
-                  </TouchableOpacity>
+              </View>
+
+              {/* Payment instructions */}
+              {caseData.payment?.invoiceNotes ? (
+                <View style={[styles.invoiceNotesBox, { marginBottom: Spacing.md }]}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.text3, marginBottom: 4 }}>Payment Instructions</Text>
+                  <Text style={styles.invoiceNotesText}>{caseData.payment.invoiceNotes}</Text>
+                </View>
+              ) : null}
+
+              {/* Rejection reason */}
+              {caseData.paymentStatus === 'REJECTED' && caseData.payment?.rejectionReason && (
+                <View style={[styles.rejectionBox, { marginBottom: Spacing.md }]}>
+                  <Text style={styles.rejectionTitle}>Receipt Rejected:</Text>
+                  <Text style={styles.rejectionText}>{caseData.payment.rejectionReason}</Text>
                 </View>
               )}
-            </View>
+
+              {/* Uploaded screenshot preview */}
+              {caseData.payment?.screenshotUrl && caseData.paymentStatus === 'SCREENSHOT_UPLOADED' && (
+                <View style={[styles.screenshotWrap, { marginBottom: Spacing.md }]}>
+                  <Text style={styles.screenshotLabel}>Submitted Receipt — Awaiting Verification</Text>
+                  <Image source={{ uri: caseData.payment.screenshotUrl }} style={styles.screenshotImg} resizeMode="cover" />
+                </View>
+              )}
+
+              {/* Upload section */}
+              {canUploadPayment && (
+                <View style={styles.uploadSection}>
+                  <Text style={styles.uploadTitle}>
+                    {caseData.paymentStatus === 'REJECTED' ? '🔄 Re-upload Receipt' : '📤 Upload Payment Receipt'}
+                  </Text>
+                  <Text style={styles.uploadSub}>
+                    Upload a screenshot of your bank transfer or payment receipt.
+                  </Text>
+                  {screenshot ? (
+                    <View style={styles.previewWrap}>
+                      <Image source={{ uri: screenshot.uri }} style={styles.previewImg} resizeMode="cover" />
+                      <View style={styles.previewActions}>
+                        <TouchableOpacity style={styles.changeBtn} onPress={() => setScreenshot(null)}>
+                          <Text style={styles.changeBtnText}>Change</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.uploadBtn, uploading && { opacity: 0.6 }]}
+                          onPress={uploadPayment}
+                          disabled={uploading}
+                        >
+                          {uploading
+                            ? <ActivityIndicator color="#fff" size="small" />
+                            : <Text style={styles.uploadBtnText}>✓ Submit</Text>
+                          }
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.uploadBtns}>
+                      <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} activeOpacity={0.85}>
+                        <Text style={styles.photoBtnIcon}>📷</Text>
+                        <Text style={styles.photoBtnText}>Take Photo</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.photoBtn} onPress={pickImage} activeOpacity={0.85}>
+                        <Text style={styles.photoBtnIcon}>🖼️</Text>
+                        <Text style={styles.photoBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Verified — show invoice */}
+          {caseData.paymentStatus === 'VERIFIED' && caseData.payment?.invoiceNumber && (
+            <>
+              <View style={styles.invoiceHeader}>
+                <View>
+                  <Text style={styles.invoiceTitle}>Invoice</Text>
+                  <Text style={styles.invoiceNumber}>{caseData.payment.invoiceNumber}</Text>
+                </View>
+                <View style={[styles.invoiceAmountBadge, { backgroundColor: Colors.green + '15' }]}>
+                  <Text style={styles.invoiceAmountLabel}>Amount Paid</Text>
+                  <Text style={[styles.invoiceAmount, { color: Colors.green }]}>
+                    Br {amountDue.toLocaleString('en-US')}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.invoiceDivider} />
+              <View style={styles.invoiceRows}>
+                <View style={styles.invoiceRow}>
+                  <Text style={styles.invoiceRowLabel}>Work Type</Text>
+                  <Text style={styles.invoiceRowValue}>{caseData.workType}</Text>
+                </View>
+                {caseData.payment.invoiceIssuedAt ? (
+                  <View style={styles.invoiceRow}>
+                    <Text style={styles.invoiceRowLabel}>Invoice Date</Text>
+                    <Text style={styles.invoiceRowValue}>
+                      {format(new Date(caseData.payment.invoiceIssuedAt), 'dd MMM yyyy')}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md }}>
+                <View style={[styles.payStatusBadge, { backgroundColor: pay?.bg, marginBottom: 0 }]}>
+                  <Text style={[styles.payStatusText, { color: pay?.color }]}>{pay?.label}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.pdfBtn, generatingPdf && { opacity: 0.6 }]}
+                  onPress={downloadInvoice}
+                  disabled={generatingPdf}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.pdfBtnText}>{generatingPdf ? 'Generating…' : '📄 View PDF'}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
         </View>
 

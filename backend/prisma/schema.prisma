@@ -159,10 +159,11 @@ enum DeliveryType {
 }
 
 enum PaymentStatus {
-  PENDING           // No screenshot yet
-  SCREENSHOT_UPLOADED // Clinic uploaded screenshot
-  VERIFIED          // Receptionist approved
-  REJECTED          // Receptionist rejected (needs re-upload)
+  PENDING              // No payment request yet
+  PAYMENT_REQUESTED    // Finance sent amount to clinic, awaiting screenshot
+  SCREENSHOT_UPLOADED  // Clinic uploaded screenshot
+  VERIFIED             // Finance approved — invoice auto-issued
+  REJECTED             // Finance rejected (needs re-upload)
 }
 
 // ── CASE STAGES (QR scan history) ──────────────────────
