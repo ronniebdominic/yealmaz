@@ -447,6 +447,7 @@ function BillingTab({ queryClient }) {
   const [subTab, setSubTab]         = useState('to-request');
   const [issueModal, setIssueModal] = useState(null);
   const [viewModal, setViewModal]   = useState(null);
+  const [collectModal, setCollect]  = useState(null);
   const [processing, setProcessing] = useState(null);
   const [page, setPage]             = useState(1);
   const [search, setSearch]         = useState('');
@@ -612,6 +613,21 @@ function BillingTab({ queryClient }) {
                             >✗ Reject</button>
                           </>
                         )}
+                        {/* Manual collection — available whenever payment is not yet verified */}
+                        {c.paymentStatus !== 'VERIFIED' && (
+                          <button
+                            onClick={() => setCollect(c)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 4,
+                              background: 'rgba(22,163,74,0.07)', color: 'var(--green)',
+                              border: '1px solid rgba(22,163,74,0.25)',
+                              borderRadius: 6, padding: '4px 9px',
+                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            💰 Collect Manually
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -633,6 +649,18 @@ function BillingTab({ queryClient }) {
           caseData={issueModal}
           onDone={() => { setIssueModal(null); queryClient.invalidateQueries({ queryKey: ['payments'] }); }}
           onClose={() => setIssueModal(null)}
+        />
+      )}
+
+      {collectModal && (
+        <CollectModal
+          caseData={collectModal}
+          onDone={() => {
+            setCollect(null);
+            queryClient.invalidateQueries({ queryKey: ['payments'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+          }}
+          onClose={() => setCollect(null)}
         />
       )}
     </>
@@ -901,6 +929,8 @@ function CollectModal({ caseData, onDone, onClose }) {
   const [notes,  setNotes]  = useState('');
   const [saving, setSaving] = useState(false);
 
+  const isTrusted = caseData.clinic?.isExcluded;
+
   const submit = async () => {
     setSaving(true);
     try {
@@ -920,19 +950,28 @@ function CollectModal({ caseData, onDone, onClose }) {
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">💰 Mark as Collected</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Trusted partner — cash / bank collection</div>
+            <div className="modal-title">💰 Manual Payment Collection</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              {isTrusted ? 'Trusted partner — cash / bank collection' : 'Record cash or bank transfer received directly'}
+            </div>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+          <div style={{
+            background: isTrusted ? '#F5F3FF' : 'var(--surface-2)',
+            border: `1px solid ${isTrusted ? '#DDD6FE' : 'var(--border)'}`,
+            borderRadius: 10, padding: '12px 14px', marginBottom: 20,
+          }}>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{caseData.patientName}</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'monospace', marginTop: 2 }}>{caseData.caseNumber}</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
               {caseData.workType}{caseData.toothNumbers ? ` · Teeth ${caseData.toothNumbers}` : ''}
             </div>
             <div style={{ fontSize: 12, marginTop: 2 }}>🏥 {caseData.clinic?.name}</div>
+            {isTrusted && (
+              <span style={{ display: 'inline-block', marginTop: 6, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9' }}>🤝 Trusted Partner</span>
+            )}
           </div>
 
           <div style={{ marginBottom: 16 }}>
