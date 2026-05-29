@@ -6,6 +6,7 @@ import AdminLayout from '../components/AdminLayout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import CaseDetailModal from '../components/CaseDetailModal';
 import Pagination from '../components/Pagination';
+import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -552,16 +553,13 @@ export default function AdminCases() {
               onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
-          <select
+          <SearchableSelect
             value={clinicId}
-            onChange={e => { setClinicId(e.target.value); setPage(1); }}
-            style={{ ...selectStyle, minWidth: 180 }}
-          >
-            <option value="">All Clinics</option>
-            {clinicList.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            onChange={v => { setClinicId(v); setPage(1); }}
+            options={clinicList.map(c => ({ value: c.id, label: c.name }))}
+            placeholder="All Clinics"
+            style={{ minWidth: 200 }}
+          />
           {(statusFilter || payFilter || search || clinicId) && (
             <button
               className="btn btn-ghost btn-sm"

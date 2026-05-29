@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
+import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -145,10 +146,10 @@ function getDueDays(workType) {
       w.includes('bleaching') || w.includes('gingival')) return 4;
   return 5;
 }
-function calcDueDate(workType) {
+function calcDueDate(workType, days) {
   const d = new Date();
-  d.setDate(d.getDate() + getDueDays(workType));
-  return d.toISOString().split('T')[0]; // yyyy-mm-dd for <input type="date">
+  d.setDate(d.getDate() + (days ?? getDueDays(workType)));
+  return d.toISOString().split('T')[0];
 }
 
 // Work types priced per full dentition — never multiplied by tooth count
@@ -187,6 +188,16 @@ export default function NewCase() {
     [pricesData]
   );
 
+  const expressDurationMap = useMemo(
+    () => Object.fromEntries(pricesData.filter(p => p.expressDurationDays != null).map(p => [p.workType, p.expressDurationDays])),
+    [pricesData]
+  );
+
+  const durationMap = useMemo(
+    () => Object.fromEntries(pricesData.filter(p => p.durationDays != null).map(p => [p.workType, p.durationDays])),
+    [pricesData]
+  );
+
   // Auto-calculate price whenever workType, tooth count, or delivery type changes
   useEffect(() => {
     if (!form.workType || Object.keys(priceMap).length === 0) return;
@@ -198,12 +209,16 @@ export default function NewCase() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
 
-  // Auto-set due date whenever work type changes
+  // Auto-set due date whenever work type or delivery type changes
   useEffect(() => {
     if (!form.workType) return;
-    setForm(prev => ({ ...prev, dueDate: calcDueDate(form.workType) }));
+    const isExpress = form.deliveryType === 'EXPRESS';
+    const days = isExpress && expressDurationMap[form.workType] != null
+      ? expressDurationMap[form.workType]
+      : durationMap[form.workType] ?? null;
+    setForm(prev => ({ ...prev, dueDate: calcDueDate(form.workType, days) }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.workType]);
+  }, [form.workType, form.deliveryType, durationMap, expressDurationMap]);
 
   useEffect(() => { loadClinics(); }, []);
 
@@ -266,10 +281,12 @@ export default function NewCase() {
               {/* Clinic */}
               <div className="form-group">
                 <label>Clinic *</label>
-                <select value={form.clinicId} onChange={set('clinicId')} required>
-                  <option value="">— Select clinic —</option>
-                  {clinics.map(c => <option key={c.id} value={c.id}>{c.code ? `[${c.code}] ` : ''}{c.name}</option>)}
-                </select>
+                <SearchableSelect
+                  value={form.clinicId}
+                  onChange={v => setForm(f => ({ ...f, clinicId: v }))}
+                  options={clinics.map(c => ({ value: c.id, label: `${c.code ? `[${c.code}] ` : ''}${c.name}` }))}
+                  placeholder="— Select clinic —"
+                />
                 <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
                   New clinic? Ask them to register via the clinic app first.
                 </div>

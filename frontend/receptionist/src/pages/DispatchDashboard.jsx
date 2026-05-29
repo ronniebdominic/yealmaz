@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
+import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -361,16 +362,13 @@ export default function DispatchDashboard() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <select
+          <SearchableSelect
             value={clinicFilter}
-            onChange={e => setClinicFilter(e.target.value)}
-            style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer', minWidth: 160 }}
-          >
-            <option value="">All Clinics</option>
-            {clinicNames.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+            onChange={v => setClinicFilter(v)}
+            options={clinicNames.map(name => ({ value: name, label: name }))}
+            placeholder="All Clinics"
+            style={{ minWidth: 180 }}
+          />
           {(search || clinicFilter) && (
             <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); }} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>✕ Clear</button>
           )}

@@ -80,7 +80,10 @@ export default function AdminPricing() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const dirtyCount = new Set([...Object.keys(edits), ...Object.keys(durationEdits)]).size;
+  const dirtyCount = new Set([
+    ...Object.keys(edits).map(k => k.replace(/^express_/, '')),
+    ...Object.keys(durationEdits).map(k => k.replace(/^express_/, '')),
+  ]).size;
 
   const handleChange = (workType, val) => {
     setEdits(prev => ({ ...prev, [workType]: val }));
@@ -91,16 +94,19 @@ export default function AdminPricing() {
   };
 
   const handleSave = () => {
-    const dirtyTypes = new Set([...Object.keys(edits), ...Object.keys(durationEdits)]);
-    if (dirtyTypes.size === 0) return;
-    const updates = [...dirtyTypes].map(workType => {
+    const allDirtyKeys = new Set([...Object.keys(edits), ...Object.keys(durationEdits)]);
+    if (allDirtyKeys.size === 0) return;
+    const dirtyWorkTypes = new Set([...allDirtyKeys].map(k => k.replace(/^express_/, '')));
+    const updates = [...dirtyWorkTypes].map(workType => {
       const original = prices.find(p => p.workType === workType);
       const price = edits[workType] !== undefined ? parseFloat(edits[workType]) : original?.price || 0;
       const durVal = durationEdits[workType];
-      const durationDays = durVal !== undefined
-        ? (durVal === '' ? null : parseInt(durVal))
-        : original?.durationDays;
-      return { workType, price, durationDays };
+      const durationDays = durVal !== undefined ? (durVal === '' ? null : parseInt(durVal)) : original?.durationDays;
+      const expPriceVal = edits[`express_${workType}`];
+      const expressPrice = expPriceVal !== undefined ? (expPriceVal === '' ? null : parseFloat(expPriceVal)) : original?.expressPrice;
+      const expDurVal = durationEdits[`express_${workType}`];
+      const expressDurationDays = expDurVal !== undefined ? (expDurVal === '' ? null : parseInt(expDurVal)) : original?.expressDurationDays;
+      return { workType, price, durationDays, expressPrice, expressDurationDays };
     }).filter(u => u.price >= 0);
     saveAll(updates);
   };
@@ -166,7 +172,9 @@ export default function AdminPricing() {
   const getDuration = (p) =>
     durationEdits[p.workType] !== undefined ? durationEdits[p.workType] : (p.durationDays ?? '');
 
-  const isDirty = (workType) => edits[workType] !== undefined || durationEdits[workType] !== undefined;
+  const isDirty = (workType) =>
+    edits[workType] !== undefined || durationEdits[workType] !== undefined ||
+    edits[`express_${workType}`] !== undefined || durationEdits[`express_${workType}`] !== undefined;
 
   return (
     <AdminLayout>
@@ -458,14 +466,31 @@ export default function AdminPricing() {
                         <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{p.workType}</span>
                       </td>
                       <td>
-                        {p.expressPrice != null
-                          ? <span style={{ fontWeight: 600, color: '#92400E' }}>Br {Number(p.expressPrice).toLocaleString('en-US')}</span>
-                          : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
+                          <input
+                            type="number" min="0" step="100" placeholder="—"
+                            value={edits[`express_${p.workType}`] !== undefined ? edits[`express_${p.workType}`] : (p.expressPrice ?? '')}
+                            onChange={e => setEdits(prev => ({ ...prev, [`express_${p.workType}`]: e.target.value }))}
+                            style={{
+                              ...inputStyle, width: 110,
+                              fontWeight: edits[`express_${p.workType}`] !== undefined ? 700 : 400,
+                              borderColor: edits[`express_${p.workType}`] !== undefined ? 'var(--amber)' : 'var(--border)',
+                            }}
+                          />
+                        </div>
                       </td>
                       <td>
-                        {p.expressDurationDays != null
-                          ? <span style={{ color: '#92400E', fontWeight: 600 }}>{p.expressDurationDays}d</span>
-                          : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                        <input
+                          type="number" min="1" step="1" placeholder="auto"
+                          value={durationEdits[`express_${p.workType}`] !== undefined ? durationEdits[`express_${p.workType}`] : (p.expressDurationDays ?? '')}
+                          onChange={e => setDurationEdits(prev => ({ ...prev, [`express_${p.workType}`]: e.target.value }))}
+                          style={{
+                            ...inputStyle, width: 90,
+                            fontWeight: durationEdits[`express_${p.workType}`] !== undefined ? 700 : 400,
+                            borderColor: durationEdits[`express_${p.workType}`] !== undefined ? 'var(--amber)' : 'var(--border)',
+                          }}
+                        />
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

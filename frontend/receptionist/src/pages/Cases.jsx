@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Layout from '../components/Layout';
+import SearchableSelect from '../components/SearchableSelect';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
 import { format } from 'date-fns';
@@ -85,16 +86,13 @@ export default function Cases() {
               onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
-          <select
+          <SearchableSelect
             value={clinicId}
-            onChange={e => { setClinicId(e.target.value); setPage(1); }}
-            style={{ ...selectStyle, minWidth: 180 }}
-          >
-            <option value="">All Clinics</option>
-            {clinicList.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            onChange={v => { setClinicId(v); setPage(1); }}
+            options={clinicList.map(c => ({ value: c.id, label: c.name }))}
+            placeholder="All Clinics"
+            style={{ minWidth: 180 }}
+          />
           {hasFilters && (
             <button className="btn btn-ghost btn-sm" onClick={reset} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>
               ✕ Clear
