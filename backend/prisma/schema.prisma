@@ -80,6 +80,8 @@ model Case {
   units           Int?        // count of tooth numbers (or manual for legacy data)
   shade           String?     // e.g. A2, B1
   notes           String?
+  remake          Boolean     @default(false)
+  remakeReason    String?
   dueDate         DateTime?
   status          CaseStatus  @default(CASE_ACCEPTED)
   qrCodeUrl       String?     // URL of the generated QR image
