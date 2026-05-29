@@ -329,7 +329,16 @@ export default function CaseDetailScreen({ navigation, route }) {
           <InfoRow label="Tooth Numbers" value={caseData.toothNumbers} />
           {caseData.units != null && <InfoRow label="Units" value={String(caseData.units)} />}
           <InfoRow label="Shade" value={caseData.shade} />
-          <InfoRow label="Due Date" value={caseData.dueDate ? format(new Date(caseData.dueDate), 'dd MMMM yyyy') : null} />
+          <InfoRow
+            label={caseData.dueDate ? 'Due Date' : caseData.payment?.verifiedAt ? 'Delivered' : 'Due Date'}
+            value={
+              caseData.dueDate
+                ? format(new Date(caseData.dueDate), 'dd MMMM yyyy')
+                : caseData.payment?.verifiedAt
+                  ? format(new Date(caseData.payment.verifiedAt), 'dd MMMM yyyy')
+                  : null
+            }
+          />
           <InfoRow label="Doctor" value={caseData.doctorName} />
           <InfoRow label="Doctor Phone" value={caseData.doctorPhone} />
           <InfoRow label="Patient Gender" value={caseData.patientGender} />

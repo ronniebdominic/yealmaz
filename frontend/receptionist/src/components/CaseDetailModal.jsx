@@ -289,7 +289,12 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ['Tooth Numbers', data.toothNumbers || '—'],
               ...(data.units != null ? [['Units', data.units]] : []),
               ['Shade', data.shade || '—'],
-              ['Due Date', data.dueDate ? format(new Date(data.dueDate), 'dd MMM yyyy') : '—'],
+              [data.dueDate ? 'Due Date' : data.payment?.verifiedAt ? 'Delivered' : 'Due Date',
+                data.dueDate
+                  ? format(new Date(data.dueDate), 'dd MMM yyyy')
+                  : data.payment?.verifiedAt
+                    ? format(new Date(data.payment.verifiedAt), 'dd MMM yyyy')
+                    : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
               ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
               ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),
