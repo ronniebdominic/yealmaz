@@ -165,6 +165,7 @@ export default function NewCase() {
   const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [form, setForm] = useState({
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
+    doctorPhone: '', doctorGender: '',
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
     deliveryType: 'NORMAL',
   });
@@ -270,15 +271,31 @@ export default function NewCase() {
                   <input placeholder="e.g. Ahmed Al-Rashid" value={form.patientName} onChange={set('patientName')} required />
                 </div>
                 <div className="form-group">
+                  <label>Patient Age</label>
+                  <input type="number" placeholder="e.g. 34" value={form.patientAge} onChange={set('patientAge')} />
+                </div>
+              </div>
+
+              {/* Doctor info */}
+              <div className="grid-2">
+                <div className="form-group">
                   <label>Doctor Name</label>
                   <input placeholder="e.g. Dr. Sarah Ahmed" value={form.doctorName} onChange={set('doctorName')} />
+                </div>
+                <div className="form-group">
+                  <label>Doctor Phone</label>
+                  <input type="tel" placeholder="e.g. +251 911 000 000" value={form.doctorPhone} onChange={set('doctorPhone')} />
                 </div>
               </div>
 
               <div className="grid-2">
                 <div className="form-group">
-                  <label>Patient Age</label>
-                  <input type="number" placeholder="e.g. 34" value={form.patientAge} onChange={set('patientAge')} />
+                  <label>Doctor Gender</label>
+                  <select value={form.doctorGender} onChange={set('doctorGender')}>
+                    <option value="">— Select —</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Shade</label>

@@ -186,8 +186,9 @@ function Odontogram({ selected, onToggle }) {
 // ── Screen ────────────────────────────────────────────────
 export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
-    patientName: '', patientAge: '', doctorName: '', workType: '',
-    shade: '', notes: '', dueDate: '', deliveryType: 'NORMAL',
+    patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
+    doctorGender: '', workType: '', shade: '', notes: '', dueDate: '',
+    deliveryType: 'NORMAL',
   });
   const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -294,6 +295,46 @@ export default function NewCaseScreen({ navigation }) {
               value={form.doctorName}
               onChangeText={set('doctorName')}
             />
+          </View>
+
+          <View style={styles.row}>
+            <View style={[styles.formGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Doctor Phone</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="+251 911 000 000"
+                placeholderTextColor={Colors.text3}
+                value={form.doctorPhone}
+                onChangeText={set('doctorPhone')}
+                keyboardType="phone-pad"
+              />
+            </View>
+            <View style={{ width: 12 }} />
+            <View style={[styles.formGroup, { flex: 1 }]}>
+              <Text style={styles.label}>Doctor Gender</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {['Male', 'Female'].map(g => {
+                  const active = form.doctorGender === g;
+                  return (
+                    <TouchableOpacity
+                      key={g}
+                      onPress={() => set('doctorGender')(g)}
+                      activeOpacity={0.8}
+                      style={{
+                        flex: 1, height: 48, alignItems: 'center', justifyContent: 'center',
+                        borderRadius: Radius.md, borderWidth: 1.5,
+                        borderColor: active ? Colors.blue : Colors.border,
+                        backgroundColor: active ? Colors.blue + '15' : Colors.bg,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.blue : Colors.text2 }}>
+                        {g}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           </View>
 
           <View style={styles.row}>

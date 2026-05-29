@@ -136,7 +136,7 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const {
-      patientName, patientAge, doctorName, workType,
+      patientName, patientAge, doctorName, doctorPhone, doctorGender, workType,
       toothNumbers, shade, notes, dueDate, totalAmount, deliveryType
     } = req.body;
 
@@ -160,6 +160,8 @@ router.post('/', protect, async (req, res) => {
         patientName,
         patientAge: patientAge ? parseInt(patientAge) : null,
         doctorName: doctorName || null,
+        doctorPhone: doctorPhone || null,
+        doctorGender: doctorGender || null,
         workType,
         toothNumbers,
         shade,

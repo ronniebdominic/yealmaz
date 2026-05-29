@@ -290,6 +290,9 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ['Shade', data.shade || '—'],
               ['Due Date', data.dueDate ? format(new Date(data.dueDate), 'dd MMM yyyy') : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
+              ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
+              ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),
+              ...(data.doctorGender ? [['Doctor Gender', data.doctorGender]] : []),
             ].map(([label, val]) => (
               <div key={label} style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: 600, marginBottom: '2px' }}>{label}</div>
