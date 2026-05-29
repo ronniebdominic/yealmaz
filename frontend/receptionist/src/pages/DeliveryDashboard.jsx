@@ -30,7 +30,13 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20, border: '1px solid var(--border)' }}>
             <div className="case-number" style={{ marginBottom: 4 }}>{caseData.caseNumber}</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{caseData.workType} · {caseData.clinic?.name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+              {caseData.workType}
+              {caseData.units != null && (
+                <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-3)' }}>({caseData.units} units)</span>
+              )}
+              {' · '}{caseData.clinic?.name}
+            </div>
             {caseData.clinic?.address && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>📍 {caseData.clinic.address}</div>
             )}
@@ -287,7 +293,9 @@ export default function DeliveryDashboard() {
                       <div>
                         <span className="case-number">{c.caseNumber}</span>
                         <div className="patient-name" style={{ marginTop: 4 }}>{c.patientName}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{c.workType}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
+                          {c.workType}{c.units != null && <span style={{ marginLeft: 4, color: 'var(--text-3)' }}>· {c.units} units</span>}
+                        </div>
                       </div>
                       <StatusBadge status={c.status} />
                     </div>

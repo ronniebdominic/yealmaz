@@ -191,6 +191,7 @@ export default function NewCaseScreen({ navigation }) {
     deliveryType: 'NORMAL',
   });
   const [selectedTeeth, setSelectedTeeth] = useState([]);
+  const [manualUnits, setManualUnits] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showWorkTypes, setShowWorkTypes] = useState(false);
   const [autoCalcDays, setAutoCalcDays] = useState(null);
@@ -231,9 +232,13 @@ export default function NewCaseScreen({ navigation }) {
     if (!validate()) return;
     setSubmitting(true);
     try {
+      const resolvedUnits = selectedTeeth.length > 0
+        ? selectedTeeth.length
+        : manualUnits ? parseInt(manualUnits) : undefined;
       const res = await api.post('/cases', {
         ...form,
         toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
+        units: resolvedUnits,
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
       });
       Alert.alert(
@@ -385,6 +390,21 @@ export default function NewCaseScreen({ navigation }) {
             ) : (
               <Text style={styles.teethNone}>No teeth selected</Text>
             )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>
+              Units{selectedTeeth.length > 0 ? ' (auto)' : ''}
+            </Text>
+            <TextInput
+              style={[styles.input, selectedTeeth.length > 0 && { opacity: 0.6 }]}
+              keyboardType="numeric"
+              placeholder="Enter number of units"
+              placeholderTextColor={Colors.textMuted}
+              value={selectedTeeth.length > 0 ? String(selectedTeeth.length) : manualUnits}
+              onChangeText={v => { if (selectedTeeth.length === 0) setManualUnits(v); }}
+              editable={selectedTeeth.length === 0}
+            />
           </View>
         </View>
 

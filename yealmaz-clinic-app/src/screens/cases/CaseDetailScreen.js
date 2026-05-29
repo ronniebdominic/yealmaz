@@ -327,6 +327,7 @@ export default function CaseDetailScreen({ navigation, route }) {
           <InfoRow label="Patient" value={caseData.patientName} />
           <InfoRow label="Work Type" value={caseData.workType} />
           <InfoRow label="Tooth Numbers" value={caseData.toothNumbers} />
+          {caseData.units != null && <InfoRow label="Units" value={String(caseData.units)} />}
           <InfoRow label="Shade" value={caseData.shade} />
           <InfoRow label="Due Date" value={caseData.dueDate ? format(new Date(caseData.dueDate), 'dd MMMM yyyy') : null} />
           <InfoRow label="Doctor" value={caseData.doctorName} />

@@ -2,6 +2,26 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Backend — Debug",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--inspect"],
+      "program": "${workspaceFolder}/backend/src/index.js",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "restart": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Receptionist — Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/receptionist/src",
+      "preLaunchTask": "Start Receptionist Frontend"
+    },
+    {
       "name": "Clinic App — Debug",
       "type": "expo",
       "request": "attach",
@@ -9,6 +29,13 @@
       "bundlerPort": "8082",
       "bundlerHost": "127.0.0.1",
       "restart": true
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Receptionist + Backend",
+      "configurations": ["Backend — Debug", "Receptionist — Chrome"],
+      "stopAll": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
+import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
 import { useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
@@ -73,6 +74,7 @@ export default function AdminDashboard() {
       [],
       ['Total Revenue (Br)', kpi?.totalRevenue ?? 0],
       ['Total Cases', kpi?.totalCases ?? 0],
+      ['Total Units', kpi?.totalUnits ?? 0],
       ['Active Cases', kpi?.activeCases ?? 0],
       ['Delivered Cases', kpi?.deliveredCases ?? 0],
       ['Pending Payments', kpi?.pendingPayments ?? 0],
@@ -86,19 +88,17 @@ export default function AdminDashboard() {
 
     // Sheet 3 — By Work Type
     const totalRev = (revenueByWorkType || []).reduce((s, r) => s + r.revenue, 0);
-    const workRows = [['#', 'Work Type', 'Cases', 'Revenue (Br)', 'Avg per Case (Br)', 'Share (%)'],
+    const workRows = [['#', 'Work Type', 'Cases', 'Total Units', 'Revenue (Br)', 'Share (%)'],
       ...(revenueByWorkType || []).map((r, i) => [
-        i + 1, r.workType, r.count, r.revenue,
-        r.count > 0 ? Math.round(r.revenue / r.count) : 0,
+        i + 1, r.workType, r.count, r.units || 0, r.revenue,
         totalRev > 0 ? ((r.revenue / totalRev) * 100).toFixed(1) : '0.0',
       ])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(workRows), 'By Work Type');
 
     // Sheet 4 — By Clinic
-    const clinicRows = [['Clinic', 'Total Cases', 'Paid Cases', 'Revenue (Br)', 'Avg per Paid Case (Br)'],
+    const clinicRows = [['Clinic', 'Total Cases', 'Paid Cases', 'Revenue (Br)'],
       ...(revenueByClinic || []).map(c => [
         c.name, c.totalCases, c.paidCases, c.revenue,
-        c.paidCases > 0 ? Math.round(c.revenue / c.paidCases) : 0,
       ])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clinicRows), 'By Clinic');
 
@@ -148,13 +148,13 @@ export default function AdminDashboard() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>Clinic</label>
-              <select value={selectedClinic} onChange={e => setSelectedClinic(e.target.value)}
-                style={{ ...inputStyle, minWidth: 160 }}>
-                <option value="">All Clinics</option>
-                {clinicList?.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={selectedClinic}
+                onChange={v => setSelectedClinic(v)}
+                options={(clinicList || []).map(c => ({ value: c.id, label: c.name }))}
+                placeholder="All Clinics"
+                style={{ minWidth: 160 }}
+              />
             </div>
 
             {/* Quick range buttons */}
@@ -183,9 +183,10 @@ export default function AdminDashboard() {
         ) : (
           <>
             {/* ── KPI Cards ── */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)' }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)' }}>
               <KpiCard icon="💰" label="Total Revenue" value={ETB(kpi?.totalRevenue)} bg="var(--green-dim)" color="var(--green)" sub="Verified payments" />
               <KpiCard icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'} bg="#EEF2FF" color="var(--blue)" sub="All time" />
+              <KpiCard icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'} bg="var(--accent-dim)" color="var(--accent)" sub="Across all cases" />
               <KpiCard icon="⚙️" label="Active Cases" value={kpi?.activeCases ?? '—'} bg="var(--amber-dim)" color="var(--amber)" sub="In production" />
               <KpiCard icon="✅" label="Delivered" value={kpi?.deliveredCases ?? '—'} bg="var(--green-dim)" color="var(--green)" sub="Completed" />
               <KpiCard icon="💳" label="Pending Payments" value={kpi?.pendingPayments ?? '—'} bg="var(--accent-dim)" color="var(--navy)" sub="Awaiting review" />
@@ -304,8 +305,8 @@ export default function AdminDashboard() {
                       <th>#</th>
                       <th>Work Type / Category</th>
                       <th>Cases Submitted</th>
+                      <th>Total Units</th>
                       <th>Revenue (Verified)</th>
-                      <th>Avg per Case</th>
                       <th>Share</th>
                     </tr>
                   </thead>
@@ -333,10 +334,10 @@ export default function AdminDashboard() {
                               padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                             }}>{row.count}</span>
                           </td>
-                          <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(row.revenue)}</td>
-                          <td style={{ color: 'var(--text-2)' }}>
-                            {row.count > 0 ? ETB(Math.round(row.revenue / row.count)) : '—'}
+                          <td style={{ fontWeight: 600, color: 'var(--accent)' }}>
+                            {row.units > 0 ? row.units : '—'}
                           </td>
+                          <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(row.revenue)}</td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', minWidth: 60 }}>
@@ -372,16 +373,15 @@ export default function AdminDashboard() {
                           <th>Total Cases</th>
                           <th>Paid Cases</th>
                           <th>Revenue (Verified)</th>
-                          <th>Avg per Case</th>
                         </tr>
                       </thead>
                       <tbody>
                         {revenueByClinic?.length === 0 ? (
-                          <tr><td colSpan={5} className="empty-state">No clinics found</td></tr>
+                          <tr><td colSpan={4} className="empty-state">No clinics found</td></tr>
                         ) : revenueByClinic?.map(c => {
                           const pct = Math.round(((c.revenue || 0) / maxRevenue) * 100);
                           return (
-                            <tr key={c.id}>
+                            <tr key={c.id} >
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <div style={{
@@ -408,9 +408,6 @@ export default function AdminDashboard() {
                                     {ETB(c.revenue)}
                                   </span>
                                 </div>
-                              </td>
-                              <td style={{ color: 'var(--text-2)' }}>
-                                {c.paidCases > 0 ? ETB(Math.round(c.revenue / c.paidCases)) : '—'}
                               </td>
                             </tr>
                           );

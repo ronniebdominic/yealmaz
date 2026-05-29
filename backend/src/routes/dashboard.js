@@ -180,7 +180,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.case.groupBy({ by: ['clinicId'], _count: { id: true } }),
       prisma.case.findMany({
         where: caseFilter,
-        select: { workType: true, payment: { select: { status: true, amount: true } } },
+        select: { workType: true, units: true, payment: { select: { status: true, amount: true } } },
       }),
     ]);
 
@@ -213,20 +213,23 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     })).sort((a, b) => b.revenue - a.revenue);
 
     const workTypeMap = {};
+    let totalUnits = 0;
     for (const c of casesByWorkType) {
       const wt = c.workType || 'Other';
-      if (!workTypeMap[wt]) workTypeMap[wt] = { count: 0, revenue: 0 };
+      if (!workTypeMap[wt]) workTypeMap[wt] = { count: 0, revenue: 0, units: 0 };
       workTypeMap[wt].count += 1;
+      workTypeMap[wt].units += c.units || 0;
+      totalUnits += c.units || 0;
       if (c.payment?.status === 'VERIFIED' && c.payment?.amount) {
         workTypeMap[wt].revenue += c.payment.amount;
       }
     }
     const revenueByWorkType = Object.entries(workTypeMap)
-      .map(([workType, d]) => ({ workType, count: d.count, revenue: d.revenue }))
+      .map(([workType, d]) => ({ workType, count: d.count, revenue: d.revenue, units: d.units }))
       .sort((a, b) => b.revenue - a.revenue);
 
     const result = {
-      kpi: { totalRevenue, totalCases, activeCases, deliveredCases, pendingPayments },
+      kpi: { totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments },
       monthlyTrend,
       revenueByClinic,
       revenueByWorkType,

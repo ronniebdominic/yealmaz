@@ -19,9 +19,11 @@ export default function AdminPricing() {
   const [newType, setNewType] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newDays, setNewDays] = useState('');
+  const [newExpressPrice, setNewExpressPrice] = useState('');
+  const [newExpressDays, setNewExpressDays] = useState('');
   // per-row edit mode
   const [editRow, setEditRow] = useState(null); // id of row being inline-edited
-  const [editRowData, setEditRowData] = useState({ workType: '', price: '', durationDays: '' });
+  const [editRowData, setEditRowData] = useState({ workType: '', price: '', durationDays: '', expressPrice: '', expressDurationDays: '' });
 
   const { data: prices = [], isLoading } = useQuery({
     queryKey: ['prices'],
@@ -107,7 +109,13 @@ export default function AdminPricing() {
 
   const startEdit = (p) => {
     setEditRow(p.id);
-    setEditRowData({ workType: p.workType, price: String(p.price), durationDays: String(p.durationDays ?? '') });
+    setEditRowData({
+      workType: p.workType,
+      price: String(p.price),
+      durationDays: String(p.durationDays ?? ''),
+      expressPrice: String(p.expressPrice ?? ''),
+      expressDurationDays: String(p.expressDurationDays ?? ''),
+    });
   };
 
   const cancelEdit = () => setEditRow(null);
@@ -121,6 +129,8 @@ export default function AdminPricing() {
       workType: editRowData.workType.trim(),
       price,
       durationDays: editRowData.durationDays ? parseInt(editRowData.durationDays) : null,
+      expressPrice: editRowData.expressPrice ? parseFloat(editRowData.expressPrice) : null,
+      expressDurationDays: editRowData.expressDurationDays ? parseInt(editRowData.expressDurationDays) : null,
     });
   };
 
@@ -139,11 +149,15 @@ export default function AdminPricing() {
       return;
     }
     const durationDays = newDays ? parseInt(newDays) : null;
-    saveAll([{ workType: trimmed, price, durationDays }]);
+    const expressPrice = newExpressPrice ? parseFloat(newExpressPrice) : null;
+    const expressDurationDays = newExpressDays ? parseInt(newExpressDays) : null;
+    saveAll([{ workType: trimmed, price, durationDays, expressPrice, expressDurationDays }]);
     setShowAdd(false);
     setNewType('');
     setNewPrice('');
     setNewDays('');
+    setNewExpressPrice('');
+    setNewExpressDays('');
   };
 
   const getPrice = (p) =>
@@ -245,7 +259,40 @@ export default function AdminPricing() {
                   style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
                 />
               </div>
-              <div style={{ flex: 1, minWidth: 140 }}>
+              <div style={{ flex: 1, minWidth: 130 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                  ⚡ EXPRESS PRICE (Br)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Br</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    placeholder="optional"
+                    value={newExpressPrice}
+                    onChange={e => setNewExpressPrice(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAddNew()}
+                    style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
+                  />
+                </div>
+              </div>
+              <div style={{ flex: 0, minWidth: 100 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                  ⚡ EXPRESS DAYS
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="auto"
+                  value={newExpressDays}
+                  onChange={e => setNewExpressDays(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddNew()}
+                  style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 130 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
                   PRICE (Br)
                 </label>
@@ -263,7 +310,7 @@ export default function AdminPricing() {
                   />
                 </div>
               </div>
-              <div style={{ flex: 0, minWidth: 110 }}>
+              <div style={{ flex: 0, minWidth: 100 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
                   DURATION (days)
                 </label>
@@ -304,21 +351,23 @@ export default function AdminPricing() {
                 <tr>
                   <th style={{ width: 48 }}>#</th>
                   <th>Work Type</th>
-                  <th style={{ width: 200 }}>Price (Br)</th>
-                  <th style={{ width: 160 }}>Duration (days)</th>
+                  <th style={{ width: 160 }}>⚡ Express Price</th>
+                  <th style={{ width: 130 }}>⚡ Express Days</th>
+                  <th style={{ width: 160 }}>Price (Br)</th>
+                  <th style={{ width: 130 }}>Duration (days)</th>
                   <th style={{ width: 140, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
                       Loading prices…
                     </td>
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="empty-state">No work types match your search</td>
+                    <td colSpan={7} className="empty-state">No work types match your search</td>
                   </tr>
                 ) : paginated.map((p, i) => {
                   const globalIdx = (page - 1) * PAGE_SIZE + i;
@@ -340,11 +389,32 @@ export default function AdminPricing() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
                             <input
+                              type="number" min="0" step="100" placeholder="—"
+                              value={editRowData.expressPrice}
+                              onChange={e => setEditRowData(d => ({ ...d, expressPrice: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                              style={{ ...inputStyle, width: 100, maxWidth: 100 }}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number" min="1" step="1" placeholder="auto"
+                            value={editRowData.expressDurationDays}
+                            onChange={e => setEditRowData(d => ({ ...d, expressDurationDays: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                            style={{ ...inputStyle, width: 90, maxWidth: 90 }}
+                          />
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
+                            <input
                               type="number" min="0" step="100"
                               value={editRowData.price}
                               onChange={e => setEditRowData(d => ({ ...d, price: e.target.value }))}
                               onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                              style={{ ...inputStyle, width: 140, maxWidth: 140 }}
+                              style={{ ...inputStyle, width: 100, maxWidth: 100 }}
                             />
                           </div>
                         </td>
@@ -354,7 +424,7 @@ export default function AdminPricing() {
                             value={editRowData.durationDays}
                             onChange={e => setEditRowData(d => ({ ...d, durationDays: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                            style={{ ...inputStyle, width: 100, maxWidth: 100 }}
+                            style={{ ...inputStyle, width: 90, maxWidth: 90 }}
                           />
                         </td>
                         <td style={{ textAlign: 'right' }}>
@@ -388,6 +458,16 @@ export default function AdminPricing() {
                         <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{p.workType}</span>
                       </td>
                       <td>
+                        {p.expressPrice != null
+                          ? <span style={{ fontWeight: 600, color: '#92400E' }}>Br {Number(p.expressPrice).toLocaleString('en-US')}</span>
+                          : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                      </td>
+                      <td>
+                        {p.expressDurationDays != null
+                          ? <span style={{ color: '#92400E', fontWeight: 600 }}>{p.expressDurationDays}d</span>
+                          : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                      </td>
+                      <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
                           <input
@@ -395,7 +475,7 @@ export default function AdminPricing() {
                             value={currentVal}
                             onChange={e => handleChange(p.workType, e.target.value)}
                             style={{
-                              ...inputStyle, width: 140,
+                              ...inputStyle, width: 110,
                               fontWeight: priceDirty ? 700 : 400,
                               borderColor: priceDirty ? 'var(--amber)' : 'var(--border)',
                             }}
@@ -408,7 +488,7 @@ export default function AdminPricing() {
                           value={currentDur}
                           onChange={e => handleDurationChange(p.workType, e.target.value)}
                           style={{
-                            ...inputStyle, width: 100,
+                            ...inputStyle, width: 90,
                             fontWeight: durDirty ? 700 : 400,
                             borderColor: durDirty ? 'var(--amber)' : 'var(--border)',
                           }}

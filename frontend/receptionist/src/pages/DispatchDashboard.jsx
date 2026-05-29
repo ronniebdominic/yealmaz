@@ -24,7 +24,13 @@ function AssignModal({ caseData, executives, onConfirm, onClose, loading, mode }
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18, border: '1px solid var(--border)' }}>
             <div className="case-number" style={{ marginBottom: 4 }}>{caseData.caseNumber}</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{caseData.workType} · {caseData.clinic?.name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+              {caseData.workType}
+              {caseData.units != null && (
+                <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-3)' }}>({caseData.units} units)</span>
+              )}
+              {' · '}{caseData.clinic?.name}
+            </div>
             {caseData.clinic?.address && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>📍 {caseData.clinic.address}</div>
             )}
@@ -412,7 +418,9 @@ export default function DispatchDashboard() {
                   <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
                     <span className="case-number" style={{ minWidth: 110 }}>{c.caseNumber}</span>
                     <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>{c.patientName}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 120 }}>{c.workType}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 120 }}>
+                      {c.workType}{c.units != null ? <span style={{ marginLeft: 4, color: 'var(--text-3)' }}>·{c.units}u</span> : null}
+                    </span>
                     <StatusBadge status={c.status} />
                     {c.assignedDelivery && (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap' }}>

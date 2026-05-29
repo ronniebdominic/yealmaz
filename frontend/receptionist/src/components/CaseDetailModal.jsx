@@ -287,6 +287,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ['Clinic', data.clinic?.name],
               ['Work Type', data.workType],
               ['Tooth Numbers', data.toothNumbers || '—'],
+              ...(data.units != null ? [['Units', data.units]] : []),
               ['Shade', data.shade || '—'],
               ['Due Date', data.dueDate ? format(new Date(data.dueDate), 'dd MMM yyyy') : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],

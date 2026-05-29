@@ -77,6 +77,7 @@ model Case {
   doctorGender    String?     // "Male" | "Female"
   workType        String      // e.g. Crown, Bridge, Denture, Aligner
   toothNumbers    String?     // e.g. "14, 15, 16"
+  units           Int?        // count of tooth numbers (or manual for legacy data)
   shade           String?     // e.g. A2, B1
   notes           String?
   dueDate         DateTime?
@@ -225,12 +226,14 @@ model DeliveryLog {
 
 // ── WORK TYPE PRICES ───────────────────────────────────
 model WorkTypePrice {
-  id           String   @id @default(uuid())
-  workType     String   @unique
-  price        Float
-  durationDays Int?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  workType            String   @unique
+  price               Float
+  durationDays        Int?
+  expressPrice        Float?
+  expressDurationDays Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@map("work_type_prices")
 }

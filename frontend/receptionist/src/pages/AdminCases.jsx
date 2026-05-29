@@ -46,7 +46,7 @@ function CaseInfoCard({ caseData, accent }) {
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <span>🏥 {caseData.clinic?.name}</span>
-        <span>{caseData.workType}</span>
+        <span>{caseData.workType}{caseData.units != null ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}</span>
         {caseData.totalAmount && (
           <span style={{ fontWeight: 600 }}>Br {caseData.totalAmount.toLocaleString('en-US')}</span>
         )}
@@ -612,6 +612,7 @@ export default function AdminCases() {
                     <th>Clinic</th>
                     <th>Patient</th>
                     <th>Work Type</th>
+                    <th style={{ width: 70 }}>Units</th>
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Payment</th>
@@ -643,6 +644,7 @@ export default function AdminCases() {
                         )}
                       </td>
                       <td style={{ fontSize: 13 }}>{c.workType}</td>
+                      <td style={{ fontSize: 12, textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
                       <td style={{ fontWeight: 600, fontSize: 13 }}>
                         {c.totalAmount
                           ? `Br ${c.totalAmount.toLocaleString('en-US')}`

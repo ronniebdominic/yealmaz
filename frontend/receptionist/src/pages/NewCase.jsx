@@ -163,6 +163,7 @@ export default function NewCase() {
   const [clinics, setClinics] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState([]);
+  const [manualUnits, setManualUnits] = useState('');
   const [form, setForm] = useState({
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
     doctorPhone: '', doctorGender: '',
@@ -181,15 +182,21 @@ export default function NewCase() {
     [pricesData]
   );
 
-  // Auto-calculate price whenever workType or tooth count changes
+  const expressPriceMap = useMemo(
+    () => Object.fromEntries(pricesData.filter(p => p.expressPrice != null).map(p => [p.workType, p.expressPrice])),
+    [pricesData]
+  );
+
+  // Auto-calculate price whenever workType, tooth count, or delivery type changes
   useEffect(() => {
     if (!form.workType || Object.keys(priceMap).length === 0) return;
-    const unitPrice = priceMap[form.workType];
+    const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
+    const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
     if (unitPrice === undefined) return;
     const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
     setForm(prev => ({ ...prev, totalAmount: String(unitPrice * count) }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.workType, selectedTeeth.length, priceMap]);
+  }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
 
   // Auto-set due date whenever work type changes
   useEffect(() => {
@@ -225,9 +232,13 @@ export default function NewCase() {
 
     setSubmitting(true);
     try {
+      const resolvedUnits = selectedTeeth.length > 0
+        ? selectedTeeth.length
+        : manualUnits ? parseInt(manualUnits) : undefined;
       const res = await api.post('/cases', {
         ...form,
         toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
+        units: resolvedUnits,
       });
       toast.success(`Case ${res.data.caseNumber} created!`);
       navigate('/cases');
@@ -314,6 +325,26 @@ export default function NewCase() {
                 </div>
               </div>
 
+              {/* Units */}
+              <div className="form-group">
+                <label>Units
+                  {selectedTeeth.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                      auto-filled from tooth selection
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Enter number of units"
+                  value={selectedTeeth.length > 0 ? selectedTeeth.length : manualUnits}
+                  onChange={e => { if (selectedTeeth.length === 0) setManualUnits(e.target.value); }}
+                  readOnly={selectedTeeth.length > 0}
+                  style={selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                />
+              </div>
+
               {/* Work type */}
               <div className="form-group">
                 <label>Work Type *</label>
@@ -373,24 +404,23 @@ export default function NewCase() {
                 </div>
                 <div className="form-group">
                   <label>Amount (Br)
-                    {form.workType && priceMap[form.workType] !== undefined && (
-                      FLAT_PRICE_TYPES.has(form.workType) ? (
+                    {form.workType && priceMap[form.workType] !== undefined && (() => {
+                      const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
+                      const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
+                      const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
+                      const accent = useExpress ? '#92400E' : 'var(--green)';
+                      return FLAT_PRICE_TYPES.has(form.workType) ? (
                         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                          flat rate —{' '}
-                          <strong style={{ color: 'var(--green)' }}>
-                            Br {priceMap[form.workType].toLocaleString('en-US')}
-                          </strong>
+                          {useExpress ? '⚡ ' : ''}flat rate —{' '}
+                          <strong style={{ color: accent }}>Br {unitPrice.toLocaleString('en-US')}</strong>
                         </span>
                       ) : (
                         <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                          Br {priceMap[form.workType].toLocaleString('en-US')} × {Math.max(1, selectedTeeth.length)} {selectedTeeth.length > 1 ? 'teeth' : 'tooth'}
-                          {' = '}
-                          <strong style={{ color: 'var(--green)' }}>
-                            Br {(priceMap[form.workType] * Math.max(1, selectedTeeth.length)).toLocaleString('en-US')}
-                          </strong>
+                          {useExpress ? '⚡ ' : ''}Br {unitPrice.toLocaleString('en-US')} × {count} {count > 1 ? 'teeth' : 'tooth'}{' = '}
+                          <strong style={{ color: accent }}>Br {(unitPrice * count).toLocaleString('en-US')}</strong>
                         </span>
-                      )
-                    )}
+                      );
+                    })()}
                   </label>
                   <input
                     type="number"

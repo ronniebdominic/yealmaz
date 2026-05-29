@@ -29,12 +29,13 @@ function patternDays(workType) {
   return 5;
 }
 
-async function getDueDays(workType) {
+async function getDueDays(workType, isExpress = false) {
   try {
     const record = await prisma.workTypePrice.findUnique({
       where: { workType },
-      select: { durationDays: true },
+      select: { durationDays: true, expressDurationDays: true },
     });
+    if (isExpress && record?.expressDurationDays) return record.expressDurationDays;
     if (record?.durationDays) return record.durationDays;
   } catch (_) {}
   return patternDays(workType);
@@ -137,7 +138,7 @@ router.post('/', protect, async (req, res) => {
   try {
     const {
       patientName, patientAge, doctorName, doctorPhone, doctorGender, workType,
-      toothNumbers, shade, notes, dueDate, totalAmount, deliveryType
+      toothNumbers, units, shade, notes, dueDate, totalAmount, deliveryType
     } = req.body;
 
     if (!patientName || !workType) {
@@ -148,11 +149,19 @@ router.post('/', protect, async (req, res) => {
     const clinicId = req.user.role === 'CLINIC' ? req.user.id : req.body.clinicId;
     if (!clinicId) return res.status(400).json({ error: 'Clinic ID is required.' });
 
+    const isExpress = deliveryType === 'EXPRESS';
     // Auto-calculate due date from work type; use manual value only if explicitly provided
-    const autoDays = await getDueDays(workType);
+    const autoDays = await getDueDays(workType, isExpress);
     const autoDate = new Date();
     autoDate.setDate(autoDate.getDate() + autoDays);
     const resolvedDueDate = dueDate ? new Date(dueDate) : autoDate;
+
+    // Compute units from toothNumbers if not explicitly provided
+    const resolvedUnits = units != null
+      ? parseInt(units)
+      : toothNumbers
+        ? toothNumbers.split(',').map(t => t.trim()).filter(Boolean).length
+        : null;
 
     const newCase = await prisma.case.create({
       data: {
@@ -164,11 +173,12 @@ router.post('/', protect, async (req, res) => {
         doctorGender: doctorGender || null,
         workType,
         toothNumbers,
+        units: resolvedUnits,
         shade,
         notes,
         dueDate: resolvedDueDate,
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
-        deliveryType: deliveryType === 'EXPRESS' ? 'EXPRESS' : 'NORMAL',
+        deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
         clinicId,
         status: 'PENDING_PICKUP'
       }

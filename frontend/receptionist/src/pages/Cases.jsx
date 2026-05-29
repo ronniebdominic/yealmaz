@@ -136,6 +136,7 @@ export default function Cases() {
                     <th>Clinic</th>
                     <th>Patient</th>
                     <th>Work Type</th>
+                    <th style={{ width: 70 }}>Units</th>
                     <th>Due Date</th>
                     <th>Status</th>
                     <th>Payment</th>
@@ -149,6 +150,7 @@ export default function Cases() {
                       <td style={{ fontWeight: 600, color: 'var(--text-1)' }}>{c.clinic?.name}</td>
                       <td><span className="patient-name">{c.patientName}</span></td>
                       <td>{c.workType}</td>
+                      <td style={{ fontSize: 12, textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                         {c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}
                       </td>
