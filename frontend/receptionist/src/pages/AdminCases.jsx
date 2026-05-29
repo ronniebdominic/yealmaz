@@ -612,6 +612,7 @@ export default function AdminCases() {
                     <th>Work Type</th>
                     <th style={{ width: 70 }}>Units</th>
                     <th>Amount</th>
+                    <th>Delivered On</th>
                     <th>Status</th>
                     <th>Payment</th>
                     <th>
@@ -650,6 +651,9 @@ export default function AdminCases() {
                       </td>
                       <td><StatusBadge status={c.status} /></td>
                       <td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></td>
+                      <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)' }}>
+                        {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
+                      </td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
                       </td>

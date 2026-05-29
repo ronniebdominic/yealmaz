@@ -313,8 +313,8 @@ export default function DeliveryDashboard() {
                       </button>
                     )}
                     {c.status === 'DELIVERED' && (
-                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                        ✅ Delivered · {format(new Date(deliveredAt), 'dd MMM, h:mm a')}
+                      <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 500 }}>
+                        ✅ Delivered on {format(new Date(c.deliveryDate || deliveredAt), 'dd MMM yyyy, h:mm a')}
                       </div>
                     )}
                   </div>

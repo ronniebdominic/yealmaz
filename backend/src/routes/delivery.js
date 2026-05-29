@@ -139,10 +139,11 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
   try {
     const { notes } = req.body;
 
-    await prisma.case.update({ where: { id: req.params.caseId }, data: { status: 'DELIVERED' } });
+    const now = new Date();
+    await prisma.case.update({ where: { id: req.params.caseId }, data: { status: 'DELIVERED', deliveryDate: now } });
     await prisma.deliveryLog.updateMany({
       where: { caseId: req.params.caseId, deliveredAt: null },
-      data: { deliveredAt: new Date(), notes }
+      data: { deliveredAt: now, notes }
     });
     await prisma.caseStage.create({
       data: { caseId: req.params.caseId, stageName: 'DELIVERED', scannedBy: req.user.name, notes: notes || 'Delivered successfully' }

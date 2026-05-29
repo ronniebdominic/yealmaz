@@ -47,6 +47,8 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  const [deliveryDateInput, setDeliveryDateInput] = useState('');
+  const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
 
   useEffect(() => {
     loadCase();
@@ -57,6 +59,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
       const res = await api.get(`/cases/${caseId}`);
       setData(res.data);
       setNewStatus(res.data.status);
+      setDeliveryDateInput(res.data.deliveryDate ? res.data.deliveryDate.slice(0, 10) : '');
     } catch (err) {
       toast.error('Could not load case');
     } finally {
@@ -75,6 +78,19 @@ export default function CaseDetailModal({ caseId, onClose }) {
       toast.error('Update failed');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const saveDeliveryDate = async () => {
+    setSavingDeliveryDate(true);
+    try {
+      await api.patch(`/cases/${caseId}/delivery-date`, { deliveryDate: deliveryDateInput || null });
+      toast.success(deliveryDateInput ? 'Delivery date saved' : 'Delivery date cleared');
+      loadCase();
+    } catch (err) {
+      toast.error('Could not save delivery date');
+    } finally {
+      setSavingDeliveryDate(false);
     }
   };
 
@@ -296,6 +312,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                     ? format(new Date(data.payment.verifiedAt), 'dd MMM yyyy')
                     : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
+              ...(data.deliveryDate ? [['Delivered On', format(new Date(data.deliveryDate), 'dd MMM yyyy, h:mm a')]] : []),
               ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
               ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),
               ...(data.patientGender ? [['Patient Gender', data.patientGender]] : []),
@@ -338,6 +355,44 @@ export default function CaseDetailModal({ caseId, onClose }) {
               <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={printQR} title="Click to print QR">
                 <img src={data.qrCodeUrl} alt="QR Code" style={{ width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: '8px' }} />
                 <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '4px' }}>🖨️ Print</div>
+              </div>
+            )}
+          </div>
+
+          {/* Delivery Date */}
+          <div className="divider" />
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>
+              Delivery Date
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="date"
+                value={deliveryDateInput}
+                onChange={e => setDeliveryDateInput(e.target.value)}
+                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={saveDeliveryDate}
+                disabled={savingDeliveryDate}
+              >
+                {savingDeliveryDate ? '…' : 'Save'}
+              </button>
+              {deliveryDateInput && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { setDeliveryDateInput(''); }}
+                  style={{ color: 'var(--text-3)' }}
+                  title="Clear delivery date"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {data.deliveryDate && (
+              <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 5 }}>
+                ✅ Currently set to {format(new Date(data.deliveryDate), 'dd MMM yyyy')}
               </div>
             )}
           </div>

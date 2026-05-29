@@ -78,6 +78,7 @@ model Case {
   workType        String      // e.g. Crown, Bridge, Denture, Aligner
   toothNumbers    String?     // e.g. "14, 15, 16"
   units           Int?        // count of tooth numbers (or manual for legacy data)
+  deliveryDate    DateTime?   // actual date the case was delivered to clinic
   shade           String?     // e.g. A2, B1
   notes           String?
   remake          Boolean     @default(false)

@@ -169,7 +169,7 @@ export default function NewCase() {
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
     doctorPhone: '', patientGender: '',
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
-    deliveryType: 'NORMAL',
+    deliveryType: 'NORMAL', deliveryDate: '',
   });
 
   const { data: pricesData = [] } = useQuery({
@@ -254,6 +254,7 @@ export default function NewCase() {
         ...form,
         toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
         units: resolvedUnits,
+        deliveryDate: form.deliveryDate || undefined,
       });
       toast.success(`Case ${res.data.caseNumber} created!`);
       navigate('/cases');
@@ -418,6 +419,12 @@ export default function NewCase() {
                     )}
                   </label>
                   <input type="date" value={form.dueDate} onChange={set('dueDate')} />
+                </div>
+                <div className="form-group">
+                  <label>Delivery Date
+                    <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>for historical cases</span>
+                  </label>
+                  <input type="date" value={form.deliveryDate} onChange={set('deliveryDate')} />
                 </div>
                 <div className="form-group">
                   <label>Amount (Br)

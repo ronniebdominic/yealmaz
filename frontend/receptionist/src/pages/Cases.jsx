@@ -136,6 +136,7 @@ export default function Cases() {
                     <th>Work Type</th>
                     <th style={{ width: 70 }}>Units</th>
                     <th>Due Date</th>
+                    <th>Delivered On</th>
                     <th>Status</th>
                     <th>Payment</th>
                     <th>Action</th>
@@ -150,11 +151,10 @@ export default function Cases() {
                       <td>{c.workType}</td>
                       <td style={{ fontSize: 12, textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                        {c.dueDate
-                          ? format(new Date(c.dueDate), 'dd MMM yyyy')
-                          : c.payment?.verifiedAt
-                            ? <span title="Delivery date">📦 {format(new Date(c.payment.verifiedAt), 'dd MMM yyyy')}</span>
-                            : '—'}
+                        {c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}
+                      </td>
+                      <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)' }}>
+                        {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
                       </td>
                       <td><StatusBadge status={c.status} /></td>
                       <td><PaymentBadge status={c.paymentStatus} /></td>

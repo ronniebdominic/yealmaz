@@ -188,7 +188,7 @@ export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
     patientGender: '', workType: '', shade: '', notes: '', dueDate: '',
-    deliveryType: 'NORMAL',
+    deliveryType: 'NORMAL', deliveryDate: '',
   });
   const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [manualUnits, setManualUnits] = useState('');
@@ -240,6 +240,7 @@ export default function NewCaseScreen({ navigation }) {
         toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
         units: resolvedUnits,
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
+        deliveryDate: form.deliveryDate || undefined,
       });
       Alert.alert(
         '✅ Case Submitted!',
@@ -497,6 +498,18 @@ export default function NewCaseScreen({ navigation }) {
                 );
               })}
             </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Delivery Date <Text style={{ fontSize: 11, color: Colors.text3, fontWeight: '400' }}>(historical cases only — YYYY-MM-DD)</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 2024-03-15"
+              placeholderTextColor={Colors.text3}
+              value={form.deliveryDate}
+              onChangeText={set('deliveryDate')}
+              keyboardType="numbers-and-punctuation"
+            />
           </View>
 
           <View style={styles.formGroup}>

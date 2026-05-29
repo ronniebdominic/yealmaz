@@ -138,7 +138,7 @@ router.post('/', protect, async (req, res) => {
   try {
     const {
       patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
-      toothNumbers, units, shade, notes, remake, remakeReason, dueDate, totalAmount, deliveryType
+      toothNumbers, units, shade, notes, remake, remakeReason, dueDate, totalAmount, deliveryType, deliveryDate
     } = req.body;
 
     if (!patientName || !workType) {
@@ -181,9 +181,10 @@ router.post('/', protect, async (req, res) => {
         dueDate: resolvedDueDate,
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
         deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
+        deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
         clinicId,
         receptionistId: req.user.role === 'RECEPTIONIST' ? req.user.id : null,
-        status: 'PENDING_PICKUP'
+        status: deliveryDate ? 'DELIVERED' : 'PENDING_PICKUP'
       }
     });
 
@@ -257,6 +258,21 @@ router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
   }
 });
 
+// ── PATCH /api/cases/:id/delivery-date ──────────────────
+router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const { deliveryDate } = req.body;
+    const updated = await prisma.case.update({
+      where: { id: req.params.id },
+      data: { deliveryDate: deliveryDate ? new Date(deliveryDate) : null },
+    });
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:analytics:*');
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Could not update delivery date.' });
+  }
+});
+
 // ── PATCH /api/cases/:id/status ──────────────────────────
 router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
@@ -264,7 +280,10 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (r
 
     const updated = await prisma.case.update({
       where: { id: req.params.id },
-      data: { status }
+      data: {
+        status,
+        ...(status === 'DELIVERED' ? { deliveryDate: new Date() } : {}),
+      }
     });
 
     await prisma.caseStage.create({
