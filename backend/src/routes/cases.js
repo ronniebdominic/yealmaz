@@ -138,7 +138,7 @@ router.post('/', protect, async (req, res) => {
   try {
     const {
       patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
-      toothNumbers, units, shade, notes, dueDate, totalAmount, deliveryType
+      toothNumbers, units, shade, notes, remake, remakeReason, dueDate, totalAmount, deliveryType
     } = req.body;
 
     if (!patientName || !workType) {
@@ -176,6 +176,8 @@ router.post('/', protect, async (req, res) => {
         units: resolvedUnits,
         shade,
         notes,
+        remake:       remake === true || remake === 'true',
+        remakeReason: remakeReason || null,
         dueDate: resolvedDueDate,
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
         deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
