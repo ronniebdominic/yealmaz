@@ -166,7 +166,7 @@ export default function NewCase() {
   const [manualUnits, setManualUnits] = useState('');
   const [form, setForm] = useState({
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
-    doctorPhone: '', doctorGender: '',
+    doctorPhone: '', patientGender: '',
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
     deliveryType: 'NORMAL',
   });
@@ -301,8 +301,8 @@ export default function NewCase() {
 
               <div className="grid-2">
                 <div className="form-group">
-                  <label>Doctor Gender</label>
-                  <select value={form.doctorGender} onChange={set('doctorGender')}>
+                  <label>Patient Gender</label>
+                  <select value={form.patientGender} onChange={set('patientGender')}>
                     <option value="">— Select —</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>

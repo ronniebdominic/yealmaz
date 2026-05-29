@@ -187,7 +187,7 @@ function Odontogram({ selected, onToggle }) {
 export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
-    doctorGender: '', workType: '', shade: '', notes: '', dueDate: '',
+    patientGender: '', workType: '', shade: '', notes: '', dueDate: '',
     deliveryType: 'NORMAL',
   });
   const [selectedTeeth, setSelectedTeeth] = useState([]);
@@ -319,11 +319,11 @@ export default function NewCaseScreen({ navigation }) {
               <Text style={styles.label}>Doctor Gender</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {['Male', 'Female'].map(g => {
-                  const active = form.doctorGender === g;
+                  const active = form.patientGender === g;
                   return (
                     <TouchableOpacity
                       key={g}
-                      onPress={() => set('doctorGender')(g)}
+                      onPress={() => set('patientGender')(g)}
                       activeOpacity={0.8}
                       style={{
                         flex: 1, height: 48, alignItems: 'center', justifyContent: 'center',

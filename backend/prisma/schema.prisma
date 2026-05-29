@@ -74,7 +74,7 @@ model Case {
   patientAge      Int?
   doctorName      String?     // referring doctor / dentist
   doctorPhone     String?
-  doctorGender    String?     // "Male" | "Female"
+  patientGender   String?     // "Male" | "Female"
   workType        String      // e.g. Crown, Bridge, Denture, Aligner
   toothNumbers    String?     // e.g. "14, 15, 16"
   units           Int?        // count of tooth numbers (or manual for legacy data)
