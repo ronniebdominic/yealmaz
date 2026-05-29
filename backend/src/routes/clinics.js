@@ -26,10 +26,11 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-// ── GET /api/clinics/all — full list for admin (includes inactive) ──
+// ── GET /api/clinics/all — active clinics list for admin ──
 router.get('/all', protect, restrict('ADMIN'), async (req, res) => {
   try {
     const clinics = await prisma.clinic.findMany({
+      where: { isActive: true },
       select: {
         id: true, code: true, name: true, station: true,
         email: true, phone: true, address: true,
