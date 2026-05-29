@@ -180,7 +180,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.case.groupBy({ by: ['clinicId'], _count: { id: true } }),
       prisma.case.findMany({
         where: caseFilter,
-        select: { workType: true, units: true, payment: { select: { status: true, amount: true } } },
+        select: { workType: true, units: true, clinicId: true, payment: { select: { status: true, amount: true } } },
       }),
     ]);
 
@@ -205,11 +205,17 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       clinicRevMap[cid].revenue   += p.amount || 0;
       clinicRevMap[cid].paidCases += 1;
     }
+    const clinicUnitsMap = {};
+    for (const c of casesByWorkType) {
+      if (!c.clinicId || !c.units) continue;
+      clinicUnitsMap[c.clinicId] = (clinicUnitsMap[c.clinicId] || 0) + c.units;
+    }
     const revenueByClinic = allClinics.map(c => ({
       id: c.id, name: c.name,
       revenue:    clinicRevMap[c.id]?.revenue    || 0,
       paidCases:  clinicRevMap[c.id]?.paidCases  || 0,
       totalCases: caseCountMap[c.id]             || 0,
+      totalUnits: clinicUnitsMap[c.id]           || 0,
     })).sort((a, b) => b.revenue - a.revenue);
 
     const workTypeMap = {};

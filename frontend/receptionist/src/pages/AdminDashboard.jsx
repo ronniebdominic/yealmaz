@@ -96,9 +96,9 @@ export default function AdminDashboard() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(workRows), 'By Work Type');
 
     // Sheet 4 — By Clinic
-    const clinicRows = [['Clinic', 'Total Cases', 'Paid Cases', 'Revenue (Br)'],
+    const clinicRows = [['Clinic', 'Total Cases', 'Total Units', 'Paid Cases', 'Revenue (Br)'],
       ...(revenueByClinic || []).map(c => [
-        c.name, c.totalCases, c.paidCases, c.revenue,
+        c.name, c.totalCases, c.totalUnits || 0, c.paidCases, c.revenue,
       ])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clinicRows), 'By Clinic');
 
@@ -371,13 +371,14 @@ export default function AdminDashboard() {
                         <tr>
                           <th>Clinic</th>
                           <th>Total Cases</th>
+                          <th>Total Units</th>
                           <th>Paid Cases</th>
                           <th>Revenue (Verified)</th>
                         </tr>
                       </thead>
                       <tbody>
                         {revenueByClinic?.length === 0 ? (
-                          <tr><td colSpan={4} className="empty-state">No clinics found</td></tr>
+                          <tr><td colSpan={5} className="empty-state">No clinics found</td></tr>
                         ) : revenueByClinic?.map(c => {
                           const pct = Math.round(((c.revenue || 0) / maxRevenue) * 100);
                           return (
@@ -395,6 +396,7 @@ export default function AdminDashboard() {
                                 </div>
                               </td>
                               <td>{c.totalCases}</td>
+                              <td style={{ fontWeight: 600, color: 'var(--accent)' }}>{c.totalUnits || '—'}</td>
                               <td>{c.paidCases}</td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

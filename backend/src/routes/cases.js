@@ -180,6 +180,7 @@ router.post('/', protect, async (req, res) => {
         totalAmount: totalAmount ? parseFloat(totalAmount) : null,
         deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
         clinicId,
+        receptionistId: req.user.role === 'RECEPTIONIST' ? req.user.id : null,
         status: 'PENDING_PICKUP'
       }
     });
