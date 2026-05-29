@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { appCache, invalidate } = require('../cache');
+const { protect, restrict } = require('../middleware/auth');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -57,6 +58,42 @@ router.put('/', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update prices.' });
+  }
+});
+
+// PATCH /api/prices/:id  — rename work type or update individual row
+router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { workType, price, durationDays } = req.body;
+    const data = {};
+    if (workType !== undefined) data.workType = workType.trim();
+    if (price !== undefined) data.price = parseFloat(price);
+    if (durationDays !== undefined) data.durationDays = durationDays ? parseInt(durationDays) : null;
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'Nothing to update.' });
+    }
+
+    await prisma.workTypePrice.update({ where: { id: req.params.id }, data });
+    await invalidate('prices');
+    const prices = await prisma.workTypePrice.findMany({ orderBy: { workType: 'asc' } });
+    res.json(prices);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update work type.' });
+  }
+});
+
+// DELETE /api/prices/:id
+router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    await prisma.workTypePrice.delete({ where: { id: req.params.id } });
+    await invalidate('prices');
+    const prices = await prisma.workTypePrice.findMany({ orderBy: { workType: 'asc' } });
+    res.json(prices);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete work type.' });
   }
 });
 

@@ -19,6 +19,9 @@ export default function AdminPricing() {
   const [newType, setNewType] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newDays, setNewDays] = useState('');
+  // per-row edit mode
+  const [editRow, setEditRow] = useState(null); // id of row being inline-edited
+  const [editRowData, setEditRowData] = useState({ workType: '', price: '', durationDays: '' });
 
   const { data: prices = [], isLoading } = useQuery({
     queryKey: ['prices'],
@@ -36,6 +39,29 @@ export default function AdminPricing() {
     },
     onError: (err) => {
       toast.error(err.response?.data?.error || 'Failed to save prices');
+    },
+  });
+
+  const { mutate: patchRow, isPending: patching } = useMutation({
+    mutationFn: ({ id, ...data }) => api.patch(`/prices/${id}`, data).then(r => r.data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['prices'], updated);
+      setEditRow(null);
+      toast.success('Work type updated');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.error || 'Failed to update work type');
+    },
+  });
+
+  const { mutate: deleteRow, isPending: deleting } = useMutation({
+    mutationFn: (id) => api.delete(`/prices/${id}`).then(r => r.data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['prices'], updated);
+      toast.success('Work type removed');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.error || 'Failed to delete work type');
     },
   });
 
@@ -78,6 +104,30 @@ export default function AdminPricing() {
   };
 
   const handleReset = () => { setEdits({}); setDurationEdits({}); };
+
+  const startEdit = (p) => {
+    setEditRow(p.id);
+    setEditRowData({ workType: p.workType, price: String(p.price), durationDays: String(p.durationDays ?? '') });
+  };
+
+  const cancelEdit = () => setEditRow(null);
+
+  const saveEdit = () => {
+    if (!editRowData.workType.trim()) { toast.error('Work type name cannot be empty'); return; }
+    const price = parseFloat(editRowData.price);
+    if (isNaN(price) || price < 0) { toast.error('Enter a valid price'); return; }
+    patchRow({
+      id: editRow,
+      workType: editRowData.workType.trim(),
+      price,
+      durationDays: editRowData.durationDays ? parseInt(editRowData.durationDays) : null,
+    });
+  };
+
+  const handleDelete = (p) => {
+    if (!window.confirm(`Remove "${p.workType}" from pricing?\n\nThis cannot be undone.`)) return;
+    deleteRow(p.id);
+  };
 
   const handleAddNew = () => {
     const trimmed = newType.trim();
@@ -256,7 +306,7 @@ export default function AdminPricing() {
                   <th>Work Type</th>
                   <th style={{ width: 200 }}>Price (Br)</th>
                   <th style={{ width: 160 }}>Duration (days)</th>
-                  <th style={{ width: 120, textAlign: 'center' }}>Status</th>
+                  <th style={{ width: 140, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -271,14 +321,68 @@ export default function AdminPricing() {
                     <td colSpan={5} className="empty-state">No work types match your search</td>
                   </tr>
                 ) : paginated.map((p, i) => {
+                  const globalIdx = (page - 1) * PAGE_SIZE + i;
+                  const isEditing = editRow === p.id;
+
+                  if (isEditing) {
+                    return (
+                      <tr key={p.id} style={{ background: 'rgba(21,101,192,0.04)', outline: '2px solid var(--blue)', outlineOffset: -2 }}>
+                        <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{globalIdx + 1}</td>
+                        <td>
+                          <input
+                            value={editRowData.workType}
+                            onChange={e => setEditRowData(d => ({ ...d, workType: e.target.value }))}
+                            autoFocus
+                            style={{ ...inputStyle, width: '100%', maxWidth: '100%', fontWeight: 600 }}
+                          />
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
+                            <input
+                              type="number" min="0" step="100"
+                              value={editRowData.price}
+                              onChange={e => setEditRowData(d => ({ ...d, price: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                              style={{ ...inputStyle, width: 140, maxWidth: 140 }}
+                            />
+                          </div>
+                        </td>
+                        <td>
+                          <input
+                            type="number" min="1" step="1" placeholder="auto"
+                            value={editRowData.durationDays}
+                            onChange={e => setEditRowData(d => ({ ...d, durationDays: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                            style={{ ...inputStyle, width: 100, maxWidth: 100 }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={saveEdit}
+                              disabled={patching}
+                              style={{ ...actionBtn, background: 'var(--blue)', color: '#fff', border: 'none' }}
+                            >
+                              {patching ? '…' : '✓ Save'}
+                            </button>
+                            <button onClick={cancelEdit} style={{ ...actionBtn }}>
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   const dirty = isDirty(p.workType);
                   const priceDirty = edits[p.workType] !== undefined;
                   const durDirty = durationEdits[p.workType] !== undefined;
                   const currentVal = getPrice(p);
                   const currentDur = getDuration(p);
-                  const globalIdx = (page - 1) * PAGE_SIZE + i;
+
                   return (
-                    <tr key={p.workType} style={dirty ? { background: 'rgba(240,165,0,0.05)' } : {}}>
+                    <tr key={p.id} style={dirty ? { background: 'rgba(240,165,0,0.05)' } : {}}>
                       <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{globalIdx + 1}</td>
                       <td>
                         <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{p.workType}</span>
@@ -287,14 +391,11 @@ export default function AdminPricing() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Br</span>
                           <input
-                            type="number"
-                            min="0"
-                            step="100"
+                            type="number" min="0" step="100"
                             value={currentVal}
                             onChange={e => handleChange(p.workType, e.target.value)}
                             style={{
-                              ...inputStyle,
-                              width: 140,
+                              ...inputStyle, width: 140,
                               fontWeight: priceDirty ? 700 : 400,
                               borderColor: priceDirty ? 'var(--amber)' : 'var(--border)',
                             }}
@@ -303,36 +404,43 @@ export default function AdminPricing() {
                       </td>
                       <td>
                         <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          placeholder="auto"
+                          type="number" min="1" step="1" placeholder="auto"
                           value={currentDur}
                           onChange={e => handleDurationChange(p.workType, e.target.value)}
                           style={{
-                            ...inputStyle,
-                            width: 100,
+                            ...inputStyle, width: 100,
                             fontWeight: durDirty ? 700 : 400,
                             borderColor: durDirty ? 'var(--amber)' : 'var(--border)',
                           }}
                         />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        {dirty ? (
-                          <span style={{
-                            background: 'rgba(240,165,0,0.15)', color: '#d97706',
-                            padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          }}>
-                            Modified
-                          </span>
-                        ) : (
-                          <span style={{
-                            background: 'var(--green-dim)', color: 'var(--green)',
-                            padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          }}>
-                            Saved
-                          </span>
-                        )}
+                      <td style={{ textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {dirty && (
+                            <span style={{
+                              background: 'rgba(240,165,0,0.15)', color: '#d97706',
+                              padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                            }}>
+                              •
+                            </span>
+                          )}
+                          <button
+                            onClick={() => startEdit(p)}
+                            disabled={!!editRow || deleting}
+                            title="Edit work type name"
+                            style={{ ...actionBtn }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(p)}
+                            disabled={!!editRow || deleting}
+                            title="Remove work type"
+                            style={{ ...actionBtn, color: 'var(--red)', borderColor: 'rgba(198,40,40,0.25)' }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -363,4 +471,13 @@ const inputStyle = {
   fontFamily: 'DM Sans, sans-serif',
   width: '100%',
   maxWidth: 320,
+};
+
+const actionBtn = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  border: '1px solid var(--border)', borderRadius: 6,
+  padding: '4px 10px', fontSize: 12, fontWeight: 600,
+  color: 'var(--text-2)', background: 'var(--surface)',
+  cursor: 'pointer', whiteSpace: 'nowrap',
+  transition: 'background 0.12s, border-color 0.12s',
 };
