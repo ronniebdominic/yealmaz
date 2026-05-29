@@ -112,10 +112,13 @@ app.use((err, req, res, next) => {
 
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`\n🦷 Ye-Almaz Dental Lab API`);
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}\n`);
+  console.log(`📦 Environment: ${process.env.NODE_ENV || 'development'}`);
+  // Clear all caches on startup so stale data never survives a redeploy
+  await invalidate('dashboard:*', 'cases:*', 'case:*', 'payments:*', 'prices', 'clinics');
+  console.log(`🧹 Cache flushed on startup\n`);
 });
 
 module.exports = { app, io, prisma };
