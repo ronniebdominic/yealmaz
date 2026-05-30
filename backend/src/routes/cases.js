@@ -226,8 +226,8 @@ router.post('/', protect, async (req, res) => {
 
     res.status(201).json(updatedCase);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Could not create case.' });
+    console.error('[POST /cases]', err);
+    res.status(500).json({ error: err.message || 'Could not create case.' });
   }
 });
 
