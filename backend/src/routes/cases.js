@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { awardCasePoints } = require('./rewards');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -212,6 +213,11 @@ router.post('/', protect, async (req, res) => {
     await prisma.payment.create({
       data: { caseId: newCase.id, status: 'PENDING', amount: totalAmount ? parseFloat(totalAmount) : null }
     });
+
+    // Award reward points if submitted by a clinic
+    if (req.user.role === 'CLINIC') {
+      awardCasePoints(req.user.id, newCase.id, newCase.caseNumber).catch(() => {});
+    }
 
     await invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
 

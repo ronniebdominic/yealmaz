@@ -28,12 +28,13 @@ import CasesScreen from './src/screens/cases/CasesScreen';
 import CaseDetailScreen from './src/screens/cases/CaseDetailScreen';
 import NewCaseScreen from './src/screens/cases/NewCaseScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
+import RewardsScreen from './src/screens/rewards/RewardsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function TabIcon({ name, focused }) {
-  const icons = { Home: focused?'🏠':'🏡', Cases: focused?'📋':'📄', NewCase: focused?'➕':'✚', Profile: focused?'👤':'👥' };
+  const icons = { Home: focused?'🏠':'🏡', Cases: focused?'📋':'📄', NewCase: focused?'➕':'✚', Rewards: focused?'🎁':'🎀', Profile: focused?'👤':'👥' };
   return <Text style={{ fontSize: 22 }}>{icons[name]}</Text>;
 }
 
@@ -52,6 +53,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Cases" component={CasesScreen} options={{ tabBarLabel: 'My Cases' }} />
       <Tab.Screen name="NewCase" component={NewCaseScreen} options={{ tabBarLabel: 'New Case' }} />
+      <Tab.Screen name="Rewards" component={RewardsScreen} options={{ tabBarLabel: 'Rewards' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );

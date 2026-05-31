@@ -62,6 +62,9 @@ model Clinic {
 
   cases             Case[]
   pushSubscriptions PushSubscription[]
+  clinicPoints      ClinicPoints?
+  rewardTransactions RewardTransaction[]
+  rewardRedemptions  RewardRedemption[]
 
   @@map("clinics")
 }
@@ -103,10 +106,11 @@ model Case {
   assignedDeliveryId String?
   assignedDelivery   User?    @relation("AssignedDeliveries", fields: [assignedDeliveryId], references: [id])
 
-  stages          CaseStage[]
-  payment         Payment?
-  deliveryLogs    DeliveryLog[]
-  notifications   Notification[]
+  stages             CaseStage[]
+  payment            Payment?
+  deliveryLogs       DeliveryLog[]
+  notifications      Notification[]
+  rewardTransactions RewardTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -268,4 +272,61 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@map("notifications")
+}
+
+// ── REWARDS ────────────────────────────────────────────
+model RewardSetting {
+  id            String   @id @default(uuid())
+  pointsPerCase Int      @default(10)
+  updatedAt     DateTime @updatedAt
+  @@map("reward_settings")
+}
+
+model ClinicPoints {
+  id            String   @id @default(uuid())
+  clinicId      String   @unique
+  clinic        Clinic   @relation(fields: [clinicId], references: [id])
+  totalEarned   Int      @default(0)
+  totalRedeemed Int      @default(0)
+  updatedAt     DateTime @updatedAt
+  @@map("clinic_points")
+}
+
+model RewardTransaction {
+  id          String   @id @default(uuid())
+  clinicId    String
+  clinic      Clinic   @relation(fields: [clinicId], references: [id])
+  type        String   // EARN | REDEEM
+  points      Int
+  description String
+  caseId      String?
+  case        Case?    @relation(fields: [caseId], references: [id])
+  createdAt   DateTime @default(now())
+  @@map("reward_transactions")
+}
+
+model RewardItem {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  pointsCost  Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  redemptions RewardRedemption[]
+  @@map("reward_items")
+}
+
+model RewardRedemption {
+  id           String     @id @default(uuid())
+  clinicId     String
+  clinic       Clinic     @relation(fields: [clinicId], references: [id])
+  rewardItemId String
+  rewardItem   RewardItem @relation(fields: [rewardItemId], references: [id])
+  pointsSpent  Int
+  status       String     @default("PENDING")
+  adminNote    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  @@map("reward_redemptions")
 }

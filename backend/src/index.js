@@ -78,6 +78,7 @@ app.use('/api/lab',           require('./routes/lab'));
 app.use('/api/scan',          require('./routes/scan'));      // Public QR scan endpoint
 app.use('/api/prices',        require('./routes/prices'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/rewards',       require('./routes/rewards'));
 
 // ── Cache management (admin only) ───────────────────────
 const { appCache, invalidate } = require('./cache');
