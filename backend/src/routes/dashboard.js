@@ -152,7 +152,12 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       });
     }
     const trendStart = trendBuckets[0].start;
-    const caseFilter = clinicId ? { clinicId } : {};
+
+    // All case KPIs are filtered by the selected date range (createdAt) and clinic
+    const caseFilter = {
+      createdAt: { gte: dateFrom, lte: dateTo },
+      ...(clinicId ? { clinicId } : {}),
+    };
 
     const [
       [totalCases, activeCases, deliveredCases],
@@ -177,7 +182,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         select: { amount: true, verifiedAt: true, case: { select: { clinicId: true } } },
       }),
       prisma.clinic.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-      prisma.case.groupBy({ by: ['clinicId'], _count: { id: true } }),
+      prisma.case.groupBy({ by: ['clinicId'], where: caseFilter, _count: { id: true } }),
       prisma.case.findMany({
         where: caseFilter,
         select: { workType: true, units: true, clinicId: true, payment: { select: { status: true, amount: true } } },
