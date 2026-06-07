@@ -185,8 +185,8 @@ export default function AdminDashboard() {
             {/* ── KPI Cards ── */}
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)' }}>
               <KpiCard icon="💰" label="Total Revenue" value={ETB(kpi?.totalRevenue)} bg="var(--green-dim)" color="var(--green)" sub="Verified payments" />
-              <KpiCard icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'} bg="#EEF2FF" color="var(--blue)" sub="All time" />
-              <KpiCard icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'} bg="var(--accent-dim)" color="var(--accent)" sub="Across all cases" />
+              <KpiCard icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'} bg="#EEF2FF" color="var(--blue)" sub="In selected range" />
+              <KpiCard icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'} bg="var(--accent-dim)" color="var(--accent)" sub="In selected range" />
               <KpiCard icon="⚙️" label="Active Cases" value={kpi?.activeCases ?? '—'} bg="var(--amber-dim)" color="var(--amber)" sub="In production" />
               <KpiCard icon="✅" label="Delivered" value={kpi?.deliveredCases ?? '—'} bg="var(--green-dim)" color="var(--green)" sub="Completed" />
               <KpiCard icon="💳" label="Pending Payments" value={kpi?.pendingPayments ?? '—'} bg="var(--accent-dim)" color="var(--navy)" sub="Awaiting review" />
