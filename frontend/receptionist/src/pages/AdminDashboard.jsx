@@ -195,7 +195,7 @@ export default function AdminDashboard() {
             {/* ── Revenue Trend ── */}
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-header">
-                <div className="card-title">Monthly Revenue Trend (12 months)</div>
+                <div className="card-title">Monthly Revenue Trend{monthlyTrend?.length ? ` (${monthlyTrend.length} month${monthlyTrend.length > 1 ? 's' : ''})` : ''}</div>
               </div>
               <div style={{ padding: '20px 20px 12px' }}>
                 <ResponsiveContainer width="100%" height={260}>

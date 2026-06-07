@@ -138,8 +138,13 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     dateTo.setHours(23, 59, 59, 999);
     const dateFrom = from ? new Date(from) : new Date(new Date().getFullYear(), 0, 1);
 
+    // Trend spans the selected filter range (capped to 24 buckets so the chart stays readable)
+    const monthsInRange = (dateTo.getFullYear() - dateFrom.getFullYear()) * 12
+      + (dateTo.getMonth() - dateFrom.getMonth()) + 1;
+    const bucketCount = Math.min(Math.max(monthsInRange, 1), 24);
+
     const trendBuckets = [];
-    for (let i = 11; i >= 0; i--) {
+    for (let i = bucketCount - 1; i >= 0; i--) {
       const d = new Date(dateTo);
       d.setDate(1);
       d.setMonth(d.getMonth() - i);
