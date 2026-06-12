@@ -158,7 +158,7 @@ router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
       tx_ref: txRef,
       first_name: firstName || 'Clinic',
       last_name: rest.join(' ') || caseData.clinic.name || '-',
-      email: caseData.clinic.email || 'noreply@yealmaz.com',
+      email: caseData.clinic.email || 'clinic.payments@gmail.com',
       phone_number: caseData.clinic.phone || undefined,
       callback_url: `${process.env.APP_URL}/api/payments/chapa/webhook`,
       return_url: `${process.env.APP_URL}/api/payments/chapa/return/${caseData.id}`,
@@ -180,7 +180,7 @@ router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
 
     res.json({ success: true, checkoutUrl: response.data.checkout_url, txRef });
   } catch (err) {
-    console.error('[Chapa initialize]', err);
+    console.error('[Chapa initialize]', err.message, JSON.stringify(err.errors || err.cause || ''));
     res.status(500).json({ error: 'Could not start online payment. Please try again.' });
   }
 });
