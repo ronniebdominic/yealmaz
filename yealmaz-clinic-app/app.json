@@ -25,7 +25,13 @@
         "backgroundColor": "#0B1D3A"
       },
       "package": "com.yealmaz.clinic",
-      "permissions": ["CAMERA","READ_EXTERNAL_STORAGE","WRITE_EXTERNAL_STORAGE","INTERNET","ACCESS_NETWORK_STATE"],
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
       "versionCode": 3
     },
     "web": {
@@ -42,10 +48,14 @@
       "startUrl": "/"
     },
     "plugins": [
-      ["expo-image-picker", {
-        "photosPermission": "Allow Ye-Almaz Clinic to access your photos to upload payment screenshots.",
-        "cameraPermission": "Allow Ye-Almaz Clinic to use your camera to take payment photos."
-      }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Ye-Almaz Clinic to access your photos to upload payment screenshots.",
+          "cameraPermission": "Allow Ye-Almaz Clinic to use your camera to take payment photos."
+        }
+      ],
+      "expo-web-browser"
     ]
   }
 }

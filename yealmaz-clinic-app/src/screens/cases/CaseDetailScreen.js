@@ -7,6 +7,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import api, { API_BASE } from '../../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
@@ -137,6 +138,8 @@ export default function CaseDetailScreen({ navigation, route }) {
   const [uploading, setUploading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [screenshot, setScreenshot] = useState(null);
+  const [payingOnline, setPayingOnline] = useState(false);
+  const [showManualUpload, setShowManualUpload] = useState(false);
 
   const { data: caseData, isLoading: loading, isRefetching, error: loadError, refetch } = useQuery({
     queryKey: ['case', caseId],
@@ -237,6 +240,30 @@ export default function CaseDetailScreen({ navigation, route }) {
       Alert.alert('Upload Failed', err.message || 'Please try again.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const payOnline = async () => {
+    setPayingOnline(true);
+    try {
+      const res = await api.post(`/payments/${caseId}/chapa/initialize`);
+      const { checkoutUrl } = res.data;
+      if (!checkoutUrl) throw new Error('Could not start online payment.');
+
+      await WebBrowser.openBrowserAsync(checkoutUrl);
+
+      // After returning from the checkout, ask the server to confirm the result
+      const statusRes = await api.get(`/payments/chapa/status/${caseId}`);
+      if (statusRes.data?.paymentStatus === 'VERIFIED') {
+        Alert.alert('✅ Payment Successful', 'Your payment has been received. Thank you!');
+      }
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+    } catch (err) {
+      console.error('[Chapa] payment failed:', err);
+      Alert.alert('Payment Failed', err.response?.data?.error || err.message || 'Please try again.');
+    } finally {
+      setPayingOnline(false);
     }
   };
 
@@ -408,8 +435,35 @@ export default function CaseDetailScreen({ navigation, route }) {
                 </View>
               )}
 
-              {/* Upload section */}
+              {/* Pay Online with Chapa — primary option */}
               {canUploadPayment && (
+                <TouchableOpacity
+                  style={[styles.chapaBtn, payingOnline && { opacity: 0.7 }]}
+                  onPress={payOnline}
+                  disabled={payingOnline}
+                  activeOpacity={0.85}
+                >
+                  {payingOnline ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Text style={styles.chapaBtnIcon}>💳</Text>
+                      <Text style={styles.chapaBtnText}>Pay Online with Chapa</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* Manual screenshot upload — secondary/additional option */}
+              {canUploadPayment && !showManualUpload && (
+                <TouchableOpacity onPress={() => setShowManualUpload(true)} style={styles.secondaryOptionBtn}>
+                  <Text style={styles.secondaryOptionText}>
+                    {caseData.paymentStatus === 'REJECTED' ? 'Re-upload receipt manually instead' : 'Or upload payment receipt manually'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {canUploadPayment && showManualUpload && (
                 <View style={styles.uploadSection}>
                   <Text style={styles.uploadTitle}>
                     {caseData.paymentStatus === 'REJECTED' ? '🔄 Re-upload Receipt' : '📤 Upload Payment Receipt'}
@@ -633,6 +687,18 @@ const styles = StyleSheet.create({
   screenshotWrap: { marginBottom: Spacing.md },
   screenshotLabel: { fontSize: 12, fontWeight: '600', color: Colors.text3, marginBottom: 8 },
   screenshotImg: { width: '100%', height: 160, borderRadius: Radius.md, backgroundColor: Colors.border },
+
+  // Chapa online payment
+  chapaBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#1565C0', borderRadius: Radius.md,
+    paddingVertical: 14, marginBottom: Spacing.sm,
+    ...Shadow.sm,
+  },
+  chapaBtnIcon: { fontSize: 18 },
+  chapaBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  secondaryOptionBtn: { alignItems: 'center', paddingVertical: 10 },
+  secondaryOptionText: { fontSize: 13, fontWeight: '600', color: Colors.blue, textDecorationLine: 'underline' },
 
   // Upload
   uploadSection: {

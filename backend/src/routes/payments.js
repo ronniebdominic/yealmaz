@@ -3,11 +3,16 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
+const { Chapa } = require('chapa-nodejs');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+const chapa = process.env.CHAPA_SECRET_KEY
+  ? new Chapa({ secretKey: process.env.CHAPA_SECRET_KEY })
+  : null;
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -66,6 +71,176 @@ router.post('/:caseId/upload', protect, upload.single('screenshot'), async (req,
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Upload failed. Please try again.' });
+  }
+});
+
+// ── Chapa: shared helper to mark a payment VERIFIED ──────
+// Used by both the webhook and the in-app verify-on-return check.
+async function finalizeChapaPayment(txRef, io) {
+  const payment = await prisma.payment.findUnique({
+    where: { chapaTxRef: txRef },
+    include: { case: { include: { clinic: { select: { id: true, name: true } } } } }
+  });
+  if (!payment || !payment.case) return null;
+  if (payment.status === 'VERIFIED') return payment; // already processed
+
+  const verification = await chapa.verify({ tx_ref: txRef });
+  if (verification.status !== 'success' || verification.data?.status !== 'success') {
+    return null;
+  }
+
+  const caseData = payment.case;
+  const updatedPayment = await prisma.payment.update({
+    where: { caseId: caseData.id },
+    data: {
+      status: 'VERIFIED',
+      verifiedAt: new Date(),
+      invoiceNumber: payment.invoiceNumber || `INV-${caseData.caseNumber}`,
+      invoiceIssuedAt: payment.invoiceIssuedAt || new Date(),
+    }
+  });
+
+  const updatedCase = await prisma.case.update({
+    where: { id: caseData.id },
+    data: { paymentStatus: 'VERIFIED', status: 'READY_TO_DISPATCH' }
+  });
+
+  await prisma.caseStage.create({
+    data: {
+      caseId: caseData.id,
+      stageName: 'READY_TO_DISPATCH',
+      scannedBy: 'Chapa (Online Payment)',
+      notes: `Payment verified via Chapa — invoice ${updatedPayment.invoiceNumber} issued — case ready for dispatch`
+    }
+  });
+
+  await invalidate(`case:${caseData.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+
+  io?.to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
+    caseId: caseData.id,
+    caseNumber: caseData.caseNumber,
+    action: 'APPROVE',
+    message: 'Your online payment was successful. Your case is ready for dispatch!'
+  });
+
+  return updatedPayment;
+}
+
+// ── POST /api/payments/:caseId/chapa/initialize ──────────
+// Clinic starts an online payment for a case with a pending payment request
+router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
+  try {
+    if (!chapa) return res.status(503).json({ error: 'Online payments are not configured yet.' });
+
+    const caseData = await prisma.case.findUnique({
+      where: { id: req.params.caseId },
+      include: { clinic: true, payment: true }
+    });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (req.user.role === 'CLINIC' && caseData.clinicId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    const amount = caseData.payment?.amount ?? caseData.totalAmount;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'No amount due for this case.' });
+    }
+    if (!['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus)) {
+      return res.status(400).json({ error: 'This case is not awaiting payment.' });
+    }
+
+    const txRef = chapa.genTxRef({ prefix: 'YDL' });
+    const [firstName, ...rest] = (caseData.clinic.name || 'Clinic').split(' ');
+
+    const response = await chapa.initialize({
+      amount: String(amount),
+      currency: 'ETB',
+      tx_ref: txRef,
+      first_name: firstName || 'Clinic',
+      last_name: rest.join(' ') || caseData.clinic.name || '-',
+      email: caseData.clinic.email || 'noreply@yealmaz.com',
+      phone_number: caseData.clinic.phone || undefined,
+      callback_url: `${process.env.APP_URL}/api/payments/chapa/webhook`,
+      return_url: `${process.env.APP_URL}/api/payments/chapa/return/${caseData.id}`,
+      customization: {
+        title: 'Ye-Almaz Lab',
+        description: `Payment for case ${caseData.caseNumber}`,
+      },
+    });
+
+    if (response.status !== 'success' || !response.data?.checkout_url) {
+      return res.status(502).json({ error: 'Could not start online payment. Please try again.' });
+    }
+
+    await prisma.payment.upsert({
+      where: { caseId: caseData.id },
+      update: { chapaTxRef: txRef, chapaCheckoutUrl: response.data.checkout_url },
+      create: { caseId: caseData.id, chapaTxRef: txRef, chapaCheckoutUrl: response.data.checkout_url, amount }
+    });
+
+    res.json({ success: true, checkoutUrl: response.data.checkout_url, txRef });
+  } catch (err) {
+    console.error('[Chapa initialize]', err);
+    res.status(500).json({ error: 'Could not start online payment. Please try again.' });
+  }
+});
+
+// ── POST /api/payments/chapa/webhook ─────────────────────
+// Public endpoint called by Chapa when a transaction completes
+router.post('/chapa/webhook', express.json(), async (req, res) => {
+  try {
+    if (!chapa) return res.status(503).end();
+
+    const signature = req.headers['chapa-signature'] || req.headers['x-chapa-signature'];
+    if (process.env.CHAPA_WEBHOOK_SECRET && signature) {
+      const valid = chapa.verifyWebhook(req.body, signature);
+      if (!valid) return res.status(401).end();
+    }
+
+    const txRef = req.body?.tx_ref;
+    if (txRef) await finalizeChapaPayment(txRef, req.app.get('io'));
+
+    res.status(200).end();
+  } catch (err) {
+    console.error('[Chapa webhook]', err);
+    res.status(200).end(); // ack so Chapa doesn't retry indefinitely
+  }
+});
+
+// ── GET /api/payments/chapa/return/:caseId ───────────────
+// Browser redirect target after the Chapa checkout completes
+router.get('/chapa/return/:caseId', async (req, res) => {
+  try {
+    const payment = await prisma.payment.findUnique({ where: { caseId: req.params.caseId } });
+    if (chapa && payment?.chapaTxRef) await finalizeChapaPayment(payment.chapaTxRef, req.app.get('io'));
+  } catch (err) {
+    console.error('[Chapa return]', err);
+  }
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Payment</title>
+  <style>body{font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0f1729;color:#fff;text-align:center}</style>
+  </head><body><div><h2>✅ Thank you</h2><p>You can return to the Ye-Almaz app now.</p></div></body></html>`);
+});
+
+// ── GET /api/payments/chapa/status/:caseId ───────────────
+// Polled by the app after returning from the checkout to confirm verification
+router.get('/chapa/status/:caseId', protect, async (req, res) => {
+  try {
+    const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (req.user.role === 'CLINIC' && caseData.clinicId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied.' });
+    }
+
+    const payment = await prisma.payment.findUnique({ where: { caseId: req.params.caseId } });
+    if (chapa && payment?.chapaTxRef && payment.status !== 'VERIFIED') {
+      await finalizeChapaPayment(payment.chapaTxRef, req.app.get('io'));
+    }
+
+    const refreshed = await prisma.case.findUnique({ where: { id: req.params.caseId } });
+    res.json({ paymentStatus: refreshed.paymentStatus });
+  } catch (err) {
+    console.error('[Chapa status]', err);
+    res.status(500).json({ error: 'Could not check payment status.' });
   }
 });
 
