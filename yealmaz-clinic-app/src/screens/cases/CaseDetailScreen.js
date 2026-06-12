@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   RefreshControl, StatusBar, ActivityIndicator, Alert,
-  Image, Platform,
+  Image, Platform, Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
@@ -250,7 +250,12 @@ export default function CaseDetailScreen({ navigation, route }) {
       const { checkoutUrl } = res.data;
       if (!checkoutUrl) throw new Error('Could not start online payment.');
 
-      await WebBrowser.openBrowserAsync(checkoutUrl);
+      if (Platform.OS === 'web') {
+        // Open in a new tab; the user returns to this tab manually afterwards
+        window.open(checkoutUrl, '_blank');
+      } else {
+        await WebBrowser.openBrowserAsync(checkoutUrl);
+      }
 
       // After returning from the checkout, ask the server to confirm the result
       const statusRes = await api.get(`/payments/chapa/status/${caseId}`);
