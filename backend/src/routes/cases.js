@@ -10,10 +10,18 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 async function generateCaseNumber() {
-  const year = new Date().getFullYear();
-  const count = await prisma.case.count();
-  const padded = String(count + 1).padStart(4, '0');
-  return `YAL-${year}-${padded}`;
+  const yy = String(new Date().getFullYear()).slice(-2);
+  const prefix = `YDL${yy}`;
+
+  const last = await prisma.case.findFirst({
+    where: { caseNumber: { startsWith: prefix } },
+    orderBy: { caseNumber: 'desc' },
+    select: { caseNumber: true },
+  });
+
+  const lastNum = last ? parseInt(last.caseNumber.slice(prefix.length), 10) || 0 : 0;
+  const padded = String(lastNum + 1).padStart(6, '0');
+  return `${prefix}${padded}`;
 }
 
 // ── Auto due-date rules ───────────────────────────────────
