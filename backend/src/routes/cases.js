@@ -147,7 +147,8 @@ router.post('/', protect, async (req, res) => {
   try {
     const {
       patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
-      toothNumbers, units, shade, notes, remake, remakeReason, dueDate, totalAmount, deliveryType, deliveryDate
+      toothNumbers, units, shade, notes, remake, remakeReason, dueDate, totalAmount, deliveryType, deliveryDate,
+      dropOffAtLab
     } = req.body;
 
     if (!patientName || !workType) {
@@ -193,7 +194,7 @@ router.post('/', protect, async (req, res) => {
         deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
         clinicId,
         receptionistId: req.user.role === 'RECEPTIONIST' ? req.user.id : null,
-        status: deliveryDate ? 'DELIVERED' : 'PENDING_PICKUP'
+        status: deliveryDate ? 'DELIVERED' : (dropOffAtLab ? 'CASE_ACCEPTED' : 'PENDING_PICKUP')
       }
     });
 
@@ -212,9 +213,13 @@ router.post('/', protect, async (req, res) => {
     await prisma.caseStage.create({
       data: {
         caseId: newCase.id,
-        stageName: 'PENDING_PICKUP',
+        stageName: newCase.status,
         scannedBy: req.user.name,
-        notes: 'Case registered — awaiting impression pickup'
+        notes: deliveryDate
+          ? 'Case registered as historical/delivered'
+          : dropOffAtLab
+            ? 'Case dropped off at lab directly'
+            : 'Case registered — awaiting impression pickup'
       }
     });
 

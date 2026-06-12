@@ -169,7 +169,7 @@ export default function NewCase() {
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
     doctorPhone: '', patientGender: '',
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
-    deliveryType: 'NORMAL', deliveryDate: '',
+    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
   });
 
   const { data: pricesData = [] } = useQuery({
@@ -255,6 +255,7 @@ export default function NewCase() {
         toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
         units: resolvedUnits,
         deliveryDate: form.deliveryDate || undefined,
+        dropOffAtLab: form.intakeMethod === 'DROP_OFF',
       });
       toast.success(`Case ${res.data.caseNumber} created!`);
       navigate('/cases');
@@ -374,6 +375,38 @@ export default function NewCase() {
                     </optgroup>
                   ))}
                 </select>
+              </div>
+
+              {/* Intake Method */}
+              <div className="form-group">
+                <label>Intake Method</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {[
+                    { value: 'PICKUP',   label: 'To Be Picked Up', icon: '🛵', desc: 'Delivery exec will collect from clinic' },
+                    { value: 'DROP_OFF', label: 'Dropped at Lab',  icon: '📥', desc: 'Impression already received at lab' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, intakeMethod: opt.value }))}
+                      style={{
+                        flex: 1, display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                        border: `2px solid ${form.intakeMethod === opt.value ? 'var(--blue)' : 'var(--border)'}`,
+                        background: form.intakeMethod === opt.value ? 'var(--blue-dim, #EEF2FF)' : 'var(--surface)',
+                        transition: 'border-color .15s, background .15s',
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: form.intakeMethod === opt.value ? 'var(--blue)' : 'var(--text-1)' }}>
+                          {opt.label}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Delivery Type */}

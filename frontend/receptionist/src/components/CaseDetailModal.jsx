@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const STATUSES = [
+  'PENDING_PICKUP', 'PICKUP_ASSIGNED',
   'CASE_ACCEPTED',
   'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
   'SCANNING', 'DESIGNING',
@@ -17,6 +18,8 @@ const STATUSES = [
 ];
 
 const STATUS_LABELS = {
+  PENDING_PICKUP:            'Awaiting Pickup',
+  PICKUP_ASSIGNED:           'Pickup Assigned',
   CASE_ACCEPTED:             'Case Accepted',
   PLASTER_DEPARTMENT:        'Plaster Department',
   MARGIN_DEPARTMENT:         'Margin Department',
