@@ -9,14 +9,20 @@ import QRScanner from '../components/QRScanner';
 
 // ── Confirm modal ────────────────────────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
-  const isCollect  = action === 'collect';
-  const isPickup   = action === 'pickup';
-  const title      = isCollect ? '🛵 Confirm Impression Collected'
-                   : isPickup  ? '📦 Confirm Pickup from Lab'
-                   :             '✅ Confirm Delivery';
-  const description = isCollect ? 'Confirm you have collected the impression/cast from the clinic and brought it to the lab.'
-                    : isPickup  ? 'Confirm you have picked up this case from the lab for delivery.'
-                    :             'Confirm this case has been delivered to the clinic.';
+  const isCollect       = action === 'collect';
+  const isPickup        = action === 'pickup';
+  const isNotPickedUp   = action === 'not_picked_up';
+  const isReturnND      = action === 'return_not_delivered';
+  const title = isCollect     ? '🛵 Confirm Impression Collected'
+              : isPickup      ? '📦 Confirm Pickup from Lab'
+              : isNotPickedUp ? '✕ Mark as Not Picked Up'
+              : isReturnND    ? '↩ Return — Not Delivered'
+              :                 '✅ Confirm Delivery';
+  const description = isCollect     ? 'Confirm you have collected the impression/cast from the clinic and brought it to the lab.'
+                    : isPickup      ? 'Confirm you have picked up this case from the lab for delivery.'
+                    : isNotPickedUp ? 'This will revert the case back to Awaiting Pickup so it can be reassigned.'
+                    : isReturnND    ? 'This will return the case to Ready to Dispatch so it can be re-assigned for delivery.'
+                    :                 'Confirm this case has been delivered to the clinic.';
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
@@ -51,7 +57,7 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
               onClick={onConfirm}
               disabled={loading}
             >
-              {loading ? 'Processing…' : isCollect ? '🏭 Impression at Lab' : isPickup ? '📦 Confirm Pickup' : '✅ Mark Delivered'}
+              {loading ? 'Processing…' : isCollect ? '🏭 Impression at Lab' : isPickup ? '📦 Confirm Pickup' : isNotPickedUp ? '✕ Not Picked Up' : isReturnND ? '↩ Return to Lab' : '✅ Mark Delivered'}
             </button>
           </div>
         </div>
@@ -123,6 +129,12 @@ export default function DeliveryDashboard() {
       } else if (action === 'pickup') {
         await api.post(`/delivery/${c.id}/pickup`);
         toast.success('📦 Pickup confirmed!');
+      } else if (action === 'not_picked_up') {
+        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: 'Not picked up — returned to awaiting pickup queue' });
+        toast.success('↩ Case returned to pickup queue');
+      } else if (action === 'return_not_delivered') {
+        await api.patch(`/cases/${c.id}/status`, { status: 'READY_TO_DISPATCH', notes: 'Return — not delivered; back to dispatch queue' });
+        toast.success('↩ Case returned to dispatch queue');
       } else {
         await api.post(`/delivery/${c.id}/deliver`);
         toast.success('✅ Delivery confirmed!');
@@ -298,9 +310,14 @@ export default function DeliveryDashboard() {
                       <StatusBadge status={c.status} />
                     </div>
                     {c.status === 'PICKUP_ASSIGNED' && (
-                      <button className="btn btn-sm" style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }} onClick={() => setModal({ case: c, action: 'collect' })}>
-                        🛵 Impression Collected from Clinic
-                      </button>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="btn btn-sm" style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }} onClick={() => setModal({ case: c, action: 'collect' })}>
+                          🛵 Impression Collected from Clinic
+                        </button>
+                        <button className="btn btn-sm" style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)' }} onClick={() => setModal({ case: c, action: 'not_picked_up' })}>
+                          ✕ Not Picked Up
+                        </button>
+                      </div>
                     )}
                     {c.status === 'READY_TO_DISPATCH' && (
                       <button className="btn btn-primary btn-sm" onClick={() => setModal({ case: c, action: 'pickup' })}>
@@ -308,9 +325,14 @@ export default function DeliveryDashboard() {
                       </button>
                     )}
                     {c.status === 'OUT_FOR_DELIVERY' && (
-                      <button className="btn btn-success btn-sm" onClick={() => setModal({ case: c, action: 'deliver' })}>
-                        ✅ Mark Delivered
-                      </button>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="btn btn-success btn-sm" onClick={() => setModal({ case: c, action: 'deliver' })}>
+                          ✅ Mark Delivered
+                        </button>
+                        <button className="btn btn-sm" style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)' }} onClick={() => setModal({ case: c, action: 'return_not_delivered' })}>
+                          ↩ Return — Not Delivered
+                        </button>
+                      </div>
                     )}
                     {c.status === 'DELIVERED' && (
                       <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 500 }}>

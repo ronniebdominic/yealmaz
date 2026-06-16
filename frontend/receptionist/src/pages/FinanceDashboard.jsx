@@ -22,6 +22,13 @@ const fetchHistory = (page, search = '') =>
   api.get(`/payments/history?page=${page}&limit=${HIST_SIZE}${search ? `&search=${encodeURIComponent(search)}` : ''}`).then(r => r.data);
 const fetchTrusted = (page, search = '') =>
   api.get(`/payments/trusted?page=${page}&limit=${HIST_SIZE}${search ? `&search=${encodeURIComponent(search)}` : ''}`).then(r => r.data);
+const fetchFinanceReport = ({ from, to, search } = {}) => {
+  const params = new URLSearchParams();
+  if (from)   params.set('from', from);
+  if (to)     params.set('to', to);
+  if (search) params.set('search', search);
+  return api.get(`/dashboard/finance-report?${params}`).then(r => r.data);
+};
 
 // ── Lab info constant ─────────────────────────────────────
 const LAB = {
@@ -1266,12 +1273,245 @@ function HistoryTab() {
   );
 }
 
+// ── Revenue Report Tab ────────────────────────────────────
+function ReportTab() {
+  const [from, setFrom]       = useState('');
+  const [to, setTo]           = useState('');
+  const [search, setSearch]   = useState('');
+  const [applied, setApplied] = useState({ from: '', to: '', search: '' });
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['finance-report', applied],
+    queryFn: () => fetchFinanceReport(applied),
+    staleTime: 60_000,
+  });
+
+  const apply = () => setApplied({ from, to, search });
+  const clear  = () => { setFrom(''); setTo(''); setSearch(''); setApplied({ from: '', to: '', search: '' }); };
+
+  const r  = data?.revenue  || {};
+  const u  = data?.units    || {};
+  const pend = data?.pending || {};
+
+  const fmtBr = (n) => `Br ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  return (
+    <>
+      {/* Filter bar */}
+      <div className="card" style={{ marginBottom: 20, padding: '16px 20px' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>From</div>
+            <input type="date" className="input" value={from} onChange={e => setFrom(e.target.value)}
+              style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>To</div>
+            <input type="date" className="input" value={to} onChange={e => setTo(e.target.value)}
+              style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>Search clinic / case no.</div>
+            <input type="text" placeholder="Clinic name or case number…" value={search} onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={apply}>Apply</button>
+            {(applied.from || applied.to || applied.search) && (
+              <button className="btn btn-ghost btn-sm" onClick={clear}>Clear</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {isLoading && <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading report…</div>}
+      {isError  && <div style={{ padding: 40, textAlign: 'center', color: 'var(--red)' }}>Failed to load report.</div>}
+
+      {data && (
+        <>
+          {/* Revenue KPI row */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+            Revenue
+          </div>
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 24 }}>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📅</div>
+              <div className="stat-label">Today</div>
+              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (r.daily?.amount || 0) >= 100000 ? 17 : 22 }}>
+                {fmtBr(r.daily?.amount)}
+              </div>
+              <div className="stat-sub">{r.daily?.count || 0} payment{r.daily?.count !== 1 ? 's' : ''}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📆</div>
+              <div className="stat-label">Month to Date</div>
+              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (r.MTD?.amount || 0) >= 100000 ? 17 : 22 }}>
+                {fmtBr(r.MTD?.amount)}
+              </div>
+              <div className="stat-sub">{r.MTD?.count || 0} payments</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🗓️</div>
+              <div className="stat-label">Year to Date</div>
+              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (r.YTD?.amount || 0) >= 100000 ? 17 : 22 }}>
+                {fmtBr(r.YTD?.amount)}
+              </div>
+              <div className="stat-sub">{r.YTD?.count || 0} payments</div>
+            </div>
+            {(applied.from || applied.to) ? (
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#EFF6FF' }}>🔍</div>
+                <div className="stat-label">Selected Range</div>
+                <div className="stat-value" style={{ color: 'var(--blue)', fontSize: (r.range?.amount || 0) >= 100000 ? 17 : 22 }}>
+                  {fmtBr(r.range?.amount)}
+                </div>
+                <div className="stat-sub">{r.range?.count || 0} payments</div>
+              </div>
+            ) : (
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+                <div className="stat-label">Pending</div>
+                <div className="stat-value" style={{ color: 'var(--red)', fontSize: (pend.amount || 0) >= 100000 ? 17 : 22 }}>
+                  {fmtBr(pend.amount)}
+                </div>
+                <div className="stat-sub">{pend.count || 0} unpaid cases</div>
+              </div>
+            )}
+          </div>
+
+          {/* Units KPI row */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+            Units Delivered
+          </div>
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
+              <div className="stat-label">Today</div>
+              <div className="stat-value">{u.daily || 0}</div>
+              <div className="stat-sub">units</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
+              <div className="stat-label">Month to Date</div>
+              <div className="stat-value">{u.MTD || 0}</div>
+              <div className="stat-sub">units</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
+              <div className="stat-label">Year to Date</div>
+              <div className="stat-value">{u.YTD || 0}</div>
+              <div className="stat-sub">units</div>
+            </div>
+          </div>
+
+          {/* Verified payments table */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <div className="card-title">✅ Verified Payments {applied.from || applied.to ? '(filtered)' : ''}</div>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentVerified?.length || 0} records</span>
+            </div>
+            <div className="table-wrap">
+              {!data.recentVerified?.length ? (
+                <div className="empty-state">
+                  <div className="empty-icon">💸</div>
+                  <div className="empty-title">No verified payments</div>
+                  <p>No payments match the selected filters.</p>
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Case #</th>
+                      <th>Clinic</th>
+                      <th>Patient</th>
+                      <th>Work Type</th>
+                      <th>Invoice</th>
+                      <th>Amount</th>
+                      <th>Verified</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentVerified.map(p => (
+                      <tr key={p.id}>
+                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{p.case?.caseNumber}</td>
+                        <td style={{ fontSize: 13 }}>{p.case?.clinic?.name}</td>
+                        <td style={{ fontWeight: 600 }}>{p.case?.patientName}</td>
+                        <td style={{ fontSize: 13 }}>{p.case?.workType}</td>
+                        <td style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>{p.invoiceNumber || '—'}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--green)' }}>
+                          {p.amount ? `Br ${p.amount.toLocaleString('en-US')}` : '—'}
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                          {p.verifiedAt ? format(new Date(p.verifiedAt), 'dd MMM yyyy') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Pending payments table */}
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">⏳ Pending Payments</div>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentPending?.length || 0} records</span>
+            </div>
+            <div className="table-wrap">
+              {!data.recentPending?.length ? (
+                <div className="empty-state">
+                  <div className="empty-icon">🎉</div>
+                  <div className="empty-title">No pending payments</div>
+                  <p>All payments are up to date.</p>
+                </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Case #</th>
+                      <th>Clinic</th>
+                      <th>Patient</th>
+                      <th>Work Type</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentPending.map(p => (
+                      <tr key={p.id}>
+                        <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{p.case?.caseNumber}</td>
+                        <td style={{ fontSize: 13 }}>{p.case?.clinic?.name}</td>
+                        <td style={{ fontWeight: 600 }}>{p.case?.patientName}</td>
+                        <td style={{ fontSize: 13 }}>{p.case?.workType}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--amber)' }}>
+                          {p.amount ? `Br ${p.amount.toLocaleString('en-US')}` : '—'}
+                        </td>
+                        <td><PaymentBadge status={p.status} /></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                          {p.updatedAt ? format(new Date(p.updatedAt), 'dd MMM yyyy') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 // ── Main Finance Dashboard ────────────────────────────────
 const MAIN_TABS = [
   { id: 'screenshots', label: 'Screenshot Approvals', icon: '💳' },
   { id: 'billing',     label: 'Billing & Invoicing',   icon: '📄' },
   { id: 'trusted',     label: 'Trusted Partners',      icon: '🤝' },
   { id: 'history',     label: 'Verified History',      icon: '✅' },
+  { id: 'report',      label: 'Revenue Report',         icon: '📊' },
 ];
 
 export default function FinanceDashboard() {
@@ -1309,6 +1549,13 @@ export default function FinanceDashboard() {
     refetchInterval: 120_000,
   });
   const trustedCount = trustedData?.pagination?.total ?? 0;
+
+  const { data: quickReport } = useQuery({
+    queryKey: ['finance-report', { from: '', to: '', search: '' }],
+    queryFn: () => fetchFinanceReport({}),
+    staleTime: 120_000,
+    refetchInterval: 120_000,
+  });
 
   const toInvoiceCount = billing.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount).length;
   const uploadedCount  = billing.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED').length;
@@ -1355,6 +1602,10 @@ export default function FinanceDashboard() {
           </button>
           <button className={`nav-item${tab === 'history' ? ' active' : ''}`} onClick={() => setTabAndClose('history')}>
             <span>✅</span> Verified History
+          </button>
+          <div className="nav-section-label">Analytics</div>
+          <button className={`nav-item${tab === 'report' ? ' active' : ''}`} onClick={() => setTabAndClose('report')}>
+            <span>📊</span> Revenue Report
           </button>
         </nav>
         <div className="drawer-footer">
@@ -1413,6 +1664,14 @@ export default function FinanceDashboard() {
           >
             <span>✅</span> Verified History
           </button>
+
+          <div className="nav-section-label">Analytics</div>
+          <button
+            className={`nav-item ${tab === 'report' ? 'active' : ''}`}
+            onClick={() => setTab('report')}
+          >
+            <span>📊</span> Revenue Report
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -1442,8 +1701,49 @@ export default function FinanceDashboard() {
         </div>
 
         <div className="content">
-          {/* ── KPI row ─────────────────────────────────── */}
-          <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(5,1fr)' }}>
+          {/* ── KPI rows ─────────────────────────────────── */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+            Today's Finance Overview
+          </div>
+          <div className="stats-grid" style={{ marginBottom: 8, gridTemplateColumns: 'repeat(4,1fr)' }}>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💵</div>
+              <div className="stat-label">Paid Today</div>
+              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 16 : 22 }}>
+                Br {(quickReport?.revenue?.daily?.amount || 0).toLocaleString('en-US')}
+              </div>
+              <div className="stat-sub">{quickReport?.paid?.today || 0} payments verified</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+              <div className="stat-label">This Month</div>
+              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (stats.thisMonthRevenue || 0) >= 100000 ? 16 : 22 }}>
+                Br {(stats.thisMonthRevenue || 0).toLocaleString('en-US')}
+              </div>
+              <div className="stat-sub">Verified revenue MTD</div>
+            </div>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+              <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+              <div className="stat-label">Pending</div>
+              <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 16 : 22 }}>
+                Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
+              </div>
+              <div className="stat-sub">{quickReport?.pending?.count || 0} unpaid cases</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: revenueGrowth != null && revenueGrowth >= 0 ? 'var(--green-dim)' : 'var(--red-dim)' }}>📈</div>
+              <div className="stat-label">Revenue Growth</div>
+              <div className="stat-value" style={{ color: revenueGrowth != null && revenueGrowth >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 24 }}>
+                {revenueGrowth != null ? `${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%` : '—'}
+              </div>
+              <div className="stat-sub">vs last month</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 10px' }}>
+            Work Queue
+          </div>
+          <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(3,1fr)' }}>
             <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
               <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📸</div>
               <div className="stat-label">Pending Approvals</div>
@@ -1464,22 +1764,6 @@ export default function FinanceDashboard() {
               <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedCount}</div>
               <div className="stat-sub">Pending collection</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
-              <div className="stat-label">This Month</div>
-              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (stats.thisMonthRevenue || 0) >= 100000 ? 18 : 24 }}>
-                Br {(stats.thisMonthRevenue || 0).toLocaleString('en-US')}
-              </div>
-              <div className="stat-sub">Verified revenue</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: revenueGrowth != null && revenueGrowth >= 0 ? 'var(--green-dim)' : 'var(--red-dim)' }}>📈</div>
-              <div className="stat-label">Revenue Growth</div>
-              <div className="stat-value" style={{ color: revenueGrowth != null && revenueGrowth >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 24 }}>
-                {revenueGrowth != null ? `${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%` : '—'}
-              </div>
-              <div className="stat-sub">vs last month</div>
-            </div>
           </div>
 
           {/* ── Tab content ─────────────────────────────── */}
@@ -1487,6 +1771,7 @@ export default function FinanceDashboard() {
           {tab === 'billing'     && <BillingTab queryClient={queryClient} />}
           {tab === 'trusted'     && <TrustedPartnersTab queryClient={queryClient} />}
           {tab === 'history'     && <HistoryTab />}
+          {tab === 'report'      && <ReportTab />}
         </div>
       </main>
     </div>

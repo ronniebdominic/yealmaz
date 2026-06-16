@@ -8,20 +8,22 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 // ── GET /api/dashboard/summary ───────────────────────────
-router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
   const cacheKey = 'dashboard:summary';
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
     const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
 
     const [
       totalCases, pendingCases, completedCases, activeCases, pendingPickups,
-      pendingPayments, thisMonthRevenue, lastMonthRevenue, recentCases
+      pendingPayments, thisMonthRevenue, lastMonthRevenue, recentCases,
+      todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch
     ] = await Promise.all([
       prisma.case.count(),
       prisma.case.count({ where: { status: { notIn: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED'] } } }),
@@ -31,7 +33,12 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
       prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfMonth } }, _sum: { amount: true } }),
       prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
-      prisma.case.findMany({ take: 10, orderBy: { createdAt: 'desc' }, include: { clinic: { select: { name: true } }, payment: true } })
+      prisma.case.findMany({ take: 10, orderBy: { createdAt: 'desc' }, include: { clinic: { select: { name: true } }, payment: true } }),
+      prisma.case.count({ where: { createdAt: { gte: startOfToday } } }),
+      prisma.case.count({ where: { remake: true, status: { notIn: ['DELIVERED', 'CANCELLED'] } } }),
+      prisma.case.count({ where: { status: 'REMAKE' } }),
+      prisma.case.count({ where: { deliveryDate: { gte: startOfToday } } }),
+      prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
     ]);
 
     const thisMonthAmt = thisMonthRevenue._sum.amount || 0;
@@ -41,7 +48,11 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
       : null;
 
     const result = {
-      stats: { totalCases, pendingCases, completedCases, activeCases, pendingPickups, pendingPayments, thisMonthRevenue: thisMonthAmt, lastMonthRevenue: lastMonthAmt, revenueGrowth },
+      stats: {
+        totalCases, pendingCases, completedCases, activeCases, pendingPickups, pendingPayments,
+        thisMonthRevenue: thisMonthAmt, lastMonthRevenue: lastMonthAmt, revenueGrowth,
+        todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch,
+      },
       recentCases
     };
 
@@ -90,6 +101,80 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
     res.json(months);
   } catch (err) {
     res.status(500).json({ error: 'Could not load revenue data.' });
+  }
+});
+
+// ── GET /api/dashboard/finance-report ───────────────────
+// Returns revenue + pending summaries for Finance dashboard (daily/MTD/YTD)
+router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    const { from, to, search } = req.query;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear  = new Date(now.getFullYear(), 0, 1);
+
+    const dateFrom = from ? new Date(from) : startOfYear;
+    const dateTo   = to   ? (() => { const d = new Date(to); d.setHours(23,59,59,999); return d; })() : now;
+
+    const searchWhere = search ? {
+      OR: [
+        { case: { clinic: { name: { contains: search, mode: 'insensitive' } } } },
+        { case: { patientName: { contains: search, mode: 'insensitive' } } },
+        { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
+      ]
+    } : {};
+
+    const [
+      revenueDaily, revenueMTD, revenueYTD, revenueRange,
+      unitsDaily, unitsMTD, unitsYTD,
+      paidToday, pendingCount, pendingAmount,
+      recentVerified, recentPending,
+    ] = await Promise.all([
+      prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfToday }, ...searchWhere }, _sum: { amount: true }, _count: true }),
+      prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfMonth }, ...searchWhere }, _sum: { amount: true }, _count: true }),
+      prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfYear }, ...searchWhere }, _sum: { amount: true }, _count: true }),
+      prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: dateFrom, lte: dateTo }, ...searchWhere }, _sum: { amount: true }, _count: true }),
+      prisma.case.aggregate({ where: { deliveryDate: { gte: startOfToday } }, _sum: { units: true } }),
+      prisma.case.aggregate({ where: { deliveryDate: { gte: startOfMonth } }, _sum: { units: true } }),
+      prisma.case.aggregate({ where: { deliveryDate: { gte: startOfYear } }, _sum: { units: true } }),
+      prisma.payment.count({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfToday } } }),
+      prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } } }),
+      prisma.payment.aggregate({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } }, _sum: { amount: true } }),
+      prisma.payment.findMany({
+        where: { status: 'VERIFIED', verifiedAt: { gte: dateFrom, lte: dateTo }, ...searchWhere },
+        include: { case: { include: { clinic: { select: { name: true } } } } },
+        orderBy: { verifiedAt: 'desc' },
+        take: 50,
+      }),
+      prisma.payment.findMany({
+        where: { status: { in: ['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, ...searchWhere },
+        include: { case: { include: { clinic: { select: { name: true } } } } },
+        orderBy: { updatedAt: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    res.json({
+      revenue: {
+        daily:  { amount: revenueDaily._sum.amount || 0, count: revenueDaily._count },
+        MTD:    { amount: revenueMTD._sum.amount   || 0, count: revenueMTD._count },
+        YTD:    { amount: revenueYTD._sum.amount   || 0, count: revenueYTD._count },
+        range:  { amount: revenueRange._sum.amount || 0, count: revenueRange._count },
+      },
+      units: {
+        daily: unitsDaily._sum.units || 0,
+        MTD:   unitsMTD._sum.units   || 0,
+        YTD:   unitsYTD._sum.units   || 0,
+      },
+      paid: { today: paidToday },
+      pending: { count: pendingCount, amount: pendingAmount._sum.amount || 0 },
+      recentVerified,
+      recentPending,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load finance report.' });
   }
 });
 

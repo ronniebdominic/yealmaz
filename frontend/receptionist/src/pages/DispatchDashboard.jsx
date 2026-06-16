@@ -103,6 +103,10 @@ export default function DispatchDashboard() {
   const [executives, setExecutives] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [modal, setModal]           = useState(null);   // { case, mode: 'pickup'|'delivery' }
+  const [payModal, setPayModal]     = useState(null);   // case for request-payment modal
+  const [payAmount, setPayAmount]   = useState('');
+  const [payNotes, setPayNotes]     = useState('');
+  const [payLoading, setPayLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [tab, setTab]               = useState('pickups'); // pickups | queue | enroute | delivered | stations
   const [search, setSearch]         = useState('');
@@ -163,6 +167,21 @@ export default function DispatchDashboard() {
       toast.error(err.response?.data?.error || 'Assignment failed');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleRequestPayment = async () => {
+    if (!payModal || !payAmount || parseFloat(payAmount) <= 0) return;
+    setPayLoading(true);
+    try {
+      await api.post(`/payments/${payModal.id}/request`, { amount: payAmount, notes: payNotes });
+      toast.success('💳 Payment request sent to clinic!');
+      setPayModal(null); setPayAmount(''); setPayNotes('');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send payment request');
+    } finally {
+      setPayLoading(false);
     }
   };
 
@@ -511,6 +530,15 @@ export default function DispatchDashboard() {
                           {c.assignedDelivery ? '↻ Reassign' : '+ Assign'}
                         </button>
                       )}
+                      {c.status === 'READY_TO_DISPATCH' && !['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(c.paymentStatus) && (
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}
+                          onClick={() => { setPayModal(c); setPayAmount(c.payment?.amount || c.totalAmount || ''); setPayNotes(''); }}
+                        >
+                          💳 Request Payment
+                        </button>
+                      )}
                       {c.assignedDelivery && c.status !== 'DELIVERED' && (
                         <button
                           className="btn btn-ghost btn-sm"
@@ -546,6 +574,56 @@ export default function DispatchDashboard() {
           loading={processing}
           mode={modal.mode}
         />
+      )}
+
+      {/* Request Payment Modal */}
+      {payModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPayModal(null)}>
+          <div className="modal">
+            <div className="modal-header">
+              <div className="modal-title">💳 Request Payment</div>
+              <button className="modal-close" onClick={() => setPayModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18, border: '1px solid var(--border)' }}>
+                <div className="case-number" style={{ marginBottom: 4 }}>{payModal.caseNumber}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{payModal.patientName}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{payModal.workType} · {payModal.clinic?.name}</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Amount (Br) *</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  placeholder="e.g. 1500"
+                  value={payAmount}
+                  onChange={e => setPayAmount(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label className="form-label">Payment Instructions (optional)</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="Bank name, account number, etc."
+                  value={payNotes}
+                  onChange={e => setPayNotes(e.target.value)}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setPayModal(null)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleRequestPayment}
+                disabled={payLoading || !payAmount || parseFloat(payAmount) <= 0}
+              >
+                {payLoading ? 'Sending…' : 'Send Request'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sign out FAB */}

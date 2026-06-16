@@ -293,7 +293,7 @@ router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), a
 });
 
 // ── PATCH /api/cases/:id/status ──────────────────────────
-router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY'), async (req, res) => {
   try {
     const { status, notes } = req.body;
 

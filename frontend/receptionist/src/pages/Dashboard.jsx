@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Layout from '../components/Layout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api from '../api';
@@ -6,13 +7,23 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
+const fetchReady   = () => api.get('/cases', { params: { status: 'READY_TO_DISPATCH', limit: 50 } }).then(r => r.data.cases ?? []);
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+
   const { data: summary, isLoading } = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: fetchSummary,
     staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
+  const { data: readyCases = [] } = useQuery({
+    queryKey: ['cases', 'ready-to-dispatch'],
+    queryFn: fetchReady,
+    staleTime: 30_000,
     refetchInterval: 60_000,
   });
 
@@ -27,6 +38,14 @@ export default function Dashboard() {
 
   const { stats, recentCases } = summary || {};
 
+  const filteredReady = search
+    ? readyCases.filter(c =>
+        c.caseNumber?.toLowerCase().includes(search.toLowerCase()) ||
+        c.clinic?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.patientName?.toLowerCase().includes(search.toLowerCase())
+      )
+    : readyCases;
+
   return (
     <Layout>
       <div className="topbar">
@@ -38,9 +57,49 @@ export default function Dashboard() {
       </div>
 
       <div className="content">
-        <div className="stats-grid">
+
+        {/* ── Today's KPIs ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+          Today's Overview
+        </div>
+        <div className="stats-grid" style={{ marginBottom: 8 }}>
           <div className="stat-card">
             <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
+            <div className="stat-label">Orders Today</div>
+            <div className="stat-value">{stats?.todayCases ?? '—'}</div>
+            <div className="stat-sub">New cases registered</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: '#FFF1F2' }}>🔄</div>
+            <div className="stat-label">Remake</div>
+            <div className="stat-value" style={{ color: stats?.remakeCount > 0 ? 'var(--red)' : 'var(--text-1)' }}>
+              {stats?.remakeCount ?? '—'}
+            </div>
+            <div className="stat-sub">Active remake cases</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: '#FFF7ED' }}>♻️</div>
+            <div className="stat-label">Redo</div>
+            <div className="stat-value" style={{ color: stats?.redoCases > 0 ? 'var(--amber)' : 'var(--text-1)' }}>
+              {stats?.redoCases ?? '—'}
+            </div>
+            <div className="stat-sub">Currently being redone</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+            <div className="stat-label">Delivered Today</div>
+            <div className="stat-value" style={{ color: 'var(--green)' }}>{stats?.deliveredToday ?? '—'}</div>
+            <div className="stat-sub">Completed today</div>
+          </div>
+        </div>
+
+        {/* ── Full stats row ── */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '18px 0 10px' }}>
+          Overall Status
+        </div>
+        <div className="stats-grid" style={{ marginBottom: 24 }}>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: '#EEF2FF' }}>🗂️</div>
             <div className="stat-label">Total Cases</div>
             <div className="stat-value">{stats?.totalCases ?? '—'}</div>
             <div className="stat-sub">All time</div>
@@ -57,27 +116,81 @@ export default function Dashboard() {
             <div className="stat-value" style={{ color: 'var(--amber)' }}>{stats?.pendingCases ?? '—'}</div>
             <div className="stat-sub">Active in lab</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => document.getElementById('ready-section')?.scrollIntoView({ behavior: 'smooth' })}>
             <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>🚚</div>
             <div className="stat-label">Ready to Dispatch</div>
-            <div className="stat-value" style={{ color: stats?.activeCases > 0 ? 'var(--accent)' : 'var(--text-1)' }}>
-              {stats?.activeCases ?? '—'}
+            <div className="stat-value" style={{ color: stats?.readyToDispatch > 0 ? 'var(--accent)' : 'var(--text-1)' }}>
+              {stats?.readyToDispatch ?? '—'}
             </div>
-            <div className="stat-sub">
-              <span
-                style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }}
-                onClick={() => navigate('/delivery')}
-              >View dispatch →</span>
-            </div>
+            <div className="stat-sub" style={{ color: 'var(--accent)', fontWeight: 600 }}>View below ↓</div>
           </div>
           <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
-            <div className="stat-label">Delivered</div>
+            <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📦</div>
+            <div className="stat-label">Total Delivered</div>
             <div className="stat-value" style={{ color: 'var(--green)' }}>{stats?.completedCases ?? '—'}</div>
-            <div className="stat-sub">Completed cases</div>
+            <div className="stat-sub">All time</div>
           </div>
         </div>
 
+        {/* ── Ready for Delivery ── */}
+        <div id="ready-section" className="card" style={{ marginBottom: 24 }}>
+          <div className="card-header">
+            <div className="card-title">🚚 Ready for Delivery</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div className="search-input" style={{ width: 260 }}>
+                <span className="icon">🔍</span>
+                <input
+                  placeholder="Search clinic, patient, case no…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                {filteredReady.length} case{filteredReady.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+          <div className="table-wrap">
+            {filteredReady.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🎉</div>
+                <div className="empty-title">No cases waiting for dispatch</div>
+                <p>Cases marked Ready to Dispatch will appear here.</p>
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Case #</th>
+                    <th>Clinic</th>
+                    <th>Patient</th>
+                    <th>Work Type</th>
+                    <th>Units</th>
+                    <th>Amount</th>
+                    <th>Payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReady.map(c => (
+                    <tr key={c.id}>
+                      <td><span className="case-number">{c.caseNumber}</span></td>
+                      <td style={{ fontWeight: 600, color: 'var(--text-1)' }}>{c.clinic?.name}</td>
+                      <td><span className="patient-name">{c.patientName}</span></td>
+                      <td>{c.workType}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--text-1)' }}>
+                        {c.payment?.amount != null ? `Br ${c.payment.amount.toLocaleString()}` : c.totalAmount != null ? `Br ${c.totalAmount.toLocaleString()}` : '—'}
+                      </td>
+                      <td><PaymentBadge status={c.paymentStatus} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* ── Recent Cases ── */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">Recent Cases</div>
@@ -100,7 +213,7 @@ export default function Dashboard() {
                 {recentCases?.length === 0 ? (
                   <tr><td colSpan={7} className="empty-state">No cases yet</td></tr>
                 ) : recentCases?.map(c => (
-                  <tr key={c.id} style={{ cursor: 'pointer' }}>
+                  <tr key={c.id}>
                     <td><span className="case-number">{c.caseNumber}</span></td>
                     <td>{c.clinic?.name}</td>
                     <td><span className="patient-name">{c.patientName}</span></td>
@@ -116,6 +229,7 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
+
       </div>
     </Layout>
   );

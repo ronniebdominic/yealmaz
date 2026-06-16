@@ -50,6 +50,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  const [statusNotes, setStatusNotes] = useState('');
   const [deliveryDateInput, setDeliveryDateInput] = useState('');
   const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
 
@@ -74,7 +75,8 @@ export default function CaseDetailModal({ caseId, onClose }) {
     if (newStatus === data.status) return;
     setUpdating(true);
     try {
-      await api.patch(`/cases/${caseId}/status`, { status: newStatus });
+      await api.patch(`/cases/${caseId}/status`, { status: newStatus, notes: statusNotes || undefined });
+      setStatusNotes('');
       toast.success(`Status updated to ${STATUS_LABELS[newStatus]}`);
       loadCase();
     } catch (err) {
@@ -348,6 +350,15 @@ export default function CaseDetailModal({ caseId, onClose }) {
                   {updating ? '…' : 'Save'}
                 </button>
               </div>
+              {newStatus === 'CASE_ACCEPTED' && newStatus !== data.status && (
+                <textarea
+                  placeholder="Add a note for this acceptance (e.g. shade, dentist instructions)…"
+                  value={statusNotes}
+                  onChange={e => setStatusNotes(e.target.value)}
+                  rows={3}
+                  style={{ width: '100%', marginTop: 10, padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              )}
               <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <StatusBadge status={data.status} />
                 <PaymentBadge status={data.paymentStatus} isExcluded={data.clinic?.isExcluded} />
