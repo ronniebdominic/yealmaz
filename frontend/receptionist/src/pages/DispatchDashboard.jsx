@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { StatusBadge } from '../components/StatusBadge';
 import SearchableSelect from '../components/SearchableSelect';
@@ -98,6 +99,7 @@ function AssignModal({ caseData, executives, onConfirm, onClose, loading, mode }
 
 // ── Main Dispatch Dashboard ──────────────────────────────────────────────────
 export default function DispatchDashboard() {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [cases, setCases]           = useState([]);
   const [executives, setExecutives] = useState([]);
@@ -272,9 +274,12 @@ export default function DispatchDashboard() {
       <div className="topbar">
         <button className="hamburger-topbar" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
         <div className="topbar-title">📋 Dispatch Dashboard</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
-          <div className="live-dot" />
-          Live · {user?.name}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate('/cases/new')}>+ New Case</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
+            <div className="live-dot" />
+            Live · {user?.name}
+          </div>
         </div>
       </div>
 
