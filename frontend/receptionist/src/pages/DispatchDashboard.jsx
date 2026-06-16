@@ -198,6 +198,14 @@ export default function DispatchDashboard() {
     }
   };
 
+  // Urgency helper — overdue and not yet delivered/cancelled
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isUrgent = (c) =>
+    c.dueDate &&
+    new Date(c.dueDate) < today &&
+    !['DELIVERED', 'CANCELLED'].includes(c.status);
+
   // Derived lists
   const q = search.toLowerCase();
   const filtered = cases.filter(c =>
@@ -218,7 +226,9 @@ export default function DispatchDashboard() {
   const delivered = filtered.filter(c => c.status === 'DELIVERED');
   const unassignedPickups = pickups.filter(c => c.status === 'PENDING_PICKUP');
   const unassigned = queue.filter(c => !c.assignedDeliveryId);
-  const shown = tab === 'pickups' ? pickups : tab === 'queue' ? queue : tab === 'enroute' ? enRoute : delivered;
+  const urgentCases = cases.filter(isUrgent);
+  const urgentFiltered = filtered.filter(isUrgent);
+  const shown = tab === 'pickups' ? pickups : tab === 'queue' ? queue : tab === 'enroute' ? enRoute : tab === 'urgent' ? urgentFiltered : delivered;
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DS';
 
@@ -286,7 +296,7 @@ export default function DispatchDashboard() {
       <div className="content" style={{ flex: 1 }}>
 
         {/* Stats */}
-        <div className="stats-grid stats-4" style={{ '--cols': 4 }}>
+        <div className="stats-grid stats-4" style={{ '--cols': 5 }}>
           <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('pickups')}>
             <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
             <div className="stat-label">Impression Pickups</div>
@@ -308,6 +318,16 @@ export default function DispatchDashboard() {
             <div className="stat-label">En Route</div>
             <div className="stat-value" style={{ color: 'var(--amber)' }}>{enRoute.length}</div>
             <div className="stat-sub">Out for delivery</div>
+          </div>
+          <div className="stat-card" style={{ cursor: urgentCases.length > 0 ? 'pointer' : 'default' }}
+            onClick={() => urgentCases.length > 0 && setTab('queue')}
+          >
+            <div className="stat-icon" style={{ background: urgentCases.length > 0 ? '#FFF1F2' : 'var(--green-dim)' }}>🔴</div>
+            <div className="stat-label">Urgent / Overdue</div>
+            <div className="stat-value" style={{ color: urgentCases.length > 0 ? 'var(--red)' : 'var(--green)' }}>{urgentCases.length}</div>
+            <div className="stat-sub" style={{ color: urgentCases.length > 0 ? 'var(--red)' : 'var(--green)' }}>
+              {urgentCases.length > 0 ? 'Past due date' : '✓ All on track'}
+            </div>
           </div>
           <div className="stat-card">
             <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
@@ -372,6 +392,13 @@ export default function DispatchDashboard() {
             <button className={`filter-chip ${tab === 'delivered' ? 'active' : ''}`} onClick={() => setTab('delivered')}>
               ✅ Delivered {delivered.length > 0 && `(${delivered.length})`}
             </button>
+            {urgentCases.length > 0 && (
+              <button className={`filter-chip ${tab === 'urgent' ? 'active' : ''}`} onClick={() => setTab('urgent')}
+                style={{ borderColor: 'var(--red)', color: tab === 'urgent' ? '#fff' : 'var(--red)', background: tab === 'urgent' ? 'var(--red)' : '#FFF1F2' }}
+              >
+                🔴 Urgent ({urgentCases.length})
+              </button>
+            )}
             <button className={`filter-chip ${tab === 'stations' ? 'active' : ''}`} onClick={() => setTab('stations')}>
               🏭 By Clinic
             </button>
@@ -462,11 +489,11 @@ export default function DispatchDashboard() {
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
           ) : shown.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">{tab === 'pickups' ? '🛵' : tab === 'queue' ? '🎉' : tab === 'enroute' ? '📭' : '📋'}</div>
+              <div className="empty-icon">{tab === 'pickups' ? '🛵' : tab === 'queue' ? '🎉' : tab === 'enroute' ? '📭' : tab === 'urgent' ? '✅' : '📋'}</div>
               <div className="empty-title">
-                {tab === 'pickups' ? 'No Pickups Pending' : tab === 'queue' ? 'Queue is Empty' : tab === 'enroute' ? 'None En Route' : 'No Deliveries Today'}
+                {tab === 'pickups' ? 'No Pickups Pending' : tab === 'queue' ? 'Queue is Empty' : tab === 'enroute' ? 'None En Route' : tab === 'urgent' ? 'No Urgent Cases' : 'No Deliveries Today'}
               </div>
-              <p>{tab === 'pickups' ? 'New cases will appear here for pickup assignment.' : tab === 'queue' ? 'No cases waiting for dispatch.' : tab === 'enroute' ? 'No cases currently out for delivery.' : 'Completed deliveries will appear here.'}</p>
+              <p>{tab === 'pickups' ? 'New cases will appear here for pickup assignment.' : tab === 'queue' ? 'No cases waiting for dispatch.' : tab === 'enroute' ? 'No cases currently out for delivery.' : tab === 'urgent' ? 'All cases are within their due dates.' : 'Completed deliveries will appear here.'}</p>
             </div>
           ) : shown.map(c => {
             const isUnassigned = !c.assignedDeliveryId;
@@ -474,14 +501,18 @@ export default function DispatchDashboard() {
               : c.status === 'PICKUP_ASSIGNED' ? '#CA8A04'
               : c.status === 'READY_TO_DISPATCH' ? (isUnassigned ? 'var(--red)' : 'var(--accent)')
               : c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--green)';
+            const urgent = isUrgent(c);
             return (
-              <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${accentColor}`, padding: '14px 18px' }}>
+              <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${urgent ? 'var(--red)' : accentColor}`, padding: '14px 18px', background: urgent ? 'rgba(239,68,68,0.03)' : undefined }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   {/* Left: case info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                       <span className="case-number">{c.caseNumber}</span>
                       <StatusBadge status={c.status} />
+                      {urgent && (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)', border: '1px solid #FECACA' }}>🔴 Overdue</span>
+                      )}
                       {c.deliveryType === 'EXPRESS' && (
                         <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>⚡ Express</span>
                       )}
@@ -497,8 +528,8 @@ export default function DispatchDashboard() {
                       <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>📍 {c.clinic.address}</div>
                     )}
                     {c.dueDate && (
-                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                        📅 Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}
+                      <div style={{ fontSize: 12, color: urgent ? 'var(--red)' : 'var(--text-3)', fontWeight: urgent ? 700 : 400 }}>
+                        📅 Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}{urgent ? ' — OVERDUE' : ''}
                       </div>
                     )}
                   </div>

@@ -256,6 +256,11 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       allClinics,
       casesPerClinic,
       casesByWorkType,
+      readyToDispatch,
+      totalRemakes,
+      remakeReasonGroups,
+      deliveredCasesData,
+      outstandingPayments,
     ] = await Promise.all([
       Promise.all([
         prisma.case.count({ where: caseFilter }),
@@ -276,6 +281,26 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.case.findMany({
         where: caseFilter,
         select: { workType: true, units: true, clinicId: true, payment: { select: { status: true, amount: true } } },
+      }),
+      prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
+      prisma.case.count({ where: { remake: true, ...caseFilter } }),
+      prisma.case.groupBy({
+        by: ['remakeReason'],
+        where: { remake: true, remakeReason: { not: null }, ...caseFilter },
+        _count: { id: true },
+        orderBy: { _count: { id: 'desc' } },
+      }),
+      prisma.case.findMany({
+        where: { ...caseFilter, status: 'DELIVERED', deliveryDate: { not: null } },
+        select: { createdAt: true, deliveryDate: true, dueDate: true },
+      }),
+      prisma.payment.aggregate({
+        where: {
+          status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
+          ...(clinicId ? { case: { clinicId } } : {}),
+        },
+        _sum: { amount: true },
+        _count: true,
       }),
     ]);
 
@@ -329,8 +354,35 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       .map(([workType, d]) => ({ workType, count: d.count, revenue: d.revenue, units: d.units }))
       .sort((a, b) => b.revenue - a.revenue);
 
+    // Average turnaround days + on-time delivery %
+    let avgTurnaroundDays = null;
+    let onTimeDeliveryPct = null;
+    if (deliveredCasesData.length > 0) {
+      const turnarounds = deliveredCasesData.map(c => {
+        const msPerDay = 1000 * 60 * 60 * 24;
+        return (new Date(c.deliveryDate) - new Date(c.createdAt)) / msPerDay;
+      });
+      avgTurnaroundDays = Math.round(turnarounds.reduce((s, d) => s + d, 0) / turnarounds.length);
+
+      const withDueDate = deliveredCasesData.filter(c => c.dueDate);
+      if (withDueDate.length > 0) {
+        const onTime = withDueDate.filter(c => new Date(c.deliveryDate) <= new Date(c.dueDate)).length;
+        onTimeDeliveryPct = Math.round((onTime / withDueDate.length) * 100);
+      }
+    }
+
+    const mostCommonRemakeReason = remakeReasonGroups.length > 0
+      ? remakeReasonGroups[0].remakeReason
+      : null;
+
     const result = {
-      kpi: { totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments },
+      kpi: {
+        totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments,
+        readyToDispatch, totalRemakes, mostCommonRemakeReason,
+        avgTurnaroundDays, onTimeDeliveryPct,
+        outstandingCount: outstandingPayments._count,
+        outstandingAmount: outstandingPayments._sum.amount || 0,
+      },
       monthlyTrend,
       revenueByClinic,
       revenueByWorkType,
@@ -342,6 +394,54 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
   } catch (err) {
     console.error('[admin-analytics]', err);
     res.status(500).json({ error: 'Could not load analytics.' });
+  }
+});
+
+// ── GET /api/dashboard/clinic-balances ──────────────────
+// Per-clinic outstanding payment totals for Finance dashboard
+router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } },
+      select: {
+        id: true, status: true, amount: true, updatedAt: true,
+        case: {
+          select: {
+            id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true,
+            clinic: { select: { id: true, name: true, isExcluded: true } },
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const clinicMap = {};
+    for (const p of payments) {
+      const clinic = p.case?.clinic;
+      if (!clinic) continue;
+      if (!clinicMap[clinic.id]) {
+        clinicMap[clinic.id] = {
+          id: clinic.id, name: clinic.name, isExcluded: clinic.isExcluded,
+          pendingCount: 0, pendingAmount: 0, cases: [],
+        };
+      }
+      clinicMap[clinic.id].pendingCount++;
+      clinicMap[clinic.id].pendingAmount += p.amount || 0;
+      clinicMap[clinic.id].cases.push({
+        caseId: p.case.id, caseNumber: p.case.caseNumber,
+        patientName: p.case.patientName, workType: p.case.workType,
+        units: p.case.units, dueDate: p.case.dueDate,
+        paymentStatus: p.status, amount: p.amount, updatedAt: p.updatedAt,
+      });
+    }
+
+    const balances = Object.values(clinicMap)
+      .sort((a, b) => b.pendingAmount - a.pendingAmount);
+
+    res.json(balances);
+  } catch (err) {
+    console.error('[clinic-balances]', err);
+    res.status(500).json({ error: 'Could not load clinic balances.' });
   }
 });
 

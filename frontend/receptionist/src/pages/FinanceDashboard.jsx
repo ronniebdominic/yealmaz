@@ -1273,6 +1273,264 @@ function HistoryTab() {
   );
 }
 
+// ── Cases Tab (in-progress + completed) ──────────────────
+const CASE_STATUS_GROUPS = [
+  { label: 'All Active', value: 'active' },
+  { label: 'In Production', value: 'production' },
+  { label: 'Ready to Dispatch', value: 'READY_TO_DISPATCH' },
+  { label: 'Out for Delivery', value: 'OUT_FOR_DELIVERY' },
+  { label: 'Completed', value: 'DELIVERED' },
+];
+
+const PRODUCTION_STATUSES = [
+  'CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
+  'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
+  'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
+  'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+];
+
+function CasesTab() {
+  const [group, setGroup]   = useState('active');
+  const [search, setSearch] = useState('');
+  const [page, setPage]     = useState(1);
+
+  const statusParam = group === 'active'
+    ? ['CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
+       'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
+       'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
+       'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+       'READY_TO_DISPATCH','OUT_FOR_DELIVERY'].join(',')
+    : group === 'production'
+    ? PRODUCTION_STATUSES.join(',')
+    : group;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['finance-cases', group, search, page],
+    queryFn: () => api.get('/cases', {
+      params: {
+        status: statusParam, limit: 20, page,
+        ...(search ? { search } : {}),
+      }
+    }).then(r => r.data),
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const cases = data?.cases ?? [];
+  const pagination = data?.pagination ?? {};
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+        {CASE_STATUS_GROUPS.map(g => (
+          <button
+            key={g.value}
+            className={`filter-chip${group === g.value ? ' active' : ''}`}
+            onClick={() => { setGroup(g.value); setPage(1); }}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <div className="search-input" style={{ maxWidth: 340 }}>
+          <span className="icon">🔍</span>
+          <input
+            placeholder="Search clinic, patient, case no…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Cases — {CASE_STATUS_GROUPS.find(g2 => g2.value === group)?.label}</div>
+          {pagination.total != null && (
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} total</span>
+          )}
+        </div>
+        <div className="table-wrap">
+          {isLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+          ) : cases.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">📋</div>
+              <div className="empty-title">No cases found</div>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Case #</th>
+                  <th>Clinic</th>
+                  <th>Patient</th>
+                  <th>Work Type</th>
+                  <th>Units</th>
+                  <th>Status</th>
+                  <th>Payment</th>
+                  <th>Amount</th>
+                  <th>Due Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cases.map(c => (
+                  <tr key={c.id}>
+                    <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{c.caseNumber}</td>
+                    <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
+                    <td><span className="patient-name">{c.patientName}</span></td>
+                    <td style={{ fontSize: 13 }}>{c.workType}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
+                    <td><StatusBadge status={c.status} /></td>
+                    <td><PaymentBadge status={c.paymentStatus} /></td>
+                    <td style={{ fontWeight: 600, color: 'var(--green)' }}>
+                      {c.payment?.amount != null ? `Br ${c.payment.amount.toLocaleString('en-US')}` :
+                       c.totalAmount != null ? `Br ${c.totalAmount.toLocaleString('en-US')}` : '—'}
+                    </td>
+                    <td style={{ fontSize: 12, color: c.dueDate && new Date(c.dueDate) < new Date() && c.status !== 'DELIVERED' ? 'var(--red)' : 'var(--text-3)' }}>
+                      {c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {pagination.totalPages > 1 && (
+          <Pagination
+            page={page} totalPages={pagination.totalPages}
+            total={pagination.total} pageSize={20}
+            onPrev={() => setPage(p => p - 1)}
+            onNext={() => setPage(p => p + 1)}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── Clinic Balances Tab ───────────────────────────────────
+const fetchClinicBalances = () => api.get('/dashboard/clinic-balances').then(r => r.data);
+
+function ClinicBalancesTab() {
+  const [expanded, setExpanded] = useState(null);
+
+  const { data: balances = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['clinic-balances'],
+    queryFn: fetchClinicBalances,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const totalOutstanding = balances.reduce((s, b) => s + b.pendingAmount, 0);
+
+  return (
+    <>
+      {/* Summary KPI */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+          <div className="stat-label">Total Outstanding</div>
+          <div className="stat-value" style={{ color: 'var(--red)', fontSize: totalOutstanding >= 100000 ? 17 : 22 }}>
+            Br {totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="stat-sub">Across all clinics</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🏥</div>
+          <div className="stat-label">Clinics with Balance</div>
+          <div className="stat-value" style={{ color: 'var(--amber)' }}>{balances.length}</div>
+          <div className="stat-sub">Have unpaid cases</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#EFF6FF' }}>📋</div>
+          <div className="stat-label">Total Unpaid Cases</div>
+          <div className="stat-value" style={{ color: 'var(--blue)' }}>
+            {balances.reduce((s, b) => s + b.pendingCount, 0)}
+          </div>
+          <div className="stat-sub">Pending payment</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">⏳ Outstanding Balance by Clinic</div>
+          <button className="btn btn-ghost btn-sm" onClick={refetch}>↺ Refresh</button>
+        </div>
+        <div className="table-wrap">
+          {isLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+          ) : isError ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--red)' }}>Failed to load balances.</div>
+          ) : balances.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🎉</div>
+              <div className="empty-title">No outstanding balances</div>
+              <p>All clinics are up to date.</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Clinic</th>
+                  <th>Unpaid Cases</th>
+                  <th>Outstanding Amount</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {balances.map(b => (
+                  <>
+                    <tr
+                      key={b.id}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setExpanded(expanded === b.id ? null : b.id)}
+                    >
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {b.name[0]?.toUpperCase()}
+                          </div>
+                          <span style={{ fontWeight: 600 }}>{b.name}</span>
+                          {b.isExcluded && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}>TRUSTED</span>}
+                        </div>
+                      </td>
+                      <td style={{ color: 'var(--amber)', fontWeight: 600 }}>{b.pendingCount}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--red)', fontSize: 15 }}>
+                        Br {b.pendingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ fontSize: 13, color: 'var(--text-3)' }}>{expanded === b.id ? '▲' : '▼'}</td>
+                    </tr>
+                    {expanded === b.id && b.cases.map(c => (
+                      <tr key={c.caseId} style={{ background: 'var(--surface-2)' }}>
+                        <td colSpan={4} style={{ padding: '6px 14px 6px 48px' }}>
+                          <div style={{ display: 'flex', gap: 20, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>{c.caseNumber}</span>
+                            <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{c.patientName}</span>
+                            <span style={{ color: 'var(--text-2)' }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</span>
+                            <PaymentBadge status={c.paymentStatus} />
+                            <span style={{ color: 'var(--green)', fontWeight: 700 }}>
+                              {c.amount != null ? `Br ${c.amount.toLocaleString('en-US')}` : 'No amount set'}
+                            </span>
+                            {c.dueDate && (
+                              <span style={{ color: new Date(c.dueDate) < new Date() ? 'var(--red)' : 'var(--text-3)' }}>
+                                Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Revenue Report Tab ────────────────────────────────────
 function ReportTab() {
   const [from, setFrom]       = useState('');
@@ -1511,6 +1769,8 @@ const MAIN_TABS = [
   { id: 'billing',     label: 'Billing & Invoicing',   icon: '📄' },
   { id: 'trusted',     label: 'Trusted Partners',      icon: '🤝' },
   { id: 'history',     label: 'Verified History',      icon: '✅' },
+  { id: 'cases',       label: 'Cases Overview',         icon: '📋' },
+  { id: 'balances',    label: 'Clinic Balances',        icon: '🏦' },
   { id: 'report',      label: 'Revenue Report',         icon: '📊' },
 ];
 
@@ -1604,6 +1864,12 @@ export default function FinanceDashboard() {
             <span>✅</span> Verified History
           </button>
           <div className="nav-section-label">Analytics</div>
+          <button className={`nav-item${tab === 'cases' ? ' active' : ''}`} onClick={() => setTabAndClose('cases')}>
+            <span>📋</span> Cases Overview
+          </button>
+          <button className={`nav-item${tab === 'balances' ? ' active' : ''}`} onClick={() => setTabAndClose('balances')}>
+            <span>🏦</span> Clinic Balances
+          </button>
           <button className={`nav-item${tab === 'report' ? ' active' : ''}`} onClick={() => setTabAndClose('report')}>
             <span>📊</span> Revenue Report
           </button>
@@ -1666,6 +1932,18 @@ export default function FinanceDashboard() {
           </button>
 
           <div className="nav-section-label">Analytics</div>
+          <button
+            className={`nav-item ${tab === 'cases' ? 'active' : ''}`}
+            onClick={() => setTab('cases')}
+          >
+            <span>📋</span> Cases Overview
+          </button>
+          <button
+            className={`nav-item ${tab === 'balances' ? 'active' : ''}`}
+            onClick={() => setTab('balances')}
+          >
+            <span>🏦</span> Clinic Balances
+          </button>
           <button
             className={`nav-item ${tab === 'report' ? 'active' : ''}`}
             onClick={() => setTab('report')}
@@ -1771,6 +2049,8 @@ export default function FinanceDashboard() {
           {tab === 'billing'     && <BillingTab queryClient={queryClient} />}
           {tab === 'trusted'     && <TrustedPartnersTab queryClient={queryClient} />}
           {tab === 'history'     && <HistoryTab />}
+          {tab === 'cases'       && <CasesTab />}
+          {tab === 'balances'    && <ClinicBalancesTab />}
           {tab === 'report'      && <ReportTab />}
         </div>
       </main>

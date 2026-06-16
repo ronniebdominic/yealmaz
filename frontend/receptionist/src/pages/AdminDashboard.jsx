@@ -182,14 +182,63 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <>
-            {/* ── KPI Cards ── */}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)' }}>
+            {/* ── KPI Cards Row 1 — Revenue & Volume ── */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Revenue & Volume</div>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)', marginBottom: 8 }}>
               <KpiCard icon="💰" label="Total Revenue" value={ETB(kpi?.totalRevenue)} bg="var(--green-dim)" color="var(--green)" sub="Verified payments" />
               <KpiCard icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'} bg="#EEF2FF" color="var(--blue)" sub="In selected range" />
               <KpiCard icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'} bg="var(--accent-dim)" color="var(--accent)" sub="In selected range" />
               <KpiCard icon="⚙️" label="Active Cases" value={kpi?.activeCases ?? '—'} bg="var(--amber-dim)" color="var(--amber)" sub="In production" />
               <KpiCard icon="✅" label="Delivered" value={kpi?.deliveredCases ?? '—'} bg="var(--green-dim)" color="var(--green)" sub="Completed" />
               <KpiCard icon="💳" label="Pending Payments" value={kpi?.pendingPayments ?? '—'} bg="var(--accent-dim)" color="var(--navy)" sub="Awaiting review" />
+            </div>
+
+            {/* ── KPI Cards Row 2 — Operations ── */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '18px 0 10px' }}>Operations</div>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 24 }}>
+              <KpiCard
+                icon="🚚" label="Ready Orders"
+                value={kpi?.readyToDispatch ?? '—'}
+                bg="var(--accent-dim)" color="var(--accent)"
+                sub="READY_TO_DISPATCH"
+              />
+              <KpiCard
+                icon="💵" label="Payments Received"
+                value={ETB(kpi?.totalRevenue)}
+                bg="var(--green-dim)" color="var(--green)"
+                sub={`${kpi?.deliveredCases ?? 0} verified`}
+              />
+              <KpiCard
+                icon="⏳" label="Outstanding"
+                value={ETB(kpi?.outstandingAmount)}
+                bg="#FFF1F2" color="var(--red)"
+                sub={`${kpi?.outstandingCount ?? 0} unpaid cases`}
+              />
+              <KpiCard
+                icon="🔄" label="Total Remakes"
+                value={kpi?.totalRemakes ?? '—'}
+                bg="var(--amber-dim)" color="var(--amber)"
+                sub="In selected range"
+              />
+              <KpiCard
+                icon="🏷️" label="Top Remake Reason"
+                value={kpi?.mostCommonRemakeReason ?? '—'}
+                bg="#F5F3FF" color="#6D28D9"
+                sub="Most common"
+              />
+              <KpiCard
+                icon="⏱️" label="Avg Turnaround"
+                value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
+                bg="#EFF6FF" color="var(--blue)"
+                sub="Days to delivery"
+              />
+              <KpiCard
+                icon="🎯" label="On-Time Delivery"
+                value={kpi?.onTimeDeliveryPct != null ? `${kpi.onTimeDeliveryPct}%` : '—'}
+                bg={kpi?.onTimeDeliveryPct >= 80 ? 'var(--green-dim)' : 'var(--amber-dim)'}
+                color={kpi?.onTimeDeliveryPct >= 80 ? 'var(--green)' : 'var(--amber)'}
+                sub="Within due date"
+              />
             </div>
 
             {/* ── Revenue Trend ── */}
