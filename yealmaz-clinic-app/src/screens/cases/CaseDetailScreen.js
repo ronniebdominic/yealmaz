@@ -243,33 +243,59 @@ export default function CaseDetailScreen({ navigation, route }) {
     }
   };
 
+  // Poll the server for the verified result after checkout. Both the Chapa webhook and
+  // the return-url handler feed this, but either can lag — so we retry with backoff.
+  // Three attempts spaced 0s/2s/4s apart, each request capped at 5s: ~6s in the normal
+  // case, ~21s worst case if every poll times out. Returning false means "not confirmed
+  // yet" (the webhook + the screen's 60s refetch still reconcile), not "payment failed".
+  const confirmChapaPayment = async () => {
+    const delays = [0, 2000, 4000];
+    for (const wait of delays) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      try {
+        const statusRes = await api.get(`/payments/chapa/status/${caseId}`, { timeout: 5000 });
+        if (statusRes.data?.paymentStatus === 'VERIFIED') return true;
+      } catch {
+        // transient error/timeout — keep trying, don't abort reconciliation
+      }
+    }
+    return false;
+  };
+
   const payOnline = async () => {
+    if (payingOnline) return; // guard: a double-tap would open a second Chapa session and strand the first (a CSRF-mismatch trigger)
     setPayingOnline(true);
     try {
+      // Always start a brand-new Chapa session so the user never lands on a stale or
+      // already-used checkout — the common cause of Chapa's "CSRF token mismatch" page.
       const res = await api.post(`/payments/${caseId}/chapa/initialize`);
-      const { checkoutUrl } = res.data;
+      const checkoutUrl = res.data?.checkoutUrl;
       if (!checkoutUrl) throw new Error('Could not start online payment.');
 
       if (Platform.OS === 'web') {
         // Open in a new tab; the user returns to this tab manually afterwards
-        window.open(checkoutUrl, '_blank');
+        window.open(checkoutUrl, '_blank', 'noopener');
       } else {
         await WebBrowser.openBrowserAsync(checkoutUrl);
       }
+    } catch (err) {
+      console.error('[Chapa] payment failed:', err);
+      Alert.alert('Payment Failed', err.response?.data?.error || err.message || 'Please try again.');
+      return;
+    } finally {
+      // Stop the spinner as soon as the checkout is open/closed — don't make the user
+      // wait on the status polls.
+      setPayingOnline(false);
+    }
 
-      // After returning from the checkout, ask the server to confirm the result
-      const statusRes = await api.get(`/payments/chapa/status/${caseId}`);
-      if (statusRes.data?.paymentStatus === 'VERIFIED') {
+    // Reconcile in the background and surface the result when it lands.
+    confirmChapaPayment().then((verified) => {
+      if (verified) {
         Alert.alert('✅ Payment Successful', 'Your payment has been received. Thank you!');
       }
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
-    } catch (err) {
-      console.error('[Chapa] payment failed:', err);
-      Alert.alert('Payment Failed', err.response?.data?.error || err.message || 'Please try again.');
-    } finally {
-      setPayingOnline(false);
-    }
+    });
   };
 
   const downloadInvoice = async () => {

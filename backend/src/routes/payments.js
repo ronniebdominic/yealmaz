@@ -11,7 +11,10 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 const chapa = process.env.CHAPA_SECRET_KEY
-  ? new Chapa({ secretKey: process.env.CHAPA_SECRET_KEY })
+  ? new Chapa({
+      secretKey: process.env.CHAPA_SECRET_KEY,
+      webhookSecret: process.env.CHAPA_WEBHOOK_SECRET || undefined,
+    })
   : null;
 
 cloudinary.config({
@@ -186,15 +189,23 @@ router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
 });
 
 // ── POST /api/payments/chapa/webhook ─────────────────────
-// Public endpoint called by Chapa when a transaction completes
-router.post('/chapa/webhook', express.json(), async (req, res) => {
+// Public endpoint called by Chapa when a transaction completes.
+// Body is parsed (+ raw body captured) by the global express.json middleware.
+router.post('/chapa/webhook', async (req, res) => {
   try {
     if (!chapa) return res.status(503).end();
 
-    const signature = req.headers['chapa-signature'] || req.headers['x-chapa-signature'];
+    const signature = req.headers['x-chapa-signature'] || req.headers['chapa-signature'];
+    const rawBody = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body || {});
+
     if (process.env.CHAPA_WEBHOOK_SECRET && signature) {
-      const valid = chapa.verifyWebhook(req.body, signature);
-      if (!valid) return res.status(401).end();
+      let valid = false;
+      try { valid = chapa.verifyWebhook(rawBody, signature); }
+      catch (e) { console.warn('[Chapa webhook] verify threw:', e.message); }
+      if (!valid) {
+        console.warn('[Chapa webhook] signature mismatch — rejecting');
+        return res.status(401).end();
+      }
     }
 
     const txRef = req.body?.tx_ref;

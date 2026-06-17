@@ -52,7 +52,11 @@ io.on('connection', (socket) => {
 // ── Middleware ───────────────────────────────────────────
 app.use(compression());
 app.use(cors());
-app.use(express.json());
+// Capture the raw body so webhook signature verification can hash the exact bytes
+// Chapa sent (re-serialized JSON would not match the HMAC).
+app.use(express.json({
+  verify: (req, _res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 const apiLimiter = rateLimit({
