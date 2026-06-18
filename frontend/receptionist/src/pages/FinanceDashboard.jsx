@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
-import api from '../api';
+import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -1188,8 +1188,23 @@ function TrustedPartnersTab({ queryClient }) {
 function HistoryTab() {
   const [page, setPage]     = useState(1);
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const handleSearch = (v) => { setSearch(v); setPage(1); };
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('/payments/export', {
+        status: 'VERIFIED',
+        search: search || undefined,
+      }, `verified_payments_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['payments', 'history', page, search],
@@ -1226,6 +1241,9 @@ function HistoryTab() {
         {search && (
           <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
         )}
+        <button className="btn btn-ghost btn-sm" onClick={exportExcel} disabled={exporting} style={{ whiteSpace: 'nowrap' }}>
+          {exporting ? 'Exporting…' : '⬇ Export Excel'}
+        </button>
       </div>
     <div className="card">
       <div className="table-wrap">

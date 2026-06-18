@@ -6,40 +6,6 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
-// ── Work type groups ──────────────────────────────────────
-const WORK_TYPE_GROUPS = [
-  { label: 'Zirconia', types: [
-    'Zirconia Express', 'Full Contoured Zirconia', 'Layered Zirconia Aesthetic',
-    'Zirconia Screw Retained Crown', 'Zirconia Veneer', 'Zirconia Rest',
-    'Zirconia Coping', 'Custom Abutment', 'Screw Retained Aesthetic',
-  ]},
-  { label: 'Lithium Disilicate', types: [
-    'Lithium Disilicate Inlays / Onlays / Crown', 'Lithium Disilicate Veneers',
-  ]},
-  { label: 'Emax', types: ['Emax Crown', 'Emax Veneer', 'Emax Bridge'] },
-  { label: 'PFM', types: ['PFM Crown', 'PFM Crown with Metal Try-In', 'PFM Bridge'] },
-  { label: 'Metal', types: ['Full Metal Crown', 'Full Metal Bridge', 'Metal Occlusal Crown'] },
-  { label: 'Implant', types: [
-    'Implant Crown PFM', 'Implant Crown Zirconia',
-    'Surgical Guide', 'Implant Planning', 'Temporary Abutment', 'Healing Cap',
-  ]},
-  { label: 'Dentures', types: [
-    'Complete Denture', 'Flexible Denture', 'Cast Partial Denture',
-    'Hybrid Denture', 'Implant Overdenture',
-  ]},
-  { label: 'Temporary', types: ['Temporary Crown PMMA', 'Temporary Bridge PMMA'] },
-  { label: 'Composite', types: ['Composite Veneer', 'Composite Crown'] },
-  { label: 'Digital / CAD', types: ['Wax-Up Diagnostic', 'CAD Design Service', '3D Printed Model'] },
-  { label: 'Guards & Appliances', types: [
-    'Orthodontic Retainer', 'Night Guard Soft', 'Night Guard Hard',
-    'Sports Guard', 'Bite Splint', 'Bleaching Tray', 'Clear Aligner Setup', 'Gingival Mask',
-  ]},
-  { label: 'Specialty Prosthetics', types: [
-    'Maryland Bridge', 'Precision Attachment', 'Telescopic Crown',
-    'Bar Attachment', 'Locator Housing', 'Peek Framework', 'Peek Crown',
-  ]},
-];
-
 // ── Odontogram ────────────────────────────────────────────
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
@@ -152,10 +118,9 @@ function calcDueDate(workType, days) {
   return d.toISOString().split('T')[0];
 }
 
-// Work types priced per full dentition — never multiplied by tooth count
+// Work types priced per item/arch — never multiplied by tooth count.
 const FLAT_PRICE_TYPES = new Set([
-  'Orthodontic Retainer', 'Night Guard Soft', 'Night Guard Hard',
-  'Sports Guard', 'Bite Splint', 'Bleaching Tray', 'Clear Aligner Setup', 'Gingival Mask',
+  'Night Guard', 'Retainer', 'Clear Aligner', 'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
 ]);
 
 // ── Page ──────────────────────────────────────────────────
@@ -244,6 +209,12 @@ export default function NewCase() {
     if (!form.clinicId) return toast.error('Please select a clinic');
     if (!form.patientName) return toast.error('Patient name is required');
     if (!form.workType) return toast.error('Work type is required');
+    // Shade, doctor name & contact are mandatory for new orders (historical entries with a delivery date are exempt)
+    if (!form.deliveryDate) {
+      if (!form.shade?.trim())       return toast.error('Shade is required');
+      if (!form.doctorName?.trim())  return toast.error("Doctor's name is required");
+      if (!form.doctorPhone?.trim()) return toast.error("Doctor's contact is required");
+    }
 
     setSubmitting(true);
     try {
@@ -309,11 +280,11 @@ export default function NewCase() {
               {/* Doctor info */}
               <div className="grid-2">
                 <div className="form-group">
-                  <label>Doctor Name</label>
+                  <label>Doctor Name *</label>
                   <input placeholder="e.g. Dr. Sarah Ahmed" value={form.doctorName} onChange={set('doctorName')} />
                 </div>
                 <div className="form-group">
-                  <label>Doctor Phone</label>
+                  <label>Doctor Phone *</label>
                   <input type="tel" placeholder="e.g. +251 911 000 000" value={form.doctorPhone} onChange={set('doctorPhone')} />
                 </div>
               </div>
@@ -328,7 +299,7 @@ export default function NewCase() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Shade</label>
+                  <label>Shade *</label>
                   <input placeholder="e.g. A2, B1" value={form.shade} onChange={set('shade')} />
                 </div>
               </div>
@@ -369,12 +340,17 @@ export default function NewCase() {
                 <label>Work Type *</label>
                 <select value={form.workType} onChange={set('workType')} required>
                   <option value="">— Select work type —</option>
-                  {WORK_TYPE_GROUPS.map(group => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.types.map(t => <option key={t} value={t}>{t}</option>)}
-                    </optgroup>
+                  {pricesData.map(p => (
+                    <option key={p.workType} value={p.workType}>
+                      {p.workType} — Br {Number(p.price).toLocaleString('en-US')}
+                    </option>
                   ))}
                 </select>
+                {pricesData.length === 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4 }}>
+                    No work types found in the pricing list. Add them under Admin → Pricing first.
+                  </div>
+                )}
               </div>
 
               {/* Intake Method */}

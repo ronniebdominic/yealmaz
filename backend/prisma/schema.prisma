@@ -111,6 +111,7 @@ model Case {
   deliveryLogs       DeliveryLog[]
   notifications      Notification[]
   rewardTransactions RewardTransaction[]
+  comments           CaseComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -188,6 +189,20 @@ model CaseStage {
   notes       String?
 
   @@map("case_stages")
+}
+
+// ── CASE COMMENTS (receptionist / staff notes thread) ──
+model CaseComment {
+  id         String   @id @default(uuid())
+  caseId     String
+  case       Case     @relation(fields: [caseId], references: [id])
+  body       String
+  authorName String?  // name of the staff member who wrote it
+  authorRole String?  // their role at the time
+  createdAt  DateTime @default(now())
+
+  @@index([caseId])
+  @@map("case_comments")
 }
 
 // ── PAYMENTS ───────────────────────────────────────────

@@ -6,6 +6,7 @@ const cloudinary = require('cloudinary').v2;
 const { Chapa } = require('chapa-nodejs');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -714,6 +715,55 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch statement.' });
+  }
+});
+
+// ── GET /api/payments/export ─────────────────────────────
+// Excel export of payments. Filter by comma-separated status set, search, and
+// a verified-date range — covers billing, history (VERIFIED) and unpaid reports.
+router.get('/export', protect, restrict('ADMIN', 'FINANCE', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const { status, search, dateFrom, dateTo } = req.query;
+
+    const where = {};
+    if (status) where.status = { in: String(status).split(',').map(s => s.trim()).filter(Boolean) };
+    if (search) {
+      where.OR = [
+        { case: { clinic: { name: { contains: search, mode: 'insensitive' } } } },
+        { case: { patientName: { contains: search, mode: 'insensitive' } } },
+        { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
+        { invoiceNumber: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (dateFrom || dateTo) {
+      where.verifiedAt = {};
+      if (dateFrom) where.verifiedAt.gte = new Date(dateFrom);
+      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.verifiedAt.lte = end; }
+    }
+
+    const payments = await prisma.payment.findMany({
+      where,
+      include: { case: { include: { clinic: { select: { name: true } } } } },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const columns = [
+      { header: 'Invoice #',   value: p => p.invoiceNumber || '' },
+      { header: 'Case #',      value: p => p.case?.caseNumber || '' },
+      { header: 'Clinic',      value: p => p.case?.clinic?.name || '' },
+      { header: 'Patient',     value: p => p.case?.patientName || '' },
+      { header: 'Work Type',   value: p => p.case?.workType || '' },
+      { header: 'Amount (Br)', value: p => p.amount ?? '' },
+      { header: 'Status',      value: p => p.status },
+      { header: 'Verified At', value: p => iso(p.verifiedAt) },
+    ];
+
+    const buffer = buildWorkbookBuffer(payments, columns, 'Payments');
+    sendXlsx(res, buffer, `payments_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  } catch (err) {
+    console.error('[payments export]', err);
+    res.status(500).json({ error: 'Could not export payments.' });
   }
 });
 

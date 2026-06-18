@@ -113,6 +113,8 @@ export default function DispatchDashboard() {
   const [tab, setTab]               = useState('pickups'); // pickups | queue | enroute | delivered | stations
   const [search, setSearch]         = useState('');
   const [clinicFilter, setClinicFilter] = useState('');
+  const [dateFrom, setDateFrom]     = useState('');
+  const [dateTo, setDateTo]         = useState('');
   const [stations, setStations]     = useState([]);
   const [stationsLoading, setStationsLoading] = useState(false);
   const [open, setOpen]             = useState(false);
@@ -208,8 +210,16 @@ export default function DispatchDashboard() {
 
   // Derived lists
   const q = search.toLowerCase();
+  const inDateRange = (c) => {
+    if (!dateFrom && !dateTo) return true;
+    const d = new Date(c.createdAt);
+    if (dateFrom && d < new Date(dateFrom)) return false;
+    if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); if (d > end) return false; }
+    return true;
+  };
   const filtered = cases.filter(c =>
     (!clinicFilter || c.clinic?.name === clinicFilter) &&
+    inDateRange(c) &&
     (!q ||
       c.clinic?.name?.toLowerCase().includes(q) ||
       c.caseNumber?.toLowerCase().includes(q) ||
@@ -420,8 +430,13 @@ export default function DispatchDashboard() {
             placeholder="All Clinics"
             style={{ minWidth: 180 }}
           />
-          {(search || clinicFilter) && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); }} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>✕ Clear</button>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Order date from"
+            style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)' }} />
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>→</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Order date to"
+            style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)' }} />
+          {(search || clinicFilter || dateFrom || dateTo) && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); setDateFrom(''); setDateTo(''); }} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>✕ Clear</button>
           )}
         </div>
 

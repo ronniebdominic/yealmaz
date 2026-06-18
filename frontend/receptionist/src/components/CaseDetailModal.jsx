@@ -53,10 +53,35 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [statusNotes, setStatusNotes] = useState('');
   const [deliveryDateInput, setDeliveryDateInput] = useState('');
   const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
 
   useEffect(() => {
     loadCase();
+    loadComments();
   }, [caseId]);
+
+  const loadComments = async () => {
+    try {
+      const res = await api.get(`/cases/${caseId}/comments`);
+      setComments(res.data || []);
+    } catch { /* non-fatal */ }
+  };
+
+  const postComment = async () => {
+    if (!newComment.trim()) return;
+    setPostingComment(true);
+    try {
+      await api.post(`/cases/${caseId}/comments`, { body: newComment.trim() });
+      setNewComment('');
+      loadComments();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not add comment');
+    } finally {
+      setPostingComment(false);
+    }
+  };
 
   const loadCase = async () => {
     try {
@@ -335,6 +360,38 @@ export default function CaseDetailModal({ caseId, onClose }) {
               <strong>Notes:</strong> {data.notes}
             </div>
           )}
+
+          {/* Comments / additional info from-or-for the dentist */}
+          <div className="divider" />
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>
+              💬 Comments <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>· additional info needed from the dentist</span>
+            </div>
+            {comments.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                {comments.map(c => (
+                  <div key={c.id} style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-1)', whiteSpace: 'pre-wrap' }}>{c.body}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                      {c.authorName || 'Staff'}{c.authorRole ? ` · ${c.authorRole}` : ''} · {format(new Date(c.createdAt), 'dd MMM yyyy, h:mm a')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <textarea
+                placeholder="Add a comment (e.g. need shade confirmation from the dentist)…"
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                rows={2}
+                style={{ flex: 1, padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', resize: 'vertical', fontFamily: 'inherit' }}
+              />
+              <button className="btn btn-primary btn-sm" onClick={postComment} disabled={postingComment || !newComment.trim()}>
+                {postingComment ? '…' : 'Add'}
+              </button>
+            </div>
+          </div>
 
           <div className="divider" />
 

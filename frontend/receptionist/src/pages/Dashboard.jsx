@@ -1,17 +1,38 @@
 import { useState } from 'react';
 import Layout from '../components/Layout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
-import api from '../api';
+import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
-const fetchReady   = () => api.get('/cases', { params: { status: 'READY_TO_DISPATCH', limit: 50 } }).then(r => r.data.cases ?? []);
+const fetchReady   = (params = {}) =>
+  api.get('/cases', { params: { status: 'READY_TO_DISPATCH', limit: 200, ...params } }).then(r => r.data.cases ?? []);
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  const exportReady = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('/cases/export', {
+        status: 'READY_TO_DISPATCH',
+        search: search || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      }, `ready_for_delivery_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data: summary, isLoading } = useQuery({
     queryKey: ['dashboard', 'summary'],
@@ -21,8 +42,8 @@ export default function Dashboard() {
   });
 
   const { data: readyCases = [] } = useQuery({
-    queryKey: ['cases', 'ready-to-dispatch'],
-    queryFn: fetchReady,
+    queryKey: ['cases', 'ready-to-dispatch', dateFrom, dateTo],
+    queryFn: () => fetchReady({ dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -93,17 +114,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── Full stats row ── */}
+        {/* ── Current workload (live operational counts — not all-time totals) ── */}
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '18px 0 10px' }}>
-          Overall Status
+          Current Workload
         </div>
         <div className="stats-grid" style={{ marginBottom: 24 }}>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#EEF2FF' }}>🗂️</div>
-            <div className="stat-label">Total Cases</div>
-            <div className="stat-value">{stats?.totalCases ?? '—'}</div>
-            <div className="stat-sub">All time</div>
-          </div>
           <div className="stat-card">
             <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
             <div className="stat-label">Awaiting Pickup</div>
@@ -124,20 +139,14 @@ export default function Dashboard() {
             </div>
             <div className="stat-sub" style={{ color: 'var(--accent)', fontWeight: 600 }}>View below ↓</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📦</div>
-            <div className="stat-label">Total Delivered</div>
-            <div className="stat-value" style={{ color: 'var(--green)' }}>{stats?.completedCases ?? '—'}</div>
-            <div className="stat-sub">All time</div>
-          </div>
         </div>
 
         {/* ── Ready for Delivery ── */}
         <div id="ready-section" className="card" style={{ marginBottom: 24 }}>
           <div className="card-header">
             <div className="card-title">🚚 Ready for Delivery</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <div className="search-input" style={{ width: 260 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="search-input" style={{ width: 220 }}>
                 <span className="icon">🔍</span>
                 <input
                   placeholder="Search clinic, patient, case no…"
@@ -145,6 +154,17 @@ export default function Dashboard() {
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Order date from"
+                style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>→</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Order date to"
+                style={{ padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
+              {(dateFrom || dateTo) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</button>
+              )}
+              <button className="btn btn-ghost btn-sm" onClick={exportReady} disabled={exporting}>
+                {exporting ? 'Exporting…' : '⬇ Excel'}
+              </button>
               <span style={{ fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                 {filteredReady.length} case{filteredReady.length !== 1 ? 's' : ''}
               </span>

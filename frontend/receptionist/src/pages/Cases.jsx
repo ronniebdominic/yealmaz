@@ -2,11 +2,12 @@ import { useState } from 'react';
 import Layout from '../components/Layout';
 import SearchableSelect from '../components/SearchableSelect';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
-import api from '../api';
+import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import CaseDetailModal from '../components/CaseDetailModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 const STATUS_FILTERS = [
   { label: 'All',             value: '' },
@@ -36,8 +37,24 @@ export default function Cases() {
   const [clinicId,  setClinicId]  = useState('');
   const [page,      setPage]      = useState(1);
   const [selectedCase, setSelectedCase] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const navigate    = useNavigate();
   const queryClient = useQueryClient();
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('/cases/export', {
+        status:   filter   || undefined,
+        search:   search   || undefined,
+        clinicId: clinicId || undefined,
+      }, `cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data: clinicList = [] } = useQuery({
     queryKey: ['clinics'],
@@ -68,7 +85,10 @@ export default function Cases() {
     <Layout>
       <div className="topbar">
         <div className="topbar-title">All Cases</div>
-        <div className="topbar-right">
+        <div className="topbar-right" style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" onClick={exportExcel} disabled={exporting}>
+            {exporting ? 'Exporting…' : '⬇ Export Excel'}
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/cases/new')}>
             + New Case
           </button>

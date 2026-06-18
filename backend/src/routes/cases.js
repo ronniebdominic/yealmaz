@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { awardCasePoints } = require('./rewards');
+const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -53,7 +54,7 @@ async function getDueDays(workType, isExpress = false) {
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc' } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', dateFrom, dateTo } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const dateOrder = sortDir === 'asc' ? 'asc' : 'desc';
 
@@ -70,8 +71,14 @@ router.get('/', protect, async (req, res) => {
         { workType: { contains: search, mode: 'insensitive' } }
       ];
     }
+    // Order-date range filter (on createdAt)
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.createdAt.lte = end; }
+    }
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, dateFrom, dateTo })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -105,6 +112,64 @@ router.get('/', protect, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch cases.' });
+  }
+});
+
+// ── GET /api/cases/export ────────────────────────────────
+// Excel export of all cases matching the same filters as GET /api/cases (no pagination).
+// Defined before /:id so "export" isn't captured as an :id.
+router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
+  try {
+    const { status, paymentStatus, search, clinicId, sortDir = 'desc', dateFrom, dateTo } = req.query;
+
+    const where = {};
+    if (clinicId) where.clinicId = clinicId;
+    if (status) where.status = status;
+    if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (search) {
+      where.OR = [
+        { clinic: { name: { contains: search, mode: 'insensitive' } } },
+        { patientName: { contains: search, mode: 'insensitive' } },
+        { caseNumber: { contains: search, mode: 'insensitive' } },
+        { workType: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.createdAt.lte = end; }
+    }
+
+    const cases = await prisma.case.findMany({
+      where,
+      include: { clinic: { select: { name: true } }, payment: { select: { amount: true } } },
+      orderBy: { createdAt: sortDir === 'asc' ? 'asc' : 'desc' },
+    });
+
+    const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const columns = [
+      { header: 'Case #',        value: c => c.caseNumber },
+      { header: 'Clinic',        value: c => c.clinic?.name || '' },
+      { header: 'Patient',       value: c => c.patientName },
+      { header: 'Work Type',     value: c => c.workType },
+      { header: 'Units',         value: c => c.units ?? '' },
+      { header: 'Shade',         value: c => c.shade || '' },
+      { header: 'Doctor',        value: c => c.doctorName || '' },
+      { header: 'Doctor Phone',  value: c => c.doctorPhone || '' },
+      { header: 'Status',        value: c => c.status },
+      { header: 'Payment',       value: c => c.paymentStatus },
+      { header: 'Amount (Br)',   value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+      { header: 'Delivery Type', value: c => c.deliveryType },
+      { header: 'Order Date',    value: c => iso(c.createdAt) },
+      { header: 'Due Date',      value: c => iso(c.dueDate) },
+      { header: 'Delivered On',  value: c => iso(c.deliveryDate) },
+    ];
+
+    const buffer = buildWorkbookBuffer(cases, columns, 'Cases');
+    sendXlsx(res, buffer, `cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  } catch (err) {
+    console.error('[cases export]', err);
+    res.status(500).json({ error: 'Could not export cases.' });
   }
 });
 
@@ -153,6 +218,18 @@ router.post('/', protect, async (req, res) => {
 
     if (!patientName || !workType) {
       return res.status(400).json({ error: 'Patient name and work type are required.' });
+    }
+
+    // Shade, doctor name, and doctor contact are mandatory for new orders.
+    // Historical/back-dated entries (a deliveryDate is supplied) are exempt.
+    if (!deliveryDate) {
+      const missing = [];
+      if (!shade || !String(shade).trim())             missing.push('shade');
+      if (!doctorName || !String(doctorName).trim())   missing.push("doctor's name");
+      if (!doctorPhone || !String(doctorPhone).trim()) missing.push("doctor's contact");
+      if (missing.length) {
+        return res.status(400).json({ error: `Please provide: ${missing.join(', ')}.` });
+      }
     }
 
     const caseNumber = await generateCaseNumber();
@@ -259,6 +336,7 @@ router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
     // Cascade delete in dependency order
     await prisma.$transaction([
       prisma.caseStage.deleteMany({ where: { caseId: req.params.id } }),
+      prisma.caseComment.deleteMany({ where: { caseId: req.params.id } }),
       prisma.deliveryLog.deleteMany({ where: { caseId: req.params.id } }),
       prisma.notification.deleteMany({ where: { caseId: req.params.id } }),
       prisma.payment.deleteMany({ where: { caseId: req.params.id } }),
@@ -274,6 +352,47 @@ router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not delete case.' });
+  }
+});
+
+// ── GET /api/cases/:id/comments ─────────────────────────
+// Staff comment thread on a case (e.g. additional info needed from the dentist)
+router.get('/:id/comments', protect, async (req, res) => {
+  try {
+    if (req.user.role === 'CLINIC') {
+      const c = await prisma.case.findUnique({ where: { id: req.params.id }, select: { clinicId: true } });
+      if (!c || c.clinicId !== req.user.id) return res.status(403).json({ error: 'Access denied.' });
+    }
+    const comments = await prisma.caseComment.findMany({
+      where: { caseId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json(comments);
+  } catch (err) {
+    console.error('[GET comments]', err);
+    res.status(500).json({ error: 'Could not load comments.' });
+  }
+});
+
+// ── POST /api/cases/:id/comments ────────────────────────
+router.post('/:id/comments', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
+  try {
+    const { body } = req.body;
+    if (!body || !String(body).trim()) {
+      return res.status(400).json({ error: 'Comment cannot be empty.' });
+    }
+    const comment = await prisma.caseComment.create({
+      data: {
+        caseId:     req.params.id,
+        body:       String(body).trim(),
+        authorName: req.user.name,
+        authorRole: req.user.role,
+      },
+    });
+    res.status(201).json(comment);
+  } catch (err) {
+    console.error('[POST comments]', err);
+    res.status(500).json({ error: 'Could not add comment.' });
   }
 });
 

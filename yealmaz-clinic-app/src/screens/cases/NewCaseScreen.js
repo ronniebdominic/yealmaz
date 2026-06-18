@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, StatusBar, ActivityIndicator, Alert,
@@ -21,89 +21,16 @@ function getDueDays(workType, priceMap = {}) {
   return 5;
 }
 
-function calcDueDate(workType, priceMap = {}) {
-  const days = getDueDays(workType, priceMap);
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return { iso: d.toISOString().slice(0, 10), days };
-}
-
 function formatDueDate(isoDate) {
   if (!isoDate) return '';
   const d = new Date(isoDate + 'T00:00:00');
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// ── Work Types ────────────────────────────────────────────
-const WORK_TYPES = [
-  // Zirconia
-  'Zirconia Express',
-  'Full Contoured Zirconia',
-  'Layered Zirconia Aesthetic',
-  'Zirconia Screw Retained Crown',
-  'Zirconia Veneer',
-  'Zirconia Rest',
-  'Zirconia Coping',
-  'Custom Abutment',
-  'Screw Retained Aesthetic',
-  // Lithium Disilicate
-  'Lithium Disilicate Inlays / Onlays / Crown',
-  'Lithium Disilicate Veneers',
-  // PFM
-  'PFM Crown',
-  'PFM Crown with Metal Try-In',
-  'PFM Bridge',
-  // Metal
-  'Full Metal Crown',
-  'Full Metal Bridge',
-  'Metal Occlusal Crown',
-  // Implant
-  'Implant Crown PFM',
-  'Implant Crown Zirconia',
-  // Dentures
-  'Complete Denture',
-  'Flexible Denture',
-  'Cast Partial Denture',
-  // Temporary
-  'Temporary Crown PMMA',
-  'Temporary Bridge PMMA',
-  // Digital / CAD
-  'Surgical Guide',
-  'Implant Planning',
-  'Wax-Up Diagnostic',
-  'CAD Design Service',
-  '3D Printed Model',
-  // Guards & Appliances
-  'Orthodontic Retainer',
-  'Night Guard Soft',
-  'Night Guard Hard',
-  'Sports Guard',
-  'Bite Splint',
-  'Bleaching Tray',
-  'Clear Aligner Setup',
-  'Gingival Mask',
-  // Emax
-  'Emax Crown',
-  'Emax Veneer',
-  'Emax Bridge',
-  // Composite
-  'Composite Veneer',
-  'Composite Crown',
-  // Specialty Prosthetics
-  'Maryland Bridge',
-  'Precision Attachment',
-  'Telescopic Crown',
-  'Bar Attachment',
-  'Locator Housing',
-  // PEEK
-  'Peek Framework',
-  'Peek Crown',
-  // Implant Prosthetics
-  'Hybrid Denture',
-  'Implant Overdenture',
-  'Temporary Abutment',
-  'Healing Cap',
-];
+// ── Flat-rate work types (priced per item/arch, NOT multiplied by tooth count) ──
+const FLAT_PRICE_TYPES = new Set([
+  'Night Guard', 'Retainer', 'Clear Aligner', 'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
+]);
 
 // ── Odontogram ────────────────────────────────────────────
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -195,22 +122,59 @@ export default function NewCaseScreen({ navigation }) {
   const [submitting, setSubmitting] = useState(false);
   const [showWorkTypes, setShowWorkTypes] = useState(false);
   const [autoCalcDays, setAutoCalcDays] = useState(null);
-  const [priceMap, setPriceMap] = useState({});
+  // The lab's pricing list is the single source of truth for selectable work types
+  const [priceList, setPriceList] = useState([]);
 
   useEffect(() => {
-    api.get('/prices').then(res => {
-      const map = {};
-      res.data.forEach(p => { if (p.durationDays) map[p.workType] = p.durationDays; });
-      setPriceMap(map);
-    }).catch(() => {});
+    api.get('/prices').then(res => setPriceList(res.data || [])).catch(() => {});
   }, []);
+
+  const durationMap = useMemo(() => {
+    const m = {};
+    priceList.forEach(p => { if (p.durationDays != null) m[p.workType] = p.durationDays; });
+    return m;
+  }, [priceList]);
+
+  const expressDurationMap = useMemo(() => {
+    const m = {};
+    priceList.forEach(p => { if (p.expressDurationDays != null) m[p.workType] = p.expressDurationDays; });
+    return m;
+  }, [priceList]);
+
+  const priceMap = useMemo(
+    () => Object.fromEntries(priceList.map(p => [p.workType, p])),
+    [priceList]
+  );
+
+  // Price for the currently selected work type
+  const selectedPrice = useMemo(() => {
+    const p = priceMap[form.workType];
+    if (!p) return null;
+    const isExpress = form.deliveryType === 'EXPRESS' && p.expressPrice != null;
+    const unit = isExpress ? p.expressPrice : p.price;
+    const isFlat = FLAT_PRICE_TYPES.has(form.workType);
+    const count = isFlat ? 1 : Math.max(1, selectedTeeth.length);
+    return { unit, count, isFlat, isExpress, total: unit * count };
+  }, [priceMap, form.workType, form.deliveryType, selectedTeeth.length]);
 
   const set = (field) => (val) => setForm(prev => ({ ...prev, [field]: val }));
 
-  const selectWorkType = (w) => {
-    const { iso, days } = calcDueDate(w, priceMap);
-    setForm(prev => ({ ...prev, workType: w, dueDate: iso }));
+  // Auto-calculate the due date from the pricing list whenever work type / delivery type changes
+  useEffect(() => {
+    if (!form.workType) return;
+    const isExpress = form.deliveryType === 'EXPRESS';
+    let days = isExpress && expressDurationMap[form.workType] != null
+      ? expressDurationMap[form.workType]
+      : durationMap[form.workType];
+    if (days == null) days = getDueDays(form.workType);
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    setForm(prev => ({ ...prev, dueDate: d.toISOString().slice(0, 10) }));
     setAutoCalcDays(days);
+  }, [form.workType, form.deliveryType, durationMap, expressDurationMap]);
+
+  const selectWorkType = (w) => {
+    setForm(prev => ({ ...prev, workType: w }));
     setShowWorkTypes(false);
   };
 
@@ -225,6 +189,12 @@ export default function NewCaseScreen({ navigation }) {
   const validate = () => {
     if (!form.patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return false; }
     if (!form.workType) { Alert.alert('Required', 'Please select a work type.'); return false; }
+    // Shade, doctor name & contact are mandatory for new orders (historical entries with a delivery date are exempt)
+    if (!form.deliveryDate) {
+      if (!form.doctorName.trim())  { Alert.alert('Required', "Please enter the doctor's name."); return false; }
+      if (!form.doctorPhone.trim()) { Alert.alert('Required', "Please enter the doctor's contact number."); return false; }
+      if (!form.shade.trim())       { Alert.alert('Required', 'Please enter the shade.'); return false; }
+    }
     return true;
   };
 
@@ -241,6 +211,7 @@ export default function NewCaseScreen({ navigation }) {
         units: resolvedUnits,
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
         deliveryDate: form.deliveryDate || undefined,
+        totalAmount: selectedPrice ? selectedPrice.total : undefined,
       });
       Alert.alert(
         '✅ Case Submitted!',
@@ -293,7 +264,7 @@ export default function NewCaseScreen({ navigation }) {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Doctor Name</Text>
+            <Text style={styles.label}>Doctor Name *</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. Dr. Sarah Ahmed"
@@ -305,7 +276,7 @@ export default function NewCaseScreen({ navigation }) {
 
           <View style={styles.row}>
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Doctor Phone</Text>
+              <Text style={styles.label}>Doctor Phone *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="+251 911 000 000"
@@ -357,7 +328,7 @@ export default function NewCaseScreen({ navigation }) {
             </View>
             <View style={{ width: 12 }} />
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Shade</Text>
+              <Text style={styles.label}>Shade *</Text>
               <TextInput
                 style={styles.input}
                 placeholder="e.g. A2, B1"
@@ -426,19 +397,40 @@ export default function NewCaseScreen({ navigation }) {
             </TouchableOpacity>
             {showWorkTypes && (
               <View style={styles.dropdown}>
-                <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-                  {WORK_TYPES.map(w => (
-                    <TouchableOpacity
-                      key={w}
-                      style={[styles.dropdownItem, form.workType === w && styles.dropdownItemActive]}
-                      onPress={() => selectWorkType(w)}
-                    >
-                      <Text style={[styles.dropdownText, form.workType === w && styles.dropdownTextActive]}>
-                        {w}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                {priceList.length === 0 ? (
+                  <Text style={{ padding: Spacing.md, fontSize: 13, color: Colors.text3, fontStyle: 'italic' }}>
+                    No work types available yet — please contact the lab.
+                  </Text>
+                ) : (
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+                    {priceList.map(p => (
+                      <TouchableOpacity
+                        key={p.workType}
+                        style={[styles.dropdownItem, styles.dropdownItemRow, form.workType === p.workType && styles.dropdownItemActive]}
+                        onPress={() => selectWorkType(p.workType)}
+                      >
+                        <Text style={[styles.dropdownText, { flex: 1 }, form.workType === p.workType && styles.dropdownTextActive]} numberOfLines={1}>
+                          {p.workType}
+                        </Text>
+                        <Text style={styles.dropdownPrice}>Br {Number(p.price).toLocaleString('en-US')}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            )}
+
+            {/* Estimated amount from the lab's price list */}
+            {selectedPrice && (
+              <View style={styles.priceBox}>
+                <Text style={styles.priceBoxLabel}>Estimated Amount</Text>
+                <Text style={styles.priceBoxValue}>
+                  Br {selectedPrice.total.toLocaleString('en-US')}
+                  {!selectedPrice.isFlat && selectedPrice.count > 1 && (
+                    <Text style={styles.priceBoxSub}>  ·  Br {selectedPrice.unit.toLocaleString('en-US')} × {selectedPrice.count}</Text>
+                  )}
+                  {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ express</Text>}
+                </Text>
               </View>
             )}
           </View>
@@ -612,8 +604,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   dropdownItemActive: { backgroundColor: Colors.blue + '10' },
+  dropdownItemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dropdownText: { fontSize: 14, color: Colors.text1 },
   dropdownTextActive: { color: Colors.blue, fontWeight: '700' },
+  dropdownPrice: { fontSize: 12, fontWeight: '700', color: Colors.text3, marginLeft: 10 },
+
+  // Estimated amount box
+  priceBox: {
+    marginTop: 12, padding: Spacing.md, borderRadius: Radius.md,
+    backgroundColor: Colors.green + '10', borderWidth: 1.5, borderColor: Colors.green + '40',
+  },
+  priceBoxLabel: { fontSize: 11, fontWeight: '700', color: Colors.text3, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2 },
+  priceBoxValue: { fontSize: 18, fontWeight: '800', color: Colors.green },
+  priceBoxSub: { fontSize: 12, fontWeight: '600', color: Colors.text3 },
 
   // Submit
   submitWrap: { gap: 10, marginTop: 8 },
