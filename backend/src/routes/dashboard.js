@@ -36,7 +36,7 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DI
       prisma.case.findMany({ take: 10, orderBy: { createdAt: 'desc' }, include: { clinic: { select: { name: true } }, payment: true } }),
       prisma.case.count({ where: { createdAt: { gte: startOfToday } } }),
       prisma.case.count({ where: { remake: true, status: { notIn: ['DELIVERED', 'CANCELLED'] } } }),
-      prisma.case.count({ where: { status: 'REMAKE' } }),
+      prisma.case.count({ where: { isRedo: true, status: { notIn: ['DELIVERED', 'CANCELLED'] } } }),
       prisma.case.count({ where: { deliveryDate: { gte: startOfToday } } }),
       prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
     ]);

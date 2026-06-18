@@ -347,6 +347,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),
               ...(data.patientGender ? [['Patient Gender', data.patientGender]] : []),
               ...(data.remake ? [['Remake', '🔄 Yes' + (data.remakeReason ? ' — ' + data.remakeReason : '')]] : []),
+              ...(data.isRedo ? [['Redo / Replacement', '♻️ Yes — 50% rate']] : []),
             ].map(([label, val]) => (
               <div key={label} style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: 600, marginBottom: '2px' }}>{label}</div>

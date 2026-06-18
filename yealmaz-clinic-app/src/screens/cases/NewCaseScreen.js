@@ -115,7 +115,7 @@ export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
     patientGender: '', workType: '', shade: '', notes: '', dueDate: '',
-    deliveryType: 'NORMAL', deliveryDate: '',
+    deliveryType: 'NORMAL', deliveryDate: '', isRedo: false,
   });
   const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [manualUnits, setManualUnits] = useState('');
@@ -146,7 +146,7 @@ export default function NewCaseScreen({ navigation }) {
     [priceList]
   );
 
-  // Price for the currently selected work type
+  // Price for the currently selected work type (redo/replacement is charged at 50%)
   const selectedPrice = useMemo(() => {
     const p = priceMap[form.workType];
     if (!p) return null;
@@ -154,8 +154,9 @@ export default function NewCaseScreen({ navigation }) {
     const unit = isExpress ? p.expressPrice : p.price;
     const isFlat = FLAT_PRICE_TYPES.has(form.workType);
     const count = isFlat ? 1 : Math.max(1, selectedTeeth.length);
-    return { unit, count, isFlat, isExpress, total: unit * count };
-  }, [priceMap, form.workType, form.deliveryType, selectedTeeth.length]);
+    const total = Math.round(unit * count * (form.isRedo ? 0.5 : 1));
+    return { unit, count, isFlat, isExpress, isRedo: form.isRedo, total };
+  }, [priceMap, form.workType, form.deliveryType, selectedTeeth.length, form.isRedo]);
 
   const set = (field) => (val) => setForm(prev => ({ ...prev, [field]: val }));
 
@@ -426,13 +427,38 @@ export default function NewCaseScreen({ navigation }) {
                 <Text style={styles.priceBoxLabel}>Estimated Amount</Text>
                 <Text style={styles.priceBoxValue}>
                   Br {selectedPrice.total.toLocaleString('en-US')}
-                  {!selectedPrice.isFlat && selectedPrice.count > 1 && (
+                  {!selectedPrice.isRedo && !selectedPrice.isFlat && selectedPrice.count > 1 && (
                     <Text style={styles.priceBoxSub}>  ·  Br {selectedPrice.unit.toLocaleString('en-US')} × {selectedPrice.count}</Text>
                   )}
                   {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ express</Text>}
+                  {selectedPrice.isRedo && <Text style={styles.priceBoxSub}>  ·  ♻️ 50% redo</Text>}
                 </Text>
               </View>
             )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Redo / Replacement</Text>
+            <TouchableOpacity
+              onPress={() => set('isRedo')(!form.isRedo)}
+              activeOpacity={0.8}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
+                borderRadius: Radius.md, borderWidth: 1.5,
+                borderColor: form.isRedo ? Colors.amber : Colors.border,
+                backgroundColor: form.isRedo ? Colors.amber + '12' : Colors.bg,
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>{form.isRedo ? '☑' : '☐'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: form.isRedo ? Colors.amber : Colors.text1 }}>
+                  This is a redo / replacement
+                </Text>
+                <Text style={{ fontSize: 11, color: Colors.text3 }}>
+                  Replacing an existing restoration — charged at 50%
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.formGroup}>

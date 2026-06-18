@@ -128,15 +128,25 @@ Detailed in the Excel beyond the 6 bullets. Much is partially built.
 - **Phase 2 — code DONE.** B1 reception daily counts (removed all-time totals); B3 `dateFrom`/`dateTo` on `GET /api/cases` + reception ready-list date search; B4 staff comment thread (`CaseComment` model + `/api/cases/:id/comments` endpoints + CaseDetailModal UI). B2 still PARKED.
 - **Phase 4 — DONE (mostly pre-existing).** Audit found Delivery "Not Picked Up" + "Return — Not Delivered" already implemented ([DeliveryDashboard.jsx](../frontend/receptionist/src/pages/DeliveryDashboard.jsx) via `PATCH /cases/:id/status`); Dispatch counters/lists/assign/assign-pickup/request-payment/stations already implemented; Finance KPIs + tabs (Screenshots, Billing, Trusted Partners, History, Cases Overview, Clinic Balances, Revenue Report) already implemented. Only concrete gap closed: **Date-from/Date-to filter added to the Dispatch board**. No migration. Workflow "ready-for-delivery visible to all 3 depts" appears satisfied (Reception ready list + Dispatch queue + Finance Cases Overview).
 - **Phase 3 — DONE.** Excel export via existing `xlsx` dep: `backend/src/utils/excel.js` helper + `GET /api/cases/export` + `GET /api/payments/export`; frontend `downloadExport()` in `api.js` + Export buttons on Cases page, reception ready list, and Finance → History tab. No migration.
-- **⚠️ PENDING MIGRATION (held by client) for B4** — must run before deploying B4, then `prisma generate`:
-  ```sql
-  CREATE TABLE IF NOT EXISTS case_comments (
-    id           TEXT PRIMARY KEY,
-    "caseId"     TEXT NOT NULL REFERENCES cases(id),
-    body         TEXT NOT NULL,
-    "authorName" TEXT,
-    "authorRole" TEXT,
-    "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE INDEX IF NOT EXISTS "case_comments_caseId_idx" ON case_comments("caseId");
-  ```
+- **A2 — DONE (code).** `isRedo` flag on Case (distinct from `remake`): redo/replacement = replacing an existing in-mouth restoration, charged at 50%. Toggle on both new-case forms halves the amount; backend stores `isRedo`; dashboard "Redo" counter now counts `isRedo` (was `status:REMAKE`); CaseDetailModal shows a Redo row. **Needs migration (below).**
+- **B2 — DONE.** Removed the "Ready for Delivery" list from the reception dashboard (duplicated Dispatch); kept the Ready-to-Dispatch count. No migration.
+
+### ⚠️ PENDING MIGRATIONS — run in Supabase SQL Editor before deploying that code, then deploy (Railway `npm run build` auto-runs `prisma generate`)
+
+**A2 — `isRedo` column. CRITICAL: deploying A2 code without this column breaks `POST /cases` (case creation) AND the dashboard summary — run this FIRST/with the A2 deploy.** Additive & safe:
+```sql
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS "isRedo" BOOLEAN NOT NULL DEFAULT false;
+```
+
+**B4 — `case_comments` table** (only the comments feature 500s without it; not catastrophic):
+```sql
+CREATE TABLE IF NOT EXISTS case_comments (
+  id           TEXT PRIMARY KEY,
+  "caseId"     TEXT NOT NULL REFERENCES cases(id),
+  body         TEXT NOT NULL,
+  "authorName" TEXT,
+  "authorRole" TEXT,
+  "createdAt"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS "case_comments_caseId_idx" ON case_comments("caseId");
+```

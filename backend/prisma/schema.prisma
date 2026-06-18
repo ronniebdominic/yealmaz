@@ -86,6 +86,7 @@ model Case {
   notes           String?
   remake          Boolean     @default(false)
   remakeReason    String?
+  isRedo          Boolean     @default(false) // redo/replacement of an existing in-mouth restoration — charged at 50%
   dueDate         DateTime?
   status          CaseStatus  @default(CASE_ACCEPTED)
   qrCodeUrl       String?     // URL of the generated QR image

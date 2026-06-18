@@ -134,7 +134,7 @@ export default function NewCase() {
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
     doctorPhone: '', patientGender: '',
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
-    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
+    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP', isRedo: false,
   });
 
   const { data: pricesData = [] } = useQuery({
@@ -170,9 +170,10 @@ export default function NewCase() {
     const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
     if (unitPrice === undefined) return;
     const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
-    setForm(prev => ({ ...prev, totalAmount: String(unitPrice * count) }));
+    const redoFactor = form.isRedo ? 0.5 : 1; // redo/replacement charged at 50%
+    setForm(prev => ({ ...prev, totalAmount: String(Math.round(unitPrice * count * redoFactor)) }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
+  }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap, form.isRedo]);
 
   // Auto-set due date whenever work type or delivery type changes
   useEffect(() => {
@@ -351,6 +352,23 @@ export default function NewCase() {
                     No work types found in the pricing list. Add them under Admin → Pricing first.
                   </div>
                 )}
+              </div>
+
+              {/* Redo / Replacement */}
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.isRedo}
+                    onChange={e => setForm(f => ({ ...f, isRedo: e.target.checked }))}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span>Redo / Replacement{' '}
+                    <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
+                      — replacing an existing restoration (charged at 50%)
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {/* Intake Method */}
