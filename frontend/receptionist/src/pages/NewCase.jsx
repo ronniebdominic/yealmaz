@@ -6,6 +6,71 @@ import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
+// ── Visual group ordering for the work-type dropdown ─────
+// Types present in the pricing DB will be slotted into these groups.
+// Any DB type not listed here falls into "Other" at the bottom.
+const GROUP_ORDER = [
+  'Zirconia', 'Lithium Disilicate', 'Emax', 'PFM', 'Metal',
+  'Implant', 'Dentures', 'Temporary', 'Composite', 'Digital / CAD',
+  'Guards & Appliances', 'Specialty Prosthetics',
+];
+
+const TYPE_TO_GROUP = {
+  'Zirconia Express':                    'Zirconia',
+  'Full Contoured Zirconia':             'Zirconia',
+  'Layered Zirconia Aesthetic':          'Zirconia',
+  'Zirconia Screw Retained Crown':       'Zirconia',
+  'Zirconia Veneer':                     'Zirconia',
+  'Zirconia Rest':                       'Zirconia',
+  'Zirconia Coping':                     'Zirconia',
+  'Custom Abutment':                     'Zirconia',
+  'Screw Retained Aesthetic':            'Zirconia',
+  'Lithium Disilicate Inlays / Onlays / Crown': 'Lithium Disilicate',
+  'Lithium Disilicate Veneers':          'Lithium Disilicate',
+  'Emax Crown':  'Emax',
+  'Emax Veneer': 'Emax',
+  'Emax Bridge': 'Emax',
+  'PFM Crown':                   'PFM',
+  'PFM Crown with Metal Try-In': 'PFM',
+  'PFM Bridge':                  'PFM',
+  'Full Metal Crown':      'Metal',
+  'Full Metal Bridge':     'Metal',
+  'Metal Occlusal Crown':  'Metal',
+  'Implant Crown PFM':     'Implant',
+  'Implant Crown Zirconia':'Implant',
+  'Surgical Guide':        'Implant',
+  'Implant Planning':      'Implant',
+  'Temporary Abutment':    'Implant',
+  'Healing Cap':           'Implant',
+  'Complete Denture':      'Dentures',
+  'Flexible Denture':      'Dentures',
+  'Cast Partial Denture':  'Dentures',
+  'Hybrid Denture':        'Dentures',
+  'Implant Overdenture':   'Dentures',
+  'Temporary Crown PMMA':  'Temporary',
+  'Temporary Bridge PMMA': 'Temporary',
+  'Composite Veneer':      'Composite',
+  'Composite Crown':       'Composite',
+  'Wax-Up Diagnostic':     'Digital / CAD',
+  'CAD Design Service':    'Digital / CAD',
+  '3D Printed Model':      'Digital / CAD',
+  'Orthodontic Retainer':  'Guards & Appliances',
+  'Night Guard Soft':      'Guards & Appliances',
+  'Night Guard Hard':      'Guards & Appliances',
+  'Sports Guard':          'Guards & Appliances',
+  'Bite Splint':           'Guards & Appliances',
+  'Bleaching Tray':        'Guards & Appliances',
+  'Clear Aligner Setup':   'Guards & Appliances',
+  'Gingival Mask':         'Guards & Appliances',
+  'Maryland Bridge':       'Specialty Prosthetics',
+  'Precision Attachment':  'Specialty Prosthetics',
+  'Telescopic Crown':      'Specialty Prosthetics',
+  'Bar Attachment':        'Specialty Prosthetics',
+  'Locator Housing':       'Specialty Prosthetics',
+  'Peek Framework':        'Specialty Prosthetics',
+  'Peek Crown':            'Specialty Prosthetics',
+};
+
 // ── Odontogram ────────────────────────────────────────────
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
@@ -36,7 +101,6 @@ function Odontogram({ selected, onToggle, onClear }) {
     flexShrink: 0,
   };
 
-  // Midline rendered as a sibling via React.Fragment (not nested inside the tooth div)
   const renderRow = (teeth, isUpper) => (
     <div style={{ display: 'flex', alignItems: 'stretch' }}>
       {teeth.map((num) => {
@@ -64,9 +128,7 @@ function Odontogram({ selected, onToggle, onClear }) {
         <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.5 }}>← R (Patient Right)</span>
         <span style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.5 }}>(Patient Left) L →</span>
       </div>
-
       {renderRow(UPPER_TEETH, true)}
-
       <div style={{
         height: 22, margin: '3px 0',
         background: '#F0F4F9', border: '1px solid #E2E8F0', borderRadius: 2,
@@ -76,9 +138,7 @@ function Odontogram({ selected, onToggle, onClear }) {
         <div style={{ flex: 1, height: 1, background: '#CBD5E0' }} />
         <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8', letterSpacing: 0.8 }}>LOWER</span>
       </div>
-
       {renderRow(LOWER_TEETH, false)}
-
       <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
         {selected.length > 0 ? (
           <>
@@ -100,7 +160,7 @@ function Odontogram({ selected, onToggle, onClear }) {
   );
 }
 
-// ── Auto due-date rules ───────────────────────────────────
+// ── Auto due-date rules (fallback when DB has no durationDays) ───
 function getDueDays(workType) {
   const w = (workType || '').toLowerCase();
   if (w.includes('coping'))    return 3;
@@ -118,10 +178,13 @@ function calcDueDate(workType, days) {
   return d.toISOString().split('T')[0];
 }
 
-// Work types priced per item/arch — never multiplied by tooth count.
+// Work types priced per full dentition — never multiplied by tooth count
 const FLAT_PRICE_TYPES = new Set([
-  'Night Guard', 'Retainer', 'Clear Aligner', 'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
+  'Orthodontic Retainer', 'Night Guard Soft', 'Night Guard Hard',
+  'Sports Guard', 'Bite Splint', 'Bleaching Tray', 'Clear Aligner Setup', 'Gingival Mask',
 ]);
+
+const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 500 };
 
 // ── Page ──────────────────────────────────────────────────
 export default function NewCase() {
@@ -130,11 +193,13 @@ export default function NewCase() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedTeeth, setSelectedTeeth] = useState([]);
   const [manualUnits, setManualUnits] = useState('');
+  const [errors, setErrors] = useState({});
   const [form, setForm] = useState({
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
     doctorPhone: '', patientGender: '',
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
-    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP', isRedo: false,
+    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
+    remake: false, redo: false, remakeReason: '',
   });
 
   const { data: pricesData = [] } = useQuery({
@@ -163,19 +228,50 @@ export default function NewCase() {
     [pricesData]
   );
 
-  // Auto-calculate price whenever workType, tooth count, or delivery type changes
-  useEffect(() => {
-    if (!form.workType || Object.keys(priceMap).length === 0) return;
+  // Build grouped work-type list from DB (single source of truth)
+  const workTypeGroups = useMemo(() => {
+    const dbTypes = new Set(pricesData.map(p => p.workType));
+    const grouped = {};
+    for (const wt of dbTypes) {
+      const group = TYPE_TO_GROUP[wt] || 'Other';
+      if (!grouped[group]) grouped[group] = [];
+      grouped[group].push(wt);
+    }
+    for (const g of Object.keys(grouped)) grouped[g].sort();
+    const result = [];
+    for (const g of GROUP_ORDER) {
+      if (grouped[g]?.length) result.push({ label: g, types: grouped[g] });
+    }
+    if (grouped['Other']?.length) result.push({ label: 'Other', types: grouped['Other'] });
+    return result;
+  }, [pricesData]);
+
+  // Base price before remake/redo modifier
+  const basePrice = useMemo(() => {
+    if (!form.workType || Object.keys(priceMap).length === 0) return null;
     const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
     const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
-    if (unitPrice === undefined) return;
+    if (unitPrice === undefined) return null;
     const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
-    const redoFactor = form.isRedo ? 0.5 : 1; // redo/replacement charged at 50%
-    setForm(prev => ({ ...prev, totalAmount: String(Math.round(unitPrice * count * redoFactor)) }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap, form.isRedo]);
+    return unitPrice * count;
+  }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
 
-  // Auto-set due date whenever work type or delivery type changes
+  // Auto-calculate price with remake/redo modifier
+  useEffect(() => {
+    if (basePrice === null) return;
+    let amount;
+    if (form.remake) {
+      amount = '0';
+    } else if (form.redo) {
+      amount = String(Math.round(basePrice * 0.5 * 100) / 100);
+    } else {
+      amount = String(basePrice);
+    }
+    setForm(prev => ({ ...prev, totalAmount: amount }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basePrice, form.remake, form.redo]);
+
+  // Auto-set due date
   useEffect(() => {
     if (!form.workType) return;
     const isExpress = form.deliveryType === 'EXPRESS';
@@ -195,7 +291,15 @@ export default function NewCase() {
     } catch {}
   };
 
-  const set = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const setCheck = (field) => (e) => {
+    const checked = e.target.checked;
+    setForm(prev => {
+      if (field === 'remake' && checked) return { ...prev, remake: true, redo: false };
+      if (field === 'redo'   && checked) return { ...prev, redo: true, remake: false };
+      return { ...prev, [field]: checked };
+    });
+  };
 
   const toggleTooth = (num) => {
     setSelectedTeeth(prev =>
@@ -205,17 +309,27 @@ export default function NewCase() {
     );
   };
 
+  const validate = () => {
+    const e = {};
+    if (!form.shade.trim())       e.shade      = 'Shade is required';
+    if (!form.doctorName.trim())  e.doctorName  = "Doctor's name is required";
+    if (!form.doctorPhone.trim()) e.doctorPhone = 'Contact / phone is required';
+    return e;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.clinicId) return toast.error('Please select a clinic');
+    if (!form.clinicId)    return toast.error('Please select a clinic');
     if (!form.patientName) return toast.error('Patient name is required');
-    if (!form.workType) return toast.error('Work type is required');
-    // Shade, doctor name & contact are mandatory for new orders (historical entries with a delivery date are exempt)
-    if (!form.deliveryDate) {
-      if (!form.shade?.trim())       return toast.error('Shade is required');
-      if (!form.doctorName?.trim())  return toast.error("Doctor's name is required");
-      if (!form.doctorPhone?.trim()) return toast.error("Doctor's contact is required");
+    if (!form.workType)    return toast.error('Work type is required');
+
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      toast.error(Object.values(errs)[0]);
+      return;
     }
+    setErrors({});
 
     setSubmitting(true);
     try {
@@ -237,6 +351,32 @@ export default function NewCase() {
       setSubmitting(false);
     }
   };
+
+  // Price label shown next to Amount field
+  const priceLabel = (() => {
+    if (!form.workType || priceMap[form.workType] == null) return null;
+    const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
+    const unitPrice  = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
+    const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
+    const full  = unitPrice * count;
+    if (form.remake) {
+      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>Remake — <strong style={{ color: 'var(--red)' }}>Free (Br 0)</strong></span>;
+    }
+    if (form.redo) {
+      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+        Redo 50% — <strong style={{ color: 'var(--amber)' }}>Br {(full * 0.5).toLocaleString('en-US')}</strong>
+      </span>;
+    }
+    return FLAT_PRICE_TYPES.has(form.workType) ? (
+      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+        {useExpress ? '⚡ ' : ''}flat — <strong style={{ color: 'var(--green)' }}>Br {unitPrice.toLocaleString('en-US')}</strong>
+      </span>
+    ) : (
+      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+        {useExpress ? '⚡ ' : ''}Br {unitPrice.toLocaleString('en-US')} × {count} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+      </span>
+    );
+  })();
 
   return (
     <Layout>
@@ -278,15 +418,28 @@ export default function NewCase() {
                 </div>
               </div>
 
-              {/* Doctor info */}
+              {/* Doctor info — mandatory */}
               <div className="grid-2">
                 <div className="form-group">
-                  <label>Doctor Name *</label>
-                  <input placeholder="e.g. Dr. Sarah Ahmed" value={form.doctorName} onChange={set('doctorName')} />
+                  <label>Doctor's Name *</label>
+                  <input
+                    placeholder="e.g. Dr. Sarah Ahmed"
+                    value={form.doctorName}
+                    onChange={e => { set('doctorName')(e); setErrors(prev => ({ ...prev, doctorName: '' })); }}
+                    style={errors.doctorName ? { borderColor: 'var(--red)' } : {}}
+                  />
+                  {errors.doctorName && <div style={errStyle}>⚠ {errors.doctorName}</div>}
                 </div>
                 <div className="form-group">
-                  <label>Doctor Phone *</label>
-                  <input type="tel" placeholder="e.g. +251 911 000 000" value={form.doctorPhone} onChange={set('doctorPhone')} />
+                  <label>Contact / Phone *</label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. +251 911 000 000"
+                    value={form.doctorPhone}
+                    onChange={e => { set('doctorPhone')(e); setErrors(prev => ({ ...prev, doctorPhone: '' })); }}
+                    style={errors.doctorPhone ? { borderColor: 'var(--red)' } : {}}
+                  />
+                  {errors.doctorPhone && <div style={errStyle}>⚠ {errors.doctorPhone}</div>}
                 </div>
               </div>
 
@@ -301,7 +454,13 @@ export default function NewCase() {
                 </div>
                 <div className="form-group">
                   <label>Shade *</label>
-                  <input placeholder="e.g. A2, B1" value={form.shade} onChange={set('shade')} />
+                  <input
+                    placeholder="e.g. A2, B1"
+                    value={form.shade}
+                    onChange={e => { set('shade')(e); setErrors(prev => ({ ...prev, shade: '' })); }}
+                    style={errors.shade ? { borderColor: 'var(--red)' } : {}}
+                  />
+                  {errors.shade && <div style={errStyle}>⚠ {errors.shade}</div>}
                 </div>
               </div>
 
@@ -326,8 +485,7 @@ export default function NewCase() {
                   )}
                 </label>
                 <input
-                  type="number"
-                  min="1"
+                  type="number" min="1"
                   placeholder="Enter number of units"
                   value={selectedTeeth.length > 0 ? selectedTeeth.length : manualUnits}
                   onChange={e => { if (selectedTeeth.length === 0) setManualUnits(e.target.value); }}
@@ -336,39 +494,77 @@ export default function NewCase() {
                 />
               </div>
 
-              {/* Work type */}
+              {/* Work type — driven by pricing DB */}
               <div className="form-group">
                 <label>Work Type *</label>
                 <select value={form.workType} onChange={set('workType')} required>
                   <option value="">— Select work type —</option>
-                  {pricesData.map(p => (
-                    <option key={p.workType} value={p.workType}>
-                      {p.workType} — Br {Number(p.price).toLocaleString('en-US')}
-                    </option>
+                  {workTypeGroups.length === 0 ? (
+                    <option disabled>Loading work types…</option>
+                  ) : workTypeGroups.map(group => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map(t => (
+                        <option key={t} value={t}>
+                          {t}{priceMap[t] != null ? ` — Br ${priceMap[t].toLocaleString('en-US')}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
-                {pricesData.length === 0 && (
-                  <div style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4 }}>
-                    No work types found in the pricing list. Add them under Admin → Pricing first.
-                  </div>
-                )}
               </div>
 
-              {/* Redo / Replacement */}
+              {/* Remake / Redo flags */}
               <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={form.isRedo}
-                    onChange={e => setForm(f => ({ ...f, isRedo: e.target.checked }))}
-                    style={{ width: 16, height: 16, cursor: 'pointer' }}
-                  />
-                  <span>Redo / Replacement{' '}
-                    <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>
-                      — replacing an existing restoration (charged at 50%)
-                    </span>
-                  </span>
-                </label>
+                <label>Case Type</label>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {[
+                    {
+                      field: 'remake', checked: form.remake,
+                      label: '🔄 Remake', desc: 'Free — no charge to clinic',
+                      color: 'var(--red)', bg: '#FFF1F2', border: '#FECACA',
+                    },
+                    {
+                      field: 'redo', checked: form.redo,
+                      label: '♻️ Redo', desc: '50% of work-type price',
+                      color: 'var(--amber)', bg: 'var(--amber-dim)', border: '#FCD34D',
+                    },
+                  ].map(opt => (
+                    <label
+                      key={opt.field}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                        border: `2px solid ${opt.checked ? opt.border : 'var(--border)'}`,
+                        background: opt.checked ? opt.bg : 'var(--surface)',
+                        transition: 'border-color .15s, background .15s',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={opt.checked}
+                        onChange={setCheck(opt.field)}
+                        style={{ width: 16, height: 16, accentColor: opt.color, cursor: 'pointer' }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? opt.color : 'var(--text-1)' }}>
+                          {opt.label}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {form.remake && (
+                  <div style={{ marginTop: 10 }}>
+                    <input
+                      placeholder="Remake reason (optional)"
+                      value={form.remakeReason}
+                      onChange={set('remakeReason')}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Intake Method */}
@@ -454,30 +650,13 @@ export default function NewCase() {
                   <input type="date" value={form.deliveryDate} onChange={set('deliveryDate')} />
                 </div>
                 <div className="form-group">
-                  <label>Amount (Br)
-                    {form.workType && priceMap[form.workType] !== undefined && (() => {
-                      const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
-                      const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
-                      const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
-                      const accent = useExpress ? '#92400E' : 'var(--green)';
-                      return FLAT_PRICE_TYPES.has(form.workType) ? (
-                        <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                          {useExpress ? '⚡ ' : ''}flat rate —{' '}
-                          <strong style={{ color: accent }}>Br {unitPrice.toLocaleString('en-US')}</strong>
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                          {useExpress ? '⚡ ' : ''}Br {unitPrice.toLocaleString('en-US')} × {count} {count > 1 ? 'teeth' : 'tooth'}{' = '}
-                          <strong style={{ color: accent }}>Br {(unitPrice * count).toLocaleString('en-US')}</strong>
-                        </span>
-                      );
-                    })()}
-                  </label>
+                  <label>Amount (Br) {priceLabel}</label>
                   <input
                     type="number"
                     placeholder="Auto-calculated from work type"
                     value={form.totalAmount}
                     onChange={set('totalAmount')}
+                    style={form.remake ? { color: 'var(--text-3)' } : form.redo ? { color: 'var(--amber)', fontWeight: 600 } : {}}
                   />
                 </div>
               </div>

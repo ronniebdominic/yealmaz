@@ -85,6 +85,7 @@ model Case {
   shade           String?     // e.g. A2, B1
   notes           String?
   remake          Boolean     @default(false)
+  redo            Boolean     @default(false)
   remakeReason    String?
   isRedo          Boolean     @default(false) // redo/replacement of an existing in-mouth restoration — charged at 50%
   dueDate         DateTime?
