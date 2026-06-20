@@ -261,6 +261,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       remakeReasonGroups,
       deliveredCasesData,
       outstandingPayments,
+      projectedAggregate,
     ] = await Promise.all([
       Promise.all([
         prisma.case.count({ where: caseFilter }),
@@ -301,6 +302,14 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         },
         _sum: { amount: true },
         _count: true,
+      }),
+      // Total projected revenue = sum of ALL payment amounts (regardless of status) in range
+      prisma.payment.aggregate({
+        where: {
+          amount: { not: null },
+          case: { createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}) },
+        },
+        _sum: { amount: true },
       }),
     ]);
 
@@ -375,11 +384,13 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       ? remakeReasonGroups[0].remakeReason
       : null;
 
+    const totalProjectedRevenue = projectedAggregate._sum.amount || 0;
+
     const result = {
       kpi: {
         totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments,
         readyToDispatch, totalRemakes, mostCommonRemakeReason,
-        avgTurnaroundDays, onTimeDeliveryPct,
+        avgTurnaroundDays, onTimeDeliveryPct, totalProjectedRevenue,
         outstandingCount: outstandingPayments._count,
         outstandingAmount: outstandingPayments._sum.amount || 0,
       },

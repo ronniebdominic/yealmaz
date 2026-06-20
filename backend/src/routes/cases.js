@@ -54,7 +54,7 @@ async function getDueDays(workType, isExpress = false) {
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', dateFrom, dateTo } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', dateFrom, dateTo, remake } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const dateOrder = sortDir === 'asc' ? 'asc' : 'desc';
 
@@ -80,8 +80,10 @@ router.get('/', protect, async (req, res) => {
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
       if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.createdAt.lte = end; }
     }
+    if (remake === 'true')  where.remake = true;
+    if (remake === 'false') where.remake = false;
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, dateFrom, dateTo })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, dateFrom, dateTo, remake })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
