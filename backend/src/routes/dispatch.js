@@ -228,4 +228,78 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
   }
 });
 
+// ── GET /api/dispatch/summary ─────────────────────────────
+// Lightweight stat counts for the Dispatch dashboard header cards
+router.get('/summary', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [totalToday, readyToDispatch, enRoute, pendingPickup, deliveredToday] = await Promise.all([
+      prisma.case.count({ where: { createdAt: { gte: todayStart } } }),
+      prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
+      prisma.case.count({ where: { status: 'OUT_FOR_DELIVERY' } }),
+      prisma.case.count({ where: { status: { in: ['PENDING_PICKUP', 'PICKUP_ASSIGNED'] } } }),
+      prisma.case.count({ where: { status: 'DELIVERED', updatedAt: { gte: todayStart } } }),
+    ]);
+
+    res.json({ totalToday, readyToDispatch, enRoute, pendingPickup, deliveredToday });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load dispatch summary.' });
+  }
+});
+
+// ── POST /api/dispatch/:caseId/send-out ──────────────────
+// Assign a delivery executive + move READY_TO_DISPATCH → OUT_FOR_DELIVERY
+router.post('/:caseId/send-out', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  const { executiveId } = req.body;
+  if (!executiveId) return res.status(400).json({ error: 'executiveId is required.' });
+
+  try {
+    const executive = await prisma.user.findUnique({ where: { id: executiveId } });
+    if (!executive || executive.role !== 'DELIVERY') {
+      return res.status(400).json({ error: 'Invalid delivery executive.' });
+    }
+
+    const updated = await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { assignedDeliveryId: executiveId, status: 'OUT_FOR_DELIVERY' },
+      include: {
+        clinic: { select: { name: true, id: true } },
+        assignedDelivery: { select: { id: true, name: true } },
+      },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'OUT_FOR_DELIVERY',
+        scannedBy: req.user.name,
+        notes: `Dispatched to ${executive.name} for delivery`,
+      },
+    });
+
+    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'dashboard:summary');
+
+    const io = req.app.get('io');
+    io.to(`delivery_${executiveId}`).emit('case_assigned', {
+      caseId: updated.id,
+      caseNumber: updated.caseNumber,
+      message: `Delivery assigned: ${updated.caseNumber} — deliver to ${updated.clinic?.name}`,
+    });
+
+    sendPushToClinic(prisma, updated.clinicId, {
+      title: '🚚 Out for Delivery',
+      body: `Case ${updated.caseNumber} (${updated.patientName}) is on its way to you.`,
+      data: { caseId: updated.id, caseNumber: updated.caseNumber, screen: 'CaseDetail' },
+    });
+
+    res.json({ success: true, case: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not dispatch case.' });
+  }
+});
+
 module.exports = router;

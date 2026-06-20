@@ -1,94 +1,77 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { StatusBadge } from '../components/StatusBadge';
+import { PaymentBadge } from '../components/StatusBadge';
 import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-// ── Assign Modal ─────────────────────────────────────────────────────────────
-function AssignModal({ caseData, executives, onConfirm, onClose, loading, mode }) {
+const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—';
+
+// ── Executive assign modal ────────────────────────────────
+function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }) {
   const [selectedExecId, setSelectedExecId] = useState('');
-  const isPickup = mode === 'pickup';
-
+  const title = mode === 'pickup' ? '🛵 Assign Pickup Driver' : '🚚 Assign Delivery Driver';
   const current = caseData.assignedDelivery;
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">{isPickup ? '🛵 Assign Pickup Executive' : '🚚 Assign Delivery Executive'}</div>
+          <div className="modal-title">{title}</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          {/* Case summary */}
-          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18, border: '1px solid var(--border)' }}>
-            <div className="case-number" style={{ marginBottom: 4 }}>{caseData.caseNumber}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-              {caseData.workType}
-              {caseData.units != null && (
-                <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-3)' }}>({caseData.units} units)</span>
-              )}
-              {' · '}{caseData.clinic?.name}
-            </div>
+          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)' }}>
+            <div className="case-number" style={{ marginBottom: 2 }}>{caseData.caseNumber}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{caseData.workType} · 🏥 {caseData.clinic?.name}</div>
             {caseData.clinic?.address && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>📍 {caseData.clinic.address}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>📍 {caseData.clinic.address}</div>
             )}
           </div>
-
           {current && (
-            <div style={{ background: 'var(--amber-dim)', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 13, color: 'var(--amber)' }}>
-              ⚠ Currently assigned to <strong>{current.name}</strong>
+            <div style={{ background: 'var(--amber-dim)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--amber)' }}>
+              ⚠ Currently: <strong>{current.name}</strong>
             </div>
           )}
-
-          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-            SELECT DELIVERY EXECUTIVE
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 8, letterSpacing: 0.5 }}>
+            SELECT DRIVER
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
             {executives.map(exec => {
-              const activeCount = exec.assignedDeliveries?.length || 0;
-              const isSelected = selectedExecId === exec.id;
+              const active = exec.assignedDeliveries?.length || 0;
+              const sel = selectedExecId === exec.id;
               return (
-                <button
-                  key={exec.id}
-                  onClick={() => setSelectedExecId(exec.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 14px', borderRadius: 10, border: `2px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                    background: isSelected ? 'var(--accent-dim)' : 'var(--surface-2)',
-                    cursor: 'pointer', transition: 'all .15s', textAlign: 'left'
-                  }}
-                >
+                <button key={exec.id} onClick={() => setSelectedExecId(exec.id)} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                  border: `2px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                  background: sel ? 'var(--accent-dim)' : 'var(--surface-2)',
+                  transition: 'all .15s',
+                }}>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>
-                      {isSelected ? '✓ ' : ''}{exec.name}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{exec.email}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{sel ? '✓ ' : ''}{exec.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{exec.email}</div>
                   </div>
                   <div style={{
                     fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                    background: activeCount === 0 ? 'var(--green-dim)' : activeCount < 3 ? 'var(--amber-dim)' : 'var(--red-dim)',
-                    color: activeCount === 0 ? 'var(--green)' : activeCount < 3 ? 'var(--amber)' : 'var(--red)',
+                    background: active === 0 ? 'var(--green-dim)' : active < 3 ? 'var(--amber-dim)' : 'var(--red-dim)',
+                    color:      active === 0 ? 'var(--green)' : active < 3 ? 'var(--amber)' : 'var(--red)',
                   }}>
-                    {activeCount} active
+                    {active} active
                   </div>
                 </button>
               );
             })}
           </div>
-
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
-            <button
-              className="btn btn-primary"
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => onConfirm(selectedExecId)}
-              disabled={loading || !selectedExecId}
-            >
-              {loading ? 'Assigning…' : isPickup ? '🛵 Assign Pickup' : '✓ Assign Delivery'}
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+              onClick={() => onConfirm(selectedExecId)} disabled={loading || !selectedExecId}>
+              {loading ? 'Assigning…' : title}
             </button>
           </div>
         </div>
@@ -97,76 +80,144 @@ function AssignModal({ caseData, executives, onConfirm, onClose, loading, mode }
   );
 }
 
-// ── Main Dispatch Dashboard ──────────────────────────────────────────────────
+// ── Request Payment modal ─────────────────────────────────
+function PaymentModal({ caseData, onClose, onSuccess }) {
+  const [amount, setAmount] = useState(caseData.payment?.amount ?? caseData.totalAmount ?? '');
+  const [notes,  setNotes]  = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!amount || parseFloat(amount) <= 0) return toast.error('Enter a valid amount');
+    setSaving(true);
+    try {
+      await api.post(`/payments/${caseData.id}/request`, { amount, notes });
+      toast.success('💳 Payment request sent!');
+      onSuccess();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">💳 Request Payment</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)', fontSize: 13 }}>
+            <div className="case-number">{caseData.caseNumber}</div>
+            <div style={{ fontWeight: 700, color: 'var(--text-1)', marginTop: 4 }}>{caseData.patientName} · {caseData.clinic?.name}</div>
+          </div>
+          <div className="form-group">
+            <label>Amount (Br) *</label>
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+          </div>
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional note to clinic…" />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
+              {saving ? 'Sending…' : '💳 Send Request'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Cell helpers ──────────────────────────────────────────
+const Th = ({ children, style }) => (
+  <th style={{ padding: '10px 14px', fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap', ...style }}>
+    {children}
+  </th>
+);
+const Td = ({ children, style }) => (
+  <td style={{ padding: '11px 14px', fontSize: 13, verticalAlign: 'middle', ...style }}>
+    {children}
+  </td>
+);
+
+// ── Main Dispatch Dashboard ───────────────────────────────
 export default function DispatchDashboard() {
-  const navigate = useNavigate();
+  const navigate     = useNavigate();
   const { user, logout } = useAuth();
-  const [cases, setCases]           = useState([]);
-  const [executives, setExecutives] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [modal, setModal]           = useState(null);   // { case, mode: 'pickup'|'delivery' }
-  const [payModal, setPayModal]     = useState(null);   // case for request-payment modal
-  const [payAmount, setPayAmount]   = useState('');
-  const [payNotes, setPayNotes]     = useState('');
-  const [payLoading, setPayLoading] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [tab, setTab]               = useState('pickups'); // pickups | queue | enroute | delivered | stations
-  const [search, setSearch]         = useState('');
-  const [clinicFilter, setClinicFilter] = useState('');
-  const [dateFrom, setDateFrom]     = useState('');
-  const [dateTo, setDateTo]         = useState('');
-  const [stations, setStations]     = useState([]);
-  const [stationsLoading, setStationsLoading] = useState(false);
-  const [open, setOpen]             = useState(false);
+  const queryClient  = useQueryClient();
 
-  const load = useCallback(async () => {
-    try {
-      const [queueRes, execRes] = await Promise.all([
-        api.get('/dispatch/queue'),
-        api.get('/dispatch/executives'),
-      ]);
-      setCases(queueRes.data);
-      setExecutives(execRes.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [tab, setTab]           = useState('place-order');
+  const [open, setOpen]         = useState(false);
+  const [search, setSearch]     = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+  const [assignModal, setAssignModal] = useState(null); // { case, mode: 'pickup'|'send-out' }
+  const [payModal, setPayModal]       = useState(null);
+  const [processing, setProcessing]   = useState(false);
 
-  const loadStations = useCallback(async () => {
-    setStationsLoading(true);
-    try {
-      const res = await api.get('/dispatch/stations');
-      setStations(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setStationsLoading(false);
-    }
-  }, []);
+  // ── Data ────────────────────────────────────────────────
+  const { data: summary = {}, refetch: refetchSummary } = useQuery({
+    queryKey: ['dispatch', 'summary'],
+    queryFn: () => api.get('/dispatch/summary').then(r => r.data),
+    staleTime: 20_000,
+    refetchInterval: 30_000,
+  });
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 20000);
-    return () => clearInterval(t);
-  }, [load]);
+  const { data: allCases = [], refetch: refetchQueue } = useQuery({
+    queryKey: ['dispatch', 'queue'],
+    queryFn: () => api.get('/dispatch/queue').then(r => r.data),
+    staleTime: 15_000,
+    refetchInterval: 20_000,
+  });
 
-  useEffect(() => {
-    if (tab === 'stations') loadStations();
-  }, [tab, loadStations]);
+  const { data: executives = [] } = useQuery({
+    queryKey: ['dispatch', 'executives'],
+    queryFn: () => api.get('/dispatch/executives').then(r => r.data),
+    staleTime: 60_000,
+  });
 
+  const refetchAll = () => { refetchQueue(); refetchSummary(); };
+
+  // ── Filtering ────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to   = dateTo   ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+    return allCases.filter(c => {
+      if (q && !c.clinic?.name?.toLowerCase().includes(q) &&
+               !c.caseNumber?.toLowerCase().includes(q) &&
+               !c.patientName?.toLowerCase().includes(q)) return false;
+      if (from && new Date(c.createdAt) < from) return false;
+      if (to   && new Date(c.createdAt) > to)   return false;
+      return true;
+    });
+  }, [allCases, search, dateFrom, dateTo]);
+
+  const placeOrder    = filtered.filter(c => c.status === 'PENDING_PICKUP');
+  const readyDelivery = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
+  const readyDispatch = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
+  const delivered     = filtered.filter(c => c.status === 'DELIVERED');
+
+  const tabCount = { 'place-order': placeOrder.length, 'ready-delivery': readyDelivery.length, 'ready-dispatch': readyDispatch.length, 'delivered': delivered.length };
+
+  // ── Actions ──────────────────────────────────────────────
   const handleAssign = async (executiveId) => {
-    if (!modal || !executiveId) return;
+    if (!assignModal || !executiveId) return;
     setProcessing(true);
     try {
-      const endpoint = modal.mode === 'pickup'
-        ? `/dispatch/${modal.case.id}/assign-pickup`
-        : `/dispatch/${modal.case.id}/assign`;
-      await api.post(endpoint, { executiveId });
-      toast.success(modal.mode === 'pickup' ? '🛵 Pickup assigned!' : '✓ Delivery assigned!');
-      setModal(null);
-      load();
+      if (assignModal.mode === 'pickup') {
+        await api.post(`/dispatch/${assignModal.case.id}/assign-pickup`, { executiveId });
+        toast.success('🛵 Pickup driver assigned!');
+      } else {
+        await api.post(`/dispatch/${assignModal.case.id}/send-out`, { executiveId });
+        toast.success('🚚 Case dispatched for delivery!');
+      }
+      setAssignModal(null);
+      refetchAll();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Assignment failed');
     } finally {
@@ -174,526 +225,414 @@ export default function DispatchDashboard() {
     }
   };
 
-  const handleRequestPayment = async () => {
-    if (!payModal || !payAmount || parseFloat(payAmount) <= 0) return;
-    setPayLoading(true);
-    try {
-      await api.post(`/payments/${payModal.id}/request`, { amount: payAmount, notes: payNotes });
-      toast.success('💳 Payment request sent to clinic!');
-      setPayModal(null); setPayAmount(''); setPayNotes('');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to send payment request');
-    } finally {
-      setPayLoading(false);
-    }
-  };
-
-  const handleUnassign = async (c) => {
-    if (!window.confirm(`Unassign ${c.caseNumber} from ${c.assignedDelivery?.name}?`)) return;
-    try {
-      await api.post(`/dispatch/${c.id}/unassign`);
-      toast.success('Unassigned');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
-    }
-  };
-
-  // Urgency helper — overdue and not yet delivered/cancelled
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isUrgent = (c) =>
-    c.dueDate &&
-    new Date(c.dueDate) < today &&
-    !['DELIVERED', 'CANCELLED'].includes(c.status);
-
-  // Derived lists
-  const q = search.toLowerCase();
-  const inDateRange = (c) => {
-    if (!dateFrom && !dateTo) return true;
-    const d = new Date(c.createdAt);
-    if (dateFrom && d < new Date(dateFrom)) return false;
-    if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); if (d > end) return false; }
-    return true;
-  };
-  const filtered = cases.filter(c =>
-    (!clinicFilter || c.clinic?.name === clinicFilter) &&
-    inDateRange(c) &&
-    (!q ||
-      c.clinic?.name?.toLowerCase().includes(q) ||
-      c.caseNumber?.toLowerCase().includes(q) ||
-      c.patientName?.toLowerCase().includes(q) ||
-      c.assignedDelivery?.name?.toLowerCase().includes(q))
-  );
-
-  // Unique clinic names for the dropdown (from all fetched cases)
-  const clinicNames = [...new Set(cases.map(c => c.clinic?.name).filter(Boolean))].sort();
-
-  const pickups   = filtered.filter(c => c.status === 'PENDING_PICKUP' || c.status === 'PICKUP_ASSIGNED');
-  const queue     = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
-  const enRoute   = filtered.filter(c => c.status === 'OUT_FOR_DELIVERY');
-  const delivered = filtered.filter(c => c.status === 'DELIVERED');
-  const unassignedPickups = pickups.filter(c => c.status === 'PENDING_PICKUP');
-  const unassigned = queue.filter(c => !c.assignedDeliveryId);
-  const urgentCases = cases.filter(isUrgent);
-  const urgentFiltered = filtered.filter(isUrgent);
-  const shown = tab === 'pickups' ? pickups : tab === 'queue' ? queue : tab === 'enroute' ? enRoute : tab === 'urgent' ? urgentFiltered : delivered;
-
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DS';
 
-  // ── Render ───────────────────────────────────────────────────────────────
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-      {/* ── Drawer overlay ──────────────────────────────── */}
-      <div className={`drawer-overlay${open ? ' open' : ''}`} onClick={() => setOpen(false)} />
+  const TABS = [
+    { id: 'place-order',    label: 'Place Order',        icon: '📋' },
+    { id: 'ready-delivery', label: 'Ready for Delivery', icon: '📦' },
+    { id: 'ready-dispatch', label: 'Ready for Dispatch', icon: '🚚' },
+    { id: 'delivered',      label: 'Delivered',          icon: '✅' },
+  ];
 
-      {/* ── Drawer ──────────────────────────────────────── */}
+  // ── Sidebar nav ──────────────────────────────────────────
+  const SidebarNav = ({ close }) => (
+    <nav className="sidebar-nav">
+      <div className="nav-section-label">Dispatch</div>
+      {TABS.map(t => (
+        <button key={t.id}
+          className={`nav-item${tab === t.id ? ' active' : ''}`}
+          onClick={() => { setTab(t.id); if (close) close(); }}
+        >
+          <span>{t.icon}</span> {t.label}
+          {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
+        </button>
+      ))}
+      <div className="nav-section-label">Cases</div>
+      <button className="nav-item" onClick={() => navigate('/cases/new')}>
+        <span>➕</span> New Case
+      </button>
+    </nav>
+  );
+
+  return (
+    <div className="app">
+      {/* Mobile topbar */}
+      <div className="mobile-topbar">
+        <button className="hamburger-topbar" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
+        <span className="mobile-topbar-title">{TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}</span>
+        <div className="live-dot" />
+      </div>
+
+      <div className={`drawer-overlay${open ? ' open' : ''}`} onClick={() => setOpen(false)} />
       <div className={`drawer${open ? ' open' : ''}`}>
         <div className="drawer-logo">
           <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(0,196,180,0.15)', color: 'var(--accent)' }}>Dispatch</span>
+          <span className="role-badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>Dispatch</span>
         </div>
-        <nav className="sidebar-nav">
-          <div className="nav-section-label">Pickups</div>
-          <button className={`nav-item${tab === 'pickups' ? ' active' : ''}`} onClick={() => { setTab('pickups'); setOpen(false); }}>
-            <span>🛵</span> Impression Pickups
-            {pickups.length > 0 && <span className="badge-count">{pickups.length}</span>}
-          </button>
-          <div className="nav-section-label">Delivery</div>
-          <button className={`nav-item${tab === 'queue' ? ' active' : ''}`} onClick={() => { setTab('queue'); setOpen(false); }}>
-            <span>📦</span> Ready to Dispatch
-            {queue.length > 0 && <span className="badge-count">{queue.length}</span>}
-          </button>
-          <button className={`nav-item${tab === 'enroute' ? ' active' : ''}`} onClick={() => { setTab('enroute'); setOpen(false); }}>
-            <span>🚚</span> En Route
-            {enRoute.length > 0 && <span className="badge-count">{enRoute.length}</span>}
-          </button>
-          <button className={`nav-item${tab === 'delivered' ? ' active' : ''}`} onClick={() => { setTab('delivered'); setOpen(false); }}>
-            <span>✅</span> Delivered
-          </button>
-          <div className="nav-section-label">Overview</div>
-          <button className={`nav-item${tab === 'stations' ? ' active' : ''}`} onClick={() => { setTab('stations'); setOpen(false); }}>
-            <span>🏭</span> Stations by Clinic
-          </button>
-        </nav>
+        <SidebarNav close={() => setOpen(false)} />
         <div className="drawer-footer">
           <div className="user-info">
-            <div className="user-avatar">{initials}</div>
-            <div>
-              <div className="user-name">{user?.name}</div>
-              <div className="user-role">Dispatch</div>
-            </div>
+            <div className="user-avatar" style={{ background: '#3B82F6', color: '#fff' }}>{initials}</div>
+            <div><div className="user-name">{user?.name}</div><div className="user-role">Dispatch</div></div>
             <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
           </div>
         </div>
       </div>
 
-      {/* Topbar */}
-      <div className="topbar">
-        <button className="hamburger-topbar" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
-        <div className="topbar-title">📋 Dispatch Dashboard</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => navigate('/cases/new')}>+ New Case</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
-            <div className="live-dot" />
-            Live · {user?.name}
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <div className="lab-name">Ye-Almaz Dental Lab</div>
+          <span className="role-badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>Dispatch</span>
+        </div>
+        <SidebarNav />
+        <div className="sidebar-footer">
+          <div className="user-info">
+            <div className="user-avatar" style={{ background: '#3B82F6', color: '#fff' }}>{initials}</div>
+            <div><div className="user-name">{user?.name}</div><div className="user-role">Dispatch</div></div>
+            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
           </div>
         </div>
-      </div>
+      </aside>
 
-      <div className="content" style={{ flex: 1 }}>
-
-        {/* Stats */}
-        <div className="stats-grid stats-4" style={{ '--cols': 5 }}>
-          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('pickups')}>
-            <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
-            <div className="stat-label">Impression Pickups</div>
-            <div className="stat-value" style={{ color: '#EA580C' }}>{pickups.length}</div>
-            <div className="stat-sub" style={{ color: unassignedPickups.length > 0 ? 'var(--red)' : 'var(--green)' }}>
-              {unassignedPickups.length > 0 ? `⚠ ${unassignedPickups.length} unassigned` : pickups.length > 0 ? '✓ All assigned' : 'None pending'}
+      <main className="main">
+        {/* Topbar */}
+        <div className="topbar">
+          <button className="hamburger-topbar" style={{ display: 'none' }} onClick={() => setOpen(true)}>☰</button>
+          <div className="topbar-title">{TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/cases/new')}>+ New Case</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
+              <div className="live-dot" /> Live · {user?.name?.split(' ')[0]}
             </div>
-          </div>
-          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('queue')}>
-            <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
-            <div className="stat-label">Ready to Dispatch</div>
-            <div className="stat-value" style={{ color: 'var(--accent)' }}>{queue.length}</div>
-            <div className="stat-sub" style={{ color: unassigned.length > 0 ? 'var(--red)' : 'var(--green)' }}>
-              {unassigned.length > 0 ? `⚠ ${unassigned.length} unassigned` : '✓ All assigned'}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚚</div>
-            <div className="stat-label">En Route</div>
-            <div className="stat-value" style={{ color: 'var(--amber)' }}>{enRoute.length}</div>
-            <div className="stat-sub">Out for delivery</div>
-          </div>
-          <div className="stat-card" style={{ cursor: urgentCases.length > 0 ? 'pointer' : 'default' }}
-            onClick={() => urgentCases.length > 0 && setTab('queue')}
-          >
-            <div className="stat-icon" style={{ background: urgentCases.length > 0 ? '#FFF1F2' : 'var(--green-dim)' }}>🔴</div>
-            <div className="stat-label">Urgent / Overdue</div>
-            <div className="stat-value" style={{ color: urgentCases.length > 0 ? 'var(--red)' : 'var(--green)' }}>{urgentCases.length}</div>
-            <div className="stat-sub" style={{ color: urgentCases.length > 0 ? 'var(--red)' : 'var(--green)' }}>
-              {urgentCases.length > 0 ? 'Past due date' : '✓ All on track'}
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
-            <div className="stat-label">Delivered Today</div>
-            <div className="stat-value" style={{ color: 'var(--green)' }}>{delivered.length}</div>
-            <div className="stat-sub">Completed</div>
           </div>
         </div>
 
-        {/* Executive load summary */}
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', fontSize: 13, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '.05em' }}>
-            EXECUTIVE WORKLOAD
+        <div className="content">
+          {/* ── Summary cards ── */}
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
+              <div className="stat-label">Orders Today</div>
+              <div className="stat-value">{summary.totalToday ?? '—'}</div>
+              <div className="stat-sub">New cases today</div>
+            </div>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready-dispatch')}>
+              <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
+              <div className="stat-label">Ready to Dispatch</div>
+              <div className="stat-value" style={{ color: 'var(--accent)' }}>{summary.readyToDispatch ?? '—'}</div>
+              <div className="stat-sub">Awaiting delivery</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚚</div>
+              <div className="stat-label">Picked Up / En Route</div>
+              <div className="stat-value" style={{ color: 'var(--amber)' }}>{summary.enRoute ?? '—'}</div>
+              <div className="stat-sub">Out for delivery</div>
+            </div>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('place-order')}>
+              <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
+              <div className="stat-label">Pending Pick-up</div>
+              <div className="stat-value" style={{ color: '#EA580C' }}>{summary.pendingPickup ?? '—'}</div>
+              <div className="stat-sub">Impression collection</div>
+            </div>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('delivered')}>
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+              <div className="stat-label">Delivered Today</div>
+              <div className="stat-value" style={{ color: 'var(--green)' }}>{summary.deliveredToday ?? '—'}</div>
+              <div className="stat-sub">Completed</div>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
-            {executives.map((exec, i) => {
-              const active = exec.assignedDeliveries?.length || 0;
-              return (
-                <div key={exec.id} style={{
-                  flex: '1 1 180px', padding: '14px 18px',
-                  borderRight: i < executives.length - 1 ? '1px solid var(--border)' : 'none'
-                }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
-                    {exec.name.replace('Yealmaz Delivery Executive ', 'Exec ')}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{exec.email}</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {exec.assignedDeliveries?.map(c => (
-                      <span key={c.id} style={{
-                        fontSize: 11, padding: '3px 8px', borderRadius: 20,
-                        background: c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber-dim)' : 'var(--accent-dim)',
-                        color: c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--accent)',
-                        fontWeight: 600
-                      }}>
-                        {c.caseNumber}
-                      </span>
-                    ))}
-                    {active === 0 && (
-                      <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>● Free</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Tabs + Search + Clinic filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-          <div className="filters" style={{ margin: 0, flex: 1, flexWrap: 'wrap' }}>
-            <button className={`filter-chip ${tab === 'pickups' ? 'active' : ''}`} onClick={() => setTab('pickups')}>
-              🛵 Pickups {pickups.length > 0 && `(${pickups.length})`}
-              {unassignedPickups.length > 0 && <span style={{ marginLeft: 4, color: 'var(--red)', fontWeight: 700 }}>⚠{unassignedPickups.length}</span>}
-            </button>
-            <button className={`filter-chip ${tab === 'queue' ? 'active' : ''}`} onClick={() => setTab('queue')}>
-              📦 Queue {queue.length > 0 && `(${queue.length})`}
-              {unassigned.length > 0 && <span style={{ marginLeft: 4, color: 'var(--red)', fontWeight: 700 }}>⚠{unassigned.length}</span>}
-            </button>
-            <button className={`filter-chip ${tab === 'enroute' ? 'active' : ''}`} onClick={() => setTab('enroute')}>
-              🚚 En Route {enRoute.length > 0 && `(${enRoute.length})`}
-            </button>
-            <button className={`filter-chip ${tab === 'delivered' ? 'active' : ''}`} onClick={() => setTab('delivered')}>
-              ✅ Delivered {delivered.length > 0 && `(${delivered.length})`}
-            </button>
-            {urgentCases.length > 0 && (
-              <button className={`filter-chip ${tab === 'urgent' ? 'active' : ''}`} onClick={() => setTab('urgent')}
-                style={{ borderColor: 'var(--red)', color: tab === 'urgent' ? '#fff' : 'var(--red)', background: tab === 'urgent' ? 'var(--red)' : '#FFF1F2' }}
-              >
-                🔴 Urgent ({urgentCases.length})
+          {/* ── Search / filter bar ── */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 16 }}>
+            <div className="search-input" style={{ flex: 2, minWidth: 180, margin: 0 }}>
+              <span className="icon">🔍</span>
+              <input
+                placeholder="Clinic, case no., patient…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>ORDER DATE FROM</div>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>TO</div>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
+            </div>
+            {(search || dateFrom || dateTo) && (
+              <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+                style={{ color: 'var(--red)', alignSelf: 'flex-end' }}>
+                ✕ Clear
               </button>
             )}
-            <button className={`filter-chip ${tab === 'stations' ? 'active' : ''}`} onClick={() => setTab('stations')}>
-              🏭 By Clinic
-            </button>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="search-input" style={{ flex: 1, minWidth: 180 }}>
-            <span className="icon">🔍</span>
-            <input
-              placeholder="Search clinic, case, patient…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <SearchableSelect
-            value={clinicFilter}
-            onChange={v => setClinicFilter(v)}
-            options={clinicNames.map(name => ({ value: name, label: name }))}
-            placeholder="All Clinics"
-            style={{ minWidth: 180 }}
-          />
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="Order date from"
-            style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)' }} />
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>→</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Order date to"
-            style={{ padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)' }} />
-          {(search || clinicFilter || dateFrom || dateTo) && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); setDateFrom(''); setDateTo(''); }} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>✕ Clear</button>
+
+          {/* ── TAB: Place Order (PENDING_PICKUP) ── */}
+          {tab === 'place-order' && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">📋 Place Order — Impression Pickups</div>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{placeOrder.length} pending</span>
+              </div>
+              <div className="table-wrap">
+                {placeOrder.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">🎉</div>
+                    <div className="empty-title">No pending pickups</div>
+                    <p>New orders will appear here for pickup assignment.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Location</Th>
+                        <Th>Contact</Th>
+                        <Th>Case #</Th>
+                        <Th>Patient</Th>
+                        <Th>Registered</Th>
+                        <Th>Assign</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {placeOrder.map(c => (
+                        <tr key={c.id}>
+                          <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                          <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                            {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
+                          </Td>
+                          <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
+                          <Td><span className="case-number">{c.caseNumber}</span></Td>
+                          <Td><span className="patient-name">{c.patientName}</span></Td>
+                          <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                            {format(new Date(c.createdAt), 'dd MMM yyyy')}
+                          </Td>
+                          <Td>
+                            <button
+                              className="btn btn-sm"
+                              style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74', whiteSpace: 'nowrap' }}
+                              onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
+                            >
+                              🛵 Assign Pickup
+                            </button>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: Ready for Delivery (READY_TO_DISPATCH — financial view) ── */}
+          {tab === 'ready-delivery' && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">📦 Ready for Delivery</div>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDelivery.length} cases</span>
+              </div>
+              <div className="table-wrap">
+                {readyDelivery.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">🎉</div>
+                    <div className="empty-title">No cases ready</div>
+                    <p>Cases that have passed QC will appear here.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Patient</Th>
+                        <Th>Case No.</Th>
+                        <Th>Product</Th>
+                        <Th>Unit</Th>
+                        <Th>Total Value</Th>
+                        <Th>Payment</Th>
+                        <Th>Request Payment</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {readyDelivery.map(c => {
+                        const amount = c.payment?.amount ?? c.totalAmount;
+                        const canRequest = !['PAYMENT_REQUESTED','SCREENSHOT_UPLOADED','VERIFIED'].includes(c.paymentStatus);
+                        return (
+                          <tr key={c.id}>
+                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td><span className="patient-name">{c.patientName}</span></Td>
+                            <Td><span className="case-number">{c.caseNumber}</span></Td>
+                            <Td style={{ fontSize: 12 }}>{c.workType}</Td>
+                            <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
+                            <Td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(amount)}</Td>
+                            <Td><PaymentBadge status={c.paymentStatus} /></Td>
+                            <Td>
+                              {canRequest ? (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
+                                  onClick={() => setPayModal(c)}
+                                >
+                                  💳 Request
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>—</span>
+                              )}
+                            </Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: Ready for Dispatch (READY_TO_DISPATCH — logistics view) ── */}
+          {tab === 'ready-dispatch' && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">🚚 Ready for Dispatch</div>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDispatch.length} cases</span>
+              </div>
+              <div className="table-wrap">
+                {readyDispatch.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">🎉</div>
+                    <div className="empty-title">Nothing to dispatch</div>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Location</Th>
+                        <Th>Contact</Th>
+                        <Th>Case #</Th>
+                        <Th>Patient</Th>
+                        <Th>Due</Th>
+                        <Th>Payment Status</Th>
+                        <Th>Assign</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {readyDispatch.map(c => {
+                        const overdue = c.dueDate && new Date(c.dueDate) < new Date();
+                        return (
+                          <tr key={c.id}>
+                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                              {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
+                            </Td>
+                            <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
+                            <Td><span className="case-number">{c.caseNumber}</span></Td>
+                            <Td><span className="patient-name">{c.patientName}</span></Td>
+                            <Td style={{ fontSize: 12, color: overdue ? 'var(--red)' : 'var(--text-3)', fontWeight: overdue ? 700 : 400 }}>
+                              {c.dueDate ? format(new Date(c.dueDate), 'dd MMM') : '—'}
+                              {overdue ? ' ⚠' : ''}
+                            </Td>
+                            <Td><PaymentBadge status={c.paymentStatus} /></Td>
+                            <Td>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                style={{ whiteSpace: 'nowrap' }}
+                                onClick={() => setAssignModal({ case: c, mode: 'send-out' })}
+                              >
+                                🚚 Dispatch
+                              </button>
+                            </Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: Delivered ── */}
+          {tab === 'delivered' && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">✅ Delivered</div>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{delivered.length} cases</span>
+              </div>
+              <div className="table-wrap">
+                {delivered.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">📦</div>
+                    <div className="empty-title">No deliveries yet today</div>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Patient</Th>
+                        <Th>Scan No.</Th>
+                        <Th>Product</Th>
+                        <Th>Unit</Th>
+                        <Th>Total Value</Th>
+                        <Th>Payment Status</Th>
+                        <Th>Delivery Status</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {delivered.map(c => {
+                        const amount = c.payment?.amount ?? c.totalAmount;
+                        return (
+                          <tr key={c.id}>
+                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td><span className="patient-name">{c.patientName}</span></Td>
+                            <Td><span className="case-number">{c.caseNumber}</span></Td>
+                            <Td style={{ fontSize: 12 }}>{c.workType}</Td>
+                            <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
+                            <Td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(amount)}</Td>
+                            <Td><PaymentBadge status={c.paymentStatus} /></Td>
+                            <Td>
+                              <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--green-dim)', color: 'var(--green)' }}>
+                                ✅ Delivered
+                              </span>
+                            </Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           )}
         </div>
+      </main>
 
-        {/* Stations view — all active cases grouped by clinic */}
-        {tab === 'stations' && (
-          stationsLoading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading stations…</div>
-          ) : stations.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon">🏭</div><div className="empty-title">No active cases</div></div>
-          ) : (() => {
-            // Group by clinic, apply search/clinic filter
-            const sq = search.toLowerCase();
-            const grouped = {};
-            for (const c of stations) {
-              if (clinicFilter && c.clinic?.name !== clinicFilter) continue;
-              if (sq && !c.clinic?.name?.toLowerCase().includes(sq) && !c.caseNumber?.toLowerCase().includes(sq) && !c.patientName?.toLowerCase().includes(sq)) continue;
-              const key = c.clinic?.name || 'Unknown Clinic';
-              if (!grouped[key]) grouped[key] = { clinic: c.clinic, cases: [] };
-              grouped[key].cases.push(c);
-            }
-            const groups = Object.values(grouped);
-            if (groups.length === 0) return <div className="empty-state"><div className="empty-title">No cases match filter</div></div>;
-            return groups.map(g => (
-              <div key={g.clinic?.id || g.clinic?.name} className="card" style={{ marginBottom: 16 }}>
-                <div style={{ padding: '12px 18px 10px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                    {g.clinic?.name?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{g.clinic?.name}</div>
-                    {g.clinic?.station && (
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginTop: 1 }}>
-                        {g.clinic.station.toUpperCase()}
-                      </div>
-                    )}
-                    {g.clinic?.address && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>📍 {g.clinic.address}</div>}
-                  </div>
-                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)' }}>
-                    {g.cases.length} case{g.cases.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                {g.cases.map(c => (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
-                    <span className="case-number" style={{ minWidth: 110 }}>{c.caseNumber}</span>
-                    <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)', fontWeight: 600 }}>{c.patientName}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 120 }}>
-                      {c.workType}{c.units != null ? <span style={{ marginLeft: 4, color: 'var(--text-3)' }}>·{c.units}u</span> : null}
-                    </span>
-                    <StatusBadge status={c.status} />
-                    {c.assignedDelivery && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        👤 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Exec ')}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ));
-          })()
-        )}
-
-        {/* Case list */}
-        {tab !== 'stations' && <div className="card">
-          {loading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
-          ) : shown.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">{tab === 'pickups' ? '🛵' : tab === 'queue' ? '🎉' : tab === 'enroute' ? '📭' : tab === 'urgent' ? '✅' : '📋'}</div>
-              <div className="empty-title">
-                {tab === 'pickups' ? 'No Pickups Pending' : tab === 'queue' ? 'Queue is Empty' : tab === 'enroute' ? 'None En Route' : tab === 'urgent' ? 'No Urgent Cases' : 'No Deliveries Today'}
-              </div>
-              <p>{tab === 'pickups' ? 'New cases will appear here for pickup assignment.' : tab === 'queue' ? 'No cases waiting for dispatch.' : tab === 'enroute' ? 'No cases currently out for delivery.' : tab === 'urgent' ? 'All cases are within their due dates.' : 'Completed deliveries will appear here.'}</p>
-            </div>
-          ) : shown.map(c => {
-            const isUnassigned = !c.assignedDeliveryId;
-            const accentColor = c.status === 'PENDING_PICKUP' ? 'var(--red)'
-              : c.status === 'PICKUP_ASSIGNED' ? '#CA8A04'
-              : c.status === 'READY_TO_DISPATCH' ? (isUnassigned ? 'var(--red)' : 'var(--accent)')
-              : c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--green)';
-            const urgent = isUrgent(c);
-            return (
-              <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${urgent ? 'var(--red)' : accentColor}`, padding: '14px 18px', background: urgent ? 'rgba(239,68,68,0.03)' : undefined }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  {/* Left: case info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span className="case-number">{c.caseNumber}</span>
-                      <StatusBadge status={c.status} />
-                      {urgent && (
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)', border: '1px solid #FECACA' }}>🔴 Overdue</span>
-                      )}
-                      {c.deliveryType === 'EXPRESS' && (
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>⚡ Express</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{c.patientName}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>{c.workType} · 🏥 {c.clinic?.name}</div>
-                    {c.clinic?.station && (
-                      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginBottom: 4 }}>
-                        {c.clinic.station.toUpperCase()}
-                      </div>
-                    )}
-                    {c.clinic?.address && (
-                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>📍 {c.clinic.address}</div>
-                    )}
-                    {c.dueDate && (
-                      <div style={{ fontSize: 12, color: urgent ? 'var(--red)' : 'var(--text-3)', fontWeight: urgent ? 700 : 400 }}>
-                        📅 Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}{urgent ? ' — OVERDUE' : ''}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right: assignment + actions */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-                    {/* Assigned exec badge */}
-                    {c.assignedDelivery ? (
-                      <div style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 700, textAlign: 'right' }}>
-                        👤 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Exec ')}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, padding: '4px 10px', borderRadius: 20, background: 'var(--red-dim)', color: 'var(--red)', fontWeight: 700 }}>
-                        ⚠ Unassigned
-                      </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {(c.status === 'PENDING_PICKUP' || c.status === 'PICKUP_ASSIGNED') && (
-                        <button
-                          className="btn btn-sm"
-                          style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }}
-                          onClick={() => setModal({ case: c, mode: 'pickup' })}
-                        >
-                          {c.assignedDelivery ? '↻ Reassign Pickup' : '🛵 Assign Pickup'}
-                        </button>
-                      )}
-                      {(c.status === 'READY_TO_DISPATCH' || c.status === 'OUT_FOR_DELIVERY') && (
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => setModal({ case: c, mode: 'delivery' })}
-                        >
-                          {c.assignedDelivery ? '↻ Reassign' : '+ Assign'}
-                        </button>
-                      )}
-                      {c.status === 'READY_TO_DISPATCH' && !['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(c.paymentStatus) && (
-                        <button
-                          className="btn btn-sm"
-                          style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}
-                          onClick={() => { setPayModal(c); setPayAmount(c.payment?.amount || c.totalAmount || ''); setPayNotes(''); }}
-                        >
-                          💳 Request Payment
-                        </button>
-                      )}
-                      {c.assignedDelivery && c.status !== 'DELIVERED' && (
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => handleUnassign(c)}
-                          style={{ color: 'var(--red)' }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Delivery time for delivered */}
-                    {c.status === 'DELIVERED' && c.deliveryLogs?.[0]?.deliveredAt && (
-                      <div style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'right' }}>
-                        ✅ {format(new Date(c.deliveryLogs[0].deliveredAt), 'dd MMM, h:mm a')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>}
-      </div>
-
-      {/* Assign Modal */}
-      {modal && (
+      {/* Assign modal */}
+      {assignModal && (
         <AssignModal
-          caseData={modal.case}
+          caseData={assignModal.case}
           executives={executives}
+          mode={assignModal.mode}
           onConfirm={handleAssign}
-          onClose={() => setModal(null)}
+          onClose={() => setAssignModal(null)}
           loading={processing}
-          mode={modal.mode}
         />
       )}
 
-      {/* Request Payment Modal */}
+      {/* Payment modal */}
       {payModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPayModal(null)}>
-          <div className="modal">
-            <div className="modal-header">
-              <div className="modal-title">💳 Request Payment</div>
-              <button className="modal-close" onClick={() => setPayModal(null)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18, border: '1px solid var(--border)' }}>
-                <div className="case-number" style={{ marginBottom: 4 }}>{payModal.caseNumber}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{payModal.patientName}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{payModal.workType} · {payModal.clinic?.name}</div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Amount (Br) *</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  placeholder="e.g. 1500"
-                  value={payAmount}
-                  onChange={e => setPayAmount(e.target.value)}
-                />
-              </div>
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label className="form-label">Payment Instructions (optional)</label>
-                <textarea
-                  className="form-input"
-                  rows={3}
-                  placeholder="Bank name, account number, etc."
-                  value={payNotes}
-                  onChange={e => setPayNotes(e.target.value)}
-                  style={{ resize: 'vertical' }}
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setPayModal(null)}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                onClick={handleRequestPayment}
-                disabled={payLoading || !payAmount || parseFloat(payAmount) <= 0}
-              >
-                {payLoading ? 'Sending…' : 'Send Request'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PaymentModal
+          caseData={payModal}
+          onClose={() => setPayModal(null)}
+          onSuccess={() => { setPayModal(null); refetchAll(); queryClient.invalidateQueries({ queryKey: ['dispatch'] }); }}
+        />
       )}
-
-      {/* Sign out FAB */}
-      <button
-        onClick={logout}
-        title="Sign out"
-        style={{
-          position: 'fixed', bottom: 24, right: 24,
-          width: 48, height: 48, borderRadius: '50%',
-          background: 'var(--surface)', border: '2px solid var(--red)',
-          boxShadow: 'var(--shadow-lg)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, cursor: 'pointer', zIndex: 50, transition: 'all .15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--red-dim)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
-      >
-        ⏻
-      </button>
     </div>
   );
 }

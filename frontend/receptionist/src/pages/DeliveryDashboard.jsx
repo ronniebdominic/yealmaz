@@ -1,63 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../AuthContext';
-import { StatusBadge } from '../components/StatusBadge';
-import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import QRScanner from '../components/QRScanner';
 
-// ── Confirm modal ────────────────────────────────────────────────────────────
+// ── Confirm action modal ──────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
-  const isCollect       = action === 'collect';
-  const isPickup        = action === 'pickup';
-  const isNotPickedUp   = action === 'not_picked_up';
-  const isReturnND      = action === 'return_not_delivered';
-  const title = isCollect     ? '🛵 Confirm Impression Collected'
-              : isPickup      ? '📦 Confirm Pickup from Lab'
-              : isNotPickedUp ? '✕ Mark as Not Picked Up'
-              : isReturnND    ? '↩ Return — Not Delivered'
-              :                 '✅ Confirm Delivery';
-  const description = isCollect     ? 'Confirm you have collected the impression/cast from the clinic and brought it to the lab.'
-                    : isPickup      ? 'Confirm you have picked up this case from the lab for delivery.'
-                    : isNotPickedUp ? 'This will revert the case back to Awaiting Pickup so it can be reassigned.'
-                    : isReturnND    ? 'This will return the case to Ready to Dispatch so it can be re-assigned for delivery.'
-                    :                 'Confirm this case has been delivered to the clinic.';
+  const cfg = {
+    picked_up:        { title: '✓ Confirm Picked Up',      desc: 'Confirm you have collected the impression from the clinic and are heading to the lab.', btn: '✓ Picked Up',      cls: 'btn btn-primary' },
+    not_picked_up:    { title: '✕ Not Picked Up',           desc: 'Mark that collection was unsuccessful. The case will return to the pickup queue.',          btn: '✕ Not Picked Up',  cls: 'btn btn-ghost' },
+    delivered:        { title: '✅ Confirm Delivery',        desc: 'Confirm this case has been successfully delivered to the clinic.',                           btn: '✅ Mark Delivered', cls: 'btn btn-success' },
+    return_delivered: { title: '↩ Return — Not Delivered',  desc: 'Case could not be delivered. It will return to the dispatch queue for reassignment.',         btn: '↩ Return to Lab',  cls: 'btn btn-ghost' },
+    not_delivered:    { title: '✕ Not Delivered',            desc: 'Mark as undeliverable. The case will return to the dispatch queue.',                         btn: '✕ Not Delivered',  cls: 'btn btn-ghost' },
+  }[action] || { title: 'Confirm', desc: '', btn: 'Confirm', cls: 'btn btn-primary' };
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">{title}</div>
+          <div className="modal-title">{cfg.title}</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
-
         <div className="modal-body">
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{description}</p>
-
+          <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{cfg.desc}</p>
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20, border: '1px solid var(--border)' }}>
             <div className="case-number" style={{ marginBottom: 4 }}>{caseData.caseNumber}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-              {caseData.workType}
-              {caseData.units != null && (
-                <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-3)' }}>({caseData.units} units)</span>
-              )}
-              {' · '}{caseData.clinic?.name}
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+              {caseData.workType}{caseData.units != null ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}
             </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>🏥 {caseData.clinic?.name}</div>
             {caseData.clinic?.address && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>📍 {caseData.clinic.address}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>📍 {caseData.clinic.address}</div>
+            )}
+            {caseData.clinic?.phone && (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>📞 {caseData.clinic.phone}</div>
             )}
           </div>
-
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
-            <button
-              className={isPickup ? 'btn btn-primary' : 'btn btn-success'}
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={onConfirm}
-              disabled={loading}
-            >
-              {loading ? 'Processing…' : isCollect ? '🏭 Impression at Lab' : isPickup ? '📦 Confirm Pickup' : isNotPickedUp ? '✕ Not Picked Up' : isReturnND ? '↩ Return to Lab' : '✅ Mark Delivered'}
+            <button className={cfg.cls} style={{ flex: 1, justifyContent: 'center' }} onClick={onConfirm} disabled={loading}>
+              {loading ? 'Processing…' : cfg.btn}
             </button>
           </div>
         </div>
@@ -66,38 +49,113 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   );
 }
 
-// ── Main dashboard ───────────────────────────────────────────────────────────
+// ── Case row card ─────────────────────────────────────────
+function CaseCard({ c, section, onAction }) {
+  const isPickup = section === 'pickup';
+  return (
+    <div style={{
+      padding: '16px 18px',
+      borderBottom: '1px solid var(--border)',
+      borderLeft: `3px solid ${isPickup ? '#EA580C' : 'var(--accent)'}`,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        {/* Info */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span className="case-number">{c.caseNumber}</span>
+            {c.deliveryType === 'EXPRESS' && (
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>⚡ Express</span>
+            )}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{c.patientName}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
+            🏥 {c.clinic?.name}
+          </div>
+          {c.clinic?.address && (
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
+              📍 {c.clinic.address}
+            </div>
+          )}
+          {c.clinic?.phone && (
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+              📞 <a href={`tel:${c.clinic.phone}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>{c.clinic.phone}</a>
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+            {c.workType}{c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}
+          </div>
+          {c.dueDate && (
+            <div style={{
+              fontSize: 12, marginTop: 4,
+              color: new Date(c.dueDate) < new Date() ? 'var(--red)' : 'var(--text-3)',
+              fontWeight: new Date(c.dueDate) < new Date() ? 700 : 400,
+            }}>
+              📅 Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}
+              {new Date(c.dueDate) < new Date() ? ' — OVERDUE' : ''}
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', flexShrink: 0 }}>
+          {isPickup ? (
+            <>
+              <button
+                className="btn btn-primary btn-sm"
+                style={{ whiteSpace: 'nowrap' }}
+                onClick={() => onAction(c, 'picked_up')}
+              >
+                ✓ Mark as Picked Up
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}
+                onClick={() => onAction(c, 'not_picked_up')}
+              >
+                ✕ Not Picked Up
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn btn-success btn-sm"
+                style={{ whiteSpace: 'nowrap', background: 'var(--green)', color: '#fff', border: 'none' }}
+                onClick={() => onAction(c, 'delivered')}
+              >
+                ✅ Mark as Delivered
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--amber)', whiteSpace: 'nowrap' }}
+                onClick={() => onAction(c, 'return_delivered')}
+              >
+                ↩ Return
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}
+                onClick={() => onAction(c, 'not_delivered')}
+              >
+                ✕ Not Delivered
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Delivery Dashboard ───────────────────────────────
 export default function DeliveryDashboard() {
   const { user, logout } = useAuth();
-  const [cases, setCases] = useState([]);
+  const [cases, setCases]   = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal]     = useState(null);
+  const [modal, setModal]     = useState(null); // { case, action }
   const [processing, setProcessing] = useState(false);
-  const [tab, setTab]           = useState('active');
-  const [scanMode, setScanMode] = useState(false);
-  const [search, setSearch]     = useState('');
-  const [clinicFilter, setClinicFilter] = useState('');
+  const [tab, setTab]         = useState('pickup');
 
-  useEffect(() => {
-    loadCases();
-    const t = setInterval(loadCases, 30000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Join personal socket room for real-time assignment notifications
-  useEffect(() => {
-    if (!user?.id) return;
-    // Dynamically import socket if available
-    import('../api').then(mod => {
-      const socket = mod.socket;
-      if (!socket) return;
-      socket.emit('join_delivery', user.id);
-      socket.on('case_assigned', () => loadCases());
-      return () => socket.off('case_assigned');
-    }).catch(() => {});
-  }, [user?.id]);
-
-  const loadCases = async () => {
+  const loadCases = useCallback(async () => {
     try {
       const res = await api.get('/delivery/assigned');
       setCases(res.data.cases ?? res.data);
@@ -106,38 +164,44 @@ export default function DeliveryDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleScan = (caseId) => {
-    setScanMode(false);
-    const found = cases.find(c => c.id === caseId);
-    if (!found) { toast.error('Case not in your delivery queue'); return; }
-    if (found.status === 'DELIVERED') { toast.success(`✅ ${found.caseNumber} — already delivered`); return; }
-    if (found.status === 'PICKUP_ASSIGNED') setModal({ case: found, action: 'collect' });
-    else if (found.status === 'READY_TO_DISPATCH') setModal({ case: found, action: 'pickup' });
-    else if (found.status === 'OUT_FOR_DELIVERY') setModal({ case: found, action: 'deliver' });
-  };
+  useEffect(() => {
+    loadCases();
+    const t = setInterval(loadCases, 20_000);
+    return () => clearInterval(t);
+  }, [loadCases]);
+
+  // Real-time assignment notifications via socket
+  useEffect(() => {
+    if (!user?.id) return;
+    import('../api').then(mod => {
+      const socket = mod.socket;
+      if (!socket) return;
+      socket.emit('join_delivery', user.id);
+      socket.on('case_assigned', () => loadCases());
+      return () => socket.off('case_assigned');
+    }).catch(() => {});
+  }, [user?.id, loadCases]);
 
   const handleAction = async () => {
     if (!modal) return;
     setProcessing(true);
     try {
       const { case: c, action } = modal;
-      if (action === 'collect') {
+      if (action === 'picked_up') {
         await api.post(`/delivery/${c.id}/collect-impression`);
-        toast.success('🏭 Impression handed to lab!');
-      } else if (action === 'pickup') {
-        await api.post(`/delivery/${c.id}/pickup`);
-        toast.success('📦 Pickup confirmed!');
+        toast.success('✓ Impression collected — heading to lab');
       } else if (action === 'not_picked_up') {
-        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: 'Not picked up — returned to awaiting pickup queue' });
+        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: 'Not picked up — returned to queue' });
         toast.success('↩ Case returned to pickup queue');
-      } else if (action === 'return_not_delivered') {
-        await api.patch(`/cases/${c.id}/status`, { status: 'READY_TO_DISPATCH', notes: 'Return — not delivered; back to dispatch queue' });
-        toast.success('↩ Case returned to dispatch queue');
-      } else {
+      } else if (action === 'delivered') {
         await api.post(`/delivery/${c.id}/deliver`);
         toast.success('✅ Delivery confirmed!');
+      } else if (action === 'return_delivered' || action === 'not_delivered') {
+        const note = action === 'return_delivered' ? 'Return — not delivered' : 'Could not deliver — returned to dispatch';
+        await api.patch(`/cases/${c.id}/status`, { status: 'READY_TO_DISPATCH', notes: note });
+        toast.success('↩ Case returned to dispatch queue');
       }
       setModal(null);
       loadCases();
@@ -148,203 +212,124 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const active      = cases.filter(c => c.status !== 'DELIVERED');
-  const done        = cases.filter(c => c.status === 'DELIVERED');
-  const toPickUp    = active.filter(c => c.status === 'PICKUP_ASSIGNED').length;
-  const ready       = active.filter(c => c.status === 'READY_TO_DISPATCH').length;
+  // Split by type
+  const pickupList   = cases.filter(c => c.status === 'PICKUP_ASSIGNED');
+  const deliveryList = cases.filter(c => c.status === 'OUT_FOR_DELIVERY');
+  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DV';
 
-  // Apply search + clinic filter
-  const sq = search.toLowerCase();
-  const applyFilter = (arr) => arr.filter(c =>
-    (!clinicFilter || c.clinic?.name === clinicFilter) &&
-    (!sq || c.clinic?.name?.toLowerCase().includes(sq) || c.caseNumber?.toLowerCase().includes(sq) || c.patientName?.toLowerCase().includes(sq))
-  );
-  const shown = applyFilter(tab === 'active' ? active : done);
-
-  // Unique clinic names for dropdown
-  const clinicNames = [...new Set(cases.map(c => c.clinic?.name).filter(Boolean))].sort();
-  const enRoute     = active.filter(c => c.status === 'OUT_FOR_DELIVERY').length;
-
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      {/* Topbar */}
       <div className="topbar">
-        <div className="topbar-title">🚚 Delivery Dashboard</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-3)' }}>
-          <div className="live-dot" />
-          Live · {user?.name?.split(' ')[0]}
+        <div className="topbar-title">🚚 Job Orders</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
+            <div className="live-dot" /> Live · {user?.name?.split(' ')[0]}
+          </div>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+            {initials}
+          </div>
+          <button
+            onClick={logout}
+            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer' }}
+          >
+            ⏻
+          </button>
         </div>
       </div>
 
       <div className="content" style={{ flex: 1 }}>
-
-        {/* Stats row */}
-        <div className="stats-grid stats-4">
-          <div className="stat-card">
+        {/* Summary */}
+        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
+          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('pickup')}>
             <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
-            <div className="stat-label">Collect from Clinic</div>
-            <div className="stat-value" style={{ color: '#EA580C' }}>{toPickUp}</div>
-            <div className="stat-sub">Impression pickup</div>
+            <div className="stat-label">Pick-up List</div>
+            <div className="stat-value" style={{ color: '#EA580C' }}>{pickupList.length}</div>
+            <div className="stat-sub">Impression collections</div>
           </div>
-          <div className="stat-card">
+          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('delivery')}>
             <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
-            <div className="stat-label">To Deliver</div>
-            <div className="stat-value" style={{ color: 'var(--accent)' }}>{ready}</div>
-            <div className="stat-sub">Ready at lab</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚚</div>
-            <div className="stat-label">En Route</div>
-            <div className="stat-value" style={{ color: 'var(--amber)' }}>{enRoute}</div>
-            <div className="stat-sub">Out for delivery</div>
+            <div className="stat-label">Delivery List</div>
+            <div className="stat-value" style={{ color: 'var(--accent)' }}>{deliveryList.length}</div>
+            <div className="stat-sub">Cases to deliver</div>
           </div>
           <div className="stat-card">
             <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
-            <div className="stat-label">Delivered</div>
-            <div className="stat-value" style={{ color: 'var(--green)' }}>{done.length}</div>
-            <div className="stat-sub">Today</div>
+            <div className="stat-label">Total Assigned</div>
+            <div className="stat-value" style={{ color: 'var(--green)' }}>{cases.length}</div>
+            <div className="stat-sub">My active jobs</div>
           </div>
         </div>
 
-        {/* Tabs + Scan QR */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-          <div className="filters" style={{ margin: 0, flex: 1 }}>
-            <button className={`filter-chip ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>
-              Active{active.length ? ` (${active.length})` : ''}
-            </button>
-            <button className={`filter-chip ${tab === 'done' ? 'active' : ''}`} onClick={() => setTab('done')}>
-              Delivered{done.length ? ` (${done.length})` : ''}
-            </button>
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setScanMode(true)}>
-            📷 Scan QR
+        {/* Tabs */}
+        <div className="filters" style={{ marginBottom: 16 }}>
+          <button
+            className={`filter-chip${tab === 'pickup' ? ' active' : ''}`}
+            onClick={() => setTab('pickup')}
+          >
+            🛵 Pick-up List {pickupList.length > 0 && `(${pickupList.length})`}
+          </button>
+          <button
+            className={`filter-chip${tab === 'delivery' ? ' active' : ''}`}
+            onClick={() => setTab('delivery')}
+          >
+            📦 Delivery List {deliveryList.length > 0 && `(${deliveryList.length})`}
           </button>
         </div>
 
-        {/* Search + clinic filter */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="search-input" style={{ flex: 1, minWidth: 160 }}>
-            <span className="icon">🔍</span>
-            <input
-              placeholder="Search clinic, case or patient…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          {clinicNames.length > 1 && (
-            <SearchableSelect
-              value={clinicFilter}
-              onChange={v => setClinicFilter(v)}
-              options={clinicNames.map(name => ({ value: name, label: name }))}
-              placeholder="All Clinics"
-              style={{ minWidth: 170 }}
-            />
-          )}
-          {(search || clinicFilter) && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setClinicFilter(''); }} style={{ color: 'var(--red)' }}>✕</button>
-          )}
-        </div>
-
-        {/* Case list — grouped by clinic */}
-        {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
-        ) : shown.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">{tab === 'active' ? '🎉' : '📭'}</div>
-            <div className="empty-title">{tab === 'active' ? 'All Clear!' : 'No Deliveries Yet'}</div>
-            <p>{tab === 'active' ? 'No cases waiting.' : 'Completed deliveries appear here.'}</p>
-          </div>
-        ) : (() => {
-          // Group shown cases by clinic
-          const grouped = {};
-          for (const c of shown) {
-            const key = c.clinic?.name || 'Unknown Clinic';
-            if (!grouped[key]) grouped[key] = { clinic: c.clinic, cases: [] };
-            grouped[key].cases.push(c);
-          }
-          return Object.values(grouped).map(g => (
-            <div key={g.clinic?.id || g.clinic?.name} className="card" style={{ marginBottom: 14 }}>
-              {/* Clinic header */}
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-2)', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                  {g.clinic?.name?.[0]?.toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>🏥 {g.clinic?.name}</div>
-                  {g.clinic?.station && (
-                    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', color: 'var(--accent)', marginTop: 1 }}>
-                      {g.clinic.station.toUpperCase()}
-                    </div>
-                  )}
-                  {g.clinic?.address && (
-                    <a href={`https://maps.google.com/?q=${encodeURIComponent(g.clinic.address)}`} target="_blank" rel="noreferrer"
-                      style={{ fontSize: 11, color: 'var(--text-3)', textDecoration: 'none', marginTop: 2, display: 'block' }}>
-                      📍 {g.clinic.address}
-                    </a>
-                  )}
-                </div>
-                {g.clinic?.phone && (
-                  <a href={`tel:${g.clinic.phone}`} style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', textDecoration: 'none', flexShrink: 0 }}>📞 Call</a>
-                )}
-                <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: 'var(--accent-dim)', color: 'var(--accent)', flexShrink: 0 }}>
-                  {g.cases.length}
-                </span>
-              </div>
-
-              {/* Cases under this clinic */}
-              {g.cases.map(c => {
-                const deliveredAt = c.deliveryLogs?.[0]?.deliveredAt || c.updatedAt;
-                const accentColor = c.status === 'PICKUP_ASSIGNED' ? '#CA8A04'
-                  : c.status === 'READY_TO_DISPATCH' ? 'var(--accent)'
-                  : c.status === 'OUT_FOR_DELIVERY' ? 'var(--amber)' : 'var(--green)';
-                return (
-                  <div key={c.id} style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${accentColor}`, padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                      <div>
-                        <span className="case-number">{c.caseNumber}</span>
-                        <div className="patient-name" style={{ marginTop: 4 }}>{c.patientName}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
-                          {c.workType}{c.units != null && <span style={{ marginLeft: 4, color: 'var(--text-3)' }}>· {c.units} units</span>}
-                        </div>
-                      </div>
-                      <StatusBadge status={c.status} />
-                    </div>
-                    {c.status === 'PICKUP_ASSIGNED' && (
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button className="btn btn-sm" style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74' }} onClick={() => setModal({ case: c, action: 'collect' })}>
-                          🛵 Impression Collected from Clinic
-                        </button>
-                        <button className="btn btn-sm" style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)' }} onClick={() => setModal({ case: c, action: 'not_picked_up' })}>
-                          ✕ Not Picked Up
-                        </button>
-                      </div>
-                    )}
-                    {c.status === 'READY_TO_DISPATCH' && (
-                      <button className="btn btn-primary btn-sm" onClick={() => setModal({ case: c, action: 'pickup' })}>
-                        📦 Confirm Pickup from Lab
-                      </button>
-                    )}
-                    {c.status === 'OUT_FOR_DELIVERY' && (
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button className="btn btn-success btn-sm" onClick={() => setModal({ case: c, action: 'deliver' })}>
-                          ✅ Mark Delivered
-                        </button>
-                        <button className="btn btn-sm" style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red)' }} onClick={() => setModal({ case: c, action: 'return_not_delivered' })}>
-                          ↩ Return — Not Delivered
-                        </button>
-                      </div>
-                    )}
-                    {c.status === 'DELIVERED' && (
-                      <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 500 }}>
-                        ✅ Delivered on {format(new Date(c.deliveryDate || deliveredAt), 'dd MMM yyyy, h:mm a')}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+        {/* Pick-up List */}
+        {tab === 'pickup' && (
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">🛵 Pick-up List</div>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                {pickupList.length} impression{pickupList.length !== 1 ? 's' : ''} to collect
+              </span>
             </div>
-          ));
-        })()}
+            {loading ? (
+              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+            ) : pickupList.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🎉</div>
+                <div className="empty-title">No pickups assigned</div>
+                <p>Impression collection jobs will appear here when dispatch assigns them to you.</p>
+              </div>
+            ) : (
+              <div>
+                {pickupList.map(c => (
+                  <CaseCard key={c.id} c={c} section="pickup" onAction={(c, action) => setModal({ case: c, action })} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Delivery List */}
+        {tab === 'delivery' && (
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">📦 Delivery List</div>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                {deliveryList.length} case{deliveryList.length !== 1 ? 's' : ''} to deliver
+              </span>
+            </div>
+            {loading ? (
+              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+            ) : deliveryList.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🎉</div>
+                <div className="empty-title">No deliveries assigned</div>
+                <p>Cases dispatched to you will appear here for delivery to the clinic.</p>
+              </div>
+            ) : (
+              <div>
+                {deliveryList.map(c => (
+                  <CaseCard key={c.id} c={c} section="delivery" onAction={(c, action) => setModal({ case: c, action })} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Confirm modal */}
@@ -357,29 +342,6 @@ export default function DeliveryDashboard() {
           loading={processing}
         />
       )}
-
-      {scanMode && (
-        <QRScanner onScan={handleScan} onClose={() => setScanMode(false)} />
-      )}
-
-      {/* Bottom FAB — sign out */}
-      <button
-        onClick={logout}
-        title="Sign out"
-        style={{
-          position: 'fixed', bottom: 24, right: 24,
-          width: 48, height: 48, borderRadius: '50%',
-          background: 'var(--surface)', border: '2px solid var(--red)',
-          boxShadow: 'var(--shadow-lg)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, cursor: 'pointer', zIndex: 50,
-          transition: 'all .15s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--red-dim)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
-      >
-        ⏻
-      </button>
     </div>
   );
 }
