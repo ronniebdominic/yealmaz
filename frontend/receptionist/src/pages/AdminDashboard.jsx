@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import SearchableSelect from '../components/SearchableSelect';
+import ExportMenu from '../components/ExportMenu';
 import api from '../api';
 import { useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
@@ -110,6 +111,7 @@ export default function AdminDashboard() {
       <div className="topbar">
         <div className="topbar-title">Analytics Dashboard</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Legacy full-workbook Excel export */}
           <button
             onClick={exportToExcel}
             disabled={loading || !data}
@@ -122,8 +124,21 @@ export default function AdminDashboard() {
               transition: 'background 0.15s',
             }}
           >
-            <span>⬇</span> Export Excel
+            <span>📊</span> Export Excel (Full)
           </button>
+          {/* Quick clinic-performance PDF/Excel */}
+          <ExportMenu
+            data={revenueByClinic || []}
+            columns={[
+              { header: 'Clinic',          value: c => c.name },
+              { header: 'Total Cases',     value: c => c.totalCases },
+              { header: 'Total Units',     value: c => c.totalUnits || 0 },
+              { header: 'Paid Cases',      value: c => c.paidCases },
+              { header: 'Revenue (Br)',    value: c => c.revenue.toFixed(2) },
+            ]}
+            filename="admin-clinic-performance"
+            title={`Clinic Performance — ${fromDate} to ${toDate}`}
+          />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
             <div className="live-dot" /> Live
           </div>

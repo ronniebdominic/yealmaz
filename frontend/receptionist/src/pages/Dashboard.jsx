@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
+import FilterBar from '../components/FilterBar';
+import ExportMenu from '../components/ExportMenu';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -173,37 +175,47 @@ function AcceptCasesSection({ queryClient }) {
 }
 
 // ─── Ready Orders Section ─────────────────────────────────
+const READY_COLS = [
+  { header: 'Case #',      value: c => c.caseNumber },
+  { header: 'Clinic',      value: c => c.clinic?.name },
+  { header: 'Patient',     value: c => c.patientName },
+  { header: 'Work Type',   value: c => c.workType },
+  { header: 'Units',       value: c => c.units ?? '' },
+  { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+  { header: 'Payment',     value: c => c.paymentStatus },
+  { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+  { header: 'Order Date',  value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+];
+
 function ReadyOrdersSection() {
-  const [search, setSearch]   = useState('');
+  const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]   = useState('');
-  const [applied, setApplied] = useState({ search: '', dateFrom: '', dateTo: '' });
-  const [page, setPage]       = useState(1);
+  const [dateTo, setDateTo]     = useState('');
+  const [applied, setApplied]   = useState({ search: '', dateFrom: '', dateTo: '' });
+  const [page, setPage]         = useState(1);
 
   const apply = () => { setApplied({ search, dateFrom, dateTo }); setPage(1); };
-  const clear  = () => {
-    setSearch(''); setDateFrom(''); setDateTo('');
-    setApplied({ search: '', dateFrom: '', dateTo: '' });
-    setPage(1);
-  };
+
+  const queryParams = (extra = {}) => ({
+    status: 'READY_TO_DISPATCH',
+    ...(applied.search   ? { search: applied.search }     : {}),
+    ...(applied.dateFrom ? { dateFrom: applied.dateFrom } : {}),
+    ...(applied.dateTo   ? { dateTo: applied.dateTo }     : {}),
+    ...extra,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['ready-orders', applied, page],
-    queryFn: () => api.get('/cases', {
-      params: {
-        status: 'READY_TO_DISPATCH',
-        limit: 20, page,
-        ...(applied.search   ? { search: applied.search }     : {}),
-        ...(applied.dateFrom ? { dateFrom: applied.dateFrom } : {}),
-        ...(applied.dateTo   ? { dateTo: applied.dateTo }     : {}),
-      }
-    }).then(r => r.data),
+    queryFn: () => api.get('/cases', { params: queryParams({ limit: 20, page }) }).then(r => r.data),
     staleTime: 30_000,
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   });
 
-  const cases = data?.cases ?? [];
+  const fetchAllForExport = () =>
+    api.get('/cases', { params: queryParams({ limit: 1000 }) }).then(r => r.data.cases ?? []);
+
+  const cases      = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
 
   return (
@@ -211,32 +223,17 @@ function ReadyOrdersSection() {
       {/* Filter bar */}
       <div className="card" style={{ marginBottom: 16, padding: '14px 18px' }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div style={{ flex: 2, minWidth: 180 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>Search</div>
-            <div className="search-input" style={{ margin: 0 }}>
-              <span className="icon">🔍</span>
-              <input
-                placeholder="Clinic name, case no., patient…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && apply()}
-              />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>Order Date From</div>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4 }}>To</div>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
-          </div>
+          <FilterBar
+            search={search} onSearch={setSearch}
+            dateFrom={dateFrom} onDateFrom={setDateFrom}
+            dateTo={dateTo} onDateTo={setDateTo}
+            placeholder="Clinic name, case no., patient…"
+            style={{ flex: 1 }}
+          />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary btn-sm" onClick={apply}>Apply</button>
             {(applied.search || applied.dateFrom || applied.dateTo) && (
-              <button className="btn btn-ghost btn-sm" onClick={clear}>Clear</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setApplied({ search: '', dateFrom: '', dateTo: '' }); setPage(1); }}>Clear</button>
             )}
           </div>
         </div>
@@ -245,9 +242,17 @@ function ReadyOrdersSection() {
       <div className="card">
         <div className="card-header">
           <div className="card-title">🚚 Ready for Delivery / Dispatch</div>
-          {pagination.total != null && (
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} case{pagination.total !== 1 ? 's' : ''}</span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {pagination.total != null && (
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} case{pagination.total !== 1 ? 's' : ''}</span>
+            )}
+            <ExportMenu
+              fetchData={fetchAllForExport}
+              columns={READY_COLS}
+              filename="ready-orders"
+              title="Ready Orders — Reception"
+            />
+          </div>
         </div>
         <div className="table-wrap">
           {isLoading ? (
@@ -359,7 +364,24 @@ function TrackOrderSection() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">Results for "{submitted}"</div>
-            {data && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.pagination?.total ?? cases.length} found</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {data && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.pagination?.total ?? cases.length} found</span>}
+              <ExportMenu
+                data={cases}
+                columns={[
+                  { header: 'Case #',     value: c => c.caseNumber },
+                  { header: 'Clinic',     value: c => c.clinic?.name },
+                  { header: 'Patient',    value: c => c.patientName },
+                  { header: 'Work Type',  value: c => c.workType },
+                  { header: 'Status',     value: c => c.status },
+                  { header: 'Payment',    value: c => c.paymentStatus },
+                  { header: 'Due Date',   value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+                  { header: 'Registered', value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+                ]}
+                filename={`case-search-${submitted}`}
+                title={`Search: ${submitted}`}
+              />
+            </div>
           </div>
           <div className="table-wrap">
             {isLoading ? (

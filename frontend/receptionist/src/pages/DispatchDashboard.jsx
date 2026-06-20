@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { PaymentBadge } from '../components/StatusBadge';
 import SearchableSelect from '../components/SearchableSelect';
+import FilterBar from '../components/FilterBar';
+import ExportMenu from '../components/ExportMenu';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -345,31 +347,13 @@ export default function DispatchDashboard() {
           </div>
 
           {/* ── Search / filter bar ── */}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 16 }}>
-            <div className="search-input" style={{ flex: 2, minWidth: 180, margin: 0 }}>
-              <span className="icon">🔍</span>
-              <input
-                placeholder="Clinic, case no., patient…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>ORDER DATE FROM</div>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>TO</div>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)' }} />
-            </div>
-            {(search || dateFrom || dateTo) && (
-              <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
-                style={{ color: 'var(--red)', alignSelf: 'flex-end' }}>
-                ✕ Clear
-              </button>
-            )}
+          <div style={{ marginBottom: 16 }}>
+            <FilterBar
+              search={search} onSearch={setSearch}
+              dateFrom={dateFrom} onDateFrom={setDateFrom}
+              dateTo={dateTo} onDateTo={setDateTo}
+              placeholder="Clinic, case no., patient…"
+            />
           </div>
 
           {/* ── TAB: Place Order (PENDING_PICKUP) ── */}
@@ -377,7 +361,22 @@ export default function DispatchDashboard() {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">📋 Place Order — Impression Pickups</div>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{placeOrder.length} pending</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{placeOrder.length} pending</span>
+                  <ExportMenu
+                    data={placeOrder}
+                    columns={[
+                      { header: 'Clinic Name', value: c => c.clinic?.name },
+                      { header: 'Location',    value: c => c.clinic?.address ?? '' },
+                      { header: 'Contact',     value: c => c.clinic?.phone ?? '' },
+                      { header: 'Case #',      value: c => c.caseNumber },
+                      { header: 'Patient',     value: c => c.patientName },
+                      { header: 'Registered',  value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+                    ]}
+                    filename="place-order"
+                    title="Place Order — Impression Pickups"
+                  />
+                </div>
               </div>
               <div className="table-wrap">
                 {placeOrder.length === 0 ? (
@@ -435,7 +434,23 @@ export default function DispatchDashboard() {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">📦 Ready for Delivery</div>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDelivery.length} cases</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDelivery.length} cases</span>
+                  <ExportMenu
+                    data={readyDelivery}
+                    columns={[
+                      { header: 'Clinic Name',    value: c => c.clinic?.name },
+                      { header: 'Patient',        value: c => c.patientName },
+                      { header: 'Case No.',       value: c => c.caseNumber },
+                      { header: 'Product',        value: c => c.workType },
+                      { header: 'Unit',           value: c => c.units ?? '' },
+                      { header: 'Total Value(Br)',value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+                      { header: 'Payment',        value: c => c.paymentStatus },
+                    ]}
+                    filename="ready-for-delivery"
+                    title="Ready for Delivery"
+                  />
+                </div>
               </div>
               <div className="table-wrap">
                 {readyDelivery.length === 0 ? (
@@ -499,7 +514,23 @@ export default function DispatchDashboard() {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">🚚 Ready for Dispatch</div>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDispatch.length} cases</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDispatch.length} cases</span>
+                  <ExportMenu
+                    data={readyDispatch}
+                    columns={[
+                      { header: 'Clinic Name',    value: c => c.clinic?.name },
+                      { header: 'Location',       value: c => c.clinic?.address ?? '' },
+                      { header: 'Contact',        value: c => c.clinic?.phone ?? '' },
+                      { header: 'Case #',         value: c => c.caseNumber },
+                      { header: 'Patient',        value: c => c.patientName },
+                      { header: 'Due Date',       value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+                      { header: 'Payment Status', value: c => c.paymentStatus },
+                    ]}
+                    filename="ready-for-dispatch"
+                    title="Ready for Dispatch"
+                  />
+                </div>
               </div>
               <div className="table-wrap">
                 {readyDispatch.length === 0 ? (
@@ -562,7 +593,24 @@ export default function DispatchDashboard() {
             <div className="card">
               <div className="card-header">
                 <div className="card-title">✅ Delivered</div>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{delivered.length} cases</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{delivered.length} cases</span>
+                  <ExportMenu
+                    data={delivered}
+                    columns={[
+                      { header: 'Clinic Name',     value: c => c.clinic?.name },
+                      { header: 'Patient',         value: c => c.patientName },
+                      { header: 'Scan No.',        value: c => c.caseNumber },
+                      { header: 'Product',         value: c => c.workType },
+                      { header: 'Unit',            value: c => c.units ?? '' },
+                      { header: 'Total Value(Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+                      { header: 'Payment Status',  value: c => c.paymentStatus },
+                      { header: 'Delivery Status', value: () => 'Delivered' },
+                    ]}
+                    filename="delivered"
+                    title="Delivered Cases"
+                  />
+                </div>
               </div>
               <div className="table-wrap">
                 {delivered.length === 0 ? (

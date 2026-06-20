@@ -6,6 +6,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
+import FilterBar from '../components/FilterBar';
+import ExportMenu from '../components/ExportMenu';
 import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -1307,10 +1309,24 @@ const PRODUCTION_STATUSES = [
   'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
 ];
 
+const CASES_COLS = [
+  { header: 'Case #',      value: c => c.caseNumber },
+  { header: 'Clinic',      value: c => c.clinic?.name },
+  { header: 'Patient',     value: c => c.patientName },
+  { header: 'Work Type',   value: c => c.workType },
+  { header: 'Units',       value: c => c.units ?? '' },
+  { header: 'Status',      value: c => c.status },
+  { header: 'Payment',     value: c => c.paymentStatus },
+  { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+  { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+];
+
 function CasesTab() {
-  const [group, setGroup]   = useState('active');
-  const [search, setSearch] = useState('');
-  const [page, setPage]     = useState(1);
+  const [group, setGroup]     = useState('active');
+  const [search, setSearch]   = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]   = useState('');
+  const [page, setPage]       = useState(1);
 
   const statusParam = group === 'active'
     ? ['CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
@@ -1322,17 +1338,23 @@ function CasesTab() {
     ? PRODUCTION_STATUSES.join(',')
     : group;
 
+  const queryParams = (extra = {}) => ({
+    status: statusParam,
+    ...(search   ? { search }   : {}),
+    ...(dateFrom ? { dateFrom } : {}),
+    ...(dateTo   ? { dateTo }   : {}),
+    ...extra,
+  });
+
   const { data, isLoading } = useQuery({
-    queryKey: ['finance-cases', group, search, page],
-    queryFn: () => api.get('/cases', {
-      params: {
-        status: statusParam, limit: 20, page,
-        ...(search ? { search } : {}),
-      }
-    }).then(r => r.data),
+    queryKey: ['finance-cases', group, search, dateFrom, dateTo, page],
+    queryFn: () => api.get('/cases', { params: queryParams({ limit: 20, page }) }).then(r => r.data),
     staleTime: 30_000,
     placeholderData: keepPreviousData,
   });
+
+  const fetchAllForExport = () =>
+    api.get('/cases', { params: queryParams({ limit: 1000 }) }).then(r => r.data.cases ?? []);
 
   const cases = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
@@ -1351,21 +1373,27 @@ function CasesTab() {
         ))}
       </div>
       <div style={{ marginBottom: 14 }}>
-        <div className="search-input" style={{ maxWidth: 340 }}>
-          <span className="icon">🔍</span>
-          <input
-            placeholder="Search clinic, patient, case no…"
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
+        <FilterBar
+          search={search} onSearch={v => { setSearch(v); setPage(1); }}
+          dateFrom={dateFrom} onDateFrom={v => { setDateFrom(v); setPage(1); }}
+          dateTo={dateTo} onDateTo={v => { setDateTo(v); setPage(1); }}
+          placeholder="Clinic, patient, case no…"
+        />
       </div>
       <div className="card">
         <div className="card-header">
           <div className="card-title">Cases — {CASE_STATUS_GROUPS.find(g2 => g2.value === group)?.label}</div>
-          {pagination.total != null && (
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} total</span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {pagination.total != null && (
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} total</span>
+            )}
+            <ExportMenu
+              fetchData={fetchAllForExport}
+              columns={CASES_COLS}
+              filename="finance-cases"
+              title={`Cases — ${CASE_STATUS_GROUPS.find(g2 => g2.value === group)?.label || ''}`}
+            />
+          </div>
         </div>
         <div className="table-wrap">
           {isLoading ? (
@@ -1472,7 +1500,20 @@ function ClinicBalancesTab() {
       <div className="card">
         <div className="card-header">
           <div className="card-title">⏳ Outstanding Balance by Clinic</div>
-          <button className="btn btn-ghost btn-sm" onClick={refetch}>↺ Refresh</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="btn btn-ghost btn-sm" onClick={refetch}>↺ Refresh</button>
+            <ExportMenu
+              data={balances}
+              columns={[
+                { header: 'Clinic',             value: b => b.name },
+                { header: 'Trusted Partner',    value: b => b.isExcluded ? 'Yes' : 'No' },
+                { header: 'Unpaid Cases',       value: b => b.pendingCount },
+                { header: 'Outstanding (Br)',   value: b => b.pendingAmount.toFixed(2) },
+              ]}
+              filename="clinic-balances"
+              title="Outstanding Balance by Clinic"
+            />
+          </div>
         </div>
         <div className="table-wrap">
           {isLoading ? (
@@ -1684,7 +1725,23 @@ function ReportTab() {
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">✅ Verified Payments {applied.from || applied.to ? '(filtered)' : ''}</div>
-              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentVerified?.length || 0} records</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentVerified?.length || 0} records</span>
+                <ExportMenu
+                  data={data.recentVerified || []}
+                  columns={[
+                    { header: 'Case #',      value: p => p.case?.caseNumber },
+                    { header: 'Clinic',      value: p => p.case?.clinic?.name },
+                    { header: 'Patient',     value: p => p.case?.patientName },
+                    { header: 'Work Type',   value: p => p.case?.workType },
+                    { header: 'Invoice #',   value: p => p.invoiceNumber ?? '' },
+                    { header: 'Amount (Br)', value: p => p.amount ?? '' },
+                    { header: 'Verified',    value: p => p.verifiedAt ? format(new Date(p.verifiedAt), 'dd MMM yyyy') : '' },
+                  ]}
+                  filename="verified-payments"
+                  title="Verified Payments — Finance Report"
+                />
+              </div>
             </div>
             <div className="table-wrap">
               {!data.recentVerified?.length ? (
@@ -1732,7 +1789,23 @@ function ReportTab() {
           <div className="card">
             <div className="card-header">
               <div className="card-title">⏳ Pending Payments</div>
-              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentPending?.length || 0} records</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentPending?.length || 0} records</span>
+                <ExportMenu
+                  data={data.recentPending || []}
+                  columns={[
+                    { header: 'Case #',      value: p => p.case?.caseNumber },
+                    { header: 'Clinic',      value: p => p.case?.clinic?.name },
+                    { header: 'Patient',     value: p => p.case?.patientName },
+                    { header: 'Work Type',   value: p => p.case?.workType },
+                    { header: 'Amount (Br)', value: p => p.amount ?? '' },
+                    { header: 'Status',      value: p => p.status },
+                    { header: 'Updated',     value: p => p.updatedAt ? format(new Date(p.updatedAt), 'dd MMM yyyy') : '' },
+                  ]}
+                  filename="pending-payments"
+                  title="Pending Payments — Finance Report"
+                />
+              </div>
             </div>
             <div className="table-wrap">
               {!data.recentPending?.length ? (
