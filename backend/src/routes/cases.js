@@ -61,7 +61,10 @@ router.get('/', protect, async (req, res) => {
     const where = {};
     if (req.user.role === 'CLINIC') where.clinicId = req.user.id;
     else if (clinicId) where.clinicId = clinicId;
-    if (status) where.status = status;
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+    }
     if (paymentStatus) where.paymentStatus = paymentStatus;
     if (search) {
       where.OR = [
@@ -124,7 +127,10 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
 
     const where = {};
     if (clinicId) where.clinicId = clinicId;
-    if (status) where.status = status;
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+    }
     if (paymentStatus) where.paymentStatus = paymentStatus;
     if (search) {
       where.OR = [
