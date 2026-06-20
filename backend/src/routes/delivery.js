@@ -108,10 +108,6 @@ router.post('/:caseId/pickup', protect, restrict('DELIVERY', 'ADMIN'), async (re
   try {
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
-    if (caseData.paymentStatus !== 'VERIFIED') {
-      return res.status(403).json({ error: 'Cannot pick up — payment not verified.' });
-    }
-
     await prisma.case.update({ where: { id: req.params.caseId }, data: { status: 'OUT_FOR_DELIVERY' } });
     await prisma.deliveryLog.create({
       data: { caseId: req.params.caseId, deliveryById: req.user.id, pickedUpAt: new Date() }
@@ -170,6 +166,42 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
     res.json({ success: true, message: 'Delivery confirmed.' });
   } catch (err) {
     res.status(500).json({ error: 'Could not confirm delivery.' });
+  }
+});
+
+// ── POST /api/delivery/:caseId/return-to-dispatch ───────
+// Called when delivery staff cannot pick up or deliver a case.
+// Returns case to READY_TO_DISPATCH and clears the assigned driver so
+// dispatch can see it and reassign.
+router.post('/:caseId/return-to-dispatch', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const { reason = 'Returned to dispatch queue by delivery staff' } = req.body;
+    const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { status: 'READY_TO_DISPATCH', assignedDeliveryId: null },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'READY_TO_DISPATCH',
+        scannedBy: req.user.name,
+        notes: reason,
+      },
+    });
+
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('case_updated', { caseId: caseData.id, caseNumber: caseData.caseNumber, status: 'READY_TO_DISPATCH' });
+
+    res.json({ success: true, message: 'Case returned to dispatch queue.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not return case to dispatch.' });
   }
 });
 

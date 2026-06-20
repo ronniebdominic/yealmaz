@@ -68,7 +68,7 @@ const NEXT_DEPT_LABEL = {
   GLAZING:      'Quality Control',
   THERMO:       'Quality Control',
   TRIMMING:     'Quality Control',
-  QC:           'Payment / Invoicing',
+  QC:           'Dispatch (auto)',
   PAYMENT:      'Dispatch',
   DISPATCH:     'Out for Delivery',
 };
@@ -168,6 +168,21 @@ router.post('/:caseId', async (req, res) => {
       }
     });
 
+    // After QC passes → auto-advance to READY_TO_DISPATCH for dispatch visibility
+    let finalStatus = newStatus;
+    if (newStatus === 'QUALITY_CHECK') {
+      await prisma.case.update({ where: { id: caseId }, data: { status: 'READY_TO_DISPATCH' } });
+      await prisma.caseStage.create({
+        data: {
+          caseId,
+          stageName: 'READY_TO_DISPATCH',
+          scannedBy: 'System',
+          notes: 'QC passed — automatically moved to dispatch queue',
+        }
+      });
+      finalStatus = 'READY_TO_DISPATCH';
+    }
+
     // Real-time push
     const io = req.app.get('io');
     const payload = {
@@ -177,24 +192,22 @@ router.post('/:caseId', async (req, res) => {
       clinicName: caseData.clinic.name,
       department: dept.label,
       departmentCode: department,
-      newStatus,
-      statusLabel: STAGE_LABELS[newStatus],
+      newStatus: finalStatus,
+      statusLabel: STAGE_LABELS[finalStatus],
       nextDept: NEXT_DEPT_LABEL[department] || '—',
       scannedAt: new Date().toISOString(),
       scannedBy
     };
 
-    invalidate(`case:${caseId}`, `case:lab:${caseId}`, 'lab:active:*', 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status');
+    invalidate(`case:${caseId}`, `case:lab:${caseId}`, 'lab:active:*', 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dispatch:queue');
 
     io.to('lab_staff').emit('stage_scanned', payload);
     io.to(`clinic_${caseData.clinic.id}`).emit('case_updated', payload);
 
-    // Push notification for payment-ready milestone
-    if (newStatus === 'PAYMENT_INVOICING') {
-      sendPushToClinic(prisma, caseData.clinic.id, {
-        title: '💳 Payment Invoice Ready',
-        body: `Case ${caseData.caseNumber} (${caseData.patientName}) is ready — please arrange payment.`,
-        data: { caseId, caseNumber: caseData.caseNumber, screen: 'CaseDetail' },
+    // Notify dispatch when case is ready
+    if (finalStatus === 'READY_TO_DISPATCH') {
+      io.to('lab_staff').emit('case_ready_for_dispatch', {
+        caseId, caseNumber: caseData.caseNumber, patientName: caseData.patientName, clinicName: caseData.clinic.name,
       });
     }
 
