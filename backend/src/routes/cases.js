@@ -334,6 +334,77 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
+// ── POST /api/cases/:id/accept ───────────────────────────
+// Receptionist formally accepts a case: fills in details + generates scan number + QR
+router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const { shade, doctorName, doctorPhone, workType, units, toothNumbers, notes, patientAge, patientGender } = req.body;
+
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    // Generate scan/case number only if not already assigned
+    let caseNumber = existing.caseNumber;
+    if (!caseNumber) {
+      caseNumber = await generateCaseNumber();
+    }
+
+    const resolvedUnits = units != null
+      ? parseInt(units)
+      : toothNumbers
+        ? toothNumbers.split(',').map(t => t.trim()).filter(Boolean).length
+        : existing.units;
+
+    const updatedData = {
+      status: 'CASE_ACCEPTED',
+      caseNumber,
+      ...(shade        ? { shade }                        : {}),
+      ...(doctorName   ? { doctorName }                   : {}),
+      ...(doctorPhone  ? { doctorPhone }                  : {}),
+      ...(workType     ? { workType }                     : {}),
+      ...(resolvedUnits ? { units: resolvedUnits }        : {}),
+      ...(toothNumbers  ? { toothNumbers }                : {}),
+      ...(notes        ? { notes }                        : {}),
+      ...(patientAge   ? { patientAge: parseInt(patientAge) } : {}),
+      ...(patientGender ? { patientGender }               : {}),
+    };
+
+    // Generate QR if not already present
+    if (!existing.qrCodeUrl) {
+      const qrData   = `${process.env.APP_URL}/api/scan/${existing.id}`;
+      const qrCodeUrl = await QRCode.toDataURL(qrData, { width: 300, margin: 2, color: { dark: '#1A56A0', light: '#FFFFFF' } });
+      updatedData.qrCodeUrl  = qrCodeUrl;
+      updatedData.qrCodeData = qrData;
+    }
+
+    const accepted = await prisma.case.update({
+      where: { id: req.params.id },
+      data: updatedData,
+      include: { clinic: { select: { name: true } } },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.id,
+        stageName: 'CASE_ACCEPTED',
+        scannedBy: req.user.name,
+        notes: notes || 'Case accepted by receptionist',
+      },
+    });
+
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dispatch:queue');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
+    io.to(`clinic_${accepted.clinicId}`).emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
+
+    res.json(accepted);
+  } catch (err) {
+    console.error('[POST /cases/:id/accept]', err);
+    res.status(500).json({ error: 'Could not accept case.' });
+  }
+});
+
 // ── DELETE /api/cases/:id ────────────────────────────────
 router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {

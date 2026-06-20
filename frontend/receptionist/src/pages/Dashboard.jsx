@@ -13,120 +13,240 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
 
 // ─── Accept Cases Section ─────────────────────────────────
+const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
+const textareaSt = { ...inputSt, resize: 'vertical' };
+
 function AcceptCasesSection({ queryClient }) {
-  const [acceptingId, setAcceptingId]   = useState(null); // case id with open note form
-  const [notes, setNotes]               = useState({});   // { caseId: noteText }
-  const [submitting, setSubmitting]     = useState(false);
+  const [openId, setOpenId]       = useState(null);  // case id with expanded panel
+  const [action, setAction]       = useState(null);  // 'accept' | 'review' | 'reject'
+  const [submitting, setSubmitting] = useState(false);
+
+  // Per-case form state for acceptance details
+  const [details, setDetails] = useState({}); // { [caseId]: { shade, doctorName, doctorPhone, workType, notes, reason } }
+  const det = (id) => details[id] || {};
+  const setDet = (id, field, val) => setDetails(prev => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['cases', 'to-accept'],
     queryFn: () => api.get('/cases', {
-      params: { status: 'PENDING_PICKUP,PICKUP_ASSIGNED', limit: 50 }
+      params: { status: 'PENDING_PICKUP,PICKUP_ASSIGNED,UNDER_REVIEW', limit: 100 }
     }).then(r => r.data),
     staleTime: 20_000,
     refetchInterval: 30_000,
   });
 
-  const cases = data?.cases ?? [];
-  const pending  = cases.filter(c => c.status === 'PENDING_PICKUP');
-  const inTransit = cases.filter(c => c.status === 'PICKUP_ASSIGNED');
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['cases'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] });
+    refetch();
+  };
+
+  const open = (id, act) => { setOpenId(openId === id && action === act ? null : id); setAction(act); };
 
   const handleAccept = async (c) => {
+    const d = det(c.id);
+    if (!d.shade?.trim())      return toast.error('Shade is required to accept');
+    if (!d.doctorName?.trim()) return toast.error("Doctor's name is required");
+    if (!d.doctorPhone?.trim()) return toast.error("Doctor's contact is required");
     setSubmitting(true);
     try {
-      await api.patch(`/cases/${c.id}/status`, {
-        status: 'CASE_ACCEPTED',
-        notes: notes[c.id]?.trim() || undefined,
+      await api.post(`/cases/${c.id}/accept`, {
+        shade:       d.shade,
+        doctorName:  d.doctorName,
+        doctorPhone: d.doctorPhone,
+        workType:    d.workType || c.workType,
+        notes:       d.notes,
       });
-      toast.success(`✓ ${c.caseNumber} accepted`);
-      setAcceptingId(null);
-      setNotes(prev => { const n = { ...prev }; delete n[c.id]; return n; });
-      queryClient.invalidateQueries({ queryKey: ['cases'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'summary'] });
-      refetch();
+      toast.success(`✓ Case accepted — scan number assigned`);
+      setOpenId(null);
+      setDetails(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      invalidate();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to accept case');
+      toast.error(err.response?.data?.error || 'Failed');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const CaseCard = ({ c }) => {
-    const isOpen = acceptingId === c.id;
-    const isTransit = c.status === 'PICKUP_ASSIGNED';
+  const handleReview = async (c) => {
+    const d = det(c.id);
+    setSubmitting(true);
+    try {
+      await api.patch(`/cases/${c.id}/status`, {
+        status: 'UNDER_REVIEW',
+        notes: d.notes || 'Needs clarification from dentist',
+      });
+      toast.success('🔎 Case marked Under Review');
+      setOpenId(null);
+      invalidate();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReject = async (c) => {
+    const d = det(c.id);
+    if (!d.notes?.trim()) return toast.error('Please enter a rejection reason');
+    setSubmitting(true);
+    try {
+      await api.patch(`/cases/${c.id}/status`, {
+        status: 'REJECTED',
+        notes: d.notes,
+      });
+      toast.success('🚫 Case rejected');
+      setOpenId(null);
+      invalidate();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cases = data?.cases ?? [];
+  const pending     = cases.filter(c => c.status === 'PENDING_PICKUP');
+  const inTransit   = cases.filter(c => c.status === 'PICKUP_ASSIGNED');
+  const underReview = cases.filter(c => c.status === 'UNDER_REVIEW');
+
+  const CaseCard = ({ c, canAct }) => {
+    const isOpen  = openId === c.id;
+    const accentColor = c.status === 'UNDER_REVIEW' ? '#1D4ED8'
+      : c.status === 'PICKUP_ASSIGNED' ? 'var(--accent)' : 'var(--text-3)';
+
     return (
-      <div style={{
-        borderBottom: '1px solid var(--border)',
-        borderLeft: `3px solid ${isTransit ? 'var(--accent)' : 'var(--text-3)'}`,
-        padding: '14px 18px',
-      }}>
+      <div style={{ borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${accentColor}`, padding: '14px 18px' }}>
+        {/* Case info row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              <span className="case-number">{c.caseNumber}</span>
+              {c.caseNumber
+                ? <span className="case-number">{c.caseNumber}</span>
+                : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--amber-dim)', color: 'var(--amber)', fontFamily: 'DM Mono, monospace' }}>No Scan # Yet</span>
+              }
               <StatusBadge status={c.status} />
               {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)' }}>🔄 Remake</span>}
               {c.redo   && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>♻️ Redo</span>}
             </div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{c.patientName}</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
-              {c.workType}{c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}{' · '}🏥 {c.clinic?.name}
+              {c.workType && c.workType !== 'TBD' ? c.workType : <span style={{ color: 'var(--amber)' }}>Work type TBD</span>}
+              {c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}{' · '}🏥 {c.clinic?.name}
             </div>
-            {c.doctorName && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>👨‍⚕️ {c.doctorName}{c.doctorPhone ? ` · ${c.doctorPhone}` : ''}</div>}
+            {c.clinic?.phone && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📞 {c.clinic.phone}</div>}
+            {c.clinic?.address && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📍 {c.clinic.address}</div>}
+            {c.doctorName && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>👨‍⚕️ {c.doctorName}{c.doctorPhone ? ` · ${c.doctorPhone}` : ''}</div>}
             {c.shade && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🎨 Shade: <strong>{c.shade}</strong></div>}
-            {c.assignedDelivery && (
-              <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>
-                🛵 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}
-              </div>
-            )}
+            {c.notes && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>📋 {c.notes}</div>}
+            {c.assignedDelivery && <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>🛵 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}</div>}
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
               Registered {format(new Date(c.createdAt), 'dd MMM yyyy, h:mm a')}
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
-            {isTransit && (
+          {/* Action buttons */}
+          {canAct && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
               <button
                 className="btn btn-primary btn-sm"
-                onClick={() => setAcceptingId(isOpen ? null : c.id)}
+                onClick={() => open(c.id, 'accept')}
+                style={{ whiteSpace: 'nowrap' }}
               >
-                {isOpen ? '✕ Cancel' : '✓ Accept Case'}
+                ✓ Accept
               </button>
-            )}
-            {!isTransit && (
-              <span style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>Awaiting pickup</span>
-            )}
-          </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => open(c.id, 'review')}
+                style={{ color: '#1D4ED8', whiteSpace: 'nowrap' }}
+              >
+                🔎 Under Review
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => open(c.id, 'reject')}
+                style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}
+              >
+                🚫 Reject
+              </button>
+            </div>
+          )}
+          {!canAct && (
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', flexShrink: 0 }}>Awaiting pickup</span>
+          )}
         </div>
 
-        {/* Inline accept form */}
-        {isOpen && (
-          <div style={{ marginTop: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 8 }}>
-              📝 Add a note (e.g. shade confirmation, info needed from dentist)
+        {/* ── Accept form ── */}
+        {isOpen && action === 'accept' && (
+          <div style={{ marginTop: 14, padding: '16px 16px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14 }}>
+              ✓ Accept Case — Fill in Details & Assign Scan Number
             </div>
-            <textarea
-              rows={3}
-              placeholder="e.g. Shade B1 confirmed. Please clarify occlusion on tooth 14…"
-              value={notes[c.id] || ''}
-              onChange={e => setNotes(prev => ({ ...prev, [c.id]: e.target.value }))}
-              style={{
-                width: '100%', padding: '8px 10px', fontSize: 13,
-                borderRadius: 8, border: '1px solid var(--border)',
-                background: 'var(--surface)', resize: 'vertical',
-                fontFamily: 'inherit', marginBottom: 10,
-              }}
-            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>SHADE *</label>
+                <input style={inputSt} placeholder="e.g. A2, B1" value={det(c.id).shade || ''} onChange={e => setDet(c.id, 'shade', e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>WORK TYPE</label>
+                <input style={inputSt} placeholder={c.workType || 'e.g. Zirconia Crown'} value={det(c.id).workType || ''} onChange={e => setDet(c.id, 'workType', e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>DOCTOR'S NAME *</label>
+                <input style={inputSt} placeholder="Dr. Ahmed" value={det(c.id).doctorName || c.doctorName || ''} onChange={e => setDet(c.id, 'doctorName', e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>CONTACT / PHONE *</label>
+                <input style={inputSt} placeholder="+251 911 000 000" value={det(c.id).doctorPhone || c.doctorPhone || ''} onChange={e => setDet(c.id, 'doctorPhone', e.target.value)} />
+              </div>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>NOTES / ACCEPTANCE NOTE</label>
+              <textarea rows={2} style={textareaSt} placeholder="Additional instructions, observations…" value={det(c.id).notes || ''} onChange={e => setDet(c.id, 'notes', e.target.value)} />
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => handleAccept(c)}
-                disabled={submitting}
-                style={{ flex: 1, justifyContent: 'center' }}
-              >
-                {submitting ? 'Accepting…' : '✓ Confirm Acceptance'}
+              <button className="btn btn-primary btn-sm" onClick={() => handleAccept(c)} disabled={submitting} style={{ flex: 1, justifyContent: 'center' }}>
+                {submitting ? 'Accepting…' : '✓ Accept & Assign Scan Number'}
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setAcceptingId(null)}>Cancel</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setOpenId(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Under Review form ── */}
+        {isOpen && action === 'review' && (
+          <div style={{ marginTop: 14, padding: '16px 16px', background: '#EFF6FF', borderRadius: 10, border: '1px solid #BFDBFE' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1D4ED8', marginBottom: 10 }}>
+              🔎 Under Review — What information is needed from the dentist?
+            </div>
+            <textarea rows={3} style={{ ...textareaSt, border: '1px solid #BFDBFE', background: '#fff' }}
+              placeholder="e.g. Shade not specified. Need confirmation of tooth 14 preparation type."
+              value={det(c.id).notes || ''} onChange={e => setDet(c.id, 'notes', e.target.value)} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="btn btn-sm" onClick={() => handleReview(c)} disabled={submitting}
+                style={{ flex: 1, justifyContent: 'center', background: '#1D4ED8', color: '#fff', border: 'none' }}>
+                {submitting ? 'Saving…' : '🔎 Mark Under Review'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setOpenId(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Reject form ── */}
+        {isOpen && action === 'reject' && (
+          <div style={{ marginTop: 14, padding: '16px 16px', background: '#FFF1F2', borderRadius: 10, border: '1px solid #FECACA' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 10 }}>
+              🚫 Reject Case — Please enter the reason
+            </div>
+            <textarea rows={3} style={{ ...textareaSt, border: '1px solid #FECACA', background: '#fff' }}
+              placeholder="e.g. Impression quality too poor to work with. Please retake."
+              value={det(c.id).notes || ''} onChange={e => setDet(c.id, 'notes', e.target.value)} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="btn btn-sm" onClick={() => handleReject(c)} disabled={submitting}
+                style={{ flex: 1, justifyContent: 'center', background: 'var(--red)', color: '#fff', border: 'none' }}>
+                {submitting ? 'Rejecting…' : '🚫 Confirm Rejection'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setOpenId(null)}>Cancel</button>
             </div>
           </div>
         )}
@@ -138,20 +258,31 @@ function AcceptCasesSection({ queryClient }) {
 
   return (
     <>
-      {/* In Transit — ready to accept */}
-      <div className="card" style={{ marginBottom: 20 }}>
+      {/* Under Review */}
+      {underReview.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <div className="card-title">🔎 Under Review</div>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{underReview.length} awaiting dentist info</span>
+          </div>
+          <div>{underReview.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
+        </div>
+      )}
+
+      {/* In Transit */}
+      <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <div className="card-title">📥 In Transit — Ready to Accept</div>
+          <div className="card-title">📥 In Transit — Arrived at Lab</div>
           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{inTransit.length} case{inTransit.length !== 1 ? 's' : ''}</span>
         </div>
         {inTransit.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🎉</div>
             <div className="empty-title">No cases in transit</div>
-            <p>Cases picked up by drivers will appear here for acceptance.</p>
+            <p>Cases picked up by drivers and brought to the lab will appear here.</p>
           </div>
         ) : (
-          <div>{inTransit.map(c => <CaseCard key={c.id} c={c} />)}</div>
+          <div>{inTransit.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
         )}
       </div>
 
@@ -167,7 +298,7 @@ function AcceptCasesSection({ queryClient }) {
             <div className="empty-title">No cases waiting for pickup</div>
           </div>
         ) : (
-          <div>{pending.map(c => <CaseCard key={c.id} c={c} />)}</div>
+          <div>{pending.map(c => <CaseCard key={c.id} c={c} canAct={false} />)}</div>
         )}
       </div>
     </>

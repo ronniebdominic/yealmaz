@@ -72,7 +72,7 @@ model Clinic {
 // ── CASES ──────────────────────────────────────────────
 model Case {
   id              String      @id @default(uuid())
-  caseNumber      String      @unique // e.g. YAL-2024-0001
+  caseNumber      String?     @unique // assigned on acceptance; null for phone orders before acceptance
   patientName     String
   patientAge      Int?
   doctorName      String?     // referring doctor / dentist
@@ -164,6 +164,10 @@ enum CaseStatus {
   ON_HOLD
   REMAKE
   CANCELLED
+
+  // Receptionist review states
+  UNDER_REVIEW   // needs more info from dentist before acceptance
+  REJECTED       // receptionist rejected the case
 }
 
 enum DeliveryType {

@@ -24,6 +24,8 @@ const STATUS_MAP = {
   ON_HOLD:                   { label: 'On Hold',                  cls: 'badge-hold' },
   REMAKE:                    { label: 'Remake',                   cls: 'badge-hold' },
   CANCELLED:                 { label: 'Cancelled',                cls: 'badge-hold' },
+  UNDER_REVIEW:              { label: 'Under Review',             cls: 'badge-review' },
+  REJECTED:                  { label: 'Rejected',                 cls: 'badge-rejected' },
 };
 
 const PAY_MAP = {
@@ -57,4 +59,5 @@ export const STAGE_ICONS = {
   QUALITY_CHECK: '🔍', PAYMENT_INVOICING: '💰',
   READY_TO_DISPATCH: '📦', OUT_FOR_DELIVERY: '🚚', DELIVERED: '✅',
   ON_HOLD: '⏸️', REMAKE: '🔄', CANCELLED: '❌',
+  UNDER_REVIEW: '🔎', REJECTED: '🚫',
 };

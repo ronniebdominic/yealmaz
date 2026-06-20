@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { PaymentBadge } from '../components/StatusBadge';
@@ -146,6 +146,150 @@ const Td = ({ children, style }) => (
   </td>
 );
 
+// ── Phone Order Modal (telephonic intake) ────────────────
+function PhoneOrderModal({ executives, onClose, onSuccess }) {
+  const [form, setForm] = useState({
+    existingClinicId: '', clinicName: '', clinicPhone: '', clinicAddress: '',
+    patientName: '', workType: '', doctorName: '', doctorPhone: '', notes: '',
+    assignToExecutiveId: '',
+  });
+  const [clinics, setClinics] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [useExisting, setUseExisting] = useState(true);
+
+  useEffect(() => {
+    api.get('/clinics').then(r => setClinics(r.data)).catch(() => {});
+  }, []);
+
+  const set = (f) => (e) => setForm(prev => ({ ...prev, [f]: e.target.value }));
+  const inp = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'inherit' };
+  const lbl = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
+
+  const submit = async () => {
+    if (!form.patientName.trim()) return toast.error('Patient name is required');
+    if (useExisting && !form.existingClinicId) return toast.error('Select a clinic or switch to manual entry');
+    if (!useExisting && !form.clinicName.trim()) return toast.error('Clinic name is required');
+
+    setSaving(true);
+    try {
+      await api.post('/dispatch/phone-order', {
+        clinicId: useExisting ? form.existingClinicId : undefined,
+        clinicName:    !useExisting ? form.clinicName    : undefined,
+        clinicPhone:   !useExisting ? form.clinicPhone   : undefined,
+        clinicAddress: !useExisting ? form.clinicAddress : undefined,
+        patientName:   form.patientName,
+        workType:      form.workType || undefined,
+        doctorName:    form.doctorName || undefined,
+        doctorPhone:   form.doctorPhone || undefined,
+        notes:         form.notes || undefined,
+        assignToExecutiveId: form.assignToExecutiveId || undefined,
+      });
+      toast.success('📞 Phone order placed!');
+      onSuccess();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to place order');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <div className="modal-title">📞 New Phone Order</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Clinic */}
+          <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <button onClick={() => setUseExisting(true)}
+                className={`filter-chip${useExisting ? ' active' : ''}`} style={{ fontSize: 12 }}>
+                Select Existing Clinic
+              </button>
+              <button onClick={() => setUseExisting(false)}
+                className={`filter-chip${!useExisting ? ' active' : ''}`} style={{ fontSize: 12 }}>
+                New / Manual Entry
+              </button>
+            </div>
+            {useExisting ? (
+              <select value={form.existingClinicId} onChange={set('existingClinicId')} style={inp}>
+                <option value="">— Select clinic —</option>
+                {clinics.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+              </select>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={lbl}>CLINIC / DENTIST NAME *</label>
+                  <input style={inp} placeholder="Dr. Ahmed Dental Clinic" value={form.clinicName} onChange={set('clinicName')} />
+                </div>
+                <div>
+                  <label style={lbl}>CONTACT PHONE</label>
+                  <input style={inp} placeholder="+251 911 000 000" value={form.clinicPhone} onChange={set('clinicPhone')} />
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={lbl}>LOCATION / ADDRESS</label>
+                  <input style={inp} placeholder="Bole, Addis Ababa" value={form.clinicAddress} onChange={set('clinicAddress')} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Patient */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <label style={lbl}>PATIENT NAME *</label>
+              <input style={inp} placeholder="Patient name" value={form.patientName} onChange={set('patientName')} />
+            </div>
+            <div>
+              <label style={lbl}>WORK TYPE</label>
+              <input style={inp} placeholder="e.g. Zirconia Crown" value={form.workType} onChange={set('workType')} />
+            </div>
+            <div>
+              <label style={lbl}>DOCTOR NAME</label>
+              <input style={inp} placeholder="Dr. Sarah" value={form.doctorName} onChange={set('doctorName')} />
+            </div>
+            <div>
+              <label style={lbl}>DOCTOR PHONE</label>
+              <input style={inp} placeholder="+251 911 000 000" value={form.doctorPhone} onChange={set('doctorPhone')} />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label style={lbl}>NOTES FROM CALL</label>
+            <textarea rows={2} style={{ ...inp, resize: 'vertical' }}
+              placeholder="Any details mentioned on the call…"
+              value={form.notes} onChange={set('notes')} />
+          </div>
+
+          {/* Assign driver immediately */}
+          <div>
+            <label style={lbl}>ASSIGN PICKUP DRIVER (optional)</label>
+            <select value={form.assignToExecutiveId} onChange={set('assignToExecutiveId')} style={inp}>
+              <option value="">— Assign later —</option>
+              {executives.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.name} · {e.assignedDeliveries?.length || 0} active jobs
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
+              {saving ? 'Placing…' : '📞 Place Phone Order'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Dispatch Dashboard ───────────────────────────────
 export default function DispatchDashboard() {
   const navigate     = useNavigate();
@@ -158,7 +302,8 @@ export default function DispatchDashboard() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
   const [assignModal, setAssignModal] = useState(null); // { case, mode: 'pickup'|'send-out' }
-  const [payModal, setPayModal]       = useState(null);
+  const [payModal, setPayModal]           = useState(null);
+  const [phoneOrderOpen, setPhoneOrderOpen] = useState(false);
   const [processing, setProcessing]   = useState(false);
 
   // ── Data ────────────────────────────────────────────────
@@ -362,6 +507,13 @@ export default function DispatchDashboard() {
               <div className="card-header">
                 <div className="card-title">📋 Place Order — Impression Pickups</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setPhoneOrderOpen(true)}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    📞 Phone Order
+                  </button>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{placeOrder.length} pending</span>
                   <ExportMenu
                     data={placeOrder}
@@ -679,6 +831,15 @@ export default function DispatchDashboard() {
           caseData={payModal}
           onClose={() => setPayModal(null)}
           onSuccess={() => { setPayModal(null); refetchAll(); queryClient.invalidateQueries({ queryKey: ['dispatch'] }); }}
+        />
+      )}
+
+      {/* Phone Order modal */}
+      {phoneOrderOpen && (
+        <PhoneOrderModal
+          executives={executives}
+          onClose={() => setPhoneOrderOpen(false)}
+          onSuccess={() => { setPhoneOrderOpen(false); refetchAll(); setTab('place-order'); }}
         />
       )}
     </div>

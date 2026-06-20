@@ -73,6 +73,8 @@ tr:hover td{background:var(--surface-2)}
 .badge-dispatch{background:var(--accent-dim);color:#00897B}.badge-dispatch::before{background:#00897B}
 .badge-delivered{background:var(--navy);color:#fff}.badge-delivered::before{background:var(--accent)}
 .badge-hold{background:#FFF1F2;color:#BE123C}.badge-hold::before{background:#BE123C}
+.badge-review{background:#EFF6FF;color:#1D4ED8}.badge-review::before{background:#1D4ED8}
+.badge-rejected{background:#1F2937;color:#F87171}.badge-rejected::before{background:#F87171}
 .badge-pay-pending{background:var(--amber-dim);color:var(--amber)}
 .badge-pay-uploaded{background:#EFF6FF;color:var(--blue)}
 .badge-pay-verified{background:var(--green-dim);color:var(--green)}

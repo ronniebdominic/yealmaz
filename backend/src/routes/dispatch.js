@@ -8,6 +8,18 @@ const { sendPushToClinic } = require('../utils/webpush');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Fallback due-date calculator (mirrors the one in cases.js)
+async function getDueDays(workType) {
+  try {
+    const rec = await prisma.workTypePrice.findUnique({ where: { workType }, select: { durationDays: true } });
+    if (rec?.durationDays) return rec.durationDays;
+  } catch (_) {}
+  const w = (workType || '').toLowerCase();
+  if (w.includes('coping') || w.includes('zirconia')) return 4;
+  if (w.includes('aligner') || w.includes('ceramic') || w.includes('emax')) return 6;
+  return 5;
+}
+
 // ── GET /api/dispatch/stations ───────────────────────────
 // All active cases (not delivered/cancelled) grouped by clinic — for dispatch & delivery overview
 router.get('/stations', protect, restrict('DISPATCH', 'ADMIN', 'DELIVERY'), async (req, res) => {
@@ -225,6 +237,89 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not assign pickup.' });
+  }
+});
+
+// ── POST /api/dispatch/phone-order ──────────────────────────
+// Dispatcher creates a new case from a telephonic call.
+// clinicId OR (clinicName + clinicPhone) must be provided.
+// No mandatory shade/doctor validation — that is done by receptionist on acceptance.
+// caseNumber is NOT generated here — assigned by receptionist when they accept.
+router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  try {
+    const {
+      clinicId, clinicName, clinicPhone, clinicAddress,
+      patientName, workType, doctorName, doctorPhone, notes,
+      assignToExecutiveId,
+    } = req.body;
+
+    if (!patientName?.trim()) return res.status(400).json({ error: 'Patient name is required.' });
+
+    // Resolve or create clinic
+    let resolvedClinicId = clinicId;
+    if (!resolvedClinicId) {
+      if (!clinicName?.trim()) return res.status(400).json({ error: 'Clinic name is required when clinic is not selected.' });
+      // Create a minimal clinic record (no login / email required)
+      const newClinic = await prisma.clinic.create({
+        data: {
+          name:     clinicName.trim(),
+          phone:    clinicPhone  || null,
+          address:  clinicAddress || null,
+          email:    `phone-order-${Date.now()}@yealmaz.internal`,
+          password: 'PHONE_ORDER_NO_LOGIN',
+          isActive: true,
+        },
+      });
+      resolvedClinicId = newClinic.id;
+      await invalidate('clinics');
+    }
+
+    const autoDays = workType ? await getDueDays(workType) : 5;
+    const dueDate  = new Date();
+    dueDate.setDate(dueDate.getDate() + autoDays);
+
+    const status = assignToExecutiveId ? 'PICKUP_ASSIGNED' : 'PENDING_PICKUP';
+
+    const newCase = await prisma.case.create({
+      data: {
+        caseNumber:  null, // assigned by receptionist on acceptance
+        patientName: patientName.trim(),
+        workType:    workType || 'TBD',
+        doctorName:  doctorName || null,
+        doctorPhone: doctorPhone || null,
+        notes:       notes || null,
+        dueDate,
+        clinicId:    resolvedClinicId,
+        status,
+        ...(assignToExecutiveId ? { assignedDeliveryId: assignToExecutiveId } : {}),
+      },
+      include: { clinic: { select: { name: true, phone: true, address: true } } },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId:    newCase.id,
+        stageName: status,
+        scannedBy: req.user.name,
+        notes:     `Phone order placed by dispatcher${assignToExecutiveId ? ' — pickup assigned' : ''}`,
+      },
+    });
+
+    await prisma.payment.create({
+      data: { caseId: newCase.id, status: 'PENDING' },
+    });
+
+    await invalidate('cases:*', 'dispatch:queue', 'dashboard:summary');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('new_case', {
+      caseId: newCase.id, caseNumber: null, patientName: newCase.patientName, clinicName: newCase.clinic.name, workType: newCase.workType,
+    });
+
+    res.status(201).json(newCase);
+  } catch (err) {
+    console.error('[POST /dispatch/phone-order]', err);
+    res.status(500).json({ error: err.message || 'Could not create phone order.' });
   }
 });
 
