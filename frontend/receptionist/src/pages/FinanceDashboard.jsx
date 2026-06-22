@@ -1034,132 +1034,225 @@ function CollectModal({ caseData, onDone, onClose }) {
   );
 }
 
+const fetchTrustedSummary = () =>
+  api.get('/dashboard/trusted-partners-summary').then(r => r.data);
+
+const ETB = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 function TrustedPartnersTab({ queryClient }) {
-  const [page, setPage]             = useState(1);
-  const [search, setSearch]         = useState('');
-  const [collectCase, setCollect]   = useState(null);
-  const [statement, setStatement]   = useState(null); // { clinicId, clinic }
+  const [expanded, setExpanded]   = useState(null); // clinic id
+  const [collectCase, setCollect] = useState(null);
+  const [statement, setStatement] = useState(null);
+  const [clinicCases, setClinicCases] = useState({}); // { [clinicId]: cases[] }
+  const [loadingClinic, setLoadingClinic] = useState(null);
 
-  const handleSearch = (v) => { setSearch(v); setPage(1); };
-
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['payments', 'trusted', page, search],
-    queryFn:  () => fetchTrusted(page, search),
-    staleTime: 30_000,
-    placeholderData: keepPreviousData,
+  const { data: summary = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['trusted-partners-summary'],
+    queryFn:  fetchTrustedSummary,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 
-  const cases      = data?.cases      || [];
-  const pagination = data?.pagination || {};
+  const toggleClinic = async (clinicId) => {
+    if (expanded === clinicId) { setExpanded(null); return; }
+    setExpanded(clinicId);
+    if (clinicCases[clinicId]) return; // already loaded
+    setLoadingClinic(clinicId);
+    try {
+      const res = await api.get('/payments/trusted', { params: { clinicId, limit: 200 } });
+      setClinicCases(prev => ({ ...prev, [clinicId]: res.data?.cases ?? [] }));
+    } catch {}
+    finally { setLoadingClinic(null); }
+  };
+
+  // Totals
+  const totals = summary.reduce((acc, c) => ({
+    totalOrders:      acc.totalOrders      + c.totalOrders,
+    totalUnits:       acc.totalUnits       + c.totalUnits,
+    deliveredOrders:  acc.deliveredOrders  + c.deliveredOrders,
+    inProgress:       acc.inProgress       + c.inProgress,
+    totalRevenue:     acc.totalRevenue     + c.totalRevenue,
+    paymentsReceived: acc.paymentsReceived + c.paymentsReceived,
+    outstanding:      acc.outstanding      + c.outstanding,
+  }), { totalOrders: 0, totalUnits: 0, deliveredOrders: 0, inProgress: 0, totalRevenue: 0, paymentsReceived: 0, outstanding: 0 });
+
+  const cases      = [];
+  const pagination = {};
 
   if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading…</div>;
-  if (isError)   return <ErrorState message="Could not load trusted partner cases." onRetry={refetch} />;
-
-  if (cases.length === 0 && page === 1) return (
+  if (isError)   return <div style={{ textAlign: 'center', color: 'var(--red)', padding: 60 }}>Could not load trusted partners. <button className="btn btn-ghost btn-sm" onClick={refetch}>Retry</button></div>;
+  if (summary.length === 0) return (
     <div className="empty-state">
       <div className="empty-icon">🤝</div>
-      <div className="empty-title">All collected!</div>
-      <p>No pending payments from trusted partner clinics.</p>
+      <div className="empty-title">No trusted partners found</div>
+      <p>Clinics marked as Trusted Partners will appear here.</p>
     </div>
   );
 
+  const numFmt = (v) => Number(v || 0).toLocaleString('en-US');
+
   return (
     <>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
-        <div className="search-input" style={{ flex: 1 }}>
-          <span className="icon">🔍</span>
-          <input
-            placeholder="Search clinic, case or patient…"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
+      {/* Summary KPIs */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
+          <div className="stat-label">Trusted Partners</div>
+          <div className="stat-value" style={{ color: '#6D28D9' }}>{summary.length}</div>
+          <div className="stat-sub">Active partner clinics</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
+          <div className="stat-label">Total Orders</div>
+          <div className="stat-value" style={{ color: 'var(--blue)' }}>{numFmt(totals.totalOrders)}</div>
+          <div className="stat-sub">{numFmt(totals.deliveredOrders)} delivered · {numFmt(totals.inProgress)} in progress</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+          <div className="stat-label">Payments Received</div>
+          <div className="stat-value" style={{ color: 'var(--green)', fontSize: totals.paymentsReceived >= 1000000 ? 16 : 22 }}>{ETB(totals.paymentsReceived)}</div>
+          <div className="stat-sub">Verified</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+          <div className="stat-label">Outstanding</div>
+          <div className="stat-value" style={{ color: 'var(--red)', fontSize: totals.outstanding >= 1000000 ? 16 : 22 }}>{ETB(totals.outstanding)}</div>
+          <div className="stat-sub">Pending collection</div>
+        </div>
+      </div>
+
+      {/* Partner table */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">🤝 Trusted Partner Clinics</div>
+          <ExportMenu
+            data={summary}
+            columns={[
+              { header: 'Clinic Name',         value: c => c.name },
+              { header: 'Total Orders',         value: c => c.totalOrders },
+              { header: 'Total Units',          value: c => c.totalUnits },
+              { header: 'Delivered Orders',     value: c => c.deliveredOrders },
+              { header: 'Orders in Progress',   value: c => c.inProgress },
+              { header: 'Total Revenue (Br)',   value: c => c.totalRevenue.toFixed(2) },
+              { header: 'Payments Received (Br)', value: c => c.paymentsReceived.toFixed(2) },
+              { header: 'Outstanding (Br)',     value: c => c.outstanding.toFixed(2) },
+            ]}
+            filename="trusted-partners"
+            title="Trusted Partners Summary"
           />
         </div>
-        {search && (
-          <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
-        )}
-      </div>
-
-      <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#6D28D9', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 16 }}>🤝</span>
-        <span>
-          <strong>{pagination.total ?? cases.length} cases</strong> from trusted partner clinics awaiting collection.
-          These clinics pay on delivery — mark each case as collected once payment is received.
-        </span>
-      </div>
-
-      <div className="card">
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Case #</th>
-                <th>Clinic</th>
-                <th>Patient</th>
-                <th>Work Type</th>
-                <th>Invoice #</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Action</th>
+                <th>Clinic Name</th>
+                <th style={{ textAlign: 'center' }}>Total Orders</th>
+                <th style={{ textAlign: 'center' }}>Total Units</th>
+                <th style={{ textAlign: 'center' }}>Delivered</th>
+                <th style={{ textAlign: 'center' }}>In Progress</th>
+                <th style={{ textAlign: 'right' }}>Total Revenue</th>
+                <th style={{ textAlign: 'right' }}>Received</th>
+                <th style={{ textAlign: 'right' }}>Outstanding</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {cases.map(c => (
-                <tr key={c.id}>
-                  <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{c.caseNumber}</td>
-                  <td>
-                    <div style={{ fontSize: 13 }}>{c.clinic?.name}</div>
-                    <span className="badge badge-trusted" style={{ fontSize: 10, marginTop: 3 }}>🤝 Trusted Partner</span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{c.patientName}</td>
-                  <td style={{ fontSize: 13 }}>
-                    {c.workType}
-                    {c.toothNumbers && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>#{c.toothNumbers}</div>}
-                  </td>
-                  <td style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>
-                    {c.payment?.invoiceNumber || <span style={{ color: 'var(--text-3)' }}>—</span>}
-                  </td>
-                  <td style={{ fontWeight: 700, fontSize: 14 }}>
-                    {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
-                  </td>
-                  <td><StatusBadge status={c.status} /></td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button
-                        onClick={() => setCollect(c)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          background: 'var(--green-dim)', color: 'var(--green)',
-                          border: '1px solid rgba(22,163,74,0.3)',
-                          borderRadius: 6, padding: '5px 11px',
-                          fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        💰 Mark Collected
-                      </button>
-                      <button
-                        onClick={() => setStatement({ clinicId: c.clinicId, clinic: c.clinic })}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          background: '#EFF6FF', color: 'var(--blue)',
-                          border: '1px solid rgba(37,99,235,0.25)',
-                          borderRadius: 6, padding: '5px 11px',
-                          fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        📄 Statement
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+              {summary.map(c => (
+                <>
+                  <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                          {c.name[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-1)' }}>{c.name}</div>
+                          {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
+                        </div>
+                        <span className="badge badge-trusted" style={{ fontSize: 10 }}>🤝 Trusted</span>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{numFmt(c.totalOrders)}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{numFmt(c.totalUnits) || '—'}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--green)', fontWeight: 600 }}>{numFmt(c.deliveredOrders)}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--amber)', fontWeight: 600 }}>{numFmt(c.inProgress)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-1)' }}>{ETB(c.totalRevenue)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETB(c.paymentsReceived)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: c.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>{ETB(c.outstanding)}</td>
+                    <td style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
+                      {expanded === c.id ? '▲' : '▼'}
+                    </td>
+                  </tr>
+
+                  {/* Expanded individual cases */}
+                  {expanded === c.id && (
+                    <tr>
+                      <td colSpan={9} style={{ padding: '0 0 12px 0', background: 'var(--surface-2)' }}>
+                        {loadingClinic === c.id ? (
+                          <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-3)' }}>Loading cases…</div>
+                        ) : (clinicCases[c.id] || []).length === 0 ? (
+                          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>No cases found</div>
+                        ) : (
+                          <table style={{ width: '100%', fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: 'var(--border)' }}>
+                                <th style={{ padding: '6px 12px 6px 52px', textAlign: 'left' }}>Case #</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'left' }}>Patient</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'left' }}>Work Type</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'center' }}>Units</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'left' }}>Status</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Amount</th>
+                                <th style={{ padding: '6px 12px' }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(clinicCases[c.id] || []).map(cas => (
+                                <tr key={cas.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                  <td style={{ padding: '8px 12px 8px 52px', fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>{cas.caseNumber}</td>
+                                  <td style={{ padding: '8px 12px', fontWeight: 600 }}>{cas.patientName}</td>
+                                  <td style={{ padding: '8px 12px', color: 'var(--text-2)' }}>{cas.workType}</td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>{cas.units ?? '—'}</td>
+                                  <td style={{ padding: '8px 12px' }}><StatusBadge status={cas.status} /></td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>
+                                    {cas.totalAmount ? `Br ${cas.totalAmount.toLocaleString('en-US')}` : '—'}
+                                  </td>
+                                  <td style={{ padding: '8px 12px' }}>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                      <button onClick={() => setCollect(cas)}
+                                        style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        💰 Collected
+                                      </button>
+                                      <button onClick={() => setStatement({ clinicId: cas.clinicId, clinic: cas.clinic })}
+                                        style={{ background: '#EFF6FF', color: 'var(--blue)', border: '1px solid rgba(37,99,235,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                        📄 Statement
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
+
+              {/* Totals row */}
+              <tr style={{ background: 'var(--surface-2)', fontWeight: 700, borderTop: '2px solid var(--border)' }}>
+                <td style={{ padding: '12px 16px', color: 'var(--text-1)' }}>TOTAL — {summary.length} partners</td>
+                <td style={{ textAlign: 'center', color: 'var(--blue)' }}>{numFmt(totals.totalOrders)}</td>
+                <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{numFmt(totals.totalUnits)}</td>
+                <td style={{ textAlign: 'center', color: 'var(--green)' }}>{numFmt(totals.deliveredOrders)}</td>
+                <td style={{ textAlign: 'center', color: 'var(--amber)' }}>{numFmt(totals.inProgress)}</td>
+                <td style={{ textAlign: 'right', color: 'var(--text-1)' }}>{ETB(totals.totalRevenue)}</td>
+                <td style={{ textAlign: 'right', color: 'var(--green)' }}>{ETB(totals.paymentsReceived)}</td>
+                <td style={{ textAlign: 'right', color: totals.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>{ETB(totals.outstanding)}</td>
+                <td></td>
+              </tr>
             </tbody>
           </table>
-          <Pagination
-            page={page} totalPages={pagination.totalPages || 1}
-            total={pagination.total || 0} pageSize={HIST_SIZE}
-            onPrev={() => setPage(p => p - 1)}
-            onNext={() => setPage(p => p + 1)}
-          />
         </div>
       </div>
 
@@ -1168,13 +1261,13 @@ function TrustedPartnersTab({ queryClient }) {
           caseData={collectCase}
           onDone={() => {
             setCollect(null);
-            queryClient.invalidateQueries({ queryKey: ['payments', 'trusted'] });
+            queryClient.invalidateQueries({ queryKey: ['trusted-partners-summary'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            setClinicCases({});
           }}
           onClose={() => setCollect(null)}
         />
       )}
-
       {statement && (
         <StatementModal
           clinicId={statement.clinicId}

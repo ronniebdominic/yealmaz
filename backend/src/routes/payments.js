@@ -634,16 +634,16 @@ router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 // ── GET /api/payments/trusted ────────────────────────────
 // Pending cases from isExcluded clinics — collected in person by finance
 router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
-  const { page = 1, limit = 20, search = '' } = req.query;
+  const { page = 1, limit = 20, search = '', clinicId } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const cacheKey = `payments:trusted:${page}:${limit}:${search}`;
+  const cacheKey = `payments:trusted:${page}:${limit}:${search}:${clinicId || ''}`;
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);
 
   try {
     const where = {
-      paymentStatus: 'PENDING',
       clinic: { isExcluded: true },
+      ...(clinicId ? { clinicId } : { paymentStatus: 'PENDING' }),
       ...(search ? {
         OR: [
           { clinic: { name: { contains: search, mode: 'insensitive' } } },

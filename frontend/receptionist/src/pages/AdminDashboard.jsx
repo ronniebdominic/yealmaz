@@ -661,10 +661,117 @@ export default function AdminDashboard() {
                 </div>
               );
             })()}
+
+            {/* ── Trusted Partners ── */}
+            <TrustedPartnersSummary />
           </>
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+// ── Trusted Partners Summary (shared Finance + Admin) ─────
+function TrustedPartnersSummary() {
+  const [expanded, setExpanded] = useState(null);
+
+  const { data: summary = [], isLoading } = useQuery({
+    queryKey: ['trusted-partners-summary'],
+    queryFn: () => api.get('/dashboard/trusted-partners-summary').then(r => r.data),
+    staleTime: 120_000,
+  });
+
+  const totals = summary.reduce((acc, c) => ({
+    totalOrders:       acc.totalOrders       + c.totalOrders,
+    totalUnits:        acc.totalUnits        + c.totalUnits,
+    deliveredOrders:   acc.deliveredOrders   + c.deliveredOrders,
+    inProgress:        acc.inProgress        + c.inProgress,
+    totalRevenue:      acc.totalRevenue      + c.totalRevenue,
+    paymentsReceived:  acc.paymentsReceived  + c.paymentsReceived,
+    outstanding:       acc.outstanding       + c.outstanding,
+  }), { totalOrders: 0, totalUnits: 0, deliveredOrders: 0, inProgress: 0, totalRevenue: 0, paymentsReceived: 0, outstanding: 0 });
+
+  const ETBa = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n    = (v) => Number(v || 0).toLocaleString('en-US');
+
+  if (isLoading) return null;
+  if (!summary.length) return null;
+
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="card-header">
+        <div className="card-title">🤝 Trusted Partners Summary</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{summary.length} partners</span>
+          <ExportMenu
+            data={summary}
+            columns={[
+              { header: 'Clinic Name',             value: c => c.name },
+              { header: 'Total Orders',             value: c => c.totalOrders },
+              { header: 'Total Units',              value: c => c.totalUnits },
+              { header: 'Delivered Orders',         value: c => c.deliveredOrders },
+              { header: 'Orders in Progress',       value: c => c.inProgress },
+              { header: 'Total Revenue (Br)',       value: c => c.totalRevenue.toFixed(2) },
+              { header: 'Payments Received (Br)',   value: c => c.paymentsReceived.toFixed(2) },
+              { header: 'Outstanding (Br)',         value: c => c.outstanding.toFixed(2) },
+            ]}
+            filename="trusted-partners"
+            title="Trusted Partners Summary"
+          />
+        </div>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Clinic Name</th>
+              <th style={{ textAlign: 'center' }}>Total Orders</th>
+              <th style={{ textAlign: 'center' }}>Total Units</th>
+              <th style={{ textAlign: 'center' }}>Delivered</th>
+              <th style={{ textAlign: 'center' }}>In Progress</th>
+              <th style={{ textAlign: 'right' }}>Total Revenue</th>
+              <th style={{ textAlign: 'right' }}>Received</th>
+              <th style={{ textAlign: 'right' }}>Outstanding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.map(c => (
+              <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                      {c.name[0]?.toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{c.name}</div>
+                      {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
+                    </div>
+                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}>🤝 Trusted</span>
+                  </div>
+                </td>
+                <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{n(c.totalOrders)}</td>
+                <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{n(c.totalUnits) || '—'}</td>
+                <td style={{ textAlign: 'center', color: 'var(--green)', fontWeight: 600 }}>{n(c.deliveredOrders)}</td>
+                <td style={{ textAlign: 'center', color: 'var(--amber)', fontWeight: 600 }}>{n(c.inProgress)}</td>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>{ETBa(c.totalRevenue)}</td>
+                <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETBa(c.paymentsReceived)}</td>
+                <td style={{ textAlign: 'right', fontWeight: 700, color: c.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>{ETBa(c.outstanding)}</td>
+              </tr>
+            ))}
+            <tr style={{ background: 'var(--surface-2)', fontWeight: 700, borderTop: '2px solid var(--border)' }}>
+              <td style={{ padding: '12px 16px' }}>TOTAL</td>
+              <td style={{ textAlign: 'center', color: 'var(--blue)' }}>{n(totals.totalOrders)}</td>
+              <td style={{ textAlign: 'center' }}>{n(totals.totalUnits)}</td>
+              <td style={{ textAlign: 'center', color: 'var(--green)' }}>{n(totals.deliveredOrders)}</td>
+              <td style={{ textAlign: 'center', color: 'var(--amber)' }}>{n(totals.inProgress)}</td>
+              <td style={{ textAlign: 'right' }}>{ETBa(totals.totalRevenue)}</td>
+              <td style={{ textAlign: 'right', color: 'var(--green)' }}>{ETBa(totals.paymentsReceived)}</td>
+              <td style={{ textAlign: 'right', color: totals.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>{ETBa(totals.outstanding)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

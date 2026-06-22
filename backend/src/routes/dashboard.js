@@ -457,4 +457,57 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
   }
 });
 
+// ── GET /api/dashboard/trusted-partners-summary ──────────
+// Per-clinic aggregated stats for trusted partner (isExcluded) clinics
+router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    const clinics = await prisma.clinic.findMany({
+      where: { isExcluded: true, isActive: true },
+      select: {
+        id: true, name: true, phone: true, address: true,
+        cases: {
+          select: {
+            id: true, status: true, units: true,
+            payment: { select: { status: true, amount: true } }
+          }
+        }
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const IN_PROGRESS_STATUSES = new Set([
+      'CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
+      'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
+      'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
+      'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+      'READY_TO_DISPATCH','OUT_FOR_DELIVERY','PENDING_PICKUP','PICKUP_ASSIGNED',
+    ]);
+
+    const summary = clinics.map(clinic => {
+      const cases = clinic.cases;
+      const totalOrders     = cases.length;
+      const totalUnits      = cases.reduce((s, c) => s + (c.units || 0), 0);
+      const deliveredOrders = cases.filter(c => c.status === 'DELIVERED').length;
+      const inProgress      = cases.filter(c => IN_PROGRESS_STATUSES.has(c.status)).length;
+      const totalRevenue    = cases.reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      const paymentsReceived = cases.filter(c => c.payment?.status === 'VERIFIED')
+                                    .reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      const outstanding     = cases.filter(c => c.payment?.status !== 'VERIFIED')
+                                    .reduce((s, c) => s + (c.payment?.amount || 0), 0);
+
+      return {
+        id: clinic.id, name: clinic.name, phone: clinic.phone, address: clinic.address,
+        totalOrders, totalUnits, deliveredOrders, inProgress,
+        totalRevenue, paymentsReceived, outstanding,
+      };
+    }).filter(c => c.totalOrders > 0)
+      .sort((a, b) => b.totalOrders - a.totalOrders);
+
+    res.json(summary);
+  } catch (err) {
+    console.error('[trusted-partners-summary]', err);
+    res.status(500).json({ error: 'Could not load trusted partners summary.' });
+  }
+});
+
 module.exports = router;
