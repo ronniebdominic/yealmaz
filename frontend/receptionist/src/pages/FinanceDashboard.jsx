@@ -2,7 +2,7 @@
 // Standalone page (no Layout wrapper) for FINANCE role users
 // Tabs: Screenshot Approvals · Billing & Invoicing · Verified History
 
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
@@ -367,7 +367,7 @@ function ScreenshotsTab({ queryClient }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {paginated.map(p => (
-        <div className="card" key={p.id} style={{ overflow: 'hidden' }}>
+        <div className="card" key={p.id} style={{ overflow: 'visible' }}>
           <div style={{ display: 'flex', gap: 0 }}>
             {/* Screenshot thumbnail */}
             <div style={{ width: 180, flexShrink: 0, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -1158,8 +1158,8 @@ function TrustedPartnersTab({ queryClient }) {
             </thead>
             <tbody>
               {summary.map(c => (
-                <>
-                  <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
+                <React.Fragment key={c.id}>
+                  <tr style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ width: 30, height: 30, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
@@ -1236,7 +1236,7 @@ function TrustedPartnersTab({ queryClient }) {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
 
               {/* Totals row */}

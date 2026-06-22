@@ -75,10 +75,10 @@ tr:hover td{background:var(--surface-2)}
 .badge-hold{background:#FFF1F2;color:#BE123C}.badge-hold::before{background:#BE123C}
 .badge-review{background:#EFF6FF;color:#1D4ED8}.badge-review::before{background:#1D4ED8}
 .badge-rejected{background:#1F2937;color:#F87171}.badge-rejected::before{background:#F87171}
-.badge-pay-pending{background:var(--amber-dim);color:var(--amber)}
-.badge-pay-uploaded{background:#EFF6FF;color:var(--blue)}
-.badge-pay-verified{background:var(--green-dim);color:var(--green)}
-.badge-pay-rejected{background:var(--red-dim);color:var(--red)}
+.badge-pay-pending{background:var(--amber-dim);color:var(--amber)}.badge-pay-pending::before{background:var(--amber)}
+.badge-pay-uploaded{background:#EFF6FF;color:var(--blue)}.badge-pay-uploaded::before{background:var(--blue)}
+.badge-pay-verified{background:var(--green-dim);color:var(--green)}.badge-pay-verified::before{background:var(--green)}
+.badge-pay-rejected{background:var(--red-dim);color:var(--red)}.badge-pay-rejected::before{background:var(--red)}
 .badge-trusted{background:#F5F3FF;color:#6D28D9}.badge-trusted::before{background:#7C3AED}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
 .btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--navy-mid)}

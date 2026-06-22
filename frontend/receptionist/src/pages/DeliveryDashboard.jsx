@@ -217,7 +217,7 @@ function JobCard({ c, section, onAction }) {
           <>
             <button
               className="btn btn-success btn-sm"
-              style={{ flex: 1, justifyContent: 'center', background: 'var(--green)', color: '#fff', border: 'none' }}
+              style={{ flex: 1, justifyContent: 'center' }}
               onClick={() => onAction(c, 'delivered')}
             >
               ✅ Mark as Delivered

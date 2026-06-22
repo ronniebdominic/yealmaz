@@ -407,14 +407,14 @@ export default function DispatchDashboard() {
         <button key={t.id}
           className={`nav-item${tab === t.id ? ' active' : ''}`}
           onClick={() => { setTab(t.id); if (close) close(); }}
-          style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}
+          style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
             <span>{t.icon}</span>
             <span style={{ flex: 1 }}>{t.label}</span>
             {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
           </div>
-          {t.sub && <div style={{ fontSize: 10, color: tab === t.id ? 'rgba(255,255,255,0.65)' : 'var(--text-3)', paddingLeft: 24, marginTop: -2 }}>{t.sub}</div>}
+          {t.sub && <div style={{ fontSize: 10, color: tab === t.id ? 'rgba(255,255,255,0.65)' : 'var(--text-3)', paddingLeft: 24 }}>{t.sub}</div>}
         </button>
       ))}
       <div className="nav-section-label">Cases</div>
