@@ -448,6 +448,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
     }
 
     const balances = Object.values(clinicMap)
+      .filter(b => b.pendingAmount > 0)
       .sort((a, b) => b.pendingAmount - a.pendingAmount);
 
     res.json(balances);
