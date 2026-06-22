@@ -413,7 +413,10 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
   try {
     const payments = await prisma.payment.findMany({
-      where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } },
+      where: {
+        status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
+        amount: { gt: 0 },   // only include cases where a non-zero amount is set
+      },
       select: {
         id: true, status: true, amount: true, updatedAt: true,
         case: {

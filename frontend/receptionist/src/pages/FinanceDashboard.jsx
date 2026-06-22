@@ -1555,12 +1555,15 @@ const fetchClinicBalances = () => api.get('/dashboard/clinic-balances').then(r =
 function ClinicBalancesTab() {
   const [expanded, setExpanded] = useState(null);
 
-  const { data: balances = [], isLoading, isError, refetch } = useQuery({
+  const { data: rawBalances = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['clinic-balances'],
     queryFn: fetchClinicBalances,
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 0,           // always fresh — don't cache stale Br 0 entries
+    refetchInterval: 60_000,
   });
+
+  // Filter out clinics with no outstanding amount (no payment amount set yet)
+  const balances = rawBalances.filter(b => b.pendingAmount > 0);
 
   const totalOutstanding = balances.reduce((s, b) => s + b.pendingAmount, 0);
 
