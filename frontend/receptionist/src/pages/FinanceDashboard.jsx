@@ -1559,26 +1559,57 @@ function ClinicBalancesTab() {
                       </td>
                       <td style={{ fontSize: 13, color: 'var(--text-3)' }}>{expanded === b.id ? '▲' : '▼'}</td>
                     </tr>
-                    {expanded === b.id && b.cases.map(c => (
-                      <tr key={c.caseId} style={{ background: 'var(--surface-2)' }}>
-                        <td colSpan={4} style={{ padding: '6px 14px 6px 48px' }}>
-                          <div style={{ display: 'flex', gap: 20, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>{c.caseNumber}</span>
-                            <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{c.patientName}</span>
-                            <span style={{ color: 'var(--text-2)' }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</span>
-                            <PaymentBadge status={c.paymentStatus} />
-                            <span style={{ color: 'var(--green)', fontWeight: 700 }}>
-                              {c.amount != null ? `Br ${c.amount.toLocaleString('en-US')}` : 'No amount set'}
-                            </span>
-                            {c.dueDate && (
-                              <span style={{ color: new Date(c.dueDate) < new Date() ? 'var(--red)' : 'var(--text-3)' }}>
-                                Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}
+                    {expanded === b.id && b.cases.map(c => {
+                      const isOldFormat = c.patientName && /^[A-Z]{2,4}-\d{4}-\d+$/.test(c.patientName);
+                      return (
+                        <tr key={c.caseId} style={{ background: 'var(--surface-2)' }}>
+                          <td colSpan={4} style={{ padding: '8px 16px 8px 52px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr auto', gap: '8px 20px', fontSize: 12, alignItems: 'center' }}>
+                              {/* Case # */}
+                              <span style={{ fontFamily: 'DM Mono, monospace', color: 'var(--blue)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                {c.caseNumber || '—'}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {/* Patient */}
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 1 }}>PATIENT</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>
+                                  {isOldFormat ? '—' : (c.patientName || '—')}
+                                </div>
+                              </div>
+                              {/* Work type + units */}
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 1 }}>PRODUCT · UNITS</div>
+                                <div style={{ color: 'var(--text-2)' }}>
+                                  {c.workType}
+                                  {c.units ? <span style={{ fontWeight: 700, color: 'var(--accent)', marginLeft: 6 }}>{c.units}u</span> : ''}
+                                </div>
+                              </div>
+                              {/* Order date */}
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 1 }}>ORDER DATE</div>
+                                <div style={{ color: 'var(--text-2)' }}>
+                                  {c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : '—'}
+                                </div>
+                              </div>
+                              {/* Delivery date */}
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 1 }}>DELIVERY DATE</div>
+                                <div style={{ color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)', fontWeight: c.deliveryDate ? 600 : 400 }}>
+                                  {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
+                                </div>
+                              </div>
+                              {/* Amount + payment status */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontWeight: 700, color: c.amount != null ? 'var(--green)' : 'var(--red)' }}>
+                                  {c.amount != null ? `Br ${c.amount.toLocaleString('en-US')}` : 'No amount set'}
+                                </span>
+                                <PaymentBadge status={c.paymentStatus} />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </>
                 ))}
               </tbody>

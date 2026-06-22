@@ -418,7 +418,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
         id: true, status: true, amount: true, updatedAt: true,
         case: {
           select: {
-            id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true,
+            id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true, deliveryDate: true, createdAt: true,
             clinic: { select: { id: true, name: true, isExcluded: true } },
           }
         }
@@ -442,6 +442,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
         caseId: p.case.id, caseNumber: p.case.caseNumber,
         patientName: p.case.patientName, workType: p.case.workType,
         units: p.case.units, dueDate: p.case.dueDate,
+        deliveryDate: p.case.deliveryDate, createdAt: p.case.createdAt,
         paymentStatus: p.status, amount: p.amount, updatedAt: p.updatedAt,
       });
     }
