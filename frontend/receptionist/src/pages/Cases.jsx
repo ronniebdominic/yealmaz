@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import SearchableSelect from '../components/SearchableSelect';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import CaseDetailModal from '../components/CaseDetailModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -22,39 +22,37 @@ const STATUS_FILTERS = [
   { label: 'Delivered',       value: 'DELIVERED' },
 ];
 
+// Statuses that map to "In Production" — passed as comma-separated from dashboard
+const PRODUCTION_STATUSES = [
+  'CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
+  'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
+  'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
+  'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+].join(',');
+
 const PAGE_SIZE = 20;
 
-const selectStyle = {
-  border: '1px solid var(--border)', borderRadius: 8,
-  padding: '7px 12px', fontSize: 13, color: 'var(--text-1)',
-  background: 'var(--surface)', outline: 'none',
-  fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
-};
-
 export default function Cases() {
-  const [filter,    setFilter]    = useState('');
-  const [search,    setSearch]    = useState('');
-  const [clinicId,  setClinicId]  = useState('');
-  const [page,      setPage]      = useState(1);
-  const [selectedCase, setSelectedCase] = useState(null);
-  const [exporting, setExporting] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate    = useNavigate();
   const queryClient = useQueryClient();
 
-  const exportExcel = async () => {
-    setExporting(true);
-    try {
-      await downloadExport('/cases/export', {
-        status:   filter   || undefined,
-        search:   search   || undefined,
-        clinicId: clinicId || undefined,
-      }, `cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch {
-      toast.error('Export failed');
-    } finally {
-      setExporting(false);
-    }
-  };
+  // Initialise from URL query params (set by dashboard card clicks)
+  const [filter,    setFilter]    = useState(searchParams.get('status') || '');
+  const [search,    setSearch]    = useState(searchParams.get('search') || '');
+  const [clinicId,  setClinicId]  = useState(searchParams.get('clinicId') || '');
+  const [dateFrom,  setDateFrom]  = useState(searchParams.get('dateFrom') || '');
+  const [dateTo,    setDateTo]    = useState(searchParams.get('dateTo') || '');
+  const [remake,    setRemake]    = useState(searchParams.get('remake') === 'true');
+  const [redo,      setRedo]      = useState(searchParams.get('redo') === 'true');
+  // multi-status override (e.g. all production statuses)
+  const [multiStatus, setMultiStatus] = useState(searchParams.get('multiStatus') || '');
+  const [page,      setPage]      = useState(1);
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Active filter label for banner
+  const filterLabel = searchParams.get('label') || '';
 
   const { data: clinicList = [] } = useQuery({
     queryKey: ['clinics'],
@@ -62,24 +60,49 @@ export default function Cases() {
     staleTime: 5 * 60_000,
   });
 
+  const queryParams = () => {
+    const p = { limit: PAGE_SIZE, page };
+    const statusValue = multiStatus || filter;
+    if (statusValue) p.status   = statusValue;
+    if (search)      p.search   = search;
+    if (clinicId)    p.clinicId = clinicId;
+    if (dateFrom)    p.dateFrom = dateFrom;
+    if (dateTo)      p.dateTo   = dateTo;
+    if (remake)      p.remake   = 'true';
+    if (redo)        p.redo     = 'true';
+    return p;
+  };
+
   const { data, isLoading } = useQuery({
-    queryKey: ['cases', filter, search, clinicId, page],
-    queryFn: () => {
-      const params = { limit: PAGE_SIZE, page };
-      if (filter)   params.status   = filter;
-      if (search)   params.search   = search;
-      if (clinicId) params.clinicId = clinicId;
-      return api.get('/cases', { params }).then(r => r.data);
-    },
+    queryKey: ['cases', filter, multiStatus, search, clinicId, dateFrom, dateTo, remake, redo, page],
+    queryFn: () => api.get('/cases', { params: queryParams() }).then(r => r.data),
     staleTime: 30_000,
     keepPreviousData: true,
   });
 
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('/cases/export', queryParams(), `cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const cases      = data?.cases      || [];
   const pagination = data?.pagination || {};
 
-  const reset = () => { setFilter(''); setSearch(''); setClinicId(''); setPage(1); };
-  const hasFilters = filter || search || clinicId;
+  const reset = () => {
+    setFilter(''); setSearch(''); setClinicId('');
+    setDateFrom(''); setDateTo('');
+    setRemake(false); setRedo(false); setMultiStatus('');
+    setPage(1);
+    navigate('/cases', { replace: true });
+  };
+
+  const hasFilters = filter || search || clinicId || dateFrom || dateTo || remake || redo || multiStatus;
 
   return (
     <Layout>
@@ -96,9 +119,25 @@ export default function Cases() {
       </div>
 
       <div className="content">
-        {/* Search + clinic selector row */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div className="search-input" style={{ flex: 1, minWidth: 200 }}>
+        {/* Active filter banner (shown when arriving from a dashboard card) */}
+        {filterLabel && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between',
+            background: 'var(--accent-dim)', border: '1px solid var(--accent)', borderRadius: 10,
+            padding: '10px 16px', marginBottom: 14, fontSize: 13,
+          }}>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+              🔍 Filtered: <strong>{filterLabel}</strong>
+            </span>
+            <button className="btn btn-ghost btn-sm" onClick={reset} style={{ color: 'var(--red)' }}>
+              ✕ Clear filter
+            </button>
+          </div>
+        )}
+
+        {/* Search + date + clinic row */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="search-input" style={{ flex: 2, minWidth: 200 }}>
             <span className="icon">🔍</span>
             <input
               placeholder="Search by clinic, patient name or case number…"
@@ -106,31 +145,62 @@ export default function Cases() {
               onChange={e => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>FROM</div>
+            <input type="date" value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+              style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>TO</div>
+            <input type="date" value={dateTo}
+              onChange={e => { setDateTo(e.target.value); setPage(1); }}
+              style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+          </div>
           <SearchableSelect
             value={clinicId}
             onChange={v => { setClinicId(v); setPage(1); }}
             options={clinicList.map(c => ({ value: c.id, label: c.name }))}
             placeholder="All Clinics"
-            style={{ minWidth: 180 }}
+            style={{ minWidth: 160 }}
           />
           {hasFilters && (
             <button className="btn btn-ghost btn-sm" onClick={reset} style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}>
-              ✕ Clear
+              ✕ Clear all
             </button>
           )}
         </div>
 
         {/* Status filter chips */}
-        <div className="filters" style={{ marginBottom: 14 }}>
+        <div className="filters" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
           {STATUS_FILTERS.map(f => (
             <button
               key={f.value}
-              className={`filter-chip ${filter === f.value ? 'active' : ''}`}
-              onClick={() => { setFilter(f.value); setPage(1); }}
+              className={`filter-chip ${!multiStatus && filter === f.value ? 'active' : ''}`}
+              onClick={() => { setFilter(f.value); setMultiStatus(''); setPage(1); }}
             >
               {f.label}
             </button>
           ))}
+          {/* Extra chips for special filters from dashboard */}
+          {remake && (
+            <button className="filter-chip active" style={{ background: 'var(--red)', color: '#fff' }}
+              onClick={() => { setRemake(false); setPage(1); }}>
+              🔄 Remake ✕
+            </button>
+          )}
+          {redo && (
+            <button className="filter-chip active" style={{ background: 'var(--amber)', color: '#fff' }}
+              onClick={() => { setRedo(false); setPage(1); }}>
+              ♻️ Redo ✕
+            </button>
+          )}
+          {multiStatus && (
+            <button className="filter-chip active"
+              onClick={() => { setMultiStatus(''); setPage(1); }}>
+              In Production ✕
+            </button>
+          )}
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>
             {pagination.total ?? 0} cases
           </span>

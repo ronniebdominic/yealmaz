@@ -12,6 +12,13 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 // ─── Data fetchers ────────────────────────────────────────
 const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
 
+const PRODUCTION_STATUSES = [
+  'CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
+  'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
+  'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
+  'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+].join(',');
+
 // ─── Accept Cases Section ─────────────────────────────────
 const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
 const textareaSt = { ...inputSt, resize: 'vertical' };
@@ -723,29 +730,41 @@ export default function Dashboard() {
                 Today's Overview
               </div>
               <div className="stats-grid" style={{ marginBottom: 24 }}>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  navigate(`/cases?dateFrom=${today}&dateTo=${today}&label=Orders+Today`);
+                }}>
                   <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
                   <div className="stat-label">Orders Today</div>
                   <div className="stat-value">{stats?.todayCases ?? '—'}</div>
-                  <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View all cases ↗</div>
+                  <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View today's orders ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  navigate(`/cases?remake=true&dateFrom=${today}&dateTo=${today}&label=Remakes+Today`);
+                }}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}>🔄</div>
                   <div className="stat-label">Remake Today</div>
                   <div className="stat-value" style={{ color: stats?.remakeCount > 0 ? 'var(--red)' : 'var(--text-1)' }}>
                     {stats?.remakeCount ?? '—'}
                   </div>
-                  <div className="stat-sub" style={{ color: 'var(--red)', fontWeight: 600 }}>View cases ↗</div>
+                  <div className="stat-sub" style={{ color: 'var(--red)', fontWeight: 600 }}>View remakes ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  navigate(`/cases?redo=true&dateFrom=${today}&dateTo=${today}&label=Redo+Today`);
+                }}>
                   <div className="stat-icon" style={{ background: '#FFF7ED' }}>♻️</div>
                   <div className="stat-label">Redo Today</div>
                   <div className="stat-value" style={{ color: stats?.redoCases > 0 ? 'var(--amber)' : 'var(--text-1)' }}>
                     {stats?.redoCases ?? '—'}
                   </div>
-                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View cases ↗</div>
+                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View redo cases ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  navigate(`/cases?status=DELIVERED&dateFrom=${today}&dateTo=${today}&label=Delivered+Today`);
+                }}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
                   <div className="stat-label">Delivered Today</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{stats?.deliveredToday ?? '—'}</div>
@@ -763,11 +782,11 @@ export default function Dashboard() {
                   <div className="stat-value" style={{ color: '#EA580C' }}>{stats?.pendingPickups ?? '—'}</div>
                   <div className="stat-sub" style={{ color: '#EA580C', fontWeight: 600 }}>View Accept Cases ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases?multiStatus=${encodeURIComponent(PRODUCTION_STATUSES)}&label=In+Production`)}>
                   <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
                   <div className="stat-label">In Production</div>
                   <div className="stat-value" style={{ color: 'var(--amber)' }}>{stats?.pendingCases ?? '—'}</div>
-                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View cases ↗</div>
+                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View in-production ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setSection('ready')}>
                   <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>🚚</div>
