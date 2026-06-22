@@ -2196,54 +2196,56 @@ export default function FinanceDashboard() {
         </div>
 
         <div className="content">
-          {/* ── KPI rows ─────────────────────────────────── */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-            Today's Finance Overview
-          </div>
-          <div className="stats-grid" style={{ marginBottom: 8, gridTemplateColumns: 'repeat(4,1fr)' }}>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💵</div>
-              <div className="stat-label">Paid Today</div>
-              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 16 : 22 }}>
-                Br {(quickReport?.revenue?.daily?.amount || 0).toLocaleString('en-US')}
+          {/* ── KPI + Work Queue — only on the home (screenshots) tab ── */}
+          {tab === 'screenshots' && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                Today's Finance Overview
               </div>
-              <div className="stat-sub">{quickReport?.paid?.today || 0} payments verified</div>
-            </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
-              <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
-              <div className="stat-label">Pending</div>
-              <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 16 : 22 }}>
-                Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
+              <div className="stats-grid" style={{ marginBottom: 8, gridTemplateColumns: 'repeat(2,1fr)' }}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💵</div>
+                  <div className="stat-label">Paid Today</div>
+                  <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 16 : 22 }}>
+                    Br {(quickReport?.revenue?.daily?.amount || 0).toLocaleString('en-US')}
+                  </div>
+                  <div className="stat-sub">{quickReport?.paid?.today || 0} payments verified</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+                  <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+                  <div className="stat-label">Pending</div>
+                  <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 16 : 22 }}>
+                    Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
+                  </div>
+                  <div className="stat-sub">{quickReport?.pending?.count || 0} unpaid cases</div>
+                </div>
               </div>
-              <div className="stat-sub">{quickReport?.pending?.count || 0} unpaid cases</div>
-            </div>
-          </div>
 
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 10px' }}>
-            Work Queue
-          </div>
-          <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(3,1fr)' }}>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
-              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📸</div>
-              <div className="stat-label">Pending Approvals</div>
-              <div className="stat-value" style={{ color: 'var(--amber)' }}>
-                {pending.length + uploadedCount}
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 10px' }}>
+                Work Queue
               </div>
-              <div className="stat-sub">Screenshots to review</div>
-            </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('billing')}>
-              <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
-              <div className="stat-label">To Invoice</div>
-              <div className="stat-value" style={{ color: 'var(--blue)' }}>{toInvoiceCount}</div>
-              <div className="stat-sub">Need invoice issued</div>
-            </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
-              <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
-              <div className="stat-label">Trusted Partners</div>
-              <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedCount}</div>
-              <div className="stat-sub">Pending collection</div>
-            </div>
-          </div>
+              <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(3,1fr)' }}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
+                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📸</div>
+                  <div className="stat-label">Pending Approvals</div>
+                  <div className="stat-value" style={{ color: 'var(--amber)' }}>{pending.length + uploadedCount}</div>
+                  <div className="stat-sub">Screenshots to review</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('billing')}>
+                  <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
+                  <div className="stat-label">To Invoice</div>
+                  <div className="stat-value" style={{ color: 'var(--blue)' }}>{toInvoiceCount}</div>
+                  <div className="stat-sub">Need invoice issued</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
+                  <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
+                  <div className="stat-label">Trusted Partners</div>
+                  <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedCount}</div>
+                  <div className="stat-sub">Pending collection</div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* ── Tab content ─────────────────────────────── */}
           {tab === 'screenshots' && <ScreenshotsTab queryClient={queryClient} />}
