@@ -313,29 +313,24 @@ function AcceptCasesSection({ queryClient }) {
 }
 
 // ─── Ready Orders Section ─────────────────────────────────
-const READY_COLS = [
-  { header: 'Case #',      value: c => c.caseNumber ?? '' },
-  { header: 'Clinic',      value: c => c.clinic?.name },
-  { header: 'Patient',     value: c => c.patientName },
-  { header: 'Work Type',   value: c => c.workType },
-  { header: 'Units',       value: c => c.units ?? '' },
-  { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
-  { header: 'Payment',     value: c => c.paymentStatus },
+// Ready for Dispatch  = READY_TO_DISPATCH (QC done, waiting for dispatch to assign driver)
+// Ready for Delivery  = OUT_FOR_DELIVERY  (driver assigned and on the way to clinic)
+
+const CASE_COLS = [
+  { header: 'Case #',        value: c => c.caseNumber ?? '' },
+  { header: 'Clinic',        value: c => c.clinic?.name },
+  { header: 'Patient',       value: c => c.patientName },
+  { header: 'Work Type',     value: c => c.workType },
+  { header: 'Units',         value: c => c.units ?? '' },
+  { header: 'Amount (Br)',   value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+  { header: 'Payment',       value: c => c.paymentStatus },
   { header: 'Delivery Date', value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
   { header: 'Order Date',    value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
 ];
 
-function ReadyOrdersSection() {
-  const [search, setSearch]     = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]     = useState('');
-  const [applied, setApplied]   = useState({ search: '', dateFrom: '', dateTo: '' });
-  const [page, setPage]         = useState(1);
-
-  const apply = () => { setApplied({ search, dateFrom, dateTo }); setPage(1); };
-
-  const queryParams = (extra = {}) => ({
-    status: 'READY_TO_DISPATCH',
+function OrdersTab({ status, title, icon, emptyText, emptyNote, accentColor, applied, page, setPage }) {
+  const params = (extra = {}) => ({
+    status,
     ...(applied.search   ? { search: applied.search }     : {}),
     ...(applied.dateFrom ? { dateFrom: applied.dateFrom } : {}),
     ...(applied.dateTo   ? { dateTo: applied.dateTo }     : {}),
@@ -343,18 +338,92 @@ function ReadyOrdersSection() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['ready-orders', applied, page],
-    queryFn: () => api.get('/cases', { params: queryParams({ limit: 20, page }) }).then(r => r.data),
+    queryKey: ['ready-orders', status, applied, page],
+    queryFn: () => api.get('/cases', { params: params({ limit: 20, page }) }).then(r => r.data),
     staleTime: 30_000,
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
   });
 
-  const fetchAllForExport = () =>
-    api.get('/cases', { params: queryParams({ limit: 1000 }) }).then(r => r.data.cases ?? []);
-
+  const fetchAll = () => api.get('/cases', { params: params({ limit: 1000 }) }).then(r => r.data.cases ?? []);
   const cases      = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title" style={{ color: accentColor }}>{icon} {title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {pagination.total != null && (
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} case{pagination.total !== 1 ? 's' : ''}</span>
+          )}
+          <ExportMenu fetchData={fetchAll} columns={CASE_COLS} filename={title.toLowerCase().replace(/ /g, '-')} title={title} />
+        </div>
+      </div>
+      <div className="table-wrap">
+        {isLoading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+        ) : cases.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🎉</div>
+            <div className="empty-title">{emptyText}</div>
+            <p>{emptyNote}</p>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Case #</th><th>Clinic</th><th>Patient</th><th>Work Type</th>
+                <th>Units</th><th>Amount</th><th>Payment</th><th>Delivery Date</th><th>Order Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cases.map(c => (
+                <tr key={c.id}>
+                  <td>{c.caseNumber ? <span className="case-number">{c.caseNumber}</span> : <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>—</span>}</td>
+                  <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
+                  <td><span className="patient-name">{c.patientName}</span></td>
+                  <td style={{ fontSize: 13 }}>{c.workType}</td>
+                  <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{c.units ?? '—'}</td>
+                  <td style={{ fontWeight: 600, color: 'var(--green)' }}>
+                    {c.payment?.amount != null ? `Br ${c.payment.amount.toLocaleString('en-US')}` :
+                     c.totalAmount != null ? `Br ${c.totalAmount.toLocaleString('en-US')}` : '—'}
+                  </td>
+                  <td><PaymentBadge status={c.paymentStatus} /></td>
+                  <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)', fontWeight: c.deliveryDate ? 600 : 400 }}>
+                    {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(c.createdAt), 'dd MMM yyyy')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {pagination.totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', fontSize: 13 }}>
+          <span style={{ color: 'var(--text-3)' }}>Page {page} of {pagination.totalPages}</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1}>← Prev</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next →</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReadyOrdersSection() {
+  const [activeTab, setActiveTab] = useState('dispatch'); // 'dispatch' | 'delivery'
+  const [search, setSearch]     = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+  const [applied, setApplied]   = useState({ search: '', dateFrom: '', dateTo: '' });
+  const [pageDispatch, setPageDispatch] = useState(1);
+  const [pageDelivery, setPageDelivery] = useState(1);
+
+  const apply = () => { setApplied({ search, dateFrom, dateTo }); setPageDispatch(1); setPageDelivery(1); };
+  const clear  = () => { setSearch(''); setDateFrom(''); setDateTo(''); setApplied({ search: '', dateFrom: '', dateTo: '' }); setPageDispatch(1); setPageDelivery(1); };
 
   return (
     <>
@@ -371,91 +440,59 @@ function ReadyOrdersSection() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary btn-sm" onClick={apply}>Apply</button>
             {(applied.search || applied.dateFrom || applied.dateTo) && (
-              <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setApplied({ search: '', dateFrom: '', dateTo: '' }); setPage(1); }}>Clear</button>
+              <button className="btn btn-ghost btn-sm" onClick={clear}>Clear</button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <div className="card-title">🚚 Ready for Delivery / Dispatch</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {pagination.total != null && (
-              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} case{pagination.total !== 1 ? 's' : ''}</span>
-            )}
-            <ExportMenu
-              fetchData={fetchAllForExport}
-              columns={READY_COLS}
-              filename="ready-orders"
-              title="Ready Orders — Reception"
-            />
-          </div>
-        </div>
-        <div className="table-wrap">
-          {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
-          ) : cases.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🎉</div>
-              <div className="empty-title">No ready orders{(applied.search || applied.dateFrom || applied.dateTo) ? ' matching filters' : ''}</div>
-              <p>Cases marked Ready to Dispatch will appear here.</p>
-            </div>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Case #</th>
-                  <th>Clinic</th>
-                  <th>Patient</th>
-                  <th>Work Type</th>
-                  <th>Units</th>
-                  <th>Amount</th>
-                  <th>Payment</th>
-                  <th>Delivery Date</th>
-                  <th>Order Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cases.map(c => (
-                    <tr key={c.id}>
-                      <td>
-                        {c.caseNumber
-                          ? <span className="case-number">{c.caseNumber}</span>
-                          : <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>—</span>
-                        }
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
-                      <td><span className="patient-name">{c.patientName}</span></td>
-                      <td style={{ fontSize: 13 }}>{c.workType}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{c.units ?? '—'}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--green)' }}>
-                        {c.payment?.amount != null ? `Br ${c.payment.amount.toLocaleString('en-US')}` :
-                         c.totalAmount != null ? `Br ${c.totalAmount.toLocaleString('en-US')}` : '—'}
-                      </td>
-                      <td><PaymentBadge status={c.paymentStatus} /></td>
-                      <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)', fontWeight: c.deliveryDate ? 600 : 400 }}>
-                        {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
-                      </td>
-                      <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                        {format(new Date(c.createdAt), 'dd MMM yyyy')}
-                      </td>
-                    </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        {pagination.totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderTop: '1px solid var(--border)', fontSize: 13 }}>
-            <span style={{ color: 'var(--text-3)' }}>Page {page} of {pagination.totalPages}</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1}>← Prev</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next →</button>
-            </div>
-          </div>
-        )}
+      {/* Tab switcher */}
+      <div className="filters" style={{ marginBottom: 14 }}>
+        <button
+          className={`filter-chip${activeTab === 'dispatch' ? ' active' : ''}`}
+          onClick={() => setActiveTab('dispatch')}
+          style={activeTab === 'dispatch' ? { background: 'var(--accent)', color: '#fff' } : {}}
+        >
+          📦 Ready for Dispatch
+          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>QC done • Awaiting driver</span>
+        </button>
+        <button
+          className={`filter-chip${activeTab === 'delivery' ? ' active' : ''}`}
+          onClick={() => setActiveTab('delivery')}
+          style={activeTab === 'delivery' ? { background: 'var(--green)', color: '#fff' } : {}}
+        >
+          🚚 Ready for Delivery
+          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>Driver assigned • En route</span>
+        </button>
       </div>
+
+      {activeTab === 'dispatch' && (
+        <OrdersTab
+          status="READY_TO_DISPATCH"
+          title="Ready for Dispatch"
+          icon="📦"
+          accentColor="var(--accent)"
+          emptyText="No cases waiting for dispatch"
+          emptyNote="Cases that have passed QC will appear here for dispatch to assign a driver."
+          applied={applied}
+          page={pageDispatch}
+          setPage={setPageDispatch}
+        />
+      )}
+
+      {activeTab === 'delivery' && (
+        <OrdersTab
+          status="OUT_FOR_DELIVERY"
+          title="Ready for Delivery"
+          icon="🚚"
+          accentColor="var(--green)"
+          emptyText="No cases currently out for delivery"
+          emptyNote="Cases appear here once dispatch has assigned a driver and the case is on its way to the clinic."
+          applied={applied}
+          page={pageDelivery}
+          setPage={setPageDelivery}
+        />
+      )}
     </>
   );
 }
@@ -618,7 +655,14 @@ export default function Dashboard() {
   });
   const { data: readyBadge } = useQuery({
     queryKey: ['cases', 'ready-badge'],
-    queryFn: () => api.get('/cases', { params: { status: 'READY_TO_DISPATCH', limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
+    // Badge shows total of READY_TO_DISPATCH + OUT_FOR_DELIVERY
+    queryFn: async () => {
+      const [dispatch, delivery] = await Promise.all([
+        api.get('/cases', { params: { status: 'READY_TO_DISPATCH', limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
+        api.get('/cases', { params: { status: 'OUT_FOR_DELIVERY',  limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
+      ]);
+      return dispatch + delivery;
+    },
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
