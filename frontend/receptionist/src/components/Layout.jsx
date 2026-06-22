@@ -2,39 +2,46 @@ import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-function NavItems({ active, onNav, newCases }) {
+function NavItems({ active, onNav }) {
   return (
     <>
-      <div className="nav-section-label">Overview</div>
+      <div className="nav-section-label">Reception</div>
       <button className={active('/')} onClick={() => onNav('/')}>
         <span>📊</span> Dashboard
       </button>
+      <button className={active('/?section=accept')} onClick={() => onNav('/?section=accept')}>
+        <span>📥</span> Accept Case
+      </button>
+      <button className={active('/?section=ready')} onClick={() => onNav('/?section=ready')}>
+        <span>🚚</span> Ready Orders
+      </button>
+      <button className={active('/?section=track')} onClick={() => onNav('/?section=track')}>
+        <span>🔍</span> Track Order
+      </button>
 
       <div className="nav-section-label">Cases</div>
-      <button className={active('/cases')} onClick={() => onNav('/cases')}>
-        <span>📋</span> All Cases
-        {newCases > 0 && <span className="badge-count">{newCases}</span>}
-      </button>
       <button className={active('/cases/new')} onClick={() => onNav('/cases/new')}>
         <span>➕</span> New Case
       </button>
-
-      <div className="nav-section-label">Delivery</div>
-      <button className={active('/delivery')} onClick={() => onNav('/delivery')}>
-        <span>🚚</span> Ready to Dispatch
+      <button className={active('/cases')} onClick={() => onNav('/cases')}>
+        <span>📋</span> All Cases
       </button>
     </>
   );
 }
 
-export default function Layout({ children, newCases = 0 }) {
+export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
   const nav    = (path) => { navigate(path); setOpen(false); };
-  const active = (path) => location.pathname === path ? 'nav-item active' : 'nav-item';
+  // Mark active for exact path; dashboard sub-sections all resolve to '/'
+  const active = (path) => {
+    const base = path.split('?')[0];
+    return location.pathname === base ? 'nav-item active' : 'nav-item';
+  };
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'RX';
 
   return (
@@ -57,7 +64,7 @@ export default function Layout({ children, newCases = 0 }) {
           <span className="role-badge">Receptionist</span>
         </div>
         <nav className="sidebar-nav">
-          <NavItems active={active} onNav={nav} newCases={newCases} />
+          <NavItems active={active} onNav={nav} />
         </nav>
         <div className="drawer-footer">
           <div className="user-info">
@@ -79,7 +86,7 @@ export default function Layout({ children, newCases = 0 }) {
           <span className="role-badge">Receptionist</span>
         </div>
         <nav className="sidebar-nav">
-          <NavItems active={active} onNav={(path) => navigate(path)} newCases={newCases} />
+          <NavItems active={active} onNav={(path) => navigate(path.split('?')[0])} />
         </nav>
         <div className="sidebar-footer">
           <div className="user-info">
