@@ -1776,7 +1776,7 @@ function ReportTab() {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
             Revenue
           </div>
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 24 }}>
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
             <div className="stat-card">
               <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📅</div>
               <div className="stat-label">Today</div>
@@ -1784,22 +1784,6 @@ function ReportTab() {
                 {fmtBr(r.daily?.amount)}
               </div>
               <div className="stat-sub">{r.daily?.count || 0} payment{r.daily?.count !== 1 ? 's' : ''}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📆</div>
-              <div className="stat-label">Month to Date</div>
-              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (r.MTD?.amount || 0) >= 100000 ? 17 : 22 }}>
-                {fmtBr(r.MTD?.amount)}
-              </div>
-              <div className="stat-sub">{r.MTD?.count || 0} payments</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🗓️</div>
-              <div className="stat-label">Year to Date</div>
-              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (r.YTD?.amount || 0) >= 100000 ? 17 : 22 }}>
-                {fmtBr(r.YTD?.amount)}
-              </div>
-              <div className="stat-sub">{r.YTD?.count || 0} payments</div>
             </div>
             {(applied.from || applied.to) ? (
               <div className="stat-card">
@@ -1820,29 +1804,10 @@ function ReportTab() {
                 <div className="stat-sub">{pend.count || 0} unpaid cases</div>
               </div>
             )}
-          </div>
-
-          {/* Units KPI row */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
-            Units Delivered
-          </div>
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
             <div className="stat-card">
               <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
-              <div className="stat-label">Today</div>
+              <div className="stat-label">Units Delivered Today</div>
               <div className="stat-value">{u.daily || 0}</div>
-              <div className="stat-sub">units</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
-              <div className="stat-label">Month to Date</div>
-              <div className="stat-value">{u.MTD || 0}</div>
-              <div className="stat-sub">units</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
-              <div className="stat-label">Year to Date</div>
-              <div className="stat-value">{u.YTD || 0}</div>
               <div className="stat-sub">units</div>
             </div>
           </div>
