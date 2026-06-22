@@ -723,33 +723,33 @@ export default function Dashboard() {
                 Today's Overview
               </div>
               <div className="stats-grid" style={{ marginBottom: 24 }}>
-                <div className="stat-card">
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
                   <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
                   <div className="stat-label">Orders Today</div>
                   <div className="stat-value">{stats?.todayCases ?? '—'}</div>
-                  <div className="stat-sub">New cases today</div>
+                  <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View all cases ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setSection('accept')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}>🔄</div>
                   <div className="stat-label">Remake Today</div>
                   <div className="stat-value" style={{ color: stats?.remakeCount > 0 ? 'var(--red)' : 'var(--text-1)' }}>
                     {stats?.remakeCount ?? '—'}
                   </div>
-                  <div className="stat-sub">Remakes submitted today</div>
+                  <div className="stat-sub" style={{ color: 'var(--red)', fontWeight: 600 }}>View cases ↗</div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
                   <div className="stat-icon" style={{ background: '#FFF7ED' }}>♻️</div>
                   <div className="stat-label">Redo Today</div>
                   <div className="stat-value" style={{ color: stats?.redoCases > 0 ? 'var(--amber)' : 'var(--text-1)' }}>
                     {stats?.redoCases ?? '—'}
                   </div>
-                  <div className="stat-sub">Redo cases today</div>
+                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View cases ↗</div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
                   <div className="stat-label">Delivered Today</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{stats?.deliveredToday ?? '—'}</div>
-                  <div className="stat-sub">Completed today</div>
+                  <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View delivered ↗</div>
                 </div>
               </div>
 
@@ -761,13 +761,13 @@ export default function Dashboard() {
                   <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
                   <div className="stat-label">Awaiting Pickup</div>
                   <div className="stat-value" style={{ color: '#EA580C' }}>{stats?.pendingPickups ?? '—'}</div>
-                  <div className="stat-sub">View Accept Cases ↗</div>
+                  <div className="stat-sub" style={{ color: '#EA580C', fontWeight: 600 }}>View Accept Cases ↗</div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate('/cases')}>
                   <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
                   <div className="stat-label">In Production</div>
                   <div className="stat-value" style={{ color: 'var(--amber)' }}>{stats?.pendingCases ?? '—'}</div>
-                  <div className="stat-sub">Active in lab</div>
+                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View cases ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setSection('ready')}>
                   <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>🚚</div>
