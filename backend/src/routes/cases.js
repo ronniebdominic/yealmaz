@@ -492,9 +492,16 @@ router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), a
 });
 
 // ── PATCH /api/cases/:id/status ──────────────────────────
+// RECEPTIONIST/ADMIN can set any status (incl. REJECTED, UNDER_REVIEW).
+// DELIVERY role is limited to delivery-workflow transitions only.
 router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY'), async (req, res) => {
   try {
     const { status, notes } = req.body;
+
+    const DELIVERY_ALLOWED = new Set(['CASE_ACCEPTED','PENDING_PICKUP','OUT_FOR_DELIVERY','DELIVERED','READY_TO_DISPATCH']);
+    if (req.user.role === 'DELIVERY' && !DELIVERY_ALLOWED.has(status)) {
+      return res.status(403).json({ error: `Delivery role cannot set status to ${status}.` });
+    }
 
     const updated = await prisma.case.update({
       where: { id: req.params.id },

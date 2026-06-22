@@ -26,7 +26,7 @@ router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DI
       todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch
     ] = await Promise.all([
       prisma.case.count(),
-      prisma.case.count({ where: { status: { notIn: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED'] } } }),
+      prisma.case.count({ where: { status: { notIn: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED', 'UNDER_REVIEW', 'REJECTED', 'REMAKE'] } } }),
       prisma.case.count({ where: { status: 'DELIVERED' } }),
       prisma.case.count({ where: { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } } }),
       prisma.case.count({ where: { status: { in: ['PENDING_PICKUP', 'PICKUP_ASSIGNED'] } } }),
@@ -475,12 +475,14 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
       orderBy: { name: 'asc' },
     });
 
+    // "In Progress" = actively being worked in the lab (excludes pre-lab pickup
+    // statuses and terminal states so the count is meaningful for clinic reports)
     const IN_PROGRESS_STATUSES = new Set([
       'CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
       'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
       'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
       'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
-      'READY_TO_DISPATCH','OUT_FOR_DELIVERY','PENDING_PICKUP','PICKUP_ASSIGNED',
+      'READY_TO_DISPATCH','OUT_FOR_DELIVERY',
     ]);
 
     const summary = clinics.map(clinic => {
@@ -492,7 +494,9 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
       const totalRevenue    = cases.reduce((s, c) => s + (c.payment?.amount || 0), 0);
       const paymentsReceived = cases.filter(c => c.payment?.status === 'VERIFIED')
                                     .reduce((s, c) => s + (c.payment?.amount || 0), 0);
-      const outstanding     = cases.filter(c => c.payment?.status !== 'VERIFIED')
+      // Only count outstanding where an amount has actually been set — cases
+      // with no payment amount yet would inflate the count with Br 0 entries.
+      const outstanding     = cases.filter(c => c.payment?.status !== 'VERIFIED' && c.payment?.amount)
                                     .reduce((s, c) => s + (c.payment?.amount || 0), 0);
 
       return {

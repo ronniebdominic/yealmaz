@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportMenu from '../components/ExportMenu';
@@ -673,7 +673,21 @@ export default function AdminDashboard() {
 
 // ── Trusted Partners Summary (shared Finance + Admin) ─────
 function TrustedPartnersSummary() {
-  const [expanded, setExpanded] = useState(null);
+  const [expanded, setExpanded]         = useState(null);
+  const [clinicCases, setClinicCases]   = useState({});
+  const [loadingClinic, setLoadingClinic] = useState(null);
+
+  const toggleClinic = async (clinicId) => {
+    if (expanded === clinicId) { setExpanded(null); return; }
+    setExpanded(clinicId);
+    if (clinicCases[clinicId]) return;
+    setLoadingClinic(clinicId);
+    try {
+      const res = await api.get('/payments/trusted', { params: { clinicId, limit: 200 } });
+      setClinicCases(prev => ({ ...prev, [clinicId]: res.data?.cases ?? [] }));
+    } catch {}
+    finally { setLoadingClinic(null); }
+  };
 
   const { data: summary = [], isLoading } = useQuery({
     queryKey: ['trusted-partners-summary'],
@@ -736,27 +750,70 @@ function TrustedPartnersSummary() {
           </thead>
           <tbody>
             {summary.map(c => (
-              <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                      {c.name[0]?.toUpperCase()}
+              <React.Fragment key={c.id}>
+                <tr style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                        {c.name[0]?.toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{c.name}</div>
+                        {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
+                      </div>
+                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}>🤝 Trusted</span>
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{c.name}</div>
-                      {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
-                    </div>
-                    <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}>🤝 Trusted</span>
-                  </div>
-                </td>
-                <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{n(c.totalOrders)}</td>
-                <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{n(c.totalUnits) || '—'}</td>
-                <td style={{ textAlign: 'center', color: 'var(--green)', fontWeight: 600 }}>{n(c.deliveredOrders)}</td>
-                <td style={{ textAlign: 'center', color: 'var(--amber)', fontWeight: 600 }}>{n(c.inProgress)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{ETBa(c.totalRevenue)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETBa(c.paymentsReceived)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700, color: c.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>{ETBa(c.outstanding)}</td>
-              </tr>
+                  </td>
+                  <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{n(c.totalOrders)}</td>
+                  <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{n(c.totalUnits) || '—'}</td>
+                  <td style={{ textAlign: 'center', color: 'var(--green)', fontWeight: 600 }}>{n(c.deliveredOrders)}</td>
+                  <td style={{ textAlign: 'center', color: 'var(--amber)', fontWeight: 600 }}>{n(c.inProgress)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{ETBa(c.totalRevenue)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETBa(c.paymentsReceived)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: c.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>
+                    {ETBa(c.outstanding)}
+                    <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 4 }}>{expanded === c.id ? '▲' : '▼'}</span>
+                  </td>
+                </tr>
+                {expanded === c.id && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: 0, background: 'var(--surface-2)' }}>
+                      {loadingClinic === c.id ? (
+                        <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>Loading cases…</div>
+                      ) : (clinicCases[c.id] || []).length === 0 ? (
+                        <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>No outstanding cases</div>
+                      ) : (
+                        <table style={{ width: '100%', fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: 'var(--border)' }}>
+                              <th style={{ padding: '6px 12px 6px 40px', textAlign: 'left' }}>Case #</th>
+                              <th style={{ padding: '6px 12px', textAlign: 'left' }}>Patient</th>
+                              <th style={{ padding: '6px 12px', textAlign: 'left' }}>Work Type</th>
+                              <th style={{ padding: '6px 12px', textAlign: 'center' }}>Units</th>
+                              <th style={{ padding: '6px 12px', textAlign: 'left' }}>Status</th>
+                              <th style={{ padding: '6px 12px', textAlign: 'right' }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(clinicCases[c.id] || []).map(cas => (
+                              <tr key={cas.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '7px 12px 7px 40px', fontFamily: 'DM Mono, monospace', color: 'var(--blue)' }}>{cas.caseNumber}</td>
+                                <td style={{ padding: '7px 12px', fontWeight: 600 }}>{cas.patientName}</td>
+                                <td style={{ padding: '7px 12px', color: 'var(--text-2)' }}>{cas.workType}</td>
+                                <td style={{ padding: '7px 12px', textAlign: 'center' }}>{cas.units ?? '—'}</td>
+                                <td style={{ padding: '7px 12px' }}><StatusBadge status={cas.status} /></td>
+                                <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>
+                                  {cas.totalAmount ? `Br ${cas.totalAmount.toLocaleString('en-US')}` : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
             <tr style={{ background: 'var(--surface-2)', fontWeight: 700, borderTop: '2px solid var(--border)' }}>
               <td style={{ padding: '12px 16px' }}>TOTAL</td>

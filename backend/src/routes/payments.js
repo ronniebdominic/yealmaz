@@ -338,8 +338,18 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
   if (cached) return res.json(cached);
 
   try {
+    // Exclude terminal statuses so cancelled/delivered cases with old payment
+    // requests don't bleed into the billing queue.
+    const ACTIVE_STATUSES = [
+      'CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
+      'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
+      'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
+      'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+      'READY_TO_DISPATCH','OUT_FOR_DELIVERY','PENDING_PICKUP','PICKUP_ASSIGNED','UNDER_REVIEW',
+    ];
     const where = {
       clinic: { isExcluded: false },
+      status: { in: ACTIVE_STATUSES },
       OR: [
         { status: 'PAYMENT_INVOICING', paymentStatus: 'PENDING' },
         { paymentStatus: { in: ['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'REJECTED'] } }
@@ -643,7 +653,12 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
   try {
     const where = {
       clinic: { isExcluded: true },
-      ...(clinicId ? { clinicId } : { paymentStatus: 'PENDING' }),
+      // When drilling into a specific clinic show all non-terminal cases (so finance
+      // can see both outstanding and already-collected); without clinicId only show
+      // cases still awaiting payment collection (paymentStatus PENDING).
+      ...(clinicId
+        ? { clinicId, status: { notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'] } }
+        : { paymentStatus: 'PENDING' }),
       ...(search ? {
         OR: [
           { clinic: { name: { contains: search, mode: 'insensitive' } } },
