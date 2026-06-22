@@ -459,7 +459,7 @@ export default function AdminDashboard() {
 
             {/* ── KPI Row 1 — Revenue & Volume ── */}
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Revenue & Volume</div>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)', marginBottom: 8 }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 8 }}>
               <KpiCard icon="💰" label="Total Revenue" value={ETB(kpi?.totalRevenue)}
                 bg="var(--green-dim)" color="var(--green)" sub="Verified payments"
                 active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')} />
@@ -474,20 +474,14 @@ export default function AdminDashboard() {
               <KpiCard icon="✅" label="Delivered" value={kpi?.deliveredCases ?? '—'}
                 bg="var(--green-dim)" color="var(--green)" sub="Completed"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
-              <KpiCard icon="💳" label="Pending Payments" value={kpi?.pendingPayments ?? '—'}
-                bg="var(--accent-dim)" color="var(--navy)" sub="Awaiting review"
-                active={drillKey === 'pendingPayments'} onClick={() => handleDrill('pendingPayments')} />
             </div>
 
             {/* ── KPI Row 2 — Operations ── */}
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '18px 0 10px' }}>Operations</div>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(7,1fr)', marginBottom: 24 }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)', marginBottom: 24 }}>
               <KpiCard icon="🚚" label="Ready Orders" value={kpi?.readyToDispatch ?? '—'}
                 bg="var(--accent-dim)" color="var(--accent)" sub="Ready to Dispatch"
                 active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')} />
-              <KpiCard icon="💵" label="Payments Received" value={ETB(kpi?.totalRevenue)}
-                bg="var(--green-dim)" color="var(--green)" sub={`${kpi?.deliveredCases ?? 0} verified`}
-                active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')} />
               <KpiCard icon="⏳" label="Outstanding" value={ETB(kpi?.outstandingAmount)}
                 bg="#FFF1F2" color="var(--red)" sub={`${kpi?.outstandingCount ?? 0} unpaid cases`}
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')} />
