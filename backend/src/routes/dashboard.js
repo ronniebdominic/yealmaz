@@ -514,4 +514,84 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
   }
 });
 
+// ── POST /api/dashboard/fix-future-dates ─────────────────
+// ONE-TIME migration: cases imported with dates in December 2026 that should
+// be December 2025 (verifiedAt, invoiceIssuedAt, createdAt, updatedAt on payments;
+// createdAt, updatedAt, deliveryDate on cases).
+// Safe to run multiple times — only touches dates that are still in the future
+// relative to the server's current time.
+router.post('/fix-future-dates', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const now = new Date();
+    // Any date beyond today is definitively wrong for historical records
+    const future = new Date(now);
+    future.setHours(23, 59, 59, 999);
+
+    const oneYearAgo = (d) => {
+      const r = new Date(d);
+      r.setFullYear(r.getFullYear() - 1);
+      return r;
+    };
+
+    // Find affected payments (verifiedAt or invoiceIssuedAt in the future)
+    const badPayments = await prisma.payment.findMany({
+      where: {
+        OR: [
+          { verifiedAt:     { gt: future } },
+          { invoiceIssuedAt: { gt: future } },
+          { uploadedAt:     { gt: future } },
+        ]
+      },
+      select: { id: true, verifiedAt: true, invoiceIssuedAt: true, uploadedAt: true }
+    });
+
+    let paymentsFix = 0;
+    for (const p of badPayments) {
+      await prisma.payment.update({
+        where: { id: p.id },
+        data: {
+          ...(p.verifiedAt      && p.verifiedAt      > future ? { verifiedAt:      oneYearAgo(p.verifiedAt) }      : {}),
+          ...(p.invoiceIssuedAt && p.invoiceIssuedAt > future ? { invoiceIssuedAt: oneYearAgo(p.invoiceIssuedAt) } : {}),
+          ...(p.uploadedAt      && p.uploadedAt      > future ? { uploadedAt:      oneYearAgo(p.uploadedAt) }      : {}),
+        }
+      });
+      paymentsFix++;
+    }
+
+    // Find affected cases (createdAt or deliveryDate in the future)
+    const badCases = await prisma.case.findMany({
+      where: {
+        OR: [
+          { createdAt:   { gt: future } },
+          { deliveryDate: { gt: future } },
+        ]
+      },
+      select: { id: true, caseNumber: true, createdAt: true, deliveryDate: true }
+    });
+
+    let casesFix = 0;
+    for (const c of badCases) {
+      await prisma.case.update({
+        where: { id: c.id },
+        data: {
+          ...(c.createdAt    && c.createdAt    > future ? { createdAt:   oneYearAgo(c.createdAt) }   : {}),
+          ...(c.deliveryDate && c.deliveryDate > future ? { deliveryDate: oneYearAgo(c.deliveryDate) } : {}),
+        }
+      });
+      casesFix++;
+    }
+
+    await invalidate('cases:*', 'dashboard:summary', 'payments:*', 'dashboard:analytics:*');
+
+    res.json({
+      success: true,
+      fixed: { payments: paymentsFix, cases: casesFix },
+      message: `Shifted ${paymentsFix} payment date(s) and ${casesFix} case date(s) back by 1 year.`
+    });
+  } catch (err) {
+    console.error('[fix-future-dates]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
