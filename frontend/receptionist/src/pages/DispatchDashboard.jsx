@@ -344,12 +344,30 @@ export default function DispatchDashboard() {
     });
   }, [allCases, search, dateFrom, dateTo]);
 
-  const placeOrder    = filtered.filter(c => c.status === 'PENDING_PICKUP');
-  const readyDelivery = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
-  const readyDispatch = filtered.filter(c => c.status === 'READY_TO_DISPATCH');
-  const delivered     = filtered.filter(c => c.status === 'DELIVERED');
+  const placeOrder = filtered.filter(c => c.status === 'PENDING_PICKUP');
 
-  const tabCount = { 'place-order': placeOrder.length, 'ready-delivery': readyDelivery.length, 'ready-dispatch': readyDispatch.length, 'delivered': delivered.length };
+  // Ready for Delivery = QC passed (READY_TO_DISPATCH) but payment NOT yet verified
+  // Dispatch uses this tab to request payment from the clinic
+  const readyDelivery = filtered.filter(c =>
+    c.status === 'READY_TO_DISPATCH' &&
+    c.paymentStatus !== 'VERIFIED'
+  );
+
+  // Ready for Dispatch = READY_TO_DISPATCH AND payment VERIFIED
+  // Payment confirmed — dispatch assigns driver to physically send the case out
+  const readyDispatch = filtered.filter(c =>
+    c.status === 'READY_TO_DISPATCH' &&
+    c.paymentStatus === 'VERIFIED'
+  );
+
+  const delivered = filtered.filter(c => c.status === 'DELIVERED');
+
+  const tabCount = {
+    'place-order':    placeOrder.length,
+    'ready-delivery': readyDelivery.length,
+    'ready-dispatch': readyDispatch.length,
+    'delivered':      delivered.length,
+  };
 
   // ── Actions ──────────────────────────────────────────────
   const handleAssign = async (executiveId) => {
@@ -375,10 +393,10 @@ export default function DispatchDashboard() {
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DS';
 
   const TABS = [
-    { id: 'place-order',    label: 'Place Order',        icon: '📋' },
-    { id: 'ready-delivery', label: 'Ready for Delivery', icon: '📦' },
-    { id: 'ready-dispatch', label: 'Ready for Dispatch', icon: '🚚' },
-    { id: 'delivered',      label: 'Delivered',          icon: '✅' },
+    { id: 'place-order',    label: 'Place Order',              icon: '📋' },
+    { id: 'ready-delivery', label: 'Ready for Delivery',       icon: '📦', sub: 'Pending payment' },
+    { id: 'ready-dispatch', label: 'Ready for Dispatch',       icon: '🚚', sub: 'Payment verified' },
+    { id: 'delivered',      label: 'Delivered',                icon: '✅' },
   ];
 
   // ── Sidebar nav ──────────────────────────────────────────
@@ -389,9 +407,14 @@ export default function DispatchDashboard() {
         <button key={t.id}
           className={`nav-item${tab === t.id ? ' active' : ''}`}
           onClick={() => { setTab(t.id); if (close) close(); }}
+          style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}
         >
-          <span>{t.icon}</span> {t.label}
-          {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            <span>{t.icon}</span>
+            <span style={{ flex: 1 }}>{t.label}</span>
+            {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
+          </div>
+          {t.sub && <div style={{ fontSize: 10, color: tab === t.id ? 'rgba(255,255,255,0.65)' : 'var(--text-3)', paddingLeft: 24, marginTop: -2 }}>{t.sub}</div>}
         </button>
       ))}
       <div className="nav-section-label">Cases</div>
@@ -465,11 +488,15 @@ export default function DispatchDashboard() {
               <div className="stat-value">{summary.totalToday ?? '—'}</div>
               <div className="stat-sub">New cases today</div>
             </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready-dispatch')}>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready-delivery')}>
               <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
-              <div className="stat-label">Ready to Dispatch</div>
+              <div className="stat-label">Ready for Delivery</div>
               <div className="stat-value" style={{ color: 'var(--accent)' }}>{summary.readyToDispatch ?? '—'}</div>
-              <div className="stat-sub">Awaiting delivery</div>
+              <div className="stat-sub">
+                <span style={{ color: 'var(--amber)' }}>{readyDelivery.length} pending payment</span>
+                {' · '}
+                <span style={{ color: 'var(--green)' }}>{readyDispatch.length} cleared</span>
+              </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚚</div>
@@ -505,7 +532,7 @@ export default function DispatchDashboard() {
           {tab === 'place-order' && (
             <div className="card">
               <div className="card-header">
-                <div className="card-title">📋 Place Order — Impression Pickups</div>
+                <div className="card-title">📋 Place Order — Client Orders Awaiting Pickup</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
                     className="btn btn-primary btn-sm"
@@ -534,8 +561,8 @@ export default function DispatchDashboard() {
                 {placeOrder.length === 0 ? (
                   <div className="empty-state">
                     <div className="empty-icon">🎉</div>
-                    <div className="empty-title">No pending pickups</div>
-                    <p>New orders will appear here for pickup assignment.</p>
+                    <div className="empty-title">No orders waiting for pickup</div>
+                    <p>Orders placed by clinics through the app (and phone orders) appear here. Assign a driver to go collect the impression.</p>
                   </div>
                 ) : (
                   <table>
@@ -581,11 +608,16 @@ export default function DispatchDashboard() {
             </div>
           )}
 
-          {/* ── TAB: Ready for Delivery (READY_TO_DISPATCH — financial view) ── */}
+          {/* ── TAB: Ready for Delivery (QC passed, payment pending) ── */}
           {tab === 'ready-delivery' && (
             <div className="card">
+              <div style={{ padding: '10px 18px 0', background: 'var(--amber-dim)', borderRadius: '10px 10px 0 0' }}>
+                <div style={{ fontSize: 12, color: '#92400E', fontWeight: 600, paddingBottom: 10 }}>
+                  📦 These cases have <strong>passed QC and are complete</strong> — payment has not yet been verified. Request payment from the clinic before dispatching.
+                </div>
+              </div>
               <div className="card-header">
-                <div className="card-title">📦 Ready for Delivery</div>
+                <div className="card-title">📦 Ready for Delivery <span style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>— Awaiting Payment</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDelivery.length} cases</span>
                   <ExportMenu
@@ -608,8 +640,8 @@ export default function DispatchDashboard() {
                 {readyDelivery.length === 0 ? (
                   <div className="empty-state">
                     <div className="empty-icon">🎉</div>
-                    <div className="empty-title">No cases ready</div>
-                    <p>Cases that have passed QC will appear here.</p>
+                    <div className="empty-title">No cases awaiting payment</div>
+                    <p>Cases that passed QC but haven't had payment verified yet appear here. Once payment is confirmed by Finance, they move to Ready for Dispatch.</p>
                   </div>
                 ) : (
                   <table>
@@ -661,11 +693,16 @@ export default function DispatchDashboard() {
             </div>
           )}
 
-          {/* ── TAB: Ready for Dispatch (READY_TO_DISPATCH — logistics view) ── */}
+          {/* ── TAB: Ready for Dispatch (READY_TO_DISPATCH + payment VERIFIED) ── */}
           {tab === 'ready-dispatch' && (
             <div className="card">
+              <div style={{ padding: '10px 18px 0', background: 'var(--green-dim)', borderRadius: '10px 10px 0 0' }}>
+                <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10 }}>
+                  ✅ These cases are <strong>QC complete and payment verified</strong> — assign a delivery driver to send them out to the clinic.
+                </div>
+              </div>
               <div className="card-header">
-                <div className="card-title">🚚 Ready for Dispatch</div>
+                <div className="card-title">🚚 Ready for Dispatch <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, marginLeft: 6 }}>— Payment Verified</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDispatch.length} cases</span>
                   <ExportMenu
@@ -688,7 +725,8 @@ export default function DispatchDashboard() {
                 {readyDispatch.length === 0 ? (
                   <div className="empty-state">
                     <div className="empty-icon">🎉</div>
-                    <div className="empty-title">Nothing to dispatch</div>
+                    <div className="empty-title">No cases cleared for dispatch</div>
+                    <p>Cases appear here once their payment is verified by Finance. Check the Ready for Delivery tab for cases still awaiting payment.</p>
                   </div>
                 ) : (
                   <table>
