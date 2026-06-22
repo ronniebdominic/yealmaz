@@ -1295,11 +1295,11 @@ function HistoryTab() {
 
 // ── Cases Tab (in-progress + completed) ──────────────────
 const CASE_STATUS_GROUPS = [
-  { label: 'All Active', value: 'active' },
-  { label: 'In Production', value: 'production' },
-  { label: 'Ready to Dispatch', value: 'READY_TO_DISPATCH' },
-  { label: 'Out for Delivery', value: 'OUT_FOR_DELIVERY' },
-  { label: 'Completed', value: 'DELIVERED' },
+  { label: 'All Cases',          value: 'all' },
+  { label: 'In Production',      value: 'production' },
+  { label: 'Ready to Dispatch',  value: 'READY_TO_DISPATCH' },
+  { label: 'Out for Delivery',   value: 'OUT_FOR_DELIVERY' },
+  { label: 'Completed',          value: 'DELIVERED' },
 ];
 
 const PRODUCTION_STATUSES = [
@@ -1317,29 +1317,27 @@ const CASES_COLS = [
   { header: 'Units',       value: c => c.units ?? '' },
   { header: 'Status',      value: c => c.status },
   { header: 'Payment',     value: c => c.paymentStatus },
-  { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
-  { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+  { header: 'Amount (Br)',   value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+  { header: 'Order Date',    value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+  { header: 'Delivery Date', value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
 ];
 
 function CasesTab() {
-  const [group, setGroup]     = useState('active');
-  const [search, setSearch]   = useState('');
+  const [group, setGroup]       = useState('all');
+  const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]   = useState('');
-  const [page, setPage]       = useState(1);
+  const [dateTo, setDateTo]     = useState('');
+  const [page, setPage]         = useState(1);
 
-  const statusParam = group === 'active'
-    ? ['CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING',
-       'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
-       'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
-       'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
-       'READY_TO_DISPATCH','OUT_FOR_DELIVERY'].join(',')
+  // 'all' → no status filter (returns every case)
+  const statusParam = group === 'all'
+    ? undefined
     : group === 'production'
     ? PRODUCTION_STATUSES.join(',')
     : group;
 
   const queryParams = (extra = {}) => ({
-    status: statusParam,
+    ...(statusParam ? { status: statusParam } : {}),
     ...(search   ? { search }   : {}),
     ...(dateFrom ? { dateFrom } : {}),
     ...(dateTo   ? { dateTo }   : {}),
@@ -1415,7 +1413,8 @@ function CasesTab() {
                   <th>Status</th>
                   <th>Payment</th>
                   <th>Amount</th>
-                  <th>Due Date</th>
+                  <th>Order Date</th>
+                  <th>Delivery Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -1432,8 +1431,11 @@ function CasesTab() {
                       {c.payment?.amount != null ? `Br ${c.payment.amount.toLocaleString('en-US')}` :
                        c.totalAmount != null ? `Br ${c.totalAmount.toLocaleString('en-US')}` : '—'}
                     </td>
-                    <td style={{ fontSize: 12, color: c.dueDate && new Date(c.dueDate) < new Date() && c.status !== 'DELIVERED' ? 'var(--red)' : 'var(--text-3)' }}>
-                      {c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      {format(new Date(c.createdAt), 'dd MMM yyyy')}
+                    </td>
+                    <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)', fontWeight: c.deliveryDate ? 600 : 400 }}>
+                      {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
                     </td>
                   </tr>
                 ))}
@@ -2114,14 +2116,6 @@ export default function FinanceDashboard() {
               </div>
               <div className="stat-sub">{quickReport?.paid?.today || 0} payments verified</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
-              <div className="stat-label">This Month</div>
-              <div className="stat-value" style={{ color: 'var(--green)', fontSize: (stats.thisMonthRevenue || 0) >= 100000 ? 16 : 22 }}>
-                Br {(stats.thisMonthRevenue || 0).toLocaleString('en-US')}
-              </div>
-              <div className="stat-sub">Verified revenue MTD</div>
-            </div>
             <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
               <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
               <div className="stat-label">Pending</div>
@@ -2129,14 +2123,6 @@ export default function FinanceDashboard() {
                 Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
               </div>
               <div className="stat-sub">{quickReport?.pending?.count || 0} unpaid cases</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: revenueGrowth != null && revenueGrowth >= 0 ? 'var(--green-dim)' : 'var(--red-dim)' }}>📈</div>
-              <div className="stat-label">Revenue Growth</div>
-              <div className="stat-value" style={{ color: revenueGrowth != null && revenueGrowth >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 24 }}>
-                {revenueGrowth != null ? `${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%` : '—'}
-              </div>
-              <div className="stat-sub">vs last month</div>
             </div>
           </div>
 
