@@ -307,15 +307,15 @@ function AcceptCasesSection({ queryClient }) {
 
 // ─── Ready Orders Section ─────────────────────────────────
 const READY_COLS = [
-  { header: 'Case #',      value: c => c.caseNumber },
+  { header: 'Case #',      value: c => c.caseNumber ?? '' },
   { header: 'Clinic',      value: c => c.clinic?.name },
   { header: 'Patient',     value: c => c.patientName },
   { header: 'Work Type',   value: c => c.workType },
   { header: 'Units',       value: c => c.units ?? '' },
   { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
   { header: 'Payment',     value: c => c.paymentStatus },
-  { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
-  { header: 'Order Date',  value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+  { header: 'Delivery Date', value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
+  { header: 'Order Date',    value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
 ];
 
 function ReadyOrdersSection() {
@@ -405,35 +405,36 @@ function ReadyOrdersSection() {
                   <th>Units</th>
                   <th>Amount</th>
                   <th>Payment</th>
-                  <th>Due Date</th>
+                  <th>Delivery Date</th>
                   <th>Order Date</th>
                 </tr>
               </thead>
               <tbody>
-                {cases.map(c => {
-                  const overdue = c.dueDate && new Date(c.dueDate) < new Date() && c.status !== 'DELIVERED';
-                  return (
+                {cases.map(c => (
                     <tr key={c.id}>
-                      <td><span className="case-number">{c.caseNumber}</span></td>
+                      <td>
+                        {c.caseNumber
+                          ? <span className="case-number">{c.caseNumber}</span>
+                          : <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>—</span>
+                        }
+                      </td>
                       <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
                       <td><span className="patient-name">{c.patientName}</span></td>
                       <td style={{ fontSize: 13 }}>{c.workType}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{c.units ?? '—'}</td>
                       <td style={{ fontWeight: 600, color: 'var(--green)' }}>
                         {c.payment?.amount != null ? `Br ${c.payment.amount.toLocaleString('en-US')}` :
                          c.totalAmount != null ? `Br ${c.totalAmount.toLocaleString('en-US')}` : '—'}
                       </td>
                       <td><PaymentBadge status={c.paymentStatus} /></td>
-                      <td style={{ fontSize: 12, color: overdue ? 'var(--red)' : 'var(--text-3)', fontWeight: overdue ? 700 : 400 }}>
-                        {c.dueDate ? format(new Date(c.dueDate), 'dd MMM') : '—'}
-                        {overdue ? ' ⚠' : ''}
+                      <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)', fontWeight: c.deliveryDate ? 600 : 400 }}>
+                        {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
                       </td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
                       </td>
                     </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           )}
@@ -460,7 +461,7 @@ function TrackOrderSection() {
   const { data, isLoading } = useQuery({
     queryKey: ['track-order', submitted],
     queryFn: () => submitted
-      ? api.get('/cases', { params: { search: submitted, limit: 30 } }).then(r => r.data)
+      ? api.get('/cases', { params: { search: submitted, limit: 100 } }).then(r => r.data)
       : null,
     enabled: !!submitted,
     staleTime: 30_000,
@@ -500,14 +501,15 @@ function TrackOrderSection() {
               <ExportMenu
                 data={cases}
                 columns={[
-                  { header: 'Case #',     value: c => c.caseNumber },
-                  { header: 'Clinic',     value: c => c.clinic?.name },
-                  { header: 'Patient',    value: c => c.patientName },
-                  { header: 'Work Type',  value: c => c.workType },
-                  { header: 'Status',     value: c => c.status },
-                  { header: 'Payment',    value: c => c.paymentStatus },
-                  { header: 'Due Date',   value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
-                  { header: 'Registered', value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+                  { header: 'Case #',         value: c => c.caseNumber ?? '' },
+                  { header: 'Clinic',         value: c => c.clinic?.name },
+                  { header: 'Patient',        value: c => c.patientName },
+                  { header: 'Work Type',      value: c => c.workType },
+                  { header: 'Units',          value: c => c.units ?? '' },
+                  { header: 'Status',         value: c => c.status },
+                  { header: 'Payment',        value: c => c.paymentStatus },
+                  { header: 'Delivery Date',  value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
+                  { header: 'Registered',     value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
                 ]}
                 filename={`case-search-${submitted}`}
                 title={`Search: ${submitted}`}
@@ -531,23 +533,37 @@ function TrackOrderSection() {
                     <th>Clinic</th>
                     <th>Patient</th>
                     <th>Work Type</th>
+                    <th>Units</th>
                     <th>Status</th>
                     <th>Payment</th>
-                    <th>Due Date</th>
+                    <th>Delivery Date</th>
                     <th>Registered</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cases.map(c => (
                     <tr key={c.id}>
-                      <td><span className="case-number">{c.caseNumber}</span></td>
+                      <td>
+                        {c.caseNumber
+                          ? <span className="case-number">{c.caseNumber}</span>
+                          : <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>—</span>
+                        }
+                      </td>
                       <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
-                      <td><span className="patient-name">{c.patientName}</span></td>
+                      <td>
+                        <span className="patient-name">
+                          {c.patientName && c.patientName.match(/^[A-Z]{2,3}-\d{4}-\d+$/)
+                            ? <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11 }}>—</span>
+                            : c.patientName || '—'
+                          }
+                        </span>
+                      </td>
                       <td style={{ fontSize: 13 }}>{c.workType}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{c.units ?? '—'}</td>
                       <td><StatusBadge status={c.status} /></td>
                       <td><PaymentBadge status={c.paymentStatus} /></td>
-                      <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                        {c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}
+                      <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)', fontWeight: c.deliveryDate ? 600 : 400 }}>
+                        {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
                       </td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
