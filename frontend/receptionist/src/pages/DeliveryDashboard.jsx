@@ -1,115 +1,46 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-// ── Confirm action modal ──────────────────────────────────
+// ── Confirm modal ─────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   const [reason, setReason] = useState('');
 
   const CFG = {
-    impression_collected: {
-      title: '✓ Impression Collected',
-      desc: 'Confirm you have collected the dental impression from the clinic and are bringing it to the lab.',
-      btn: '✓ Confirm — Impression Collected',
-      cls: 'btn btn-primary',
-      needsReason: false,
-    },
-    impression_not_collected: {
-      title: '✕ Could Not Collect',
-      desc: 'The impression could not be collected. This case will return to the pickup queue for reassignment.',
-      btn: '✕ Could Not Collect',
-      cls: 'btn btn-ghost',
-      needsReason: true,
-      placeholder: 'Reason (e.g. clinic closed, patient not ready)…',
-    },
-    picked_up_from_lab: {
-      title: '✓ Picked Up from Lab',
-      desc: 'Confirm you have picked up this case from the lab and are heading to the clinic for delivery.',
-      btn: '✓ Confirm — Picked Up from Lab',
-      cls: 'btn btn-primary',
-      needsReason: false,
-    },
-    not_picked_up_from_lab: {
-      title: '✕ Cannot Pick Up',
-      desc: 'You cannot collect this case from the lab. It will be returned to Dispatch for reassignment.',
-      btn: '✕ Return to Dispatch',
-      cls: 'btn btn-ghost',
-      needsReason: true,
-      placeholder: 'Reason (e.g. not ready, wrong package)…',
-    },
-    delivered: {
-      title: '✅ Confirm Delivery',
-      desc: 'Confirm this case has been successfully delivered to the clinic.',
-      btn: '✅ Mark as Delivered',
-      cls: 'btn btn-success',
-      needsReason: false,
-    },
-    not_delivered: {
-      title: '↩ Could Not Deliver',
-      desc: 'Delivery was unsuccessful. The case will be returned to Dispatch for reassignment.',
-      btn: '↩ Return to Dispatch',
-      cls: 'btn btn-ghost',
-      needsReason: true,
-      placeholder: 'Reason (e.g. clinic closed, wrong address)…',
-    },
+    picked_up:     { title: '✓ Mark as Picked Up',    btn: '✓ Confirm Picked Up',      color: '#16A34A', needsReason: false },
+    not_picked_up: { title: '✕ Not Picked Up',         btn: '✕ Confirm Not Picked Up',  color: '#DC2626', needsReason: true,  placeholder: 'Reason (e.g. clinic closed)…' },
+    delivered:     { title: '✅ Mark as Delivered',    btn: '✅ Confirm Delivered',      color: '#16A34A', needsReason: false },
+    not_delivered: { title: '↩ Return — Not Delivered',btn: '↩ Return to Dispatch',     color: '#DC2626', needsReason: true,  placeholder: 'Reason (e.g. clinic closed)…' },
   };
-
-  const cfg = CFG[action] || { title: 'Confirm', desc: '', btn: 'Confirm', cls: 'btn btn-primary', needsReason: false };
+  const cfg = CFG[action] || {};
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">{cfg.title}</div>
+          <div className="modal-title" style={{ color: cfg.color }}>{cfg.title}</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 16 }}>{cfg.desc}</p>
-
-          {/* Case summary */}
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
-              🏥 {caseData.clinic?.name}
-            </div>
-            {caseData.clinic?.address && (
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
-                📍 {caseData.clinic.address}
-              </div>
-            )}
-            {caseData.clinic?.phone && (
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
-                📞 <a href={`tel:${caseData.clinic.phone}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                  {caseData.clinic.phone}
-                </a>
-              </div>
-            )}
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
-              <span className="case-number" style={{ marginRight: 8 }}>{caseData.caseNumber || 'No scan # yet'}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{caseData.patientName}</span>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{caseData.workType}</div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-1)', marginBottom: 4 }}>🏥 {caseData.clinic?.name}</div>
+            {caseData.clinic?.address && <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 3 }}>📍 {caseData.clinic.address}</div>}
+            {caseData.clinic?.phone && <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>📞 <a href={`tel:${caseData.clinic.phone}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>{caseData.clinic.phone}</a></div>}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13, color: 'var(--text-2)' }}>
+              <span className="case-number" style={{ marginRight: 8 }}>{caseData.caseNumber || '—'}</span>
+              {caseData.patientName && caseData.patientName !== 'TBD' && caseData.patientName}
             </div>
           </div>
-
           {cfg.needsReason && (
-            <textarea
-              rows={2}
-              placeholder={cfg.placeholder}
-              value={reason}
-              onChange={e => setReason(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', resize: 'vertical', fontFamily: 'inherit', marginBottom: 14 }}
-            />
+            <textarea rows={2} placeholder={cfg.placeholder} value={reason} onChange={e => setReason(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', resize: 'vertical', fontFamily: 'inherit', marginBottom: 14 }} />
           )}
-
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
-            <button
-              className={cfg.cls}
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => onConfirm(reason)}
-              disabled={loading || (cfg.needsReason && !reason.trim())}
-            >
+            <button onClick={() => onConfirm(reason)} disabled={loading || (cfg.needsReason && !reason.trim())}
+              style={{ flex: 1, justifyContent: 'center', background: cfg.color, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
               {loading ? 'Processing…' : cfg.btn}
             </button>
           </div>
@@ -119,164 +50,25 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   );
 }
 
-// ── Job card ──────────────────────────────────────────────
-function JobCard({ c, section, onAction }) {
-  const borderColor = section === 'impression' ? '#EA580C'
-    : section === 'lab-pickup' ? 'var(--accent)'
-    : 'var(--green)';
-
-  const isOverdue = c.dueDate && new Date(c.dueDate) < new Date();
-
-  return (
-    <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${borderColor}` }}>
-      {/* Clinic info — primary focus for delivery staff */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', marginBottom: 4 }}>
-          🏥 {c.clinic?.name}
-        </div>
-        {c.clinic?.address ? (
-          <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 4, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-            <span>📍</span>
-            <span>{c.clinic.address}</span>
-          </div>
-        ) : (
-          <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 4 }}>📍 No address on file</div>
-        )}
-        {c.clinic?.phone ? (
-          <div style={{ fontSize: 14, marginBottom: 4 }}>
-            📞 <a href={`tel:${c.clinic.phone}`} style={{ color: 'var(--accent)', fontWeight: 700, textDecoration: 'none' }}>
-              {c.clinic.phone}
-            </a>
-          </div>
-        ) : (
-          <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 4 }}>📞 No contact on file</div>
-        )}
-      </div>
-
-      {/* Case details — secondary */}
-      <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 12, fontSize: 13 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-          {c.caseNumber
-            ? <span className="case-number">{c.caseNumber}</span>
-            : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--amber-dim)', color: 'var(--amber)', fontFamily: 'DM Mono, monospace' }}>No Scan # Yet</span>
-          }
-          {c.deliveryType === 'EXPRESS' && (
-            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>⚡ Express</span>
-          )}
-        </div>
-        <div style={{ fontWeight: 600, color: 'var(--text-1)', marginBottom: 2 }}>{c.patientName}</div>
-        <div style={{ color: 'var(--text-2)' }}>{c.workType}{c.units != null ? ` · ${c.units} units` : ''}</div>
-        {c.dueDate && (
-          <div style={{ marginTop: 4, fontSize: 12, color: isOverdue ? 'var(--red)' : 'var(--text-3)', fontWeight: isOverdue ? 700 : 400 }}>
-            📅 Due: {format(new Date(c.dueDate), 'dd MMM yyyy')}{isOverdue ? ' — OVERDUE' : ''}
-          </div>
-        )}
-      </div>
-
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {section === 'impression' && (
-          <>
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => onAction(c, 'impression_collected')}
-            >
-              ✓ Impression Collected
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ color: 'var(--red)' }}
-              onClick={() => onAction(c, 'impression_not_collected')}
-            >
-              ✕ Not Collected
-            </button>
-          </>
-        )}
-
-        {section === 'lab-pickup' && (
-          <>
-            <button
-              className="btn btn-primary btn-sm"
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => onAction(c, 'picked_up_from_lab')}
-            >
-              ✓ Picked Up from Lab
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ color: 'var(--red)' }}
-              onClick={() => onAction(c, 'not_picked_up_from_lab')}
-            >
-              ↩ Return to Dispatch
-            </button>
-          </>
-        )}
-
-        {section === 'delivery' && (
-          <>
-            <button
-              className="btn btn-success btn-sm"
-              style={{ flex: 1, justifyContent: 'center' }}
-              onClick={() => onAction(c, 'delivered')}
-            >
-              ✅ Mark as Delivered
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ color: 'var(--red)' }}
-              onClick={() => onAction(c, 'not_delivered')}
-            >
-              ↩ Not Delivered
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Section card wrapper ──────────────────────────────────
-function Section({ title, icon, color, cases, section, onAction, emptyText, emptyNote }) {
-  return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
-        <div className="card-title">{icon} {title}</div>
-        <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 700 }}>
-          {cases.length} job{cases.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-      {cases.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">✅</div>
-          <div className="empty-title">{emptyText}</div>
-          {emptyNote && <p>{emptyNote}</p>}
-        </div>
-      ) : (
-        <div>{cases.map(c => <JobCard key={c.id} c={c} section={section} onAction={onAction} />)}</div>
-      )}
-    </div>
-  );
-}
-
 // ── Main Delivery Dashboard ───────────────────────────────
 export default function DeliveryDashboard() {
   const { user, logout } = useAuth();
-  const [cases, setCases]   = useState([]);
+  const [cases, setCases]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal]     = useState(null); // { case, action }
+  const [modal, setModal]     = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [tab, setTab]         = useState('all'); // 'all' | section tabs
+
+  // Search / filter
+  const [search, setSearch]   = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]   = useState('');
 
   const loadCases = useCallback(async () => {
     try {
       const res = await api.get('/delivery/assigned');
       setCases(res.data.cases ?? res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -285,7 +77,6 @@ export default function DeliveryDashboard() {
     return () => clearInterval(t);
   }, [loadCases]);
 
-  // Socket: real-time assignment notifications
   useEffect(() => {
     if (!user?.id) return;
     import('../api').then(mod => {
@@ -302,149 +93,262 @@ export default function DeliveryDashboard() {
     setProcessing(true);
     try {
       const { case: c, action } = modal;
-
-      if (action === 'impression_collected') {
+      if (action === 'picked_up') {
         await api.post(`/delivery/${c.id}/collect-impression`);
-        toast.success('✓ Impression collected — heading to lab');
-
-      } else if (action === 'impression_not_collected') {
-        await api.patch(`/cases/${c.id}/status`, {
-          status: 'PENDING_PICKUP',
-          notes: reason || 'Could not collect impression — returned to queue',
-        });
-        toast.success('↩ Case returned to pickup queue');
-
-      } else if (action === 'picked_up_from_lab') {
-        await api.post(`/delivery/${c.id}/pickup`);
-        toast.success('✓ Picked up from lab — heading to clinic');
-
-      } else if (action === 'not_picked_up_from_lab') {
-        await api.post(`/delivery/${c.id}/return-to-dispatch`, {
-          reason: reason || 'Could not pick up from lab — returned to dispatch',
-        });
-        toast.success('↩ Case returned to Dispatch');
-
+        toast.success('✓ Impression collected');
+      } else if (action === 'not_picked_up') {
+        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: reason || 'Not picked up' });
+        toast.success('↩ Returned to pickup queue');
       } else if (action === 'delivered') {
         await api.post(`/delivery/${c.id}/deliver`);
-        toast.success('✅ Delivery confirmed!');
-
+        toast.success('✅ Delivered!');
       } else if (action === 'not_delivered') {
-        await api.post(`/delivery/${c.id}/return-to-dispatch`, {
-          reason: reason || 'Could not deliver — returned to dispatch',
-        });
-        toast.success('↩ Case returned to Dispatch');
+        await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason: reason || 'Could not deliver' });
+        toast.success('↩ Returned to dispatch');
       }
-
       setModal(null);
       loadCases();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Action failed');
-    } finally {
-      setProcessing(false);
-    }
+    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    finally { setProcessing(false); }
   };
 
-  // Split cases into their sections
-  const impressionPickups = cases.filter(c => c.status === 'PICKUP_ASSIGNED');
-  const labPickups        = cases.filter(c => c.status === 'READY_TO_DISPATCH');
-  const outForDelivery    = cases.filter(c => c.status === 'OUT_FOR_DELIVERY');
-  const totalJobs = impressionPickups.length + labPickups.length + outForDelivery.length;
+  // Filter helper
+  const applyFilter = useCallback((arr) => {
+    const q = search.toLowerCase();
+    return arr.filter(c => {
+      if (q && !c.clinic?.name?.toLowerCase().includes(q) &&
+               !c.caseNumber?.toLowerCase().includes(q) &&
+               !c.patientName?.toLowerCase().includes(q) &&
+               !c.clinic?.address?.toLowerCase().includes(q)) return false;
+      if (dateFrom) {
+        const created = new Date(c.createdAt);
+        if (created < new Date(dateFrom)) return false;
+      }
+      if (dateTo) {
+        const end = new Date(dateTo); end.setHours(23, 59, 59, 999);
+        const created = new Date(c.createdAt);
+        if (created > end) return false;
+      }
+      return true;
+    });
+  }, [search, dateFrom, dateTo]);
+
+  const pickupList   = useMemo(() => applyFilter(cases.filter(c => c.status === 'PICKUP_ASSIGNED')),   [cases, applyFilter]);
+  const labPickups   = useMemo(() => applyFilter(cases.filter(c => c.status === 'READY_TO_DISPATCH')), [cases, applyFilter]);
+  const deliveryList = useMemo(() => applyFilter(cases.filter(c => c.status === 'OUT_FOR_DELIVERY')),  [cases, applyFilter]);
+  const completedList = useMemo(() => applyFilter(cases.filter(c => c.status === 'DELIVERED')),        [cases, applyFilter]);
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DV';
+  const hasFilter = search || dateFrom || dateTo;
+
+  // ── Table row ────────────────────────────────────────────
+  const Row = ({ c, section }) => (
+    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+      <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1a1a2e' }}>
+        {c.clinic?.name || '—'}
+        {c.caseNumber && <div style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: '#6b7280', marginTop: 2 }}>{c.caseNumber}</div>}
+      </td>
+      <td style={{ padding: '10px 14px', fontSize: 13, color: '#374151' }}>
+        {c.clinic?.address ? <><span style={{ marginRight: 4 }}>📍</span>{c.clinic.address}</> : '—'}
+      </td>
+      <td style={{ padding: '10px 14px', fontSize: 13 }}>
+        {c.clinic?.phone
+          ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 600, textDecoration: 'none' }}>📞 {c.clinic.phone}</a>
+          : '—'}
+      </td>
+      <td style={{ padding: '10px 14px' }}>
+        {section === 'pickup' && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setModal({ case: c, action: 'picked_up' })}
+              style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ✓ Mark as Picked Up
+            </button>
+            <button onClick={() => setModal({ case: c, action: 'not_picked_up' })}
+              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ✕ Not Picked Up
+            </button>
+          </div>
+        )}
+        {section === 'labpickup' && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setModal({ case: c, action: 'picked_up' })}
+              style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ✓ Picked Up from Lab
+            </button>
+            <button onClick={() => setModal({ case: c, action: 'not_delivered' })}
+              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ↩ Return to Dispatch
+            </button>
+          </div>
+        )}
+        {section === 'delivery' && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setModal({ case: c, action: 'delivered' })}
+              style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ✅ Mark as Delivered
+            </button>
+            <button onClick={() => setModal({ case: c, action: 'not_delivered' })}
+              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ↩ Return Not Delivered
+            </button>
+          </div>
+        )}
+        {section === 'done' && (
+          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: '#D1FAE5', color: '#065F46' }}>
+            ✅ Delivered {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : ''}
+          </span>
+        )}
+      </td>
+    </tr>
+  );
+
+  // Section header bar (styled like the Excel)
+  const SectionHeader = ({ label, color, bg, count }) => (
+    <tr>
+      <td colSpan={4} style={{ padding: '8px 14px', background: bg, fontWeight: 800, fontSize: 13, color, letterSpacing: 0.3 }}>
+        {label} <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({count})</span>
+      </td>
+    </tr>
+  );
+
+  const ColHeaders = () => (
+    <tr style={{ background: '#F9FAFB' }}>
+      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Clinic Name</th>
+      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Location</th>
+      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Contact</th>
+      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Action</th>
+    </tr>
+  );
+
+  const EmptyRow = ({ msg }) => (
+    <tr>
+      <td colSpan={4} style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>
+        {msg}
+      </td>
+    </tr>
+  );
+
+  const totalJobs = pickupList.length + labPickups.length + deliveryList.length;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
       {/* Topbar */}
-      <div className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>🚚 My Job Orders</div>
-          {totalJobs > 0 && (
-            <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--accent)', color: '#fff' }}>
-              {totalJobs}
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
-            <div className="live-dot" /> Live
+      <div style={{ background: '#0F2044', color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img src="/logo.png" alt="logo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)' }} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>Delivery Staff Portal</div>
+            <div style={{ fontSize: 11, opacity: 0.65 }}>Job Order List</div>
           </div>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
-            {initials}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, opacity: 0.7 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+            Live · {user?.name?.split(' ')[0]}
           </div>
           <button onClick={logout}
-            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer' }}>
-            ⏻
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
+            ⏻ Logout
           </button>
         </div>
       </div>
 
-      <div className="content" style={{ flex: 1 }}>
-        {/* Summary row */}
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
-            <div className="stat-label">Impression Pickups</div>
-            <div className="stat-value" style={{ color: '#EA580C' }}>{impressionPickups.length}</div>
-            <div className="stat-sub">Collect from clinic</div>
+      <div style={{ flex: 1, padding: '20px', maxWidth: 1100, margin: '0 auto', width: '100%' }}>
+
+        {/* Search / Filter bar */}
+        <div style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ flex: 2, minWidth: 200 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 4, letterSpacing: 0.5 }}>SEARCH</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #E5E7EB', borderRadius: 8, padding: '7px 10px', background: '#F9FAFB' }}>
+              <span style={{ fontSize: 14 }}>🔍</span>
+              <input placeholder="Clinic, case no., patient, location…" value={search} onChange={e => setSearch(e.target.value)}
+                style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1, color: '#1F2937' }} />
+            </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
-            <div className="stat-label">Ready at Lab</div>
-            <div className="stat-value" style={{ color: 'var(--accent)' }}>{labPickups.length}</div>
-            <div className="stat-sub">Collect from lab</div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 4, letterSpacing: 0.5 }}>FROM DATE</div>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#1F2937' }} />
           </div>
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🚚</div>
-            <div className="stat-label">Out for Delivery</div>
-            <div className="stat-value" style={{ color: 'var(--green)' }}>{outForDelivery.length}</div>
-            <div className="stat-sub">Deliver to clinic</div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 4, letterSpacing: 0.5 }}>TO DATE</div>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#1F2937' }} />
           </div>
+          {hasFilter && (
+            <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+              style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-end' }}>
+              ✕ Clear
+            </button>
+          )}
         </div>
 
-        {loading ? (
-          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-3)', fontSize: 15 }}>
-            Loading your jobs…
+        {/* Job Order List Table */}
+        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 16 }}>
+          {/* Title bar */}
+          <div style={{ background: '#1F2937', color: '#fff', padding: '10px 16px', fontWeight: 800, fontSize: 14, letterSpacing: 0.3 }}>
+            📋 Job Order List
+            {totalJobs > 0 && <span style={{ marginLeft: 10, fontSize: 12, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '2px 10px' }}>{totalJobs} active jobs</span>}
           </div>
-        ) : totalJobs === 0 ? (
-          <div className="empty-state" style={{ paddingTop: 60 }}>
-            <div className="empty-icon">✅</div>
-            <div className="empty-title">All clear!</div>
-            <p>No jobs assigned to you right now. Dispatch will notify you when a new job is ready.</p>
+
+          {loading ? (
+            <div style={{ padding: 48, textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>Loading your jobs…</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <tbody>
+                {/* ── Pick-up List (impression from clinic) ── */}
+                <SectionHeader label="🔵 Pick-up List" bg="#DBEAFE" color="#1D4ED8" count={pickupList.length} />
+                <ColHeaders />
+                {pickupList.length === 0
+                  ? <EmptyRow msg="No impression pickups assigned" />
+                  : pickupList.map(c => <Row key={c.id} c={c} section="pickup" />)
+                }
+
+                {/* Spacer */}
+                <tr><td colSpan={4} style={{ height: 12, background: '#F9FAFB' }} /></tr>
+
+                {/* ── Lab Pickup (finished cases from lab) ── */}
+                <SectionHeader label="🟠 Collect from Lab" bg="#FEF3C7" color="#92400E" count={labPickups.length} />
+                <ColHeaders />
+                {labPickups.length === 0
+                  ? <EmptyRow msg="No cases to collect from lab" />
+                  : labPickups.map(c => <Row key={c.id} c={c} section="labpickup" />)
+                }
+
+                {/* Spacer */}
+                <tr><td colSpan={4} style={{ height: 12, background: '#F9FAFB' }} /></tr>
+
+                {/* ── Delivery List ── */}
+                <SectionHeader label="🟡 Delivery List" bg="#FEF9C3" color="#854D0E" count={deliveryList.length} />
+                <ColHeaders />
+                {deliveryList.length === 0
+                  ? <EmptyRow msg="No deliveries in progress" />
+                  : deliveryList.map(c => <Row key={c.id} c={c} section="delivery" />)
+                }
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Completed / Delivered Orders */}
+        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ background: '#065F46', color: '#fff', padding: '10px 16px', fontWeight: 800, fontSize: 14, letterSpacing: 0.3 }}>
+            ✅ Delivered Orders
+            {completedList.length > 0 && <span style={{ marginLeft: 10, fontSize: 12, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '2px 10px' }}>{completedList.length}</span>}
           </div>
-        ) : (
-          <>
-            {/* Section 1: Lab Pickups (shown first — these need to leave the lab) */}
-            {labPickups.length > 0 && (
-              <Section
-                title="Collect from Lab" icon="📦" color="var(--accent)"
-                cases={labPickups} section="lab-pickup" onAction={(c, action) => setModal({ case: c, action })}
-                emptyText="Nothing to collect from lab"
-              />
-            )}
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              <ColHeaders />
+              {completedList.length === 0
+                ? <EmptyRow msg="No delivered orders yet today" />
+                : completedList.map(c => <Row key={c.id} c={c} section="done" />)
+              }
+            </tbody>
+          </table>
+        </div>
 
-            {/* Section 2: Out for Delivery */}
-            {outForDelivery.length > 0 && (
-              <Section
-                title="Out for Delivery — Deliver to Clinic" icon="🚚" color="var(--green)"
-                cases={outForDelivery} section="delivery" onAction={(c, action) => setModal({ case: c, action })}
-                emptyText="No deliveries in progress"
-              />
-            )}
-
-            {/* Section 3: Impression Pickups */}
-            {impressionPickups.length > 0 && (
-              <Section
-                title="Impression Pickup — Collect from Clinic" icon="🛵" color="#EA580C"
-                cases={impressionPickups} section="impression" onAction={(c, action) => setModal({ case: c, action })}
-                emptyText="No impression pickups"
-                emptyNote="Impression collection jobs appear here when dispatch assigns them."
-              />
-            )}
-          </>
-        )}
       </div>
 
-      {/* Confirm modal */}
       {modal && (
         <ConfirmModal
           caseData={modal.case}
