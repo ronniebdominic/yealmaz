@@ -65,7 +65,10 @@ router.get('/', protect, async (req, res) => {
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
-    if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (paymentStatus) {
+      const payStatuses = paymentStatus.split(',').map(s => s.trim()).filter(Boolean);
+      where.paymentStatus = payStatuses.length === 1 ? payStatuses[0] : { in: payStatuses };
+    }
     if (search) {
       where.OR = [
         { clinic: { name: { contains: search, mode: 'insensitive' } } },
@@ -135,7 +138,10 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
-    if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (paymentStatus) {
+      const payStatuses = paymentStatus.split(',').map(s => s.trim()).filter(Boolean);
+      where.paymentStatus = payStatuses.length === 1 ? payStatuses[0] : { in: payStatuses };
+    }
     if (search) {
       where.OR = [
         { clinic: { name: { contains: search, mode: 'insensitive' } } },
