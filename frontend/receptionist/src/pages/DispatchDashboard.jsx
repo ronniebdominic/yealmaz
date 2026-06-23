@@ -406,12 +406,14 @@ export default function DispatchDashboard() {
     c.paymentStatus === 'VERIFIED'
   );
 
+  const enRoute   = filtered.filter(c => c.status === 'OUT_FOR_DELIVERY');
   const delivered = filtered.filter(c => c.status === 'DELIVERED');
 
   const tabCount = {
     'place-order':    placeOrder.length,
     'ready-delivery': readyDelivery.length,
     'ready-dispatch': readyDispatch.length,
+    'en-route':       enRoute.length,
     'delivered':      delivered.length,
   };
 
@@ -442,6 +444,7 @@ export default function DispatchDashboard() {
     { id: 'place-order',    label: 'Place Order',              icon: '📋' },
     { id: 'ready-delivery', label: 'Ready for Delivery',       icon: '📦', sub: 'Pending payment' },
     { id: 'ready-dispatch', label: 'Ready for Dispatch',       icon: '🚚', sub: 'Payment verified' },
+    { id: 'en-route',       label: 'En Route',                 icon: '🚴', sub: 'Out for delivery' },
     { id: 'delivered',      label: 'Delivered',                icon: '✅' },
   ];
 
@@ -528,11 +531,11 @@ export default function DispatchDashboard() {
         <div className="content">
           {/* ── Summary cards ── */}
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
-            <div className="stat-card">
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('place-order')}>
               <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
               <div className="stat-label">Orders Today</div>
               <div className="stat-value">{summary.totalToday ?? '—'}</div>
-              <div className="stat-sub">New cases today</div>
+              <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View orders ↗</div>
             </div>
             <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready-delivery')}>
               <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
@@ -544,11 +547,11 @@ export default function DispatchDashboard() {
                 <span style={{ color: 'var(--green)' }}>{readyDispatch.length} cleared</span>
               </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚚</div>
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('en-route')}>
+              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚴</div>
               <div className="stat-label">Picked Up / En Route</div>
               <div className="stat-value" style={{ color: 'var(--amber)' }}>{summary.enRoute ?? '—'}</div>
-              <div className="stat-sub">Out for delivery</div>
+              <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View en route ↗</div>
             </div>
             <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('place-order')}>
               <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
@@ -813,6 +816,86 @@ export default function DispatchDashboard() {
                               >
                                 🚚 Dispatch
                               </button>
+                            </Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: En Route (OUT_FOR_DELIVERY) ── */}
+          {tab === 'en-route' && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">🚴 En Route — Out for Delivery</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{enRoute.length} cases</span>
+                  <ExportMenu
+                    data={enRoute}
+                    columns={[
+                      { header: 'Clinic Name',    value: c => c.clinic?.name },
+                      { header: 'Location',       value: c => c.clinic?.address ?? '' },
+                      { header: 'Contact',        value: c => c.clinic?.phone ?? '' },
+                      { header: 'Case #',         value: c => c.caseNumber },
+                      { header: 'Patient',        value: c => c.patientName },
+                      { header: 'Product',        value: c => c.workType },
+                      { header: 'Units',          value: c => c.units ?? '' },
+                      { header: 'Total Value(Br)',value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+                      { header: 'Payment Status', value: c => c.paymentStatus },
+                      { header: 'Driver',         value: c => c.assignedDelivery?.name ?? '' },
+                    ]}
+                    filename="en-route"
+                    title="En Route — Out for Delivery"
+                  />
+                </div>
+              </div>
+              <div className="table-wrap">
+                {enRoute.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">🎉</div>
+                    <div className="empty-title">No cases out for delivery</div>
+                    <p>Cases dispatched to a driver will appear here.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Location</Th>
+                        <Th>Contact</Th>
+                        <Th>Case #</Th>
+                        <Th>Patient</Th>
+                        <Th>Product</Th>
+                        <Th>Units</Th>
+                        <Th style={{ textAlign: 'right' }}>Total Value</Th>
+                        <Th>Payment</Th>
+                        <Th>Driver</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {enRoute.map(c => {
+                        const amount = c.payment?.amount ?? c.totalAmount;
+                        return (
+                          <tr key={c.id}>
+                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}</Td>
+                            <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
+                            <Td><span className="case-number">{c.caseNumber}</span></Td>
+                            <Td><span className="patient-name">{c.patientName}</span></Td>
+                            <Td style={{ fontSize: 12 }}>{c.workType}</Td>
+                            <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
+                            <Td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETB(amount)}</Td>
+                            <Td><PaymentBadge status={c.paymentStatus} /></Td>
+                            <Td>
+                              {c.assignedDelivery ? (
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
+                                  👤 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}
+                                </span>
+                              ) : '—'}
                             </Td>
                           </tr>
                         );
