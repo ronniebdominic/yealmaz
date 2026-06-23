@@ -196,7 +196,7 @@ const Td = ({ children, style }) => (
 function PhoneOrderModal({ executives, onClose, onSuccess }) {
   const [form, setForm] = useState({
     existingClinicId: '', clinicName: '', clinicPhone: '', clinicAddress: '',
-    patientName: '', workType: '', doctorName: '', doctorPhone: '', notes: '',
+    doctorName: '', doctorPhone: '', notes: '',
     assignToExecutiveId: '',
   });
   const [clinics, setClinics] = useState([]);
@@ -212,7 +212,6 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
   const lbl = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
 
   const submit = async () => {
-    if (!form.patientName.trim()) return toast.error('Patient name is required');
     if (useExisting && !form.existingClinicId) return toast.error('Select a clinic or switch to manual entry');
     if (!useExisting && !form.clinicName.trim()) return toast.error('Clinic name is required');
 
@@ -223,8 +222,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
         clinicName:    !useExisting ? form.clinicName    : undefined,
         clinicPhone:   !useExisting ? form.clinicPhone   : undefined,
         clinicAddress: !useExisting ? form.clinicAddress : undefined,
-        patientName:   form.patientName,
-        workType:      form.workType || undefined,
+        patientName:   'TBD',   // receptionist fills details on acceptance
         doctorName:    form.doctorName || undefined,
         doctorPhone:   form.doctorPhone || undefined,
         notes:         form.notes || undefined,
@@ -283,16 +281,8 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
             )}
           </div>
 
-          {/* Patient */}
+          {/* Doctor info */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div>
-              <label style={lbl}>PATIENT NAME *</label>
-              <input style={inp} placeholder="Patient name" value={form.patientName} onChange={set('patientName')} />
-            </div>
-            <div>
-              <label style={lbl}>WORK TYPE</label>
-              <input style={inp} placeholder="e.g. Zirconia Crown" value={form.workType} onChange={set('workType')} />
-            </div>
             <div>
               <label style={lbl}>DOCTOR NAME</label>
               <input style={inp} placeholder="Dr. Sarah" value={form.doctorName} onChange={set('doctorName')} />

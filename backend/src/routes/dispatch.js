@@ -253,7 +253,8 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
       assignToExecutiveId,
     } = req.body;
 
-    if (!patientName?.trim()) return res.status(400).json({ error: 'Patient name is required.' });
+    // patientName is filled in by the receptionist when accepting the case;
+    // dispatcher only needs to provide clinic info for the pickup.
 
     // Resolve or create clinic
     let resolvedClinicId = clinicId;
