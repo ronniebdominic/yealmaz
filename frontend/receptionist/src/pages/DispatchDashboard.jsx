@@ -84,9 +84,34 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
 
 // ── Request Payment modal ─────────────────────────────────
 function PaymentModal({ caseData, onClose, onSuccess }) {
-  const [amount, setAmount] = useState(caseData.payment?.amount ?? caseData.totalAmount ?? '');
+  // Priority: payment.amount → case.totalAmount → work-type price from pricing table
+  const preset = caseData.payment?.amount ?? caseData.totalAmount ?? null;
+  const [amount, setAmount] = useState(preset !== null ? String(preset) : '');
   const [notes,  setNotes]  = useState('');
   const [saving, setSaving] = useState(false);
+  const [loadingPrice, setLoadingPrice] = useState(false);
+  const [priceHint, setPriceHint] = useState('');
+
+  // If no amount is set, fetch the work-type price as the default
+  useEffect(() => {
+    if (preset !== null) return;               // already have an amount
+    if (!caseData.workType) return;
+    setLoadingPrice(true);
+    api.get('/prices')
+      .then(r => {
+        const entry = r.data.find(p => p.workType === caseData.workType);
+        if (entry?.price) {
+          // Multiply by units if available and not a flat-rate type
+          const FLAT = new Set(['Orthodontic Retainer','Night Guard Soft','Night Guard Hard','Sports Guard','Bite Splint','Bleaching Tray','Clear Aligner Setup','Gingival Mask']);
+          const units = (!FLAT.has(caseData.workType) && caseData.units) ? caseData.units : 1;
+          const total = entry.price * units;
+          setAmount(String(total));
+          setPriceHint(`Auto-filled: Br ${entry.price.toLocaleString('en-US')} × ${units} unit${units !== 1 ? 's' : ''} = Br ${total.toLocaleString('en-US')}`);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPrice(false));
+  }, []);
 
   const submit = async () => {
     if (!amount || parseFloat(amount) <= 0) return toast.error('Enter a valid amount');
@@ -110,21 +135,42 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
+          {/* Case summary */}
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)', fontSize: 13 }}>
             <div className="case-number">{caseData.caseNumber}</div>
             <div style={{ fontWeight: 700, color: 'var(--text-1)', marginTop: 4 }}>{caseData.patientName} · {caseData.clinic?.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}
+            </div>
           </div>
+
           <div className="form-group">
-            <label>Amount (Br) *</label>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Amount (Br) *</span>
+              {loadingPrice && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Loading price…</span>}
+            </label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => { setAmount(e.target.value); setPriceHint(''); }}
+              placeholder="0.00"
+              style={{ fontSize: 16, fontWeight: 700 }}
+            />
+            {priceHint && (
+              <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 4, fontWeight: 600 }}>
+                ✓ {priceHint}
+              </div>
+            )}
           </div>
+
           <div className="form-group">
             <label>Notes</label>
             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional note to clinic…" />
           </div>
+
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving || loadingPrice}>
               {saving ? 'Sending…' : '💳 Send Request'}
             </button>
           </div>
