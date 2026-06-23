@@ -313,8 +313,9 @@ function AcceptCasesSection({ queryClient }) {
 }
 
 // ─── Ready Orders Section ─────────────────────────────────
-// Ready for Dispatch  = READY_TO_DISPATCH (QC done, waiting for dispatch to assign driver)
-// Ready for Delivery  = OUT_FOR_DELIVERY  (driver assigned and on the way to clinic)
+// Mirrors Dispatch dashboard exactly:
+// Ready for Delivery = READY_TO_DISPATCH + payment NOT verified (QC done, payment pending)
+// Ready for Dispatch = READY_TO_DISPATCH + payment VERIFIED (cleared, assign driver)
 
 const CASE_COLS = [
   { header: 'Case #',        value: c => c.caseNumber ?? '' },
@@ -328,9 +329,12 @@ const CASE_COLS = [
   { header: 'Order Date',    value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
 ];
 
-function OrdersTab({ status, title, icon, emptyText, emptyNote, accentColor, applied, page, setPage }) {
+function OrdersTab({ status, paymentVerified, title, icon, emptyText, emptyNote, accentColor, applied, page, setPage }) {
   const params = (extra = {}) => ({
     status,
+    // paymentVerified: true → VERIFIED only; false → everything else; undefined → all
+    ...(paymentVerified === true  ? { paymentStatus: 'VERIFIED' }                                          : {}),
+    ...(paymentVerified === false ? { paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED,REJECTED' } : {}),
     ...(applied.search   ? { search: applied.search }     : {}),
     ...(applied.dateFrom ? { dateFrom: applied.dateFrom } : {}),
     ...(applied.dateTo   ? { dateTo: applied.dateTo }     : {}),
@@ -338,7 +342,7 @@ function OrdersTab({ status, title, icon, emptyText, emptyNote, accentColor, app
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['ready-orders', status, applied, page],
+    queryKey: ['ready-orders', status, paymentVerified, applied, page],
     queryFn: () => api.get('/cases', { params: params({ limit: 20, page }) }).then(r => r.data),
     staleTime: 30_000,
     refetchInterval: 60_000,
@@ -446,14 +450,14 @@ function ReadyOrdersSection() {
         </div>
       </div>
 
-      {/* Tab switcher */}
+      {/* Tab switcher — mirrors Dispatch dashboard exactly */}
       <div className="filters" style={{ marginBottom: 14 }}>
         <button
           className={`filter-chip${activeTab === 'dispatch' ? ' active' : ''}`}
           onClick={() => setActiveTab('dispatch')}
-          style={activeTab === 'dispatch' ? { background: 'var(--accent)', color: '#fff' } : {}}
+          style={activeTab === 'dispatch' ? { background: '#EA580C', color: '#fff' } : {}}
         >
-          📦 Ready for Dispatch
+          📦 Ready for Delivery
           <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>QC done • Awaiting driver</span>
         </button>
         <button
@@ -461,33 +465,37 @@ function ReadyOrdersSection() {
           onClick={() => setActiveTab('delivery')}
           style={activeTab === 'delivery' ? { background: 'var(--green)', color: '#fff' } : {}}
         >
-          🚚 Ready for Delivery
-          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>Driver assigned • En route</span>
+          🚚 Ready for Dispatch
+          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>Payment verified • Assign driver</span>
         </button>
       </div>
 
+      {/* Ready for Delivery = READY_TO_DISPATCH + payment NOT yet verified */}
       {activeTab === 'dispatch' && (
         <OrdersTab
           status="READY_TO_DISPATCH"
-          title="Ready for Dispatch"
+          paymentVerified={false}
+          title="Ready for Delivery"
           icon="📦"
-          accentColor="var(--accent)"
-          emptyText="No cases waiting for dispatch"
-          emptyNote="Cases that have passed QC will appear here for dispatch to assign a driver."
+          accentColor="#EA580C"
+          emptyText="No cases awaiting payment"
+          emptyNote="Cases that passed QC but haven't had payment verified appear here."
           applied={applied}
           page={pageDispatch}
           setPage={setPageDispatch}
         />
       )}
 
+      {/* Ready for Dispatch = READY_TO_DISPATCH + payment VERIFIED */}
       {activeTab === 'delivery' && (
         <OrdersTab
-          status="OUT_FOR_DELIVERY"
-          title="Ready for Delivery"
+          status="READY_TO_DISPATCH"
+          paymentVerified={true}
+          title="Ready for Dispatch"
           icon="🚚"
           accentColor="var(--green)"
-          emptyText="No cases currently out for delivery"
-          emptyNote="Cases appear here once dispatch has assigned a driver and the case is on its way to the clinic."
+          emptyText="No payment-verified cases ready for dispatch"
+          emptyNote="Cases appear here once Finance has verified the payment — dispatch can then assign a driver."
           applied={applied}
           page={pageDelivery}
           setPage={setPageDelivery}

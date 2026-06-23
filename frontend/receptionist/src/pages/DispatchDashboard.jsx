@@ -520,7 +520,7 @@ export default function DispatchDashboard() {
 
         <div className="content">
           {/* ── Summary cards ── */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
             <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('place-order')}>
               <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
               <div className="stat-label">Orders Today</div>
@@ -548,12 +548,6 @@ export default function DispatchDashboard() {
               <div className="stat-label">Pending Pick-up</div>
               <div className="stat-value" style={{ color: '#EA580C' }}>{summary.pendingPickup ?? '—'}</div>
               <div className="stat-sub">Impression collection</div>
-            </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('delivered')}>
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
-              <div className="stat-label">Delivered Today</div>
-              <div className="stat-value" style={{ color: 'var(--green)' }}>{summary.deliveredToday ?? '—'}</div>
-              <div className="stat-sub">Completed</div>
             </div>
           </div>
 
