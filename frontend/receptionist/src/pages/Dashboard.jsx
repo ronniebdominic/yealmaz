@@ -455,47 +455,47 @@ function ReadyOrdersSection() {
         <button
           className={`filter-chip${activeTab === 'dispatch' ? ' active' : ''}`}
           onClick={() => setActiveTab('dispatch')}
-          style={activeTab === 'dispatch' ? { background: '#EA580C', color: '#fff' } : {}}
+          style={activeTab === 'dispatch' ? { background: 'var(--green)', color: '#fff' } : {}}
         >
           📦 Ready for Delivery
-          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>QC done • Awaiting driver</span>
+          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>Payment verified • Ready to deliver</span>
         </button>
         <button
           className={`filter-chip${activeTab === 'delivery' ? ' active' : ''}`}
           onClick={() => setActiveTab('delivery')}
-          style={activeTab === 'delivery' ? { background: 'var(--green)', color: '#fff' } : {}}
+          style={activeTab === 'delivery' ? { background: 'var(--amber)', color: '#fff' } : {}}
         >
           🚚 Ready for Dispatch
-          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>Payment verified • Assign driver</span>
+          <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>QC done • Awaiting payment</span>
         </button>
       </div>
 
-      {/* Ready for Delivery = READY_TO_DISPATCH + payment NOT yet verified */}
+      {/* Ready for Delivery = READY_TO_DISPATCH + payment VERIFIED */}
       {activeTab === 'dispatch' && (
         <OrdersTab
           status="READY_TO_DISPATCH"
-          paymentVerified={false}
+          paymentVerified={true}
           title="Ready for Delivery"
           icon="📦"
-          accentColor="#EA580C"
-          emptyText="No cases awaiting payment"
-          emptyNote="Cases that passed QC but haven't had payment verified appear here."
+          accentColor="var(--green)"
+          emptyText="No payment-verified cases ready for delivery"
+          emptyNote="Cases appear here once QC is passed AND Finance has verified the payment."
           applied={applied}
           page={pageDispatch}
           setPage={setPageDispatch}
         />
       )}
 
-      {/* Ready for Dispatch = READY_TO_DISPATCH + payment VERIFIED */}
+      {/* Ready for Dispatch = READY_TO_DISPATCH + payment NOT yet verified */}
       {activeTab === 'delivery' && (
         <OrdersTab
           status="READY_TO_DISPATCH"
-          paymentVerified={true}
+          paymentVerified={false}
           title="Ready for Dispatch"
           icon="🚚"
-          accentColor="var(--green)"
-          emptyText="No payment-verified cases ready for dispatch"
-          emptyNote="Cases appear here once Finance has verified the payment — dispatch can then assign a driver."
+          accentColor="var(--amber)"
+          emptyText="No cases awaiting dispatch"
+          emptyNote="Cases that passed QC but haven't had payment verified appear here. Finance will request payment."
           applied={applied}
           page={pageDelivery}
           setPage={setPageDelivery}
