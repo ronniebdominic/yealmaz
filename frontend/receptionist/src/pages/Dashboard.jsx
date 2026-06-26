@@ -189,10 +189,12 @@ function AcceptCasesSection({ queryClient }) {
 
   const cases = data?.cases ?? [];
   const pending      = cases.filter(c => c.status === 'PENDING_PICKUP');
-  // PICKUP_ASSIGNED + driver still assigned = still in transit (going to collect)
-  const inTransit    = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && c.assignedDelivery);
-  // PICKUP_ASSIGNED + no driver = impression arrived at lab, driver cleared after delivery
-  const arrivedAtLab = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && !c.assignedDelivery);
+  // PICKUP_ASSIGNED + driver still assigned = still in transit (going to collect clinic)
+  // Use assignedDeliveryId (scalar always on model) rather than assignedDelivery (relation)
+  // to avoid false "arrived" when relation join is missing from the API response.
+  const inTransit    = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && (c.assignedDeliveryId || c.assignedDelivery?.id));
+  // PICKUP_ASSIGNED + no driver = impression arrived at lab, driver was cleared after delivery
+  const arrivedAtLab = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && !c.assignedDeliveryId && !c.assignedDelivery?.id);
   const underReview  = cases.filter(c => c.status === 'UNDER_REVIEW');
 
   const CaseCard = ({ c, canAct }) => {

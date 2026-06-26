@@ -151,36 +151,29 @@ router.post('/:caseId', async (req, res) => {
       });
     }
 
-    // Update case status
-    await prisma.case.update({
-      where: { id: caseId },
-      data: { status: newStatus }
-    });
-
-    // Log the stage
-    await prisma.caseStage.create({
-      data: {
-        caseId,
-        stageName: newStatus,
-        scannedBy,
-        location: dept.label,
-        notes: `Scanned at ${dept.label} department`
-      }
-    });
-
-    // After QC passes → auto-advance to READY_TO_DISPATCH for dispatch visibility
+    // After QC passes → advance directly to READY_TO_DISPATCH in one write.
+    // Guard: skip if already READY_TO_DISPATCH (re-scan idempotency).
     let finalStatus = newStatus;
     if (newStatus === 'QUALITY_CHECK') {
-      await prisma.case.update({ where: { id: caseId }, data: { status: 'READY_TO_DISPATCH' } });
+      if (caseData.status === 'READY_TO_DISPATCH') {
+        // Already advanced on a previous scan — just log QC without changing status
+        await prisma.caseStage.create({
+          data: { caseId, stageName: 'QUALITY_CHECK', scannedBy, location: dept.label, notes: 'QC re-scan (already dispatched)' }
+        });
+        finalStatus = 'READY_TO_DISPATCH';
+      } else {
+        // Write READY_TO_DISPATCH directly — no intermediate QUALITY_CHECK write
+        await prisma.case.update({ where: { id: caseId }, data: { status: 'READY_TO_DISPATCH' } });
+        await prisma.caseStage.create({ data: { caseId, stageName: 'QUALITY_CHECK', scannedBy, location: dept.label, notes: 'QC passed' } });
+        await prisma.caseStage.create({ data: { caseId, stageName: 'READY_TO_DISPATCH', scannedBy: 'System', notes: 'QC passed — moved to dispatch queue' } });
+        finalStatus = 'READY_TO_DISPATCH';
+      }
+    } else {
+      // Normal status update
+      await prisma.case.update({ where: { id: caseId }, data: { status: newStatus } });
       await prisma.caseStage.create({
-        data: {
-          caseId,
-          stageName: 'READY_TO_DISPATCH',
-          scannedBy: 'System',
-          notes: 'QC passed — automatically moved to dispatch queue',
-        }
+        data: { caseId, stageName: newStatus, scannedBy, location: dept.label, notes: `Scanned at ${dept.label} department` }
       });
-      finalStatus = 'READY_TO_DISPATCH';
     }
 
     // Real-time push

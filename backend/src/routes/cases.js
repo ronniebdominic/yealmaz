@@ -96,9 +96,10 @@ router.get('/', protect, async (req, res) => {
       prisma.case.findMany({
         where,
         include: {
-          clinic: { select: { id: true, name: true, phone: true, isExcluded: true } },
-          stages: { orderBy: { scannedAt: 'desc' }, take: 1 },
-          payment: true
+          clinic:           { select: { id: true, name: true, phone: true, isExcluded: true } },
+          stages:           { orderBy: { scannedAt: 'desc' }, take: 1 },
+          payment:          true,
+          assignedDelivery: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: dateOrder },
         skip,
@@ -377,9 +378,9 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ...(notes        ? { notes }                        : {}),
       ...(patientAge    ? { patientAge: parseInt(patientAge) }     : {}),
       ...(patientGender ? { patientGender }                        : {}),
-      ...(deliveryType  ? { deliveryType }                         : {}),
-      ...(totalAmount   ? { totalAmount: parseFloat(totalAmount) } : {}),
-      ...(dueDate       ? { dueDate: new Date(dueDate) }           : {}),
+      ...(deliveryType  != null                  ? { deliveryType }                              : {}),
+      ...(totalAmount   != null && totalAmount !== '' ? { totalAmount: parseFloat(totalAmount) } : {}),
+      ...(dueDate       != null && dueDate !== ''     ? { dueDate: new Date(dueDate) }           : {}),
     };
 
     // Generate QR if not already present
