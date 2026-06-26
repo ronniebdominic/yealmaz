@@ -9,38 +9,43 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   const [reason, setReason] = useState('');
 
   const CFG = {
-    picked_up:     { title: '✓ Mark as Picked Up',    btn: '✓ Confirm Picked Up',      color: '#16A34A', needsReason: false },
-    not_picked_up: { title: '✕ Not Picked Up',         btn: '✕ Confirm Not Picked Up',  color: '#DC2626', needsReason: true,  placeholder: 'Reason (e.g. clinic closed)…' },
-    delivered:     { title: '✅ Mark as Delivered',    btn: '✅ Confirm Delivered',      color: '#16A34A', needsReason: false },
-    not_delivered: { title: '↩ Return — Not Delivered',btn: '↩ Return to Dispatch',     color: '#DC2626', needsReason: true,  placeholder: 'Reason (e.g. clinic closed)…' },
+    picked_up:     { title: 'Mark as Picked Up',    color: '#16A34A', needsReason: false, btn: '✓ Confirm Picked Up' },
+    not_picked_up: { title: 'Not Picked Up',         color: '#DC2626', needsReason: true,  btn: '✕ Confirm', placeholder: 'Reason (e.g. clinic closed)…' },
+    lab_pickup:    { title: 'Collected from Lab',    color: '#16A34A', needsReason: false, btn: '✓ Confirm Collected' },
+    delivered:     { title: 'Mark as Delivered',     color: '#16A34A', needsReason: false, btn: '✅ Confirm Delivered' },
+    not_delivered: { title: 'Return — Not Delivered',color: '#DC2626', needsReason: true,  btn: '↩ Return to Dispatch', placeholder: 'Reason (e.g. clinic closed)…' },
   };
   const cfg = CFG[action] || {};
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <div className="modal-title" style={{ color: cfg.color }}>{cfg.title}</div>
-          <button className="modal-close" onClick={onClose}>×</button>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 420, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+        <div style={{ background: cfg.color, color: '#fff', padding: '14px 18px', fontWeight: 800, fontSize: 15 }}>
+          {cfg.title}
         </div>
-        <div className="modal-body">
-          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, border: '1px solid var(--border)' }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-1)', marginBottom: 4 }}>🏥 {caseData.clinic?.name}</div>
-            {caseData.clinic?.address && <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 3 }}>📍 {caseData.clinic.address}</div>}
-            {caseData.clinic?.phone && <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>📞 <a href={`tel:${caseData.clinic.phone}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>{caseData.clinic.phone}</a></div>}
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, fontSize: 13, color: 'var(--text-2)' }}>
-              <span className="case-number" style={{ marginRight: 8 }}>{caseData.caseNumber || '—'}</span>
-              {caseData.patientName && caseData.patientName !== 'TBD' && caseData.patientName}
-            </div>
+        <div style={{ padding: 18 }}>
+          <div style={{ background: '#F9FAFB', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid #E5E7EB' }}>
+            <div style={{ fontWeight: 800, fontSize: 15, color: '#1F2937', marginBottom: 3 }}>🏥 {caseData.clinic?.name}</div>
+            {caseData.clinic?.address && <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 2 }}>📍 {caseData.clinic.address}</div>}
+            {caseData.clinic?.phone  && <div style={{ fontSize: 13 }}>📞 <a href={`tel:${caseData.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700 }}>{caseData.clinic.phone}</a></div>}
+            {(caseData.caseNumber || caseData.workType) && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #E5E7EB', fontSize: 12, color: '#6B7280' }}>
+                {caseData.caseNumber && <span style={{ fontFamily: 'monospace', marginRight: 8 }}>{caseData.caseNumber}</span>}
+                {caseData.workType}
+              </div>
+            )}
           </div>
           {cfg.needsReason && (
             <textarea rows={2} placeholder={cfg.placeholder} value={reason} onChange={e => setReason(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', resize: 'vertical', fontFamily: 'inherit', marginBottom: 14 }} />
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #D1D5DB', resize: 'vertical', fontFamily: 'inherit', marginBottom: 12 }} />
           )}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
+            <button onClick={onClose} disabled={loading}
+              style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid #D1D5DB', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>
+              Cancel
+            </button>
             <button onClick={() => onConfirm(reason)} disabled={loading || (cfg.needsReason && !reason.trim())}
-              style={{ flex: 1, justifyContent: 'center', background: cfg.color, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
+              style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: cfg.color, color: '#fff', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
               {loading ? 'Processing…' : cfg.btn}
             </button>
           </div>
@@ -50,15 +55,13 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   );
 }
 
-// ── Main Delivery Dashboard ───────────────────────────────
+// ── Main ─────────────────────────────────────────────────
 export default function DeliveryDashboard() {
   const { user, logout } = useAuth();
   const [cases, setCases]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal]     = useState(null);
   const [processing, setProcessing] = useState(false);
-
-  // Search / filter
   const [search, setSearch]   = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]   = useState('');
@@ -80,11 +83,11 @@ export default function DeliveryDashboard() {
   useEffect(() => {
     if (!user?.id) return;
     import('../api').then(mod => {
-      const socket = mod.socket;
-      if (!socket) return;
-      socket.emit('join_delivery', user.id);
-      socket.on('case_assigned', () => loadCases());
-      return () => socket.off('case_assigned');
+      const s = mod.socket;
+      if (!s) return;
+      s.emit('join_delivery', user.id);
+      s.on('case_assigned', loadCases);
+      return () => s.off('case_assigned', loadCases);
     }).catch(() => {});
   }, [user?.id, loadCases]);
 
@@ -97,13 +100,16 @@ export default function DeliveryDashboard() {
         await api.post(`/delivery/${c.id}/collect-impression`);
         toast.success('✓ Impression collected');
       } else if (action === 'not_picked_up') {
-        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: reason || 'Not picked up' });
-        toast.success('↩ Returned to pickup queue');
+        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: reason });
+        toast.success('↩ Returned to queue');
+      } else if (action === 'lab_pickup') {
+        await api.post(`/delivery/${c.id}/pickup`);
+        toast.success('✓ Collected from lab');
       } else if (action === 'delivered') {
         await api.post(`/delivery/${c.id}/deliver`);
         toast.success('✅ Delivered!');
       } else if (action === 'not_delivered') {
-        await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason: reason || 'Could not deliver' });
+        await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason });
         toast.success('↩ Returned to dispatch');
       }
       setModal(null);
@@ -112,241 +118,215 @@ export default function DeliveryDashboard() {
     finally { setProcessing(false); }
   };
 
-  // Filter helper
-  const applyFilter = useCallback((arr) => {
+  // Filter
+  const applyFilter = useCallback(arr => {
     const q = search.toLowerCase();
     return arr.filter(c => {
       if (q && !c.clinic?.name?.toLowerCase().includes(q) &&
                !c.caseNumber?.toLowerCase().includes(q) &&
-               !c.patientName?.toLowerCase().includes(q) &&
-               !c.clinic?.address?.toLowerCase().includes(q)) return false;
-      if (dateFrom) {
-        const created = new Date(c.createdAt);
-        if (created < new Date(dateFrom)) return false;
-      }
-      if (dateTo) {
-        const end = new Date(dateTo); end.setHours(23, 59, 59, 999);
-        const created = new Date(c.createdAt);
-        if (created > end) return false;
-      }
+               !c.clinic?.address?.toLowerCase().includes(q) &&
+               !c.patientName?.toLowerCase().includes(q)) return false;
+      if (dateFrom && new Date(c.createdAt) < new Date(dateFrom)) return false;
+      if (dateTo)   { const e = new Date(dateTo); e.setHours(23,59,59,999); if (new Date(c.createdAt) > e) return false; }
       return true;
     });
   }, [search, dateFrom, dateTo]);
 
-  const pickupList   = useMemo(() => applyFilter(cases.filter(c => c.status === 'PICKUP_ASSIGNED')),   [cases, applyFilter]);
-  const labPickups   = useMemo(() => applyFilter(cases.filter(c => c.status === 'READY_TO_DISPATCH')), [cases, applyFilter]);
-  const deliveryList = useMemo(() => applyFilter(cases.filter(c => c.status === 'OUT_FOR_DELIVERY')),  [cases, applyFilter]);
-  const completedList = useMemo(() => applyFilter(cases.filter(c => c.status === 'DELIVERED')),        [cases, applyFilter]);
+  // Sections — impression pickups + lab pickups together form "Pick-up List"
+  const impressionPickups = useMemo(() => applyFilter(cases.filter(c => c.status === 'PICKUP_ASSIGNED')),    [cases, applyFilter]);
+  const labPickups        = useMemo(() => applyFilter(cases.filter(c => c.status === 'READY_TO_DISPATCH')), [cases, applyFilter]);
+  const deliveryList      = useMemo(() => applyFilter(cases.filter(c => c.status === 'OUT_FOR_DELIVERY')),  [cases, applyFilter]);
+  const completedList     = useMemo(() => applyFilter(cases.filter(c => c.status === 'DELIVERED')),         [cases, applyFilter]);
 
-  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DV';
+  const pickupList = [...impressionPickups, ...labPickups]; // combined pick-up list
+  const totalActive = pickupList.length + deliveryList.length;
+  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) || 'DV';
   const hasFilter = search || dateFrom || dateTo;
 
-  // ── Table row ────────────────────────────────────────────
-  const Row = ({ c, section }) => (
-    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-      <td style={{ padding: '10px 14px', fontWeight: 700, color: '#1a1a2e' }}>
-        {c.clinic?.name || '—'}
-        {c.caseNumber && <div style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: '#6b7280', marginTop: 2 }}>{c.caseNumber}</div>}
+  // ── Shared table row ─────────────────────────────────────
+  const TR = ({ c, section }) => (
+    <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
+      <td style={{ padding: '10px 14px', minWidth: 180 }}>
+        <div style={{ fontWeight: 700, color: '#111827', fontSize: 14 }}>{c.clinic?.name || '—'}</div>
+        {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{c.caseNumber}</div>}
+        {c.workType && <div style={{ fontSize: 11, color: '#6B7280' }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</div>}
       </td>
-      <td style={{ padding: '10px 14px', fontSize: 13, color: '#374151' }}>
-        {c.clinic?.address ? <><span style={{ marginRight: 4 }}>📍</span>{c.clinic.address}</> : '—'}
+      <td style={{ padding: '10px 14px', fontSize: 13, color: '#374151', minWidth: 160 }}>
+        {c.clinic?.address
+          ? <><span style={{ color: '#6B7280' }}>📍 </span>{c.clinic.address}</>
+          : <span style={{ color: '#D1D5DB' }}>—</span>}
       </td>
-      <td style={{ padding: '10px 14px', fontSize: 13 }}>
+      <td style={{ padding: '10px 14px', fontSize: 13, minWidth: 140 }}>
         {c.clinic?.phone
-          ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 600, textDecoration: 'none' }}>📞 {c.clinic.phone}</a>
-          : '—'}
+          ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none' }}>📞 {c.clinic.phone}</a>
+          : <span style={{ color: '#D1D5DB' }}>—</span>}
       </td>
-      <td style={{ padding: '10px 14px' }}>
-        {section === 'pickup' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => setModal({ case: c, action: 'picked_up' })}
-              style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              ✓ Mark as Picked Up
-            </button>
-            <button onClick={() => setModal({ case: c, action: 'not_picked_up' })}
-              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              ✕ Not Picked Up
-            </button>
-          </div>
-        )}
-        {section === 'labpickup' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => setModal({ case: c, action: 'picked_up' })}
-              style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              ✓ Picked Up from Lab
-            </button>
-            <button onClick={() => setModal({ case: c, action: 'not_delivered' })}
-              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              ↩ Return to Dispatch
-            </button>
-          </div>
-        )}
-        {section === 'delivery' && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => setModal({ case: c, action: 'delivered' })}
-              style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              ✅ Mark as Delivered
-            </button>
-            <button onClick={() => setModal({ case: c, action: 'not_delivered' })}
-              style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              ↩ Return Not Delivered
-            </button>
-          </div>
-        )}
-        {section === 'done' && (
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: '#D1FAE5', color: '#065F46' }}>
-            ✅ Delivered {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : ''}
-          </span>
-        )}
+      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {/* Green action */}
+          <button
+            onClick={() => setModal({ case: c, action: section === 'delivery' ? 'delivered' : c.status === 'READY_TO_DISPATCH' ? 'lab_pickup' : 'picked_up' })}
+            style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {section === 'delivery' ? '✓ Mark as Deliver' : c.status === 'READY_TO_DISPATCH' ? '✓ Picked up from Lab' : '✓ Mark as Pick up'}
+          </button>
+          {/* Red action */}
+          <button
+            onClick={() => setModal({ case: c, action: section === 'delivery' ? 'not_delivered' : 'not_picked_up' })}
+            style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {section === 'delivery' ? '↩ Return not delivered' : '✕ Not Picked up'}
+          </button>
+        </div>
       </td>
     </tr>
   );
 
-  // Section header bar (styled like the Excel)
-  const SectionHeader = ({ label, color, bg, count }) => (
-    <tr>
-      <td colSpan={4} style={{ padding: '8px 14px', background: bg, fontWeight: 800, fontSize: 13, color, letterSpacing: 0.3 }}>
-        {label} <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({count})</span>
-      </td>
+  const ColHead = () => (
+    <tr style={{ background: '#F3F4F6' }}>
+      {['Clinic Name', 'Location', 'Contact', 'Action'].map(h => (
+        <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
+      ))}
     </tr>
   );
-
-  const ColHeaders = () => (
-    <tr style={{ background: '#F9FAFB' }}>
-      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Clinic Name</th>
-      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Location</th>
-      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Contact</th>
-      <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.5, textTransform: 'uppercase' }}>Action</th>
-    </tr>
-  );
-
-  const EmptyRow = ({ msg }) => (
-    <tr>
-      <td colSpan={4} style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>
-        {msg}
-      </td>
-    </tr>
-  );
-
-  const totalJobs = pickupList.length + labPickups.length + deliveryList.length;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F3F4F6', display: 'flex', flexDirection: 'column' }}>
-      {/* Topbar */}
-      <div style={{ background: '#0F2044', color: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'DM Sans, sans-serif' }}>
+
+      {/* Header */}
+      <div style={{ background: '#0F2044', color: '#fff', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/logo.png" alt="logo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)' }} />
+          <img src="/logo.png" alt="logo" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
           <div>
-            <div style={{ fontWeight: 800, fontSize: 15 }}>Delivery Staff Portal</div>
-            <div style={{ fontSize: 11, opacity: 0.65 }}>Job Order List</div>
+            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 0.2 }}>Delivery Staffs Portal</div>
+            <div style={{ fontSize: 11, opacity: 0.55 }}>Job Order List</div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, opacity: 0.7 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
-            Live · {user?.name?.split(' ')[0]}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {totalActive > 0 && (
+            <span style={{ background: '#DC2626', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 }}>
+              {totalActive} active
+            </span>
+          )}
+          <div style={{ fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> Live · {user?.name?.split(' ')[0]}
           </div>
           <button onClick={logout}
-            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
-            ⏻ Logout
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
+            ⏻
           </button>
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: '20px', maxWidth: 1100, margin: '0 auto', width: '100%' }}>
+      <div style={{ maxWidth: 1060, margin: '0 auto', padding: '20px 16px' }}>
 
         {/* Search / Filter bar */}
-        <div style={{ background: '#fff', borderRadius: 10, padding: '14px 16px', marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+        <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', border: '1px solid #E5E7EB' }}>
           <div style={{ flex: 2, minWidth: 200 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 4, letterSpacing: 0.5 }}>SEARCH</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>SEARCH</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #E5E7EB', borderRadius: 8, padding: '7px 10px', background: '#F9FAFB' }}>
-              <span style={{ fontSize: 14 }}>🔍</span>
-              <input placeholder="Clinic, case no., patient, location…" value={search} onChange={e => setSearch(e.target.value)}
+              <span>🔍</span>
+              <input placeholder="Clinic name, case no., location…" value={search} onChange={e => setSearch(e.target.value)}
                 style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1, color: '#1F2937' }} />
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 4, letterSpacing: 0.5 }}>FROM DATE</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>FROM</div>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
               style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#1F2937' }} />
           </div>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 4, letterSpacing: 0.5 }}>TO DATE</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>TO</div>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
               style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#1F2937' }} />
           </div>
           {hasFilter && (
             <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
-              style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-end' }}>
+              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#DC2626', fontSize: 13, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-end' }}>
               ✕ Clear
             </button>
           )}
         </div>
 
-        {/* Job Order List Table */}
-        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: 16 }}>
-          {/* Title bar */}
-          <div style={{ background: '#1F2937', color: '#fff', padding: '10px 16px', fontWeight: 800, fontSize: 14, letterSpacing: 0.3 }}>
-            📋 Job Order List
-            {totalJobs > 0 && <span style={{ marginLeft: 10, fontSize: 12, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '2px 10px' }}>{totalJobs} active jobs</span>}
-          </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 60, color: '#9CA3AF', fontSize: 14 }}>Loading your jobs…</div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid #E5E7EB' }}>
 
-          {loading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>Loading your jobs…</div>
-          ) : (
+            {/* ── PICK UP LIST ─────────────────────────────── */}
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
-                {/* ── Pick-up List (impression from clinic) ── */}
-                <SectionHeader label="🔵 Pick-up List" bg="#DBEAFE" color="#1D4ED8" count={pickupList.length} />
-                <ColHeaders />
-                {pickupList.length === 0
-                  ? <EmptyRow msg="No impression pickups assigned" />
-                  : pickupList.map(c => <Row key={c.id} c={c} section="pickup" />)
-                }
+                {/* Section header — blue (Excel style) */}
+                <tr>
+                  <td colSpan={4} style={{ background: '#BFDBFE', padding: '9px 14px', fontWeight: 800, fontSize: 13, color: '#1E40AF', letterSpacing: 0.2 }}>
+                    Pick up list
+                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({pickupList.length})</span>
+                  </td>
+                </tr>
+                <ColHead />
+                {pickupList.length === 0 ? (
+                  <tr><td colSpan={4} style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>No pickup jobs assigned</td></tr>
+                ) : pickupList.map(c => <TR key={c.id} c={c} section="pickup" />)}
 
                 {/* Spacer */}
-                <tr><td colSpan={4} style={{ height: 12, background: '#F9FAFB' }} /></tr>
+                <tr><td colSpan={4} style={{ height: 2, background: '#E5E7EB' }} /></tr>
 
-                {/* ── Lab Pickup (finished cases from lab) ── */}
-                <SectionHeader label="🟠 Collect from Lab" bg="#FEF3C7" color="#92400E" count={labPickups.length} />
-                <ColHeaders />
-                {labPickups.length === 0
-                  ? <EmptyRow msg="No cases to collect from lab" />
-                  : labPickups.map(c => <Row key={c.id} c={c} section="labpickup" />)
-                }
-
-                {/* Spacer */}
-                <tr><td colSpan={4} style={{ height: 12, background: '#F9FAFB' }} /></tr>
-
-                {/* ── Delivery List ── */}
-                <SectionHeader label="🟡 Delivery List" bg="#FEF9C3" color="#854D0E" count={deliveryList.length} />
-                <ColHeaders />
-                {deliveryList.length === 0
-                  ? <EmptyRow msg="No deliveries in progress" />
-                  : deliveryList.map(c => <Row key={c.id} c={c} section="delivery" />)
-                }
+                {/* ── DELIVERY LIST ─────────────────────────── */}
+                <tr>
+                  <td colSpan={4} style={{ background: '#FEF08A', padding: '9px 14px', fontWeight: 800, fontSize: 13, color: '#854D0E', letterSpacing: 0.2 }}>
+                    Delivery list
+                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({deliveryList.length})</span>
+                  </td>
+                </tr>
+                <ColHead />
+                {deliveryList.length === 0 ? (
+                  <tr><td colSpan={4} style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>No deliveries in progress</td></tr>
+                ) : deliveryList.map(c => <TR key={c.id} c={c} section="delivery" />)}
               </tbody>
             </table>
-          )}
-        </div>
 
-        {/* Completed / Delivered Orders */}
-        <div style={{ background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          <div style={{ background: '#065F46', color: '#fff', padding: '10px 16px', fontWeight: 800, fontSize: 14, letterSpacing: 0.3 }}>
-            ✅ Delivered Orders
-            {completedList.length > 0 && <span style={{ marginLeft: 10, fontSize: 12, background: 'rgba(255,255,255,0.15)', borderRadius: 20, padding: '2px 10px' }}>{completedList.length}</span>}
+            {/* ── DELIVERED (completed today) ─────────────── */}
+            {completedList.length > 0 && (
+              <>
+                <div style={{ height: 2, background: '#E5E7EB' }} />
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr>
+                      <td colSpan={4} style={{ background: '#D1FAE5', padding: '9px 14px', fontWeight: 800, fontSize: 13, color: '#065F46', letterSpacing: 0.2 }}>
+                        Delivered
+                        <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({completedList.length})</span>
+                      </td>
+                    </tr>
+                    <ColHead />
+                    {completedList.map(c => (
+                      <tr key={c.id} style={{ borderBottom: '1px solid #E5E7EB', background: '#F0FDF4' }}>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ fontWeight: 700, color: '#111827' }}>{c.clinic?.name}</div>
+                          {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{c.caseNumber}</div>}
+                        </td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: '#6B7280' }}>{c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13 }}>
+                          {c.clinic?.phone ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none' }}>📞 {c.clinic.phone}</a> : '—'}
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ background: '#16A34A', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700 }}>
+                            ✅ Delivered {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM') : ''}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {totalActive === 0 && completedList.length === 0 && !hasFilter && (
+              <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+                <div style={{ fontWeight: 700, color: '#374151', fontSize: 16 }}>All clear!</div>
+                <div style={{ color: '#9CA3AF', marginTop: 4 }}>No jobs assigned right now. You'll be notified when a new job is ready.</div>
+              </div>
+            )}
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              <ColHeaders />
-              {completedList.length === 0
-                ? <EmptyRow msg="No delivered orders yet today" />
-                : completedList.map(c => <Row key={c.id} c={c} section="done" />)
-              }
-            </tbody>
-          </table>
-        </div>
-
+        )}
       </div>
 
       {modal && (
