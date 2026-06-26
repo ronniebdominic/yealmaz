@@ -113,9 +113,12 @@ function AcceptCasesSection({ queryClient }) {
   };
 
   const cases = data?.cases ?? [];
-  const pending     = cases.filter(c => c.status === 'PENDING_PICKUP');
-  const inTransit   = cases.filter(c => c.status === 'PICKUP_ASSIGNED');
-  const underReview = cases.filter(c => c.status === 'UNDER_REVIEW');
+  const pending      = cases.filter(c => c.status === 'PENDING_PICKUP');
+  // PICKUP_ASSIGNED + driver still assigned = still in transit (going to collect)
+  const inTransit    = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && c.assignedDelivery);
+  // PICKUP_ASSIGNED + no driver = impression arrived at lab, driver cleared after delivery
+  const arrivedAtLab = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && !c.assignedDelivery);
+  const underReview  = cases.filter(c => c.status === 'UNDER_REVIEW');
 
   const CaseCard = ({ c, canAct }) => {
     const isOpen  = openId === c.id;
@@ -276,27 +279,43 @@ function AcceptCasesSection({ queryClient }) {
         </div>
       )}
 
-      {/* In Transit */}
+      {/* Arrived at Lab — highest priority, needs immediate acceptance */}
+      {arrivedAtLab.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, border: '2px solid var(--blue)' }}>
+          <div className="card-header" style={{ background: 'var(--blue)', borderRadius: '10px 10px 0 0' }}>
+            <div className="card-title" style={{ color: '#fff' }}>🏭 Arrived at Lab — Needs Acceptance</div>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>
+              {arrivedAtLab.length} case{arrivedAtLab.length !== 1 ? 's' : ''} awaiting review
+            </span>
+          </div>
+          <div style={{ background: '#EFF6FF', padding: '8px 16px', fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>
+            📦 The delivery driver has brought these impressions to the lab. Please review and Accept, reject, or put Under Review.
+          </div>
+          <div>{arrivedAtLab.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
+        </div>
+      )}
+
+      {/* In Transit — driver is still going to the clinic */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <div className="card-title">📥 In Transit — Arrived at Lab</div>
+          <div className="card-title">🛵 In Transit</div>
           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{inTransit.length} case{inTransit.length !== 1 ? 's' : ''}</span>
         </div>
         {inTransit.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🎉</div>
             <div className="empty-title">No cases in transit</div>
-            <p>Cases picked up by drivers and brought to the lab will appear here.</p>
+            <p>Cases where a driver is on the way to collect the impression will appear here.</p>
           </div>
         ) : (
-          <div>{inTransit.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
+          <div>{inTransit.map(c => <CaseCard key={c.id} c={c} canAct={false} />)}</div>
         )}
       </div>
 
-      {/* Awaiting Pickup */}
+      {/* Awaiting Pickup — no driver assigned yet */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">🛵 Awaiting Pickup</div>
+          <div className="card-title">📋 Awaiting Pickup</div>
           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pending.length} case{pending.length !== 1 ? 's' : ''}</span>
         </div>
         {pending.length === 0 ? (

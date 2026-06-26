@@ -63,40 +63,34 @@ router.post('/:caseId/collect-impression', protect, restrict('DELIVERY', 'ADMIN'
       return res.status(400).json({ error: 'Case is not in PICKUP_ASSIGNED status.' });
     }
 
+    // Keep status as PICKUP_ASSIGNED but clear the driver so:
+    // - Delivery staff no longer see it (they filter by assignedDeliveryId = me)
+    // - Receptionist sees it in "Arrived at Lab" group (PICKUP_ASSIGNED + no driver)
+    // - Receptionist must explicitly Accept / Reject / Under Review before it enters production
     await prisma.case.update({
       where: { id: req.params.caseId },
-      data: { status: 'CASE_ACCEPTED', assignedDeliveryId: null }
+      data: { assignedDeliveryId: null }
     });
 
     await prisma.caseStage.create({
       data: {
         caseId: req.params.caseId,
-        stageName: 'CASE_ACCEPTED',
+        stageName: 'PICKUP_ASSIGNED',
         scannedBy: req.user.name,
-        notes: 'Impression collected from clinic — case handed to lab'
+        notes: 'Impression arrived at lab — awaiting receptionist acceptance'
       }
     });
 
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
 
     const io = req.app.get('io');
-    io.to('lab_staff').emit('new_case', {
+    io.to('lab_staff').emit('case_arrived', {
       caseId: caseData.id, caseNumber: caseData.caseNumber,
       patientName: caseData.patientName, workType: caseData.workType,
-      message: 'Impression received — ready for production'
-    });
-    io.to(`clinic_${caseData.clinicId}`).emit('case_updated', {
-      caseId: caseData.id, caseNumber: caseData.caseNumber,
-      status: 'CASE_ACCEPTED', message: 'Impression received at lab — production started!'
+      message: 'Impression arrived — awaiting receptionist acceptance'
     });
 
-    sendPushToClinic(prisma, caseData.clinicId, {
-      title: '🏭 Impression Received at Lab',
-      body: `Case ${caseData.caseNumber} (${caseData.patientName}) impression received. Production has started!`,
-      data: { caseId: caseData.id, caseNumber: caseData.caseNumber, screen: 'CaseDetail' },
-    });
-
-    res.json({ success: true, message: 'Impression collected. Case entered production.' });
+    res.json({ success: true, message: 'Impression arrived at lab. Receptionist will review and accept.' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not confirm impression collection.' });
