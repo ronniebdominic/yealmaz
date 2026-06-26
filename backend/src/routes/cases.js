@@ -348,7 +348,7 @@ router.post('/', protect, async (req, res) => {
 // Receptionist formally accepts a case: fills in details + generates scan number + QR
 router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
-    const { shade, doctorName, doctorPhone, workType, units, toothNumbers, notes, patientAge, patientGender } = req.body;
+    const { shade, doctorName, doctorPhone, workType, units, toothNumbers, notes, patientAge, patientGender, deliveryType, totalAmount, dueDate } = req.body;
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
@@ -375,8 +375,11 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ...(resolvedUnits ? { units: resolvedUnits }        : {}),
       ...(toothNumbers  ? { toothNumbers }                : {}),
       ...(notes        ? { notes }                        : {}),
-      ...(patientAge   ? { patientAge: parseInt(patientAge) } : {}),
-      ...(patientGender ? { patientGender }               : {}),
+      ...(patientAge    ? { patientAge: parseInt(patientAge) }     : {}),
+      ...(patientGender ? { patientGender }                        : {}),
+      ...(deliveryType  ? { deliveryType }                         : {}),
+      ...(totalAmount   ? { totalAmount: parseFloat(totalAmount) } : {}),
+      ...(dueDate       ? { dueDate: new Date(dueDate) }           : {}),
     };
 
     // Generate QR if not already present
