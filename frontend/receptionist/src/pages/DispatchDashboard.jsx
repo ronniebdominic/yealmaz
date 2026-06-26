@@ -337,10 +337,12 @@ export default function DispatchDashboard() {
   const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
-  const [assignModal, setAssignModal] = useState(null); // { case, mode: 'pickup'|'send-out' }
+  const [assignModal, setAssignModal]     = useState(null);
   const [payModal, setPayModal]           = useState(null);
   const [phoneOrderOpen, setPhoneOrderOpen] = useState(false);
-  const [processing, setProcessing]   = useState(false);
+  const [processing, setProcessing]       = useState(false);
+  const [todayOrders, setTodayOrders]     = useState(null);  // drill-down for Orders Today
+  const [loadingToday, setLoadingToday]   = useState(false);
 
   // ── Data ────────────────────────────────────────────────
   const { data: summary = {}, refetch: refetchSummary } = useQuery({
@@ -364,6 +366,17 @@ export default function DispatchDashboard() {
   });
 
   const refetchAll = () => { refetchQueue(); refetchSummary(); };
+
+  const openTodayOrders = async () => {
+    if (todayOrders !== null) { setTodayOrders(null); return; } // toggle off
+    setLoadingToday(true);
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const res = await api.get('/cases', { params: { dateFrom: today, dateTo: today, limit: 200 } });
+      setTodayOrders(res.data.cases ?? []);
+    } catch { setTodayOrders([]); }
+    finally { setLoadingToday(false); }
+  };
 
   // ── Filtering ────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -522,37 +535,91 @@ export default function DispatchDashboard() {
         </div>
 
         <div className="content">
-          {/* ── Summary cards ── */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('place-order')}>
+          {/* ── Summary cards — counts from live queue data to match tabs exactly ── */}
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
+
+            {/* Orders Today — uses server count; opens drill-down showing all today's cases */}
+            <div className="stat-card" style={{ cursor: 'pointer', outline: todayOrders !== null ? '2px solid var(--blue)' : 'none', outlineOffset: 2 }}
+              onClick={openTodayOrders}>
               <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
               <div className="stat-label">Orders Today</div>
               <div className="stat-value">{summary.totalToday ?? '—'}</div>
-              <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View orders ↗</div>
-            </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready-delivery')}>
-              <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
-              <div className="stat-label">Ready for Delivery</div>
-              <div className="stat-value" style={{ color: 'var(--accent)' }}>{summary.readyToDispatch ?? '—'}</div>
-              <div className="stat-sub">
-                <span style={{ color: 'var(--amber)' }}>{readyDelivery.length} awaiting payment</span>
-                {' · '}
-                <span style={{ color: 'var(--green)' }}>{readyDispatch.length} cleared for dispatch</span>
+              <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>
+                {loadingToday ? 'Loading…' : todayOrders !== null ? '▲ Hide' : 'View all ↗'}
               </div>
             </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('en-route')}>
-              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚴</div>
-              <div className="stat-label">Picked Up / En Route</div>
-              <div className="stat-value" style={{ color: 'var(--amber)' }}>{summary.enRoute ?? '—'}</div>
-              <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View en route ↗</div>
+
+            {/* Ready for Delivery — live count from queue */}
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('ready-delivery'); setTodayOrders(null); }}>
+              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📦</div>
+              <div className="stat-label">Ready for Delivery</div>
+              <div className="stat-value" style={{ color: 'var(--amber)' }}>{readyDelivery.length}</div>
+              <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Awaiting payment ↗</div>
             </div>
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('place-order')}>
+
+            {/* Ready for Dispatch — live count from queue */}
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('ready-dispatch'); setTodayOrders(null); }}>
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🚚</div>
+              <div className="stat-label">Ready for Dispatch</div>
+              <div className="stat-value" style={{ color: 'var(--green)' }}>{readyDispatch.length}</div>
+              <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Payment verified ↗</div>
+            </div>
+
+            {/* En Route — live count from queue */}
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('en-route'); setTodayOrders(null); }}>
+              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚴</div>
+              <div className="stat-label">En Route</div>
+              <div className="stat-value" style={{ color: 'var(--amber)' }}>{enRoute.length}</div>
+              <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Out for delivery ↗</div>
+            </div>
+
+            {/* Pending Pickup — live count from queue */}
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('place-order'); setTodayOrders(null); }}>
               <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
-              <div className="stat-label">Pending Pick-up</div>
-              <div className="stat-value" style={{ color: '#EA580C' }}>{summary.pendingPickup ?? '—'}</div>
-              <div className="stat-sub">Impression collection</div>
+              <div className="stat-label">Pending Pickup</div>
+              <div className="stat-value" style={{ color: '#EA580C' }}>{placeOrder.length}</div>
+              <div className="stat-sub" style={{ color: '#EA580C', fontWeight: 600 }}>Needs driver ↗</div>
             </div>
           </div>
+
+          {/* ── Today's Orders drill-down panel ── */}
+          {todayOrders !== null && (
+            <div className="card" style={{ marginBottom: 16, border: '2px solid var(--blue)', borderRadius: 12 }}>
+              <div className="card-header" style={{ background: 'var(--blue)', color: '#fff', borderRadius: '10px 10px 0 0' }}>
+                <div style={{ fontWeight: 700 }}>📋 All Orders Today ({todayOrders.length})</div>
+                <button onClick={() => setTodayOrders(null)}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', fontSize: 15 }}>×</button>
+              </div>
+              <div className="table-wrap">
+                {todayOrders.length === 0 ? (
+                  <div className="empty-state"><div className="empty-title">No cases registered today</div></div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Case #</Th><Th>Clinic</Th><Th>Patient</Th><Th>Work Type</Th>
+                        <Th>Units</Th><Th style={{ textAlign: 'right' }}>Amount</Th><Th>Status</Th><Th>Payment</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {todayOrders.map(c => (
+                        <tr key={c.id}>
+                          <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
+                          <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                          <Td><span className="patient-name">{c.patientName}</span></Td>
+                          <Td style={{ fontSize: 12 }}>{c.workType}</Td>
+                          <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
+                          <Td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETB(c.payment?.amount ?? c.totalAmount)}</Td>
+                          <Td><span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)' }}>{c.status?.replace(/_/g,' ')}</span></Td>
+                          <Td><PaymentBadge status={c.paymentStatus} /></Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── Search / filter bar ── */}
           <div style={{ marginBottom: 16 }}>
