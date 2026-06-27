@@ -83,34 +83,35 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
 }
 
 // ── Request Payment modal ─────────────────────────────────
+const DISPATCH_FLAT_PRICE_TYPES = new Set([
+  'Night Guard', 'Night Guard Soft', 'Night Guard Hard',
+  'Retainer', 'Orthodontic Retainer', 'Clear Aligner', 'Clear Aligner Setup',
+  'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
+  'Sports Guard', 'Bite Splint', 'Gingival Mask',
+]);
+
 function PaymentModal({ caseData, onClose, onSuccess }) {
-  // Priority: payment.amount → case.totalAmount → work-type price from pricing table
+  // Priority: payment.amount → case.totalAmount → computed from price list
   const preset = caseData.payment?.amount ?? caseData.totalAmount ?? null;
   const [amount, setAmount] = useState(preset !== null ? String(preset) : '');
   const [notes,  setNotes]  = useState('');
   const [saving, setSaving] = useState(false);
-  const [loadingPrice, setLoadingPrice] = useState(false);
-  const [priceHint, setPriceHint] = useState('');
+  const [calcHint, setCalcHint] = useState(null);
 
-  // If no amount is set, fetch the work-type price as the default
   useEffect(() => {
-    if (preset !== null) return;               // already have an amount
     if (!caseData.workType) return;
-    setLoadingPrice(true);
-    api.get('/prices')
-      .then(r => {
-        const entry = r.data.find(p => p.workType === caseData.workType);
-        if (entry?.price) {
-          // Multiply by units if available and not a flat-rate type
-          const FLAT = new Set(['Orthodontic Retainer','Night Guard Soft','Night Guard Hard','Sports Guard','Bite Splint','Bleaching Tray','Clear Aligner Setup','Gingival Mask']);
-          const units = (!FLAT.has(caseData.workType) && caseData.units) ? caseData.units : 1;
-          const total = entry.price * units;
-          setAmount(String(total));
-          setPriceHint(`Auto-filled: Br ${entry.price.toLocaleString('en-US')} × ${units} unit${units !== 1 ? 's' : ''} = Br ${total.toLocaleString('en-US')}`);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingPrice(false));
+    api.get('/prices').then(r => {
+      const entry = (r.data || []).find(p => p.workType === caseData.workType);
+      if (!entry) return;
+      const isExpress = caseData.deliveryType === 'EXPRESS' && entry.expressPrice != null;
+      const unitPrice = isExpress ? entry.expressPrice : entry.price;
+      const isFlat = DISPATCH_FLAT_PRICE_TYPES.has(caseData.workType);
+      const count = isFlat ? 1 : Math.max(1, caseData.units || 1);
+      const total = Math.round(unitPrice * count * (caseData.isRedo ? 0.5 : 1));
+      setCalcHint({ unitPrice, count, isFlat, isExpress, isRedo: caseData.isRedo, total });
+      if (preset === null) setAmount(String(total));
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submit = async () => {
@@ -140,25 +141,35 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
             <div className="case-number">{caseData.caseNumber}</div>
             <div style={{ fontWeight: 700, color: 'var(--text-1)', marginTop: 4 }}>{caseData.patientName} · {caseData.clinic?.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-              {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}
+              {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}{caseData.deliveryType === 'EXPRESS' ? ' · ⚡ Express' : ''}
             </div>
           </div>
 
           <div className="form-group">
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Amount (Br) *</span>
-              {loadingPrice && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Loading price…</span>}
-            </label>
+            <label>Amount (Br) *</label>
             <input
               type="number"
               value={amount}
-              onChange={e => { setAmount(e.target.value); setPriceHint(''); }}
+              onChange={e => setAmount(e.target.value)}
               placeholder="0.00"
               style={{ fontSize: 16, fontWeight: 700 }}
             />
-            {priceHint && (
-              <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 4, fontWeight: 600 }}>
-                ✓ {priceHint}
+            {calcHint && (
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                <span>💡</span>
+                <span>
+                  Br {calcHint.unitPrice.toLocaleString('en-US')}
+                  {!calcHint.isFlat && calcHint.count > 1 && ` × ${calcHint.count} units`}
+                  {calcHint.isExpress && ' · ⚡ express'}
+                  {calcHint.isRedo && ' · 50% redo'}
+                  {' = '}
+                  <strong style={{ color: 'var(--text-1)' }}>Br {calcHint.total.toLocaleString('en-US')}</strong>
+                  {preset !== null && Number(preset) !== calcHint.total && (
+                    <span style={{ color: 'var(--amber)', marginLeft: 6 }}>
+                      (case stored Br {Number(preset).toLocaleString('en-US')})
+                    </span>
+                  )}
+                </span>
               </div>
             )}
           </div>
@@ -170,7 +181,7 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
 
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving || loadingPrice}>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
               {saving ? 'Sending…' : '💳 Send Request'}
             </button>
           </div>
