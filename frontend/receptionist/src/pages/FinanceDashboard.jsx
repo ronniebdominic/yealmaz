@@ -2181,19 +2181,134 @@ function ReportTab() {
 }
 
 // ── Main Finance Dashboard ────────────────────────────────
-const MAIN_TABS = [
-  { id: 'screenshots', label: 'Screenshot Approvals', icon: '💳' },
-  { id: 'billing',     label: 'Billing & Invoicing',   icon: '📄' },
-  { id: 'trusted',     label: 'Trusted Partners',      icon: '🤝' },
-  { id: 'history',     label: 'Verified History',      icon: '✅' },
-  { id: 'cases',       label: 'Cases Overview',         icon: '📋' },
-  { id: 'balances',    label: 'Clinic Balances',        icon: '🏦' },
-  { id: 'report',      label: 'Revenue Report',         icon: '📊' },
+// ── Ready for Delivery Tab ────────────────────────────────
+// Finance view of cases that passed QC (READY_TO_DISPATCH) — payment status at a glance.
+function ReadyForDeliveryTab() {
+  const [search, setSearch] = useState('');
+  const { data, isLoading } = useQuery({
+    queryKey: ['payments', 'ready-for-delivery'],
+    queryFn: () => api.get('/cases', { params: { status: 'READY_TO_DISPATCH', limit: 300 } }).then(r => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  const cases = (data?.cases ?? []).filter(c => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return c.clinic?.name?.toLowerCase().includes(q)
+        || c.caseNumber?.toLowerCase().includes(q)
+        || c.patientName?.toLowerCase().includes(q);
+  });
+
+  const total = cases.reduce((s, c) => s + (c.payment?.amount ?? c.totalAmount ?? 0), 0);
+  const verified = cases.filter(c => c.paymentStatus === 'VERIFIED').length;
+
+  return (
+    <>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 16 }}>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
+          <div className="stat-label">Ready for Delivery</div>
+          <div className="stat-value" style={{ color: 'var(--accent)' }}>{cases.length}</div>
+          <div className="stat-sub">Passed QC</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+          <div className="stat-label">Payment Verified</div>
+          <div className="stat-value" style={{ color: 'var(--green)' }}>{verified}</div>
+          <div className="stat-sub">Cleared to dispatch</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}>💰</div>
+          <div className="stat-label">Total Value</div>
+          <div className="stat-value" style={{ color: 'var(--text-1)', fontSize: total >= 1000000 ? 16 : 22 }}>{ETB(total)}</div>
+          <div className="stat-sub">Across {cases.length} cases</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">📦 Ready for Delivery</div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div className="search-input" style={{ maxWidth: 240 }}>
+              <span className="icon">🔍</span>
+              <input placeholder="Search clinic, case, patient…" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <ExportMenu
+              data={cases}
+              columns={[
+                { header: 'Case #',      value: c => c.caseNumber },
+                { header: 'Clinic',      value: c => c.clinic?.name },
+                { header: 'Patient',     value: c => c.patientName },
+                { header: 'Work Type',   value: c => c.workType },
+                { header: 'Units',       value: c => c.units ?? '' },
+                { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
+                { header: 'Payment',     value: c => c.paymentStatus },
+              ]}
+              filename="ready-for-delivery" title="Ready for Delivery"
+            />
+          </div>
+        </div>
+        <div className="table-wrap">
+          {isLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+          ) : cases.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">🎉</div><div className="empty-title">Nothing ready for delivery</div></div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Case #</th><th>Clinic</th><th>Patient</th><th>Work Type</th>
+                  <th style={{ textAlign: 'center' }}>Units</th>
+                  <th style={{ textAlign: 'right' }}>Amount</th><th>Payment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cases.map(c => (
+                  <tr key={c.id}>
+                    <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{c.caseNumber}</td>
+                    <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
+                    <td>{c.patientName}</td>
+                    <td style={{ fontSize: 13 }}>{c.workType}</td>
+                    <td style={{ textAlign: 'center' }}>{c.units ?? '—'}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>
+                      {(c.payment?.amount ?? c.totalAmount) ? ETB(c.payment?.amount ?? c.totalAmount) : '—'}
+                    </td>
+                    <td><PaymentBadge status={c.paymentStatus} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Nav model — single source of truth, rendered in both drawer + sidebar.
+const NAV_GROUPS = [
+  { group: 'Overview', items: [
+    { id: 'dashboard',      label: 'Dashboard',          icon: '📊' },
+  ]},
+  { group: 'Operations', items: [
+    { id: 'ready',          label: 'Ready for Delivery', icon: '📦' },
+    { id: 'screenshots',    label: 'Payment Gateway',    icon: '💳', badge: 'payments' },
+    { id: 'billing',        label: 'Billing & Invoicing',icon: '📄', badge: 'invoice' },
+    { id: 'trusted',        label: 'Trusted Partners',   icon: '🤝', badge: 'trusted' },
+  ]},
+  { group: 'Analytics', items: [
+    { id: 'report',         label: 'Report',             icon: '📈' },
+    { id: 'history',        label: 'Verified History',   icon: '✅' },
+    { id: 'cases',          label: 'Cases Overview',     icon: '📋' },
+    { id: 'balances',       label: 'Clinic Balances',    icon: '🏦' },
+  ]},
 ];
+const MAIN_TABS = NAV_GROUPS.flatMap(g => g.items);
 
 export default function FinanceDashboard() {
   const { user, logout } = useAuth();
-  const [tab, setTab]    = useState('screenshots');
+  const [tab, setTab]    = useState('dashboard');
   const [open, setOpen]  = useState(false);
   const queryClient      = useQueryClient();
 
@@ -2219,13 +2334,15 @@ export default function FinanceDashboard() {
     staleTime: 60_000,
   });
 
-  const { data: trustedData } = useQuery({
-    queryKey: ['payments', 'trusted', 1],
-    queryFn: () => fetchTrusted(1),
+  // Accurate trusted-partner status straight from the summary endpoint
+  const { data: trustedSummary = [] } = useQuery({
+    queryKey: ['trusted-partners-summary'],
+    queryFn: fetchTrustedSummary,
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
-  const trustedCount = trustedData?.pagination?.total ?? 0;
+  const trustedOutstanding = trustedSummary.filter(c => c.outstanding > 0).length;
+  const trustedBillsDue    = trustedSummary.filter(c => c.billOverdue).length;
 
   const { data: quickReport } = useQuery({
     queryKey: ['finance-report', { from: '', to: '', search: '' }],
@@ -2236,12 +2353,42 @@ export default function FinanceDashboard() {
 
   const toInvoiceCount = billing.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount).length;
   const uploadedCount  = billing.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED').length;
+  const paymentsToVerify = pending.length + uploadedCount;
   const stats          = summary?.stats || {};
-  const revenueGrowth  = stats.revenueGrowth ?? null;
+
+  // Badge value resolver — keyed by NAV item .badge
+  const badgeFor = (key) => {
+    if (key === 'payments') return paymentsToVerify;
+    if (key === 'invoice')  return toInvoiceCount;
+    if (key === 'trusted')  return trustedOutstanding;
+    return 0;
+  };
 
   const currentTab = MAIN_TABS.find(t => t.id === tab);
 
   const setTabAndClose = (id) => { setTab(id); setOpen(false); };
+
+  // Shared nav renderer — used by both the mobile drawer and the desktop sidebar
+  const NavList = ({ onNav }) => (
+    <nav className="sidebar-nav">
+      {NAV_GROUPS.map(grp => (
+        <React.Fragment key={grp.group}>
+          <div className="nav-section-label">{grp.group}</div>
+          {grp.items.map(item => {
+            const count = item.badge ? badgeFor(item.badge) : 0;
+            return (
+              <button key={item.id}
+                className={`nav-item${tab === item.id ? ' active' : ''}`}
+                onClick={() => onNav(item.id)}>
+                <span>{item.icon}</span> {item.label}
+                {count > 0 && <span className="badge-count">{count}</span>}
+              </button>
+            );
+          })}
+        </React.Fragment>
+      ))}
+    </nav>
+  );
 
   return (
     <div className="app">
@@ -2262,35 +2409,7 @@ export default function FinanceDashboard() {
           <div className="lab-name">Ye-Almaz Dental Lab</div>
           <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>Finance</span>
         </div>
-        <nav className="sidebar-nav">
-          <div className="nav-section-label">Payments</div>
-          <button className={`nav-item${tab === 'screenshots' ? ' active' : ''}`} onClick={() => setTabAndClose('screenshots')}>
-            <span>💳</span> Screenshot Approvals
-            {(pending.length + uploadedCount) > 0 && <span className="badge-count">{pending.length + uploadedCount}</span>}
-          </button>
-          <div className="nav-section-label">Billing</div>
-          <button className={`nav-item${tab === 'billing' ? ' active' : ''}`} onClick={() => setTabAndClose('billing')}>
-            <span>📄</span> Billing & Invoicing
-            {toInvoiceCount > 0 && <span className="badge-count">{toInvoiceCount}</span>}
-          </button>
-          <button className={`nav-item${tab === 'trusted' ? ' active' : ''}`} onClick={() => setTabAndClose('trusted')}>
-            <span>🤝</span> Trusted Partners
-            {trustedCount > 0 && <span className="badge-count">{trustedCount}</span>}
-          </button>
-          <button className={`nav-item${tab === 'history' ? ' active' : ''}`} onClick={() => setTabAndClose('history')}>
-            <span>✅</span> Verified History
-          </button>
-          <div className="nav-section-label">Analytics</div>
-          <button className={`nav-item${tab === 'cases' ? ' active' : ''}`} onClick={() => setTabAndClose('cases')}>
-            <span>📋</span> Cases Overview
-          </button>
-          <button className={`nav-item${tab === 'balances' ? ' active' : ''}`} onClick={() => setTabAndClose('balances')}>
-            <span>🏦</span> Clinic Balances
-          </button>
-          <button className={`nav-item${tab === 'report' ? ' active' : ''}`} onClick={() => setTabAndClose('report')}>
-            <span>📊</span> Revenue Report
-          </button>
-        </nav>
+        <NavList onNav={setTabAndClose} />
         <div className="drawer-footer">
           <div className="user-info">
             <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
@@ -2314,60 +2433,7 @@ export default function FinanceDashboard() {
           <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>Finance</span>
         </div>
 
-        <nav className="sidebar-nav">
-          <div className="nav-section-label">Payments</div>
-          <button
-            className={`nav-item ${tab === 'screenshots' ? 'active' : ''}`}
-            onClick={() => setTab('screenshots')}
-          >
-            <span>💳</span> Screenshot Approvals
-            {(pending.length + uploadedCount) > 0 && (
-              <span className="badge-count">{pending.length + uploadedCount}</span>
-            )}
-          </button>
-
-          <div className="nav-section-label">Billing</div>
-          <button
-            className={`nav-item ${tab === 'billing' ? 'active' : ''}`}
-            onClick={() => setTab('billing')}
-          >
-            <span>📄</span> Billing & Invoicing
-            {toInvoiceCount > 0 && <span className="badge-count">{toInvoiceCount}</span>}
-          </button>
-          <button
-            className={`nav-item ${tab === 'trusted' ? 'active' : ''}`}
-            onClick={() => setTab('trusted')}
-          >
-            <span>🤝</span> Trusted Partners
-            {trustedCount > 0 && <span className="badge-count">{trustedCount}</span>}
-          </button>
-          <button
-            className={`nav-item ${tab === 'history' ? 'active' : ''}`}
-            onClick={() => setTab('history')}
-          >
-            <span>✅</span> Verified History
-          </button>
-
-          <div className="nav-section-label">Analytics</div>
-          <button
-            className={`nav-item ${tab === 'cases' ? 'active' : ''}`}
-            onClick={() => setTab('cases')}
-          >
-            <span>📋</span> Cases Overview
-          </button>
-          <button
-            className={`nav-item ${tab === 'balances' ? 'active' : ''}`}
-            onClick={() => setTab('balances')}
-          >
-            <span>🏦</span> Clinic Balances
-          </button>
-          <button
-            className={`nav-item ${tab === 'report' ? 'active' : ''}`}
-            onClick={() => setTab('report')}
-          >
-            <span>📊</span> Revenue Report
-          </button>
-        </nav>
+        <NavList onNav={setTab} />
 
         <div className="sidebar-footer">
           <div className="user-info">
@@ -2396,25 +2462,24 @@ export default function FinanceDashboard() {
         </div>
 
         <div className="content">
-          {/* ── KPI + Work Queue — only on the home (screenshots) tab ── */}
-          {tab === 'screenshots' && (
+          {/* ── Dashboard home — Excel-style KPIs (all clickable) + work queue ── */}
+          {tab === 'dashboard' && (
             <>
-              {/* Excel-style finance KPIs: Delivered/day · Total Units · Revenue · Paid · Pending */}
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
                 Today's Finance Overview
               </div>
               <div className="stats-grid" style={{ marginBottom: 18, gridTemplateColumns: 'repeat(5,1fr)' }}>
-                <div className="stat-card">
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready')}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📦</div>
                   <div className="stat-label">Delivered / Day</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{stats.deliveredToday ?? 0}</div>
-                  <div className="stat-sub">Orders delivered today</div>
+                  <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View deliveries ↗</div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🦷</div>
                   <div className="stat-label">Total Units</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.units?.daily ?? 0}</div>
-                  <div className="stat-sub">Units delivered today</div>
+                  <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Units today ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
@@ -2422,13 +2487,13 @@ export default function FinanceDashboard() {
                   <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.revenue?.daily?.amount || 0).toLocaleString('en-US')}
                   </div>
-                  <div className="stat-sub">Verified today</div>
+                  <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Verified today ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('history')}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
                   <div className="stat-label">Paid</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.paid?.today ?? 0}</div>
-                  <div className="stat-sub">Payments verified today</div>
+                  <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View history ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
@@ -2436,37 +2501,46 @@ export default function FinanceDashboard() {
                   <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
                   </div>
-                  <div className="stat-sub">{quickReport?.pending?.count || 0} unpaid cases</div>
+                  <div className="stat-sub" style={{ color: 'var(--red)', fontWeight: 600 }}>{quickReport?.pending?.count || 0} unpaid ↗</div>
                 </div>
               </div>
 
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 10px' }}>
                 Work Queue
               </div>
-              <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(3,1fr)' }}>
+              <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(4,1fr)' }}>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
-                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📸</div>
+                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>💳</div>
                   <div className="stat-label">Payments to Verify</div>
-                  <div className="stat-value" style={{ color: 'var(--amber)' }}>{pending.length + uploadedCount}</div>
-                  <div className="stat-sub">Gateway + screenshots</div>
+                  <div className="stat-value" style={{ color: 'var(--amber)' }}>{paymentsToVerify}</div>
+                  <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Gateway payments ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('billing')}>
                   <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
                   <div className="stat-label">To Invoice</div>
                   <div className="stat-value" style={{ color: 'var(--blue)' }}>{toInvoiceCount}</div>
-                  <div className="stat-sub">Need invoice issued</div>
+                  <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>Issue invoices ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
                   <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
-                  <div className="stat-label">Trusted Partners</div>
-                  <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedCount}</div>
-                  <div className="stat-sub">Bills to collect</div>
+                  <div className="stat-label">Trusted — Outstanding</div>
+                  <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedOutstanding}</div>
+                  <div className="stat-sub" style={{ color: '#6D28D9', fontWeight: 600 }}>Clinics to bill ↗</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
+                  <div className="stat-icon" style={{ background: trustedBillsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}>🗓</div>
+                  <div className="stat-label">Bills Due</div>
+                  <div className="stat-value" style={{ color: trustedBillsDue > 0 ? 'var(--red)' : 'var(--green)' }}>{trustedBillsDue}</div>
+                  <div className="stat-sub" style={{ color: trustedBillsDue > 0 ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>
+                    {trustedBillsDue > 0 ? 'Overdue schedules ↗' : 'All up to date'}
+                  </div>
                 </div>
               </div>
             </>
           )}
 
           {/* ── Tab content ─────────────────────────────── */}
+          {tab === 'ready'       && <ReadyForDeliveryTab />}
           {tab === 'screenshots' && <ScreenshotsTab queryClient={queryClient} />}
           {tab === 'billing'     && <BillingTab queryClient={queryClient} />}
           {tab === 'trusted'     && <TrustedPartnersTab queryClient={queryClient} />}
