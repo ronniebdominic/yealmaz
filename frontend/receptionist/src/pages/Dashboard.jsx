@@ -27,6 +27,152 @@ const FLAT_PRICE_TYPES = new Set([
   'Sports Guard','Bite Splint','Bleaching Tray','Clear Aligner Setup','Gingival Mask',
 ]);
 
+// ─── Stable sub-forms (module-level so React never unmounts on parent re-render) ─
+
+// AcceptForm — owns all its form state locally so typing doesn't re-render parent
+function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, expressDurMap, onAccept, onCancel, submitting }) {
+  const [shade,       setShade]       = useState(c.shade        || '');
+  const [workType,    setWorkType]    = useState((c.workType !== 'TBD' ? c.workType : '') || '');
+  const [doctorName,  setDoctorName]  = useState(c.doctorName   || '');
+  const [doctorPhone, setDoctorPhone] = useState(c.doctorPhone  || '');
+  const [units,       setUnits]       = useState(c.units ? String(c.units) : '');
+  const [orderType,   setOrderType]   = useState(c.deliveryType || 'NORMAL');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [dueDate,     setDueDate]     = useState('');
+  const [notes,       setNotes]       = useState('');
+
+  const calcPriceAndDate = (wt, ot, u) => {
+    if (!wt || !priceMap[wt]) return;
+    const isExp = ot === 'EXPRESS';
+    const unitPrice = isExp && expressPriceMap[wt] != null ? expressPriceMap[wt] : (priceMap[wt] ?? null);
+    if (unitPrice != null) {
+      const count = FLAT_PRICE_TYPES.has(wt) ? 1 : Math.max(1, parseInt(u) || 1);
+      setTotalAmount(String(unitPrice * count));
+    }
+    const days = isExp && expressDurMap[wt] ? expressDurMap[wt] : (durationMap[wt] ?? 5);
+    const d = new Date(); d.setDate(d.getDate() + days);
+    setDueDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleWT = (wt)  => { setWorkType(wt);    calcPriceAndDate(wt, orderType, units); };
+  const handleOT = (ot)  => { setOrderType(ot);   calcPriceAndDate(workType, ot, units); };
+  const handleU  = (u)   => { setUnits(u);        calcPriceAndDate(workType, orderType, u); };
+
+  const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
+  const lbl     = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
+
+  const selWorkType = workType || c.workType || '';
+  const isExpress   = orderType === 'EXPRESS';
+  const unitPrice   = isExpress && expressPriceMap[selWorkType] != null ? expressPriceMap[selWorkType] : (priceMap[selWorkType] ?? null);
+  const count       = selWorkType && FLAT_PRICE_TYPES.has(selWorkType) ? 1 : Math.max(1, parseInt(units) || 1);
+  const calcAmt     = unitPrice != null ? unitPrice * count : null;
+
+  const submit = () => onAccept({ shade, workType: selWorkType, doctorName, doctorPhone, units, orderType, totalAmount, dueDate, notes });
+
+  return (
+    <div style={{ marginTop: 14, padding: '16px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14 }}>
+        ✓ Accept Case — Fill in Details & Assign Scan Number
+      </div>
+      {/* Shade + Work Type */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={lbl}>SHADE *</label>
+          <select style={inputSt} value={shade} onChange={e => setShade(e.target.value)}>
+            <option value="">— Select shade —</option>
+            {SHADE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={lbl}>WORK TYPE *</label>
+          <select style={inputSt} value={selWorkType} onChange={e => handleWT(e.target.value)}>
+            <option value="">— Select work type —</option>
+            {pricesData.map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
+          </select>
+        </div>
+      </div>
+      {/* Units + Order Type */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={lbl}>UNITS</label>
+          <input type="number" min="1" style={inputSt} placeholder="1" value={units} onChange={e => handleU(e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>ORDER TYPE</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ val: 'NORMAL', label: '🚚 Normal' }, { val: 'EXPRESS', label: '⚡ Express' }].map(opt => (
+              <button key={opt.val} type="button" onClick={() => handleOT(opt.val)} style={{
+                flex: 1, padding: '7px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                border: `2px solid ${orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
+                background: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'rgba(240,165,0,0.1)' : 'var(--blue-dim,#EEF2FF)') : 'var(--surface)',
+                color: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-2)',
+              }}>{opt.label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Amount + Due Date */}
+      {selWorkType && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={lbl}>AMOUNT (BR){calcAmt != null && <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}</label>
+            <input type="number" style={inputSt} placeholder="Auto-calculated" value={totalAmount || (calcAmt ?? '')} onChange={e => setTotalAmount(e.target.value)} />
+          </div>
+          <div>
+            <label style={lbl}>DUE DATE (auto)</label>
+            <input type="date" style={inputSt} value={dueDate} onChange={e => setDueDate(e.target.value)} />
+          </div>
+        </div>
+      )}
+      {/* Doctor + Phone */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={lbl}>DOCTOR'S NAME *{c.doctorName && !doctorName.trim() && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>}</label>
+          <input style={{ ...inputSt, ...(c.doctorName && !doctorName.trim() ? { background: 'var(--green-dim)', color: 'var(--green)' } : {}) }}
+            placeholder="Dr. Ahmed" value={doctorName} onChange={e => setDoctorName(e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>CONTACT / PHONE *{c.doctorPhone && !doctorPhone.trim() && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>}</label>
+          <input type="tel" style={{ ...inputSt, ...(c.doctorPhone && !doctorPhone.trim() ? { background: 'var(--green-dim)', color: 'var(--green)' } : {}) }}
+            placeholder="+251 911 000 000" value={doctorPhone} onChange={e => setDoctorPhone(e.target.value)} />
+        </div>
+      </div>
+      {/* Notes */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={lbl}>NOTES / ACCEPTANCE NOTE</label>
+        <textarea rows={3} style={{ ...inputSt, resize: 'vertical' }}
+          placeholder="Additional instructions, observations, shade confirmation…"
+          value={notes} onChange={e => setNotes(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-primary btn-sm" onClick={submit} disabled={submitting} style={{ flex: 1, justifyContent: 'center' }}>
+          {submitting ? 'Accepting…' : '✓ Accept & Assign Scan Number'}
+        </button>
+        <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ReviewForm / RejectForm — same pattern: local state avoids parent re-renders
+function SimpleNoteForm({ color, bg, border, title, placeholder, confirmLabel, onConfirm, onCancel, submitting }) {
+  const [note, setNote] = useState('');
+  return (
+    <div style={{ marginTop: 14, padding: '16px', background: bg, borderRadius: 10, border: `1px solid ${border}` }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color, marginBottom: 10 }}>{title}</div>
+      <textarea rows={3} placeholder={placeholder} value={note} onChange={e => setNote(e.target.value)}
+        style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: `1px solid ${border}`, background: '#fff', resize: 'vertical', fontFamily: 'inherit', marginBottom: 10 }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn btn-sm" onClick={() => onConfirm(note)} disabled={submitting}
+          style={{ flex: 1, justifyContent: 'center', background: color, color: '#fff', border: 'none' }}>
+          {submitting ? 'Saving…' : confirmLabel}
+        </button>
+        <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Data fetchers ────────────────────────────────────────
 const fetchSummary = () => api.get('/dashboard/summary').then(r => r.data);
 
@@ -45,12 +191,9 @@ function AcceptCasesSection({ queryClient }) {
   const [openId, setOpenId]         = useState(null);
   const [action, setAction]         = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [details, setDetails]       = useState({});
+  // NOTE: form state for the accept form now lives in <AcceptForm> (module-level component)
+  // so typing in any field no longer re-renders AcceptCasesSection or remounts CaseCard.
 
-  const det = (id) => details[id] || {};
-  const setDet = (id, field, val) => setDetails(prev => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
-
-  // Load pricing table for work-type dropdown + price/duration lookup
   const { data: pricesData = [] } = useQuery({
     queryKey: ['prices'],
     queryFn: () => api.get('/prices').then(r => r.data),
@@ -60,48 +203,6 @@ function AcceptCasesSection({ queryClient }) {
   const expressPriceMap = useMemo(() => Object.fromEntries(pricesData.filter(p => p.expressPrice).map(p => [p.workType, p.expressPrice])), [pricesData]);
   const durationMap     = useMemo(() => Object.fromEntries(pricesData.filter(p => p.durationDays).map(p => [p.workType, p.durationDays])), [pricesData]);
   const expressDurMap   = useMemo(() => Object.fromEntries(pricesData.filter(p => p.expressDurationDays).map(p => [p.workType, p.expressDurationDays])), [pricesData]);
-
-  // Auto-calculate price & due date whenever work type / order type / units change
-  const calcPrice = (id, workType, orderType, units) => {
-    if (!workType) return;
-    const isExpress = orderType === 'EXPRESS';
-    const unitPrice = isExpress && expressPriceMap[workType] != null
-      ? expressPriceMap[workType]
-      : (priceMap[workType] ?? null);
-    if (unitPrice == null) return;
-    const count = FLAT_PRICE_TYPES.has(workType) ? 1 : Math.max(1, parseInt(units) || 1);
-    setDet(id, 'totalAmount', String(unitPrice * count));
-  };
-
-  const calcDueDate = (id, workType, orderType) => {
-    if (!workType) return;
-    const isExpress = orderType === 'EXPRESS';
-    const days = isExpress && expressDurMap[workType]
-      ? expressDurMap[workType]
-      : (durationMap[workType] ?? 5);
-    const d = new Date(); d.setDate(d.getDate() + days);
-    setDet(id, 'dueDate', d.toISOString().split('T')[0]);
-  };
-
-  const handleWorkTypeChange = (id, workType) => {
-    const d = det(id);
-    setDet(id, 'workType', workType);
-    calcPrice(id, workType, d.orderType || 'NORMAL', d.units || 1);
-    calcDueDate(id, workType, d.orderType || 'NORMAL');
-  };
-
-  const handleOrderTypeChange = (id, orderType) => {
-    const d = det(id);
-    setDet(id, 'orderType', orderType);
-    calcPrice(id, d.workType, orderType, d.units || 1);
-    calcDueDate(id, d.workType, orderType);
-  };
-
-  const handleUnitsChange = (id, units) => {
-    const d = det(id);
-    setDet(id, 'units', units);
-    calcPrice(id, d.workType, d.orderType || 'NORMAL', units);
-  };
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['cases', 'to-accept'],
@@ -128,42 +229,35 @@ function AcceptCasesSection({ queryClient }) {
 
   const open = (id, act) => { setOpenId(openId === id && action === act ? null : id); setAction(act); };
 
-  const handleAccept = async (c) => {
-    const d = det(c.id);
+  // handleAccept receives formData from <AcceptForm> — no closure over local state
+  const handleAccept = async (c, formData) => {
+    const effectiveDoctorName  = formData.doctorName?.trim()  || c.doctorName?.trim();
+    const effectiveDoctorPhone = formData.doctorPhone?.trim() || c.doctorPhone?.trim();
 
-    // Use effective value: form field first, fall back to existing case data
-    // (so validation passes when fields were already set on the case)
-    const effectiveDoctorName  = (d.doctorName?.trim()  || c.doctorName?.trim());
-    const effectiveDoctorPhone = (d.doctorPhone?.trim() || c.doctorPhone?.trim());
-
-    if (!d.shade)                  return toast.error('Shade is required to accept');
-    if (!d.workType && !c.workType) return toast.error('Work type is required');
-    if (!effectiveDoctorName)       return toast.error("Doctor's name is required");
-    if (!effectiveDoctorPhone)      return toast.error("Doctor's contact is required");
+    if (!formData.shade)                           return toast.error('Shade is required');
+    if (!formData.workType && !c.workType)         return toast.error('Work type is required');
+    if (!effectiveDoctorName)                      return toast.error("Doctor's name is required");
+    if (!effectiveDoctorPhone)                     return toast.error("Doctor's contact is required");
 
     setSubmitting(true);
-
-    // Optimistically remove from list immediately so the UI doesn't wait for refetch
     removeFromList(c.id);
     setOpenId(null);
 
     try {
       await api.post(`/cases/${c.id}/accept`, {
-        shade:        d.shade,
+        shade:        formData.shade,
         doctorName:   effectiveDoctorName,
         doctorPhone:  effectiveDoctorPhone,
-        workType:     d.workType || c.workType,
-        units:        d.units ? parseInt(d.units) : undefined,
-        deliveryType: d.orderType || 'NORMAL',
-        totalAmount:  d.totalAmount ? parseFloat(d.totalAmount) : undefined,
-        dueDate:      d.dueDate || undefined,
-        notes:        d.notes,
+        workType:     formData.workType || c.workType,
+        units:        formData.units ? parseInt(formData.units) : undefined,
+        deliveryType: formData.orderType || 'NORMAL',
+        totalAmount:  formData.totalAmount != null && formData.totalAmount !== '' ? parseFloat(formData.totalAmount) : undefined,
+        dueDate:      formData.dueDate || undefined,
+        notes:        formData.notes,
       });
-      toast.success(`✓ Case accepted — scan number assigned`);
-      setDetails(prev => { const n = { ...prev }; delete n[c.id]; return n; });
-      invalidate();  // background refresh to sync exact server state
+      toast.success('✓ Case accepted — scan number assigned');
+      invalidate();
     } catch (err) {
-      // On failure, restore the case in the list by refetching
       refetch();
       toast.error(err.response?.data?.error || 'Failed to accept case');
     } finally {
@@ -171,14 +265,11 @@ function AcceptCasesSection({ queryClient }) {
     }
   };
 
-  const handleReview = async (c) => {
-    const d = det(c.id);
+  // handleReview / handleReject receive the note text directly from <SimpleNoteForm>
+  const handleReview = async (c, note) => {
     setSubmitting(true);
     try {
-      await api.patch(`/cases/${c.id}/status`, {
-        status: 'UNDER_REVIEW',
-        notes: d.notes || 'Needs clarification from dentist',
-      });
+      await api.patch(`/cases/${c.id}/status`, { status: 'UNDER_REVIEW', notes: note || 'Needs clarification from dentist' });
       toast.success('🔎 Case marked Under Review');
       setOpenId(null);
       invalidate();
@@ -189,15 +280,11 @@ function AcceptCasesSection({ queryClient }) {
     }
   };
 
-  const handleReject = async (c) => {
-    const d = det(c.id);
-    if (!d.notes?.trim()) return toast.error('Please enter a rejection reason');
+  const handleReject = async (c, note) => {
+    if (!note?.trim()) return toast.error('Please enter a rejection reason');
     setSubmitting(true);
     try {
-      await api.patch(`/cases/${c.id}/status`, {
-        status: 'REJECTED',
-        notes: d.notes,
-      });
+      await api.patch(`/cases/${c.id}/status`, { status: 'REJECTED', notes: note });
       toast.success('🚫 Case rejected');
       setOpenId(null);
       invalidate();
@@ -284,186 +371,51 @@ function AcceptCasesSection({ queryClient }) {
           )}
         </div>
 
-        {/* ── Accept form ── */}
+        {/* ── Accept form — rendered as a stable module-level component so typing
+             doesn't re-render AcceptCasesSection and remount CaseCard ── */}
         {isOpen && action === 'accept' && (() => {
-          const d = det(c.id);
-          const orderType   = d.orderType   || 'NORMAL';
-          const selWorkType = d.workType    || c.workType || '';
-          const units       = parseInt(d.units || 1) || 1;
-          const isExpress   = orderType === 'EXPRESS';
-          const unitPrice   = isExpress && expressPriceMap[selWorkType] != null
-            ? expressPriceMap[selWorkType] : (priceMap[selWorkType] ?? null);
-          const count   = selWorkType && FLAT_PRICE_TYPES.has(selWorkType) ? 1 : units;
-          const calcAmt = unitPrice != null ? unitPrice * count : null;
-
+          // This IIFE only evaluates once when action==='accept', not on typing.
+          // All typing state lives inside <AcceptForm>.
           return (
-            <div style={{ marginTop: 14, padding: '16px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14 }}>
-                ✓ Accept Case — Fill in Details & Assign Scan Number
-              </div>
 
-              {/* Row 1: Shade + Work Type */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>SHADE *</label>
-                  <select style={inputSt} value={d.shade || ''} onChange={e => setDet(c.id, 'shade', e.target.value)}>
-                    <option value="">— Select shade —</option>
-                    {SHADE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>WORK TYPE *</label>
-                  <select style={inputSt} value={selWorkType} onChange={e => handleWorkTypeChange(c.id, e.target.value)}>
-                    <option value="">— Select work type —</option>
-                    {pricesData.map(p => (
-                      <option key={p.workType} value={p.workType}>
-                        {p.workType} — Br {p.price?.toLocaleString('en-US')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 2: Units + Order Type */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>UNITS</label>
-                  <input type="number" min="1" style={inputSt} placeholder="1"
-                    value={d.units || ''} onChange={e => handleUnitsChange(c.id, e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>ORDER TYPE</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {[
-                      { val: 'NORMAL',  label: '🚚 Normal' },
-                      { val: 'EXPRESS', label: '⚡ Express' },
-                    ].map(opt => (
-                      <button key={opt.val} type="button"
-                        onClick={() => handleOrderTypeChange(c.id, opt.val)}
-                        style={{
-                          flex: 1, padding: '7px 10px', fontSize: 12, fontWeight: 700,
-                          borderRadius: 8, cursor: 'pointer',
-                          border: `2px solid ${orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
-                          background: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'rgba(240,165,0,0.1)' : 'var(--blue-dim,#EEF2FF)') : 'var(--surface)',
-                          color: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-2)',
-                        }}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Price + Due Date auto-display */}
-              {selWorkType && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>
-                      AMOUNT (BR)
-                      {calcAmt != null && (
-                        <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>
-                          {isExpress ? '⚡ ' : ''}auto: Br {calcAmt.toLocaleString('en-US')}
-                        </span>
-                      )}
-                    </label>
-                    <input type="number" style={inputSt} placeholder="Auto-calculated"
-                      value={d.totalAmount ?? (calcAmt ?? '')}
-                      onChange={e => setDet(c.id, 'totalAmount', e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>DUE DATE (auto)</label>
-                    <input type="date" style={inputSt}
-                      value={d.dueDate || ''}
-                      onChange={e => setDet(c.id, 'dueDate', e.target.value)} />
-                  </div>
-                </div>
-              )}
-
-              {/* Row 3: Doctor + Phone — pre-filled and locked if already set on the case */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>
-                    DOCTOR'S NAME *
-                    {c.doctorName && !d.doctorName && (
-                      <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>
-                    )}
-                  </label>
-                  <input
-                    style={{ ...inputSt, background: c.doctorName && !d.doctorName ? 'var(--green-dim)' : undefined, color: c.doctorName && !d.doctorName ? 'var(--green)' : undefined }}
-                    placeholder="Dr. Ahmed"
-                    value={d.doctorName !== undefined ? d.doctorName : (c.doctorName || '')}
-                    onChange={e => setDet(c.id, 'doctorName', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>
-                    CONTACT / PHONE *
-                    {c.doctorPhone && !d.doctorPhone && (
-                      <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>
-                    )}
-                  </label>
-                  <input
-                    type="tel"
-                    style={{ ...inputSt, background: c.doctorPhone && !d.doctorPhone ? 'var(--green-dim)' : undefined, color: c.doctorPhone && !d.doctorPhone ? 'var(--green)' : undefined }}
-                    placeholder="+251 911 000 000"
-                    value={d.doctorPhone !== undefined ? d.doctorPhone : (c.doctorPhone || '')}
-                    onChange={e => setDet(c.id, 'doctorPhone', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>NOTES / ACCEPTANCE NOTE</label>
-                <textarea rows={2} style={textareaSt} placeholder="Additional instructions, observations…"
-                  value={d.notes || ''} onChange={e => setDet(c.id, 'notes', e.target.value)} />
-              </div>
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-primary btn-sm" onClick={() => handleAccept(c)} disabled={submitting} style={{ flex: 1, justifyContent: 'center' }}>
-                  {submitting ? 'Accepting…' : '✓ Accept & Assign Scan Number'}
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setOpenId(null)}>Cancel</button>
-              </div>
-            </div>
+            <AcceptForm
+              c={c}
+              pricesData={pricesData}
+              priceMap={priceMap}
+              expressPriceMap={expressPriceMap}
+              durationMap={durationMap}
+              expressDurMap={expressDurMap}
+              submitting={submitting}
+              onAccept={(formData) => handleAccept(c, formData)}
+              onCancel={() => setOpenId(null)}
+            />
           );
         })()}
 
         {/* ── Under Review form ── */}
         {isOpen && action === 'review' && (
-          <div style={{ marginTop: 14, padding: '16px 16px', background: '#EFF6FF', borderRadius: 10, border: '1px solid #BFDBFE' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1D4ED8', marginBottom: 10 }}>
-              🔎 Under Review — What information is needed from the dentist?
-            </div>
-            <textarea rows={3} style={{ ...textareaSt, border: '1px solid #BFDBFE', background: '#fff' }}
-              placeholder="e.g. Shade not specified. Need confirmation of tooth 14 preparation type."
-              value={det(c.id).notes || ''} onChange={e => setDet(c.id, 'notes', e.target.value)} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button className="btn btn-sm" onClick={() => handleReview(c)} disabled={submitting}
-                style={{ flex: 1, justifyContent: 'center', background: '#1D4ED8', color: '#fff', border: 'none' }}>
-                {submitting ? 'Saving…' : '🔎 Mark Under Review'}
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setOpenId(null)}>Cancel</button>
-            </div>
-          </div>
+          <SimpleNoteForm
+            color="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
+            title="🔎 Under Review — What information is needed from the dentist?"
+            placeholder="e.g. Shade not specified. Need confirmation of tooth 14 preparation type."
+            confirmLabel="🔎 Mark Under Review"
+            submitting={submitting}
+            onConfirm={(note) => handleReview(c, note)}
+            onCancel={() => setOpenId(null)}
+          />
         )}
 
         {/* ── Reject form ── */}
         {isOpen && action === 'reject' && (
-          <div style={{ marginTop: 14, padding: '16px 16px', background: '#FFF1F2', borderRadius: 10, border: '1px solid #FECACA' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--red)', marginBottom: 10 }}>
-              🚫 Reject Case — Please enter the reason
-            </div>
-            <textarea rows={3} style={{ ...textareaSt, border: '1px solid #FECACA', background: '#fff' }}
-              placeholder="e.g. Impression quality too poor to work with. Please retake."
-              value={det(c.id).notes || ''} onChange={e => setDet(c.id, 'notes', e.target.value)} />
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button className="btn btn-sm" onClick={() => handleReject(c)} disabled={submitting}
-                style={{ flex: 1, justifyContent: 'center', background: 'var(--red)', color: '#fff', border: 'none' }}>
-                {submitting ? 'Rejecting…' : '🚫 Confirm Rejection'}
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setOpenId(null)}>Cancel</button>
-            </div>
-          </div>
+          <SimpleNoteForm
+            color="var(--red)" bg="#FFF1F2" border="#FECACA"
+            title="🚫 Reject Case — Please enter the reason"
+            placeholder="e.g. Impression quality too poor to work with. Please retake."
+            confirmLabel="🚫 Confirm Rejection"
+            submitting={submitting}
+            onConfirm={(note) => handleReject(c, note)}
+            onCancel={() => setOpenId(null)}
+          />
         )}
       </div>
     );
