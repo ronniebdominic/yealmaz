@@ -163,6 +163,39 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
   }
 });
 
+// ── POST /api/delivery/:caseId/return-to-pickup-queue ───
+// Delivery staff could not collect impression from clinic.
+// Returns to PENDING_PICKUP + clears driver so dispatch can reassign.
+router.post('/:caseId/return-to-pickup-queue', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const { reason = 'Could not collect impression — returned to pickup queue' } = req.body;
+    const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
+    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { status: 'PENDING_PICKUP', assignedDeliveryId: null },
+    });
+
+    await prisma.caseStage.create({
+      data: { caseId: req.params.caseId, stageName: 'PENDING_PICKUP', scannedBy: req.user.name, notes: reason },
+    });
+
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('case_updated', {
+      caseId: caseData.id, caseNumber: caseData.caseNumber, status: 'PENDING_PICKUP',
+      message: 'Driver could not collect — case returned to pickup queue for reassignment',
+    });
+
+    res.json({ success: true, message: 'Case returned to pickup queue. Dispatch can reassign a driver.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not return case to pickup queue.' });
+  }
+});
+
 // ── POST /api/delivery/:caseId/return-to-dispatch ───────
 // Called when delivery staff cannot pick up or deliver a case.
 // Returns case to READY_TO_DISPATCH and clears the assigned driver so

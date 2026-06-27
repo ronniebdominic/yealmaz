@@ -9,11 +9,15 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   const [reason, setReason] = useState('');
 
   const CFG = {
-    picked_up:     { title: 'Mark as Picked Up',    color: '#16A34A', needsReason: false, btn: '✓ Confirm Picked Up' },
-    not_picked_up: { title: 'Not Picked Up',         color: '#DC2626', needsReason: true,  btn: '✕ Confirm', placeholder: 'Reason (e.g. clinic closed)…' },
-    lab_pickup:    { title: 'Collected from Lab',    color: '#16A34A', needsReason: false, btn: '✓ Confirm Collected' },
-    delivered:     { title: 'Mark as Delivered',     color: '#16A34A', needsReason: false, btn: '✅ Confirm Delivered' },
-    not_delivered: { title: 'Return — Not Delivered',color: '#DC2626', needsReason: true,  btn: '↩ Return to Dispatch', placeholder: 'Reason (e.g. clinic closed)…' },
+    picked_up:          { title: 'Mark as Picked Up',         color: '#16A34A', needsReason: false, btn: '✓ Confirm Picked Up' },
+    not_picked_up:      { title: 'Not Picked Up — Return to Dispatch', color: '#DC2626', needsReason: true, btn: '↩ Return to Dispatch Queue', placeholder: 'Reason (e.g. clinic closed, patient absent)…',
+      note: 'The driver assignment will be cleared. Dispatch will be notified to assign a new driver.' },
+    lab_pickup:         { title: 'Collected from Lab',         color: '#16A34A', needsReason: false, btn: '✓ Confirm Collected from Lab' },
+    not_picked_lab:     { title: 'Could Not Collect — Return to Dispatch', color: '#DC2626', needsReason: true, btn: '↩ Return to Dispatch Queue', placeholder: 'Reason (e.g. not ready at lab)…',
+      note: 'This case will return to the Ready for Dispatch queue. Dispatch will assign a new driver.' },
+    delivered:          { title: 'Mark as Delivered',          color: '#16A34A', needsReason: false, btn: '✅ Confirm Delivered' },
+    not_delivered:      { title: 'Could Not Deliver — Return to Dispatch', color: '#DC2626', needsReason: true, btn: '↩ Return to Dispatch Queue', placeholder: 'Reason (e.g. clinic closed)…',
+      note: 'This case will return to the Ready for Dispatch queue. Dispatch will assign a new driver.' },
   };
   const cfg = CFG[action] || {};
 
@@ -35,6 +39,11 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
               </div>
             )}
           </div>
+          {cfg.note && (
+            <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12, color: '#92400E', fontWeight: 600 }}>
+              ⚠ {cfg.note}
+            </div>
+          )}
           {cfg.needsReason && (
             <textarea rows={2} placeholder={cfg.placeholder} value={reason} onChange={e => setReason(e.target.value)}
               style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #D1D5DB', resize: 'vertical', fontFamily: 'inherit', marginBottom: 12 }} />
@@ -98,19 +107,30 @@ export default function DeliveryDashboard() {
       const { case: c, action } = modal;
       if (action === 'picked_up') {
         await api.post(`/delivery/${c.id}/collect-impression`);
-        toast.success('✓ Impression collected');
+        toast.success('✓ Impression collected — heading to lab');
+
       } else if (action === 'not_picked_up') {
-        await api.patch(`/cases/${c.id}/status`, { status: 'PENDING_PICKUP', notes: reason });
-        toast.success('↩ Returned to queue');
+        // Impression pickup failed → PENDING_PICKUP + clear driver → dispatch reassigns
+        await api.post(`/delivery/${c.id}/return-to-pickup-queue`, { reason });
+        toast.success('↩ Returned to dispatch — driver cleared, case ready for reassignment');
+
       } else if (action === 'lab_pickup') {
         await api.post(`/delivery/${c.id}/pickup`);
-        toast.success('✓ Collected from lab');
+        toast.success('✓ Collected from lab — heading to clinic');
+
+      } else if (action === 'not_picked_lab') {
+        // Lab pickup failed → READY_TO_DISPATCH + clear driver → dispatch reassigns
+        await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason });
+        toast.success('↩ Returned to dispatch queue — driver cleared, case ready for reassignment');
+
       } else if (action === 'delivered') {
         await api.post(`/delivery/${c.id}/deliver`);
-        toast.success('✅ Delivered!');
+        toast.success('✅ Delivery confirmed!');
+
       } else if (action === 'not_delivered') {
+        // Delivery failed → READY_TO_DISPATCH + clear driver → dispatch reassigns
         await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason });
-        toast.success('↩ Returned to dispatch');
+        toast.success('↩ Returned to dispatch queue — driver cleared, case ready for reassignment');
       }
       setModal(null);
       loadCases();
@@ -169,9 +189,16 @@ export default function DeliveryDashboard() {
             style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             {section === 'delivery' ? '✓ Mark as Deliver' : c.status === 'READY_TO_DISPATCH' ? '✓ Picked up from Lab' : '✓ Mark as Pick up'}
           </button>
-          {/* Red action */}
+          {/* Red action — routes to correct return endpoint based on case type */}
           <button
-            onClick={() => setModal({ case: c, action: section === 'delivery' ? 'not_delivered' : 'not_picked_up' })}
+            onClick={() => setModal({
+              case: c,
+              action: section === 'delivery'
+                ? 'not_delivered'                                          // OUT_FOR_DELIVERY → READY_TO_DISPATCH + clear driver
+                : c.status === 'READY_TO_DISPATCH'
+                  ? 'not_picked_lab'                                       // Lab pickup failed → READY_TO_DISPATCH + clear driver
+                  : 'not_picked_up'                                        // Clinic pickup failed → PENDING_PICKUP + clear driver
+            })}
             style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             {section === 'delivery' ? '↩ Return not delivered' : '✕ Not Picked up'}
           </button>
