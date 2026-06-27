@@ -381,7 +381,7 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 
 // ── POST /api/payments/:caseId/request ──────────────────
 // Finance sends payment request (with amount) to clinic app — no invoice yet
-router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
   try {
     const { amount, notes } = req.body;
     if (!amount || parseFloat(amount) <= 0) {
