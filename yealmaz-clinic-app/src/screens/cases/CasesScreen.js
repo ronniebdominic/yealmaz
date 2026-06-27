@@ -70,7 +70,7 @@ export default function CasesScreen({ navigation, route }) {
             <Text style={styles.patient}>{c.patientName}</Text>
             <Text style={styles.stageIcon}>{stage.icon}</Text>
           </View>
-          <Text style={styles.caseNum}>{c.caseNumber}</Text>
+          <Text style={styles.caseNum}>{c.caseNumber || 'Scan # Pending'}</Text>
           <Text style={styles.workType}>{c.workType}</Text>
           <View style={styles.cardBottom}>
             <View style={[styles.stagePill, { backgroundColor: stage.color + '18' }]}>

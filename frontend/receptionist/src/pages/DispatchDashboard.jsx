@@ -393,7 +393,8 @@ export default function DispatchDashboard() {
     });
   }, [allCases, search, dateFrom, dateTo]);
 
-  const placeOrder = filtered.filter(c => c.status === 'PENDING_PICKUP');
+  const placeOrder        = filtered.filter(c => c.status === 'PENDING_PICKUP');
+  const pickupInProgress  = filtered.filter(c => c.status === 'PICKUP_ASSIGNED' && c.assignedDelivery);
 
   // ── FINAL DEFINITION (locked) ─────────────────────────────
   // Ready for Delivery  = QC passed → READY_TO_DISPATCH, payment NOT yet verified
@@ -416,11 +417,12 @@ export default function DispatchDashboard() {
   const delivered = filtered.filter(c => c.status === 'DELIVERED');
 
   const tabCount = {
-    'place-order':    placeOrder.length,
-    'ready-delivery': readyDelivery.length,
-    'ready-dispatch': readyDispatch.length,
-    'en-route':       enRoute.length,
-    'delivered':      delivered.length,
+    'place-order':       placeOrder.length,
+    'pickup-progress':   pickupInProgress.length,
+    'ready-delivery':    readyDelivery.length,
+    'ready-dispatch':    readyDispatch.length,
+    'en-route':          enRoute.length,
+    'delivered':         delivered.length,
   };
 
   // ── Actions ──────────────────────────────────────────────
@@ -446,38 +448,52 @@ export default function DispatchDashboard() {
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DS';
 
+  // Each tab carries a workflow `group` used to section the sidebar nav,
+  // matching how Reception/Finance group their nav under section labels.
   const TABS = [
-    { id: 'place-order',    label: 'Place Order',              icon: '📋' },
-    { id: 'ready-delivery', label: 'Ready for Delivery',       icon: '📦', sub: 'QC done · awaiting payment' },
-    { id: 'ready-dispatch', label: 'Ready for Dispatch',       icon: '🚚', sub: 'Payment verified · assign driver' },
-    { id: 'en-route',       label: 'En Route',                 icon: '🚴', sub: 'Out for delivery' },
-    { id: 'delivered',      label: 'Delivered',                icon: '✅' },
+    { id: 'place-order',      label: 'Place Order',        icon: '📋', group: 'Pickup',    sub: 'Awaiting pickup'        },
+    { id: 'pickup-progress',  label: 'Pickup In Progress', icon: '🛵', group: 'Pickup',    sub: 'Driver collecting'      },
+    { id: 'ready-delivery',   label: 'Ready for Delivery', icon: '📦', group: 'Delivery',  sub: 'QC done · awaiting pay' },
+    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: '🚚', group: 'Delivery',  sub: 'Paid · assign driver'   },
+    { id: 'en-route',         label: 'En Route',           icon: '🚴', group: 'Delivery',  sub: 'Out for delivery'       },
+    { id: 'delivered',        label: 'Delivered',          icon: '✅', group: 'Completed', sub: 'Done'                   },
   ];
+  const NAV_GROUPS = ['Pickup', 'Delivery', 'Completed'];
 
-  // ── Sidebar nav ──────────────────────────────────────────
+  // ── Sidebar nav (grouped by workflow stage, matching the rest of the app) ──
   const SidebarNav = ({ close }) => (
     <nav className="sidebar-nav">
-      <div className="nav-section-label">Dispatch</div>
-      {TABS.map(t => (
-        <button key={t.id}
-          className={`nav-item${tab === t.id ? ' active' : ''}`}
-          onClick={() => { setTab(t.id); if (close) close(); }}
-          style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-            <span>{t.icon}</span>
-            <span style={{ flex: 1 }}>{t.label}</span>
-            {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
-          </div>
-          {t.sub && <div style={{ fontSize: 10, color: tab === t.id ? 'rgba(255,255,255,0.65)' : 'var(--text-3)', paddingLeft: 24 }}>{t.sub}</div>}
-        </button>
+      {NAV_GROUPS.map(group => (
+        <div key={group}>
+          <div className="nav-section-label">{group}</div>
+          {TABS.filter(t => t.group === group).map(t => (
+            <button key={t.id}
+              className={`nav-item${tab === t.id ? ' active' : ''}`}
+              onClick={() => { setTab(t.id); setTodayOrders(null); if (close) close(); }}
+              style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                <span>{t.icon}</span>
+                <span style={{ flex: 1 }}>{t.label}</span>
+                {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
+              </div>
+              {t.sub && <div style={{ fontSize: 10, color: tab === t.id ? 'rgba(255,255,255,0.65)' : 'var(--text-3)', paddingLeft: 24 }}>{t.sub}</div>}
+            </button>
+          ))}
+        </div>
       ))}
-      <div className="nav-section-label">Cases</div>
-      <button className="nav-item" onClick={() => navigate('/cases/new')}>
-        <span>➕</span> New Case
-      </button>
     </nav>
   );
+
+  // ── KPI pipeline — one card per stage, in workflow order, colour-coded ──────
+  const PIPELINE = [
+    { tab: 'place-order',     label: 'Pending Pickup',     icon: '📋', count: placeOrder.length,      hint: 'Needs driver',     color: '#DC2626', bg: '#FEF2F2' },
+    { tab: 'pickup-progress', label: 'Pickup In Progress', icon: '🛵', count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: '#EFF6FF' },
+    { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: '📦', count: readyDelivery.length,    hint: 'Awaiting payment', color: '#D97706', bg: '#FFFBEB' },
+    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: '🚚', count: readyDispatch.length,    hint: 'Payment verified', color: '#16A34A', bg: '#F0FDF4' },
+    { tab: 'en-route',        label: 'En Route',           icon: '🚴', count: enRoute.length,          hint: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF' },
+    { tab: 'delivered',       label: 'Delivered',          icon: '✅', count: delivered.length,        hint: 'Completed',        color: '#16A34A', bg: '#F0FDF4' },
+  ];
 
   return (
     <div className="app">
@@ -527,7 +543,6 @@ export default function DispatchDashboard() {
           <button className="hamburger-topbar" style={{ display: 'none' }} onClick={() => setOpen(true)}>☰</button>
           <div className="topbar-title">{TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/cases/new')}>+ New Case</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
               <div className="live-dot" /> Live · {user?.name?.split(' ')[0]}
             </div>
@@ -535,51 +550,32 @@ export default function DispatchDashboard() {
         </div>
 
         <div className="content">
-          {/* ── Summary cards — counts from live queue data to match tabs exactly ── */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
+          {/* ── Analytical Dashboard header — Orders Today headline + drill-down ── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)' }}>Analytical Dashboard</h2>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>
+                Today: <strong style={{ color: 'var(--blue)' }}>{summary.totalToday ?? '—'}</strong> orders placed
+              </span>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={openTodayOrders}
+              style={{ borderColor: todayOrders !== null ? 'var(--blue)' : 'var(--border)', color: 'var(--blue)' }}>
+              {loadingToday ? 'Loading…' : todayOrders !== null ? '▲ Hide today' : '📋 View all today ↗'}
+            </button>
+          </div>
 
-            {/* Orders Today — uses server count; opens drill-down showing all today's cases */}
-            <div className="stat-card" style={{ cursor: 'pointer', outline: todayOrders !== null ? '2px solid var(--blue)' : 'none', outlineOffset: 2 }}
-              onClick={openTodayOrders}>
-              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
-              <div className="stat-label">Orders Today</div>
-              <div className="stat-value">{summary.totalToday ?? '—'}</div>
-              <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>
-                {loadingToday ? 'Loading…' : todayOrders !== null ? '▲ Hide' : 'View all ↗'}
+          {/* ── KPI pipeline — workflow stages left → right, colour-coded ── */}
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', marginBottom: 20 }}>
+            {PIPELINE.map(s => (
+              <div key={s.tab} className="stat-card"
+                style={{ cursor: 'pointer', borderTop: `3px solid ${s.color}`, outline: tab === s.tab ? `2px solid ${s.color}` : 'none', outlineOffset: 2 }}
+                onClick={() => { setTab(s.tab); setTodayOrders(null); }}>
+                <div className="stat-icon" style={{ background: s.bg }}>{s.icon}</div>
+                <div className="stat-label">{s.label}</div>
+                <div className="stat-value" style={{ color: s.color }}>{s.count}</div>
+                <div className="stat-sub" style={{ color: s.color, fontWeight: 600 }}>{s.hint} ↗</div>
               </div>
-            </div>
-
-            {/* Ready for Delivery — live count from queue */}
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('ready-delivery'); setTodayOrders(null); }}>
-              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📦</div>
-              <div className="stat-label">Ready for Delivery</div>
-              <div className="stat-value" style={{ color: 'var(--amber)' }}>{readyDelivery.length}</div>
-              <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Awaiting payment ↗</div>
-            </div>
-
-            {/* Ready for Dispatch — live count from queue */}
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('ready-dispatch'); setTodayOrders(null); }}>
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🚚</div>
-              <div className="stat-label">Ready for Dispatch</div>
-              <div className="stat-value" style={{ color: 'var(--green)' }}>{readyDispatch.length}</div>
-              <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Payment verified ↗</div>
-            </div>
-
-            {/* En Route — live count from queue */}
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('en-route'); setTodayOrders(null); }}>
-              <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🚴</div>
-              <div className="stat-label">En Route</div>
-              <div className="stat-value" style={{ color: 'var(--amber)' }}>{enRoute.length}</div>
-              <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Out for delivery ↗</div>
-            </div>
-
-            {/* Pending Pickup — live count from queue */}
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setTab('place-order'); setTodayOrders(null); }}>
-              <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
-              <div className="stat-label">Pending Pickup</div>
-              <div className="stat-value" style={{ color: '#EA580C' }}>{placeOrder.length}</div>
-              <div className="stat-sub" style={{ color: '#EA580C', fontWeight: 600 }}>Needs driver ↗</div>
-            </div>
+            ))}
           </div>
 
           {/* ── Today's Orders drill-down panel ── */}
@@ -701,6 +697,79 @@ export default function DispatchDashboard() {
                             >
                               🛵 Assign Pickup
                             </button>
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: Pickup In Progress (PICKUP_ASSIGNED + driver) ── */}
+          {tab === 'pickup-progress' && (
+            <div className="card">
+              <div style={{ padding: '10px 18px 0', background: '#F0FDF4', borderRadius: '10px 10px 0 0' }}>
+                <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10 }}>
+                  🛵 A driver has been assigned to collect the impression from the clinic. Once collected, the case will appear on the Receptionist dashboard for acceptance.
+                </div>
+              </div>
+              <div className="card-header">
+                <div className="card-title">🛵 Pickup In Progress</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pickupInProgress.length} in transit</span>
+                  <ExportMenu
+                    data={pickupInProgress}
+                    columns={[
+                      { header: 'Clinic Name', value: c => c.clinic?.name },
+                      { header: 'Location',    value: c => c.clinic?.address ?? '' },
+                      { header: 'Contact',     value: c => c.clinic?.phone ?? '' },
+                      { header: 'Case #',      value: c => c.caseNumber ?? '' },
+                      { header: 'Patient',     value: c => c.patientName },
+                      { header: 'Driver',      value: c => c.assignedDelivery?.name ?? '' },
+                      { header: 'Registered',  value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
+                    ]}
+                    filename="pickup-in-progress"
+                    title="Pickup In Progress"
+                  />
+                </div>
+              </div>
+              <div className="table-wrap">
+                {pickupInProgress.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">✅</div>
+                    <div className="empty-title">No pickups in progress</div>
+                    <p>Cases where a driver has been assigned to collect the impression will appear here. Assign a driver from the Place Order tab to see them here.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Location</Th>
+                        <Th>Contact</Th>
+                        <Th>Case #</Th>
+                        <Th>Patient</Th>
+                        <Th>Driver</Th>
+                        <Th>Registered</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pickupInProgress.map(c => (
+                        <tr key={c.id}>
+                          <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                          <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                            {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
+                          </Td>
+                          <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
+                          <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
+                          <Td><span className="patient-name">{c.patientName}</span></Td>
+                          <Td style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
+                            🛵 {c.assignedDelivery?.name?.replace('Yealmaz Delivery Executive ', 'Driver ')}
+                          </Td>
+                          <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                            {format(new Date(c.createdAt), 'dd MMM yyyy')}
                           </Td>
                         </tr>
                       ))}

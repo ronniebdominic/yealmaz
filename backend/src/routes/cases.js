@@ -249,7 +249,6 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    const caseNumber = await generateCaseNumber();
     const clinicId = req.user.role === 'CLINIC' ? req.user.id : req.body.clinicId;
     if (!clinicId) return res.status(400).json({ error: 'Clinic ID is required.' });
 
@@ -266,6 +265,14 @@ router.post('/', protect, async (req, res) => {
       : toothNumbers
         ? toothNumbers.split(',').map(t => t.trim()).filter(Boolean).length
         : null;
+
+    // Determine final status first so we know whether to generate a case number.
+    // PENDING_PICKUP cases (mobile submissions, phone orders) go through dispatch → pickup →
+    // receptionist acceptance. The scan/case number and QR code are assigned at acceptance,
+    // NOT at submission, so the clinic doesn't see a number that implies the case is in production.
+    const finalStatus = deliveryDate ? 'DELIVERED' : (dropOffAtLab ? 'CASE_ACCEPTED' : 'PENDING_PICKUP');
+    const needsScanNumber = finalStatus !== 'PENDING_PICKUP';
+    const caseNumber = needsScanNumber ? await generateCaseNumber() : null;
 
     const newCase = await prisma.case.create({
       data: {
@@ -289,21 +296,30 @@ router.post('/', protect, async (req, res) => {
         deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
         clinicId,
         receptionistId: req.user.role === 'RECEPTIONIST' ? req.user.id : null,
-        status: deliveryDate ? 'DELIVERED' : (dropOffAtLab ? 'CASE_ACCEPTED' : 'PENDING_PICKUP')
+        status: finalStatus,
       }
     });
 
-    const qrData = `${process.env.APP_URL}/api/scan/${newCase.id}`;
-    const qrCodeUrl = await QRCode.toDataURL(qrData, {
-      width: 300, margin: 2,
-      color: { dark: '#1A56A0', light: '#FFFFFF' }
-    });
-
-    const updatedCase = await prisma.case.update({
-      where: { id: newCase.id },
-      data: { qrCodeUrl, qrCodeData: qrData },
-      include: { clinic: { select: { name: true } } }
-    });
+    // QR code is only meaningful once a case is in lab production.
+    // Skip for PENDING_PICKUP cases — it will be generated when the receptionist accepts.
+    let updatedCase = newCase;
+    if (needsScanNumber) {
+      const qrData = `${process.env.APP_URL}/api/scan/${newCase.id}`;
+      const qrCodeUrl = await QRCode.toDataURL(qrData, {
+        width: 300, margin: 2,
+        color: { dark: '#1A56A0', light: '#FFFFFF' }
+      });
+      updatedCase = await prisma.case.update({
+        where: { id: newCase.id },
+        data: { qrCodeUrl, qrCodeData: qrData },
+        include: { clinic: { select: { name: true } } }
+      });
+    } else {
+      updatedCase = await prisma.case.findUnique({
+        where: { id: newCase.id },
+        include: { clinic: { select: { name: true } } }
+      });
+    }
 
     await prisma.caseStage.create({
       data: {
@@ -327,7 +343,7 @@ router.post('/', protect, async (req, res) => {
       awardCasePoints(req.user.id, newCase.id, newCase.caseNumber).catch(() => {});
     }
 
-    await invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
+    await invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('new_case', {

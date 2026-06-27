@@ -375,7 +375,7 @@ export default function CaseDetailScreen({ navigation, route }) {
         <View style={[styles.statusHero, { backgroundColor: stage.color }]}>
           <Text style={styles.statusHeroIcon}>{stage.icon}</Text>
           <Text style={styles.statusHeroLabel}>{stage.label}</Text>
-          <Text style={styles.statusHeroCase}>{caseData.caseNumber}</Text>
+          <Text style={styles.statusHeroCase}>{caseData.caseNumber || 'Awaiting Scan #'}</Text>
         </View>
 
 

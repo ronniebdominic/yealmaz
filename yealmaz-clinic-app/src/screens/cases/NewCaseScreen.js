@@ -216,7 +216,7 @@ export default function NewCaseScreen({ navigation }) {
       });
       Alert.alert(
         '✅ Case Submitted!',
-        `Case ${res.data.caseNumber} has been created. A QR code has been generated for lab tracking.`,
+        `Your case has been submitted successfully. Our dispatch team will assign a driver to collect the impression from your clinic. You will be notified once the case is accepted by the lab.`,
         [
           { text: 'View Case', onPress: () => navigation.replace('CaseDetail', { caseId: res.data.id }) },
           { text: 'Done', onPress: () => navigation.goBack() },
