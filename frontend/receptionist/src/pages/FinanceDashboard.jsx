@@ -520,11 +520,11 @@ function ScreenshotsTab({ queryClient }) {
   );
 }
 
-// ── Billing & Invoicing Tab ───────────────────────────────
+// ── Issued Invoices panel ─────────────────────────────────
 // Real invoices ONLY — generated after payment is done. (Quotes/payment
 // requests are auto-sent by Dispatch via 'Request Payment'; they are not
 // invoices and do not appear here.)
-function BillingTab() {
+function InvoicesPanel() {
   const [page, setPage]     = useState(1);
   const [search, setSearch] = useState('');
   const [submitted, setSubmitted] = useState('');
@@ -647,6 +647,29 @@ function BillingTab() {
       {viewInvoice && (
         <InvoiceViewModal caseData={viewInvoice} onClose={() => setViewInvoice(null)} />
       )}
+    </>
+  );
+}
+
+// ── Billing & Invoicing Tab ───────────────────────────────
+// Two views: issued Invoices, and Verify Payments (gateway success/failed +
+// approve/reject screenshot uploads — folded in from the old Payment Gateway tab).
+const BILLING_VIEWS = [
+  { id: 'invoices', label: '📄 Invoices' },
+  { id: 'verify',   label: '💳 Verify Payments' },
+];
+function BillingTab({ view = 'invoices', onView }) {
+  const queryClient = useQueryClient();
+  return (
+    <>
+      <div className="filters" style={{ margin: '0 0 18px', flexWrap: 'wrap' }}>
+        {BILLING_VIEWS.map(v => (
+          <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {view === 'verify' ? <ScreenshotsTab queryClient={queryClient} /> : <InvoicesPanel />}
     </>
   );
 }
@@ -1885,8 +1908,8 @@ function ClinicBalancesTab() {
   );
 }
 
-// ── Revenue Report Tab ────────────────────────────────────
-function ReportTab() {
+// ── Revenue Overview panel (Report › Overview) ────────────
+function RevenueOverviewPanel() {
   const [from, setFrom]       = useState('');
   const [to, setTo]           = useState('');
   const [search, setSearch]   = useState('');
@@ -2220,22 +2243,45 @@ function ReadyForDeliveryTab() {
   );
 }
 
+// ── Report Tab ────────────────────────────────────────────
+// Four views: revenue Overview, plus Verified History, Clinic Balances and Cases
+// (folded in from the old standalone Analytics nav items).
+const REPORT_VIEWS = [
+  { id: 'overview', label: '📈 Overview' },
+  { id: 'history',  label: '✅ Verified History' },
+  { id: 'balances', label: '🏦 Clinic Balances' },
+  { id: 'cases',    label: '📋 Cases' },
+];
+function ReportTab({ view = 'overview', onView }) {
+  return (
+    <>
+      <div className="filters" style={{ margin: '0 0 18px', flexWrap: 'wrap' }}>
+        {REPORT_VIEWS.map(v => (
+          <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {view === 'history'  && <HistoryTab />}
+      {view === 'balances' && <ClinicBalancesTab />}
+      {view === 'cases'    && <CasesTab />}
+      {view === 'overview' && <RevenueOverviewPanel />}
+    </>
+  );
+}
+
 // Nav model — single source of truth, rendered in both drawer + sidebar.
 const NAV_GROUPS = [
   { group: 'Overview', items: [
-    { id: 'dashboard',      label: 'Dashboard',          icon: '📊' },
+    { id: 'dashboard',  label: 'Dashboard',          icon: '📊' },
   ]},
   { group: 'Operations', items: [
-    { id: 'ready',          label: 'Ready for Delivery', icon: '📦' },
-    { id: 'screenshots',    label: 'Payment Gateway',    icon: '💳', badge: 'payments' },
-    { id: 'billing',        label: 'Billing & Invoicing',icon: '📄' },
-    { id: 'trusted',        label: 'Trusted Partners',   icon: '🤝', badge: 'trusted' },
+    { id: 'ready',      label: 'Ready for Delivery', icon: '📦' },
+    { id: 'billing',    label: 'Billing & Invoicing',icon: '📄', badge: 'payments' },
+    { id: 'trusted',    label: 'Trusted Partners',   icon: '🤝', badge: 'trusted' },
   ]},
   { group: 'Analytics', items: [
-    { id: 'report',         label: 'Report',             icon: '📈' },
-    { id: 'history',        label: 'Verified History',   icon: '✅' },
-    { id: 'cases',          label: 'Cases Overview',     icon: '📋' },
-    { id: 'balances',       label: 'Clinic Balances',    icon: '🏦' },
+    { id: 'report',     label: 'Report',             icon: '📈' },
   ]},
 ];
 const MAIN_TABS = NAV_GROUPS.flatMap(g => g.items);
@@ -2243,6 +2289,8 @@ const MAIN_TABS = NAV_GROUPS.flatMap(g => g.items);
 export default function FinanceDashboard() {
   const { user, logout } = useAuth();
   const [tab, setTab]    = useState('dashboard');
+  const [billingView, setBillingView] = useState('invoices'); // invoices | verify
+  const [reportView, setReportView]   = useState('overview');  // overview | history | balances | cases
   const [open, setOpen]  = useState(false);
   const queryClient      = useQueryClient();
 
@@ -2285,7 +2333,6 @@ export default function FinanceDashboard() {
     refetchInterval: 120_000,
   });
 
-  const toInvoiceCount = billing.filter(c => c.status === 'PAYMENT_INVOICING' && !c.totalAmount).length;
   const uploadedCount  = billing.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED').length;
   const paymentsToVerify = pending.length + uploadedCount;
   const stats          = summary?.stats || {};
@@ -2293,7 +2340,6 @@ export default function FinanceDashboard() {
   // Badge value resolver — keyed by NAV item .badge
   const badgeFor = (key) => {
     if (key === 'payments') return paymentsToVerify;
-    if (key === 'invoice')  return toInvoiceCount;
     if (key === 'trusted')  return trustedOutstanding;
     return 0;
   };
@@ -2409,13 +2455,13 @@ export default function FinanceDashboard() {
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{stats.deliveredToday ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View deliveries ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('overview'); setTab('report'); }}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🦷</div>
                   <div className="stat-label">Total Units</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.units?.daily ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Units today ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('overview'); setTab('report'); }}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
                   <div className="stat-label">Revenue</div>
                   <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 15 : 20 }}>
@@ -2423,13 +2469,13 @@ export default function FinanceDashboard() {
                   </div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Verified today ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('history')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('history'); setTab('report'); }}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
                   <div className="stat-label">Paid</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.paid?.today ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View history ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('overview'); setTab('report'); }}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
                   <div className="stat-label">Pending</div>
                   <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 15 : 20 }}>
@@ -2443,13 +2489,13 @@ export default function FinanceDashboard() {
                 Work Queue
               </div>
               <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(4,1fr)' }}>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setBillingView('verify'); setTab('billing'); }}>
                   <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>💳</div>
                   <div className="stat-label">Payments to Verify</div>
                   <div className="stat-value" style={{ color: 'var(--amber)' }}>{paymentsToVerify}</div>
                   <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Gateway payments ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('billing')}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setBillingView('invoices'); setTab('billing'); }}>
                   <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
                   <div className="stat-label">Invoices Today</div>
                   <div className="stat-value" style={{ color: 'var(--blue)' }}>{quickReport?.paid?.today ?? 0}</div>
@@ -2474,14 +2520,10 @@ export default function FinanceDashboard() {
           )}
 
           {/* ── Tab content ─────────────────────────────── */}
-          {tab === 'ready'       && <ReadyForDeliveryTab />}
-          {tab === 'screenshots' && <ScreenshotsTab queryClient={queryClient} />}
-          {tab === 'billing'     && <BillingTab />}
-          {tab === 'trusted'     && <TrustedPartnersTab queryClient={queryClient} />}
-          {tab === 'history'     && <HistoryTab />}
-          {tab === 'cases'       && <CasesTab />}
-          {tab === 'balances'    && <ClinicBalancesTab />}
-          {tab === 'report'      && <ReportTab />}
+          {tab === 'ready'    && <ReadyForDeliveryTab />}
+          {tab === 'billing'  && <BillingTab view={billingView} onView={setBillingView} />}
+          {tab === 'trusted'  && <TrustedPartnersTab queryClient={queryClient} />}
+          {tab === 'report'   && <ReportTab view={reportView} onView={setReportView} />}
         </div>
       </main>
     </div>
