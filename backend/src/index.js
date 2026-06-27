@@ -50,6 +50,7 @@ io.on('connection', (socket) => {
 });
 
 // ── Middleware ───────────────────────────────────────────
+app.set('trust proxy', 1); // Railway sits behind a proxy; needed for express-rate-limit v7+
 app.use(compression());
 app.use(cors());
 // Capture the raw body so webhook signature verification can hash the exact bytes
