@@ -129,4 +129,36 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   }
 });
 
+// ── PATCH /api/clinics/:id/billing ───────────────────────
+// Finance sets the billing cycle for a trusted-partner clinic.
+// cycle: NONE | WEEKLY | FORTNIGHTLY | MONTHLY | CUSTOM
+// anchor: day-of-week (0=Sun..6=Sat) for WEEKLY/FORTNIGHTLY, day-of-month (1-28) for MONTHLY
+router.patch('/:id/billing', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    const { billingCycle, billingAnchor, markBilled } = req.body;
+
+    const VALID = ['NONE', 'WEEKLY', 'FORTNIGHTLY', 'MONTHLY', 'CUSTOM'];
+    if (billingCycle !== undefined && !VALID.includes(billingCycle)) {
+      return res.status(400).json({ error: `billingCycle must be one of: ${VALID.join(', ')}.` });
+    }
+
+    const data = {};
+    if (billingCycle !== undefined)  data.billingCycle  = billingCycle;
+    if (billingAnchor !== undefined) data.billingAnchor = billingAnchor === null || billingAnchor === '' ? null : parseInt(billingAnchor);
+    if (markBilled)                  data.lastBilledAt  = new Date();
+
+    const clinic = await prisma.clinic.update({
+      where: { id: req.params.id },
+      data,
+      select: { id: true, name: true, billingCycle: true, billingAnchor: true, lastBilledAt: true },
+    });
+
+    await appCache.del('clinics');
+    res.json(clinic);
+  } catch (err) {
+    console.error('[clinics/:id/billing]', err);
+    res.status(500).json({ error: 'Could not update billing cycle.' });
+  }
+});
+
 module.exports = router;

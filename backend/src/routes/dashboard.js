@@ -468,15 +468,30 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
       where: { isExcluded: true, isActive: true },
       select: {
         id: true, name: true, phone: true, address: true,
+        billingCycle: true, billingAnchor: true, lastBilledAt: true,
         cases: {
           select: {
-            id: true, status: true, units: true,
+            id: true, status: true, units: true, createdAt: true,
             payment: { select: { status: true, amount: true } }
           }
         }
       },
       orderBy: { name: 'asc' },
     });
+
+    // Compute the next bill date from cycle + anchor + lastBilledAt (or createdAt baseline)
+    const computeNextBill = (cycle, anchor, lastBilledAt) => {
+      if (!cycle || cycle === 'NONE' || cycle === 'CUSTOM') return null;
+      const base = lastBilledAt ? new Date(lastBilledAt) : new Date();
+      const next = new Date(base);
+      if (cycle === 'WEEKLY')      next.setDate(base.getDate() + 7);
+      else if (cycle === 'FORTNIGHTLY') next.setDate(base.getDate() + 14);
+      else if (cycle === 'MONTHLY') {
+        next.setMonth(base.getMonth() + 1);
+        if (anchor != null) next.setDate(Math.min(anchor, 28));
+      }
+      return next;
+    };
 
     // "In Progress" = actively being worked in the lab (excludes pre-lab pickup
     // statuses and terminal states so the count is meaningful for clinic reports)
@@ -499,16 +514,29 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
                                     .reduce((s, c) => s + (c.payment?.amount || 0), 0);
       // Only count outstanding where an amount has actually been set — cases
       // with no payment amount yet would inflate the count with Br 0 entries.
-      const outstanding     = cases.filter(c => c.payment?.status !== 'VERIFIED' && c.payment?.amount)
-                                    .reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      const outstandingCases = cases.filter(c => c.payment?.status !== 'VERIFIED' && c.payment?.amount);
+      const outstanding      = outstandingCases.reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      const outstandingCount = outstandingCases.length;
+
+      // Aging — days since the oldest unpaid case was created
+      const oldestOutstanding = outstandingCases.reduce(
+        (oldest, c) => (!oldest || new Date(c.createdAt) < new Date(oldest) ? c.createdAt : oldest), null);
+      const oldestAgeDays = oldestOutstanding
+        ? Math.floor((Date.now() - new Date(oldestOutstanding).getTime()) / 86_400_000)
+        : 0;
+
+      const nextBillDate = computeNextBill(clinic.billingCycle, clinic.billingAnchor, clinic.lastBilledAt);
+      const billOverdue  = nextBillDate ? nextBillDate < new Date() : false;
 
       return {
         id: clinic.id, name: clinic.name, phone: clinic.phone, address: clinic.address,
         totalOrders, totalUnits, deliveredOrders, inProgress,
-        totalRevenue, paymentsReceived, outstanding,
+        totalRevenue, paymentsReceived, outstanding, outstandingCount, oldestAgeDays,
+        billingCycle: clinic.billingCycle || 'NONE', billingAnchor: clinic.billingAnchor,
+        lastBilledAt: clinic.lastBilledAt, nextBillDate, billOverdue,
       };
     }).filter(c => c.totalOrders > 0)
-      .sort((a, b) => b.totalOrders - a.totalOrders);
+      .sort((a, b) => b.outstanding - a.outstanding);
 
     res.json(summary);
   } catch (err) {

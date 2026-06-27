@@ -720,10 +720,10 @@ function BillingTab({ queryClient }) {
 // ── Monthly Statement HTML ────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function buildStatementHTML(clinic, cases, month, year, allOutstanding) {
+function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLabel) {
   const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  const period = allOutstanding ? 'All Outstanding' : `${MONTHS[month]} ${year}`;
+  const period = periodLabel || (allOutstanding ? 'All Outstanding' : `${MONTHS[month]} ${year}`);
 
   const rows = cases.map((c, i) => `
     <tr>
@@ -771,7 +771,7 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding) {
     <div class="lab-sub">Addis Ababa, Ethiopia<br>+251 911 000 000 · info@yealmaz.com</div>
   </div>
   <div class="doc-title">
-    <h1>STATEMENT</h1>
+    <h1>BILL</h1>
     <div class="period">${period}</div>
     <div><span class="badge">⏳ Outstanding</span></div>
   </div>
@@ -815,61 +815,99 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding) {
 </body></html>`;
 }
 
-// ── Statement Modal ───────────────────────────────────────
-function StatementModal({ clinicId, clinic, onClose }) {
-  const now = new Date();
-  const [month, setMonth]               = useState(now.getMonth());
-  const [year, setYear]                 = useState(now.getFullYear());
-  const [allOutstanding, setAllOutstanding] = useState(false);
-  const [cases, setCases]               = useState([]);
-  const [loading, setLoading]           = useState(false);
+// ── Generate Bill / Statement Modal ───────────────────────
+// Trusted-partner billing: pick a period (week / fortnight / month / custom /
+// all-outstanding), preview the consolidated bill, print it, and optionally
+// mark the clinic as billed (records lastBilledAt for the next cycle).
+const BILL_PRESETS = [
+  { id: 'week',     label: 'This Week' },
+  { id: 'fortnight',label: 'This Fortnight' },
+  { id: 'month',    label: 'This Month' },
+  { id: 'custom',   label: 'Custom Range' },
+  { id: 'all',      label: 'All Outstanding' },
+];
 
-  const load = async (m, y, all) => {
+function rangeForPreset(preset, customFrom, customTo) {
+  const now = new Date();
+  const iso = (d) => d.toISOString().slice(0, 10);
+  if (preset === 'all') return {};
+  if (preset === 'custom') return { dateFrom: customFrom || undefined, dateTo: customTo || undefined };
+  if (preset === 'week') {
+    const from = new Date(now); from.setDate(now.getDate() - 6);
+    return { dateFrom: iso(from), dateTo: iso(now) };
+  }
+  if (preset === 'fortnight') {
+    const from = new Date(now); from.setDate(now.getDate() - 13);
+    return { dateFrom: iso(from), dateTo: iso(now) };
+  }
+  // month
+  return { dateFrom: iso(new Date(now.getFullYear(), now.getMonth(), 1)), dateTo: iso(now) };
+}
+
+function StatementModal({ clinicId, clinic, onClose, onBilled }) {
+  const now = new Date();
+  const [preset, setPreset]       = useState(clinic.billingCycle && clinic.billingCycle !== 'NONE'
+    ? ({ WEEKLY: 'week', FORTNIGHTLY: 'fortnight', MONTHLY: 'month', CUSTOM: 'custom' }[clinic.billingCycle] || 'month')
+    : 'month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo]     = useState('');
+  const [cases, setCases]           = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [marking, setMarking]       = useState(false);
+
+  const range = rangeForPreset(preset, customFrom, customTo);
+  const periodLabel = preset === 'all' ? 'All Outstanding'
+    : range.dateFrom ? `${range.dateFrom} → ${range.dateTo || 'today'}` : 'All';
+
+  const load = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (!all) {
-        params.dateFrom = new Date(y, m, 1).toISOString().slice(0, 10);
-        params.dateTo   = new Date(y, m + 1, 0).toISOString().slice(0, 10);
-      }
-      const res = await api.get(`/payments/statement/${clinicId}`, { params });
+      const res = await api.get(`/payments/statement/${clinicId}`, { params: range });
       setCases(res.data);
     } catch {
-      toast.error('Failed to load statement data');
+      toast.error('Failed to load bill data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(month, year, allOutstanding); }, [month, year, allOutstanding]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [preset, customFrom, customTo]);
 
   const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
 
   const print = () => {
     const w = window.open('', '_blank');
-    w.document.write(buildStatementHTML(clinic, cases, month, year, allOutstanding));
+    // buildStatementHTML signature: (clinic, cases, month, year, allOutstanding) — pass period via allOutstanding label
+    w.document.write(buildStatementHTML(clinic, cases, now.getMonth(), now.getFullYear(), preset === 'all', periodLabel));
     w.document.close();
   };
 
-  const yearOptions = [];
-  for (let y = now.getFullYear(); y >= now.getFullYear() - 2; y--) yearOptions.push(y);
+  const markBilled = async () => {
+    setMarking(true);
+    try {
+      await api.patch(`/clinics/${clinicId}/billing`, { markBilled: true });
+      toast.success('✓ Marked as billed — next cycle scheduled');
+      onBilled?.();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not mark as billed');
+    } finally {
+      setMarking(false);
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 600, width: '100%' }}>
+      <div className="modal" style={{ maxWidth: 640, width: '100%' }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">📄 Monthly Statement</div>
+            <div className="modal-title">🧾 Generate Bill</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-              🏥 {clinic.name}
+              🏥 {clinic.name}{clinic.billingCycle && clinic.billingCycle !== 'NONE' ? ` · ${clinic.billingCycle.toLowerCase()} cycle` : ''}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={print}
-              disabled={loading || cases.length === 0}
-            >
+            <button className="btn btn-primary btn-sm" onClick={print} disabled={loading || cases.length === 0}>
               🖨️ Print / Save PDF
             </button>
             <button className="modal-close" onClick={onClose}>×</button>
@@ -877,38 +915,35 @@ function StatementModal({ clinicId, clinic, onClose }) {
         </div>
 
         <div className="modal-body">
-          {/* Period controls */}
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-            <select
-              value={month}
-              onChange={e => { setAllOutstanding(false); setMonth(Number(e.target.value)); }}
-              disabled={allOutstanding}
-              style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', cursor: 'pointer', opacity: allOutstanding ? 0.4 : 1 }}
-            >
-              {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
-            </select>
-            <select
-              value={year}
-              onChange={e => { setAllOutstanding(false); setYear(Number(e.target.value)); }}
-              disabled={allOutstanding}
-              style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', cursor: 'pointer', opacity: allOutstanding ? 0.4 : 1 }}
-            >
-              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={allOutstanding}
-                onChange={e => setAllOutstanding(e.target.checked)}
-                style={{ width: 15, height: 15, cursor: 'pointer' }}
-              />
-              Show all outstanding
-            </label>
-            {loading && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Loading…</span>}
+          {/* Period preset chips */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {BILL_PRESETS.map(p => (
+              <button key={p.id} onClick={() => setPreset(p.id)}
+                className={`filter-chip${preset === p.id ? ' active' : ''}`}
+                style={preset === p.id ? { background: 'var(--blue)', color: '#fff' } : {}}>
+                {p.label}
+              </button>
+            ))}
           </div>
 
+          {/* Custom range inputs */}
+          {preset === 'custom' && (
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-end' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>FROM</div>
+                <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                  style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>TO</div>
+                <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                  style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+              </div>
+            </div>
+          )}
+
           {/* Summary banner */}
-          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', textTransform: 'uppercase' }}>Cases</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)' }}>{cases.length}</div>
@@ -917,10 +952,17 @@ function StatementModal({ clinicId, clinic, onClose }) {
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', textTransform: 'uppercase' }}>Total Outstanding</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--blue)' }}>Br {total.toLocaleString('en-US')}</div>
             </div>
-            <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                {allOutstanding ? 'All outstanding cases' : `${MONTHS[month]} ${year}`}
-              </div>
+            <div style={{ marginLeft: 'auto', alignSelf: 'center', textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{periodLabel}</div>
+              {clinic.lastBilledAt && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                  Last billed: {format(new Date(clinic.lastBilledAt), 'dd MMM yyyy')}
+                </div>
+              )}
+              <button className="btn btn-success btn-sm" onClick={markBilled} disabled={marking || cases.length === 0}
+                style={{ marginTop: 6 }}>
+                {marking ? 'Saving…' : '✓ Mark as Billed'}
+              </button>
             </div>
           </div>
 
@@ -967,6 +1009,100 @@ function StatementModal({ clinicId, clinic, onClose }) {
               </table>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Billing Cycle Modal ───────────────────────────────────
+// Finance assigns a recurring billing cadence to a trusted-partner clinic.
+const CYCLE_OPTIONS = [
+  { id: 'NONE',        label: 'No schedule',  desc: 'Bill manually whenever needed' },
+  { id: 'WEEKLY',      label: 'Weekly',       desc: 'Every 7 days' },
+  { id: 'FORTNIGHTLY', label: 'Fortnightly',  desc: 'Every 14 days' },
+  { id: 'MONTHLY',     label: 'Monthly',      desc: 'Once a month' },
+  { id: 'CUSTOM',      label: 'Custom',       desc: 'Ad-hoc — choose dates each time' },
+];
+const WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function BillingCycleModal({ clinic, onClose, onSaved }) {
+  const [cycle, setCycle]   = useState(clinic.billingCycle || 'NONE');
+  const [anchor, setAnchor] = useState(clinic.billingAnchor ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/clinics/${clinic.id}/billing`, {
+        billingCycle: cycle,
+        billingAnchor: (cycle === 'WEEKLY' || cycle === 'FORTNIGHTLY' || cycle === 'MONTHLY') ? (anchor === '' ? null : anchor) : null,
+      });
+      toast.success('✓ Billing cycle updated');
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not save billing cycle');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isWeekly = cycle === 'WEEKLY' || cycle === 'FORTNIGHTLY';
+  const isMonthly = cycle === 'MONTHLY';
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 460, width: '100%' }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">🗓 Billing Schedule</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🏥 {clinic.name}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 8, letterSpacing: 0.5 }}>BILLING CYCLE</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {CYCLE_OPTIONS.map(opt => (
+              <label key={opt.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                border: `2px solid ${cycle === opt.id ? 'var(--blue)' : 'var(--border)'}`,
+                background: cycle === opt.id ? 'var(--blue-dim,#EEF2FF)' : 'var(--surface)',
+              }}>
+                <input type="radio" checked={cycle === opt.id} onChange={() => setCycle(opt.id)} style={{ width: 16, height: 16 }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: cycle === opt.id ? 'var(--blue)' : 'var(--text-1)' }}>{opt.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {isWeekly && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>BILL ON</div>
+              <select value={anchor} onChange={e => setAnchor(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                <option value="">— Any day —</option>
+                {WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
+              </select>
+            </div>
+          )}
+          {isMonthly && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6 }}>DAY OF MONTH (1–28)</div>
+              <input type="number" min="1" max="28" value={anchor} onChange={e => setAnchor(e.target.value)} placeholder="e.g. 1"
+                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save Schedule'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1083,9 +1219,16 @@ const ETB = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFractio
 function TrustedPartnersTab({ queryClient }) {
   const [expanded, setExpanded]   = useState(null); // clinic id
   const [collectCase, setCollect] = useState(null);
-  const [statement, setStatement] = useState(null);
+  const [statement, setStatement] = useState(null);   // { clinicId, clinic } → Generate Bill modal
+  const [cycleClinic, setCycleClinic] = useState(null); // clinic → Billing Cycle modal
   const [clinicCases, setClinicCases] = useState({}); // { [clinicId]: cases[] }
   const [loadingClinic, setLoadingClinic] = useState(null);
+
+  const cycleBadge = (cyc) => {
+    if (!cyc || cyc === 'NONE') return null;
+    const map = { WEEKLY: '#0EA5E9', FORTNIGHTLY: '#6366F1', MONTHLY: '#16A34A', CUSTOM: '#9333EA' };
+    return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: `${map[cyc]}22`, color: map[cyc] }}>{cyc.toLowerCase()}</span>;
+  };
 
   const { data: summary = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['trusted-partners-summary'],
@@ -1131,16 +1274,18 @@ function TrustedPartnersTab({ queryClient }) {
   );
 
   const numFmt = (v) => Number(v || 0).toLocaleString('en-US');
+  const billsDue = summary.filter(c => c.billOverdue).length;
+  const scheduled = summary.filter(c => c.billingCycle && c.billingCycle !== 'NONE').length;
 
   return (
     <>
       {/* Summary KPIs */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 20 }}>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
         <div className="stat-card">
           <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
           <div className="stat-label">Trusted Partners</div>
           <div className="stat-value" style={{ color: '#6D28D9' }}>{summary.length}</div>
-          <div className="stat-sub">Active partner clinics</div>
+          <div className="stat-sub">{scheduled} on a billing schedule</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
@@ -1159,6 +1304,12 @@ function TrustedPartnersTab({ queryClient }) {
           <div className="stat-label">Outstanding</div>
           <div className="stat-value" style={{ color: 'var(--red)', fontSize: totals.outstanding >= 1000000 ? 16 : 22 }}>{ETB(totals.outstanding)}</div>
           <div className="stat-sub">Pending collection</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: billsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}>🗓</div>
+          <div className="stat-label">Bills Due</div>
+          <div className="stat-value" style={{ color: billsDue > 0 ? 'var(--red)' : 'var(--green)' }}>{billsDue}</div>
+          <div className="stat-sub">{billsDue > 0 ? 'Scheduled bills overdue' : 'All schedules up to date'}</div>
         </div>
       </div>
 
@@ -1194,7 +1345,7 @@ function TrustedPartnersTab({ queryClient }) {
                 <th style={{ textAlign: 'right' }}>Total Revenue</th>
                 <th style={{ textAlign: 'right' }}>Received</th>
                 <th style={{ textAlign: 'right' }}>Outstanding</th>
-                <th></th>
+                <th style={{ textAlign: 'center' }}>Billing</th>
               </tr>
             </thead>
             <tbody>
@@ -1219,9 +1370,35 @@ function TrustedPartnersTab({ queryClient }) {
                     <td style={{ textAlign: 'center', color: 'var(--amber)', fontWeight: 600 }}>{numFmt(c.inProgress)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-1)' }}>{ETB(c.totalRevenue)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETB(c.paymentsReceived)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, color: c.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>{ETB(c.outstanding)}</td>
-                    <td style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
-                      {expanded === c.id ? '▲' : '▼'}
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: c.outstanding > 0 ? 'var(--red)' : 'var(--green)' }}>
+                      {ETB(c.outstanding)}
+                      {c.outstandingCount > 0 && (
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>
+                          {c.outstandingCount} case{c.outstandingCount !== 1 ? 's' : ''}{c.oldestAgeDays > 0 ? ` · ${c.oldestAgeDays}d old` : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {cycleBadge(c.billingCycle)}
+                          {c.billOverdue && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)' }}>⚠ due</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => setStatement({ clinicId: c.id, clinic: c })}
+                            style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            🧾 Bill
+                          </button>
+                          <button onClick={() => setCycleClinic(c)}
+                            style={{ background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                            🗓
+                          </button>
+                          <button onClick={() => toggleClinic(c.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)' }}>
+                            {expanded === c.id ? '▲' : '▼'}
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
 
@@ -1314,6 +1491,20 @@ function TrustedPartnersTab({ queryClient }) {
           clinicId={statement.clinicId}
           clinic={statement.clinic}
           onClose={() => setStatement(null)}
+          onBilled={() => {
+            queryClient.invalidateQueries({ queryKey: ['trusted-partners-summary'] });
+            refetch();
+          }}
+        />
+      )}
+      {cycleClinic && (
+        <BillingCycleModal
+          clinic={cycleClinic}
+          onClose={() => setCycleClinic(null)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['trusted-partners-summary'] });
+            refetch();
+          }}
         />
       )}
     </>
@@ -2208,22 +2399,41 @@ export default function FinanceDashboard() {
           {/* ── KPI + Work Queue — only on the home (screenshots) tab ── */}
           {tab === 'screenshots' && (
             <>
+              {/* Excel-style finance KPIs: Delivered/day · Total Units · Revenue · Paid · Pending */}
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
                 Today's Finance Overview
               </div>
-              <div className="stats-grid" style={{ marginBottom: 8, gridTemplateColumns: 'repeat(2,1fr)' }}>
+              <div className="stats-grid" style={{ marginBottom: 18, gridTemplateColumns: 'repeat(5,1fr)' }}>
+                <div className="stat-card">
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📦</div>
+                  <div className="stat-label">Delivered / Day</div>
+                  <div className="stat-value" style={{ color: 'var(--green)' }}>{stats.deliveredToday ?? 0}</div>
+                  <div className="stat-sub">Orders delivered today</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🦷</div>
+                  <div className="stat-label">Total Units</div>
+                  <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.units?.daily ?? 0}</div>
+                  <div className="stat-sub">Units delivered today</div>
+                </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
-                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💵</div>
-                  <div className="stat-label">Paid Today</div>
-                  <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 16 : 22 }}>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+                  <div className="stat-label">Revenue</div>
+                  <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.revenue?.daily?.amount || 0).toLocaleString('en-US')}
                   </div>
-                  <div className="stat-sub">{quickReport?.paid?.today || 0} payments verified</div>
+                  <div className="stat-sub">Verified today</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('history')}>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+                  <div className="stat-label">Paid</div>
+                  <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.paid?.today ?? 0}</div>
+                  <div className="stat-sub">Payments verified today</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('report')}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
                   <div className="stat-label">Pending</div>
-                  <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 16 : 22 }}>
+                  <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
                   </div>
                   <div className="stat-sub">{quickReport?.pending?.count || 0} unpaid cases</div>
@@ -2236,9 +2446,9 @@ export default function FinanceDashboard() {
               <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(3,1fr)' }}>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('screenshots')}>
                   <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>📸</div>
-                  <div className="stat-label">Pending Approvals</div>
+                  <div className="stat-label">Payments to Verify</div>
                   <div className="stat-value" style={{ color: 'var(--amber)' }}>{pending.length + uploadedCount}</div>
-                  <div className="stat-sub">Screenshots to review</div>
+                  <div className="stat-sub">Gateway + screenshots</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('billing')}>
                   <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
@@ -2250,7 +2460,7 @@ export default function FinanceDashboard() {
                   <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
                   <div className="stat-label">Trusted Partners</div>
                   <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedCount}</div>
-                  <div className="stat-sub">Pending collection</div>
+                  <div className="stat-sub">Bills to collect</div>
                 </div>
               </div>
             </>

@@ -57,6 +57,12 @@ model Clinic {
   password  String
   isActive    Boolean  @default(true)
   isExcluded  Boolean  @default(false)
+
+  // Trusted-partner billing schedule (finance generates consolidated bills)
+  billingCycle  String?   @default("NONE") // NONE | WEEKLY | FORTNIGHTLY | MONTHLY | CUSTOM
+  billingAnchor Int?                        // day-of-week (0-6) for weekly/fortnightly, day-of-month (1-28) for monthly
+  lastBilledAt  DateTime?                   // when finance last generated a bill for this clinic
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
