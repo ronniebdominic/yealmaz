@@ -83,6 +83,9 @@ export const Shadow = {
 
 // Stage config
 export const STAGES = {
+  // Intake — pickup flow
+  PENDING_PICKUP:            { label: 'Awaiting Pickup',            color: '#546E7A', icon: '🕐', step: -2 },
+  PICKUP_ASSIGNED:           { label: 'Driver En Route',            color: '#1E88E5', icon: '🛵', step: -1 },
   // Case received
   CASE_ACCEPTED:             { label: 'Case Accepted',              color: '#3949AB', icon: '📥', step: 0  },
   // Model preparation
@@ -114,6 +117,8 @@ export const STAGES = {
   ON_HOLD:                   { label: 'On Hold',                    color: '#B71C1C', icon: '⏸️', step: -1 },
   REMAKE:                    { label: 'Remake',                     color: '#6A1B9A', icon: '🔄', step: -2 },
   CANCELLED:                 { label: 'Cancelled',                  color: '#424242', icon: '❌', step: -3 },
+  UNDER_REVIEW:              { label: 'Under Review',               color: '#F57C00', icon: '📋', step: -4 },
+  REJECTED:                  { label: 'Rejected',                   color: '#B71C1C', icon: '🚫', step: -5 },
 };
 
 export const PAYMENT_STATUS = {

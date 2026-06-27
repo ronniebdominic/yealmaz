@@ -346,7 +346,7 @@ export default function CaseDetailScreen({ navigation, route }) {
     );
   }
 
-  const stage = STAGES[caseData.status] || STAGES.CASE_ACCEPTED;
+  const stage = STAGES[caseData.status] || { label: caseData.status, color: Colors.text3, icon: '📄' };
   const pay = PAYMENT_STATUS[caseData.paymentStatus];
   const canUploadPayment = ['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus);
   const hasPaymentRequest = ['PAYMENT_REQUESTED', 'REJECTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(caseData.paymentStatus);
@@ -592,7 +592,7 @@ export default function CaseDetailScreen({ navigation, route }) {
             <Text style={{ color: Colors.text3, fontSize: 13 }}>No stage scans yet.</Text>
           ) : (
             caseData.stages?.map((s, i) => {
-              const st = STAGES[s.stageName] || STAGES.CASE_ACCEPTED;
+              const st = STAGES[s.stageName] || { label: s.stageName, color: Colors.text3, icon: '📄' };
               return (
                 <View key={s.id} style={styles.timelineItem}>
                   <View style={styles.timelineDotWrap}>

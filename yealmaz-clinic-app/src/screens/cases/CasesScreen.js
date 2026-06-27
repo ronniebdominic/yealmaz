@@ -56,7 +56,7 @@ export default function CasesScreen({ navigation, route }) {
   const changeSearch = (s) => { setSearch(s); setPage(1); };
 
   const renderCase = ({ item: c }) => {
-    const stage = STAGES[c.status] || STAGES.CASE_ACCEPTED;
+    const stage = STAGES[c.status] || { label: c.status, color: Colors.text3, icon: '📄' };
     const pay = PAYMENT_STATUS[c.paymentStatus];
     return (
       <TouchableOpacity
