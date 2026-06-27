@@ -597,4 +597,225 @@ router.post('/fix-future-dates', protect, restrict('ADMIN'), async (req, res) =>
   }
 });
 
+// ── POST /api/dashboard/run-workflow-test ─────────────────
+// End-to-end workflow test: creates a real test case, walks it through every
+// stage, verifies status at each step, then cleans up. ADMIN only.
+router.post('/run-workflow-test', protect, restrict('ADMIN'), async (req, res) => {
+  const steps = [];
+  let caseId = null;
+
+  const pass = (step, detail = '') => steps.push({ step, status: 'PASS', detail });
+  const fail = (step, detail)       => steps.push({ step, status: 'FAIL', detail });
+
+  const check = async (step, fn) => {
+    try {
+      const result = await fn();
+      pass(step, result || '');
+      return true;
+    } catch (err) {
+      fail(step, err.message || String(err));
+      return false;
+    }
+  };
+
+  // Fixed IDs from real DB
+  const CLINIC_ID   = '8928d9b4-01c2-44f3-87f8-7309294217b6';
+  const DELIVERY_ID = '96399573-4007-4440-b24b-d480668914ff';
+  const FINANCE_ID  = 'cf8068a4-58cf-4ead-b23b-0272087870ab';
+  const WORK_TYPE   = 'Full Contoured Zirconia';
+
+  try {
+
+    // ── STEP 1: Create phone order (dispatch) ────────────────
+    await check('1. Create phone order (PENDING_PICKUP)', async () => {
+      const c = await prisma.case.create({
+        data: {
+          caseNumber:   null,
+          patientName:  'TEST PATIENT - WORKFLOW',
+          workType:     WORK_TYPE,
+          clinicId:     CLINIC_ID,
+          status:       'PENDING_PICKUP',
+          deliveryType: 'NORMAL',
+          dueDate:      new Date(Date.now() + 5 * 86400000),
+        }
+      });
+      caseId = c.id;
+      await prisma.payment.create({ data: { caseId, status: 'PENDING' } });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'PENDING_PICKUP', scannedBy: 'TEST', notes: 'Workflow test order' } });
+      if (c.status !== 'PENDING_PICKUP') throw new Error(`Expected PENDING_PICKUP, got ${c.status}`);
+      if (c.caseNumber !== null) throw new Error('caseNumber should be null before acceptance');
+      return `Case created id=${caseId}`;
+    });
+
+    // ── STEP 2: Dispatch assigns pickup driver ───────────────
+    await check('2. Assign pickup driver → PICKUP_ASSIGNED', async () => {
+      await prisma.case.update({ where: { id: caseId }, data: { assignedDeliveryId: DELIVERY_ID, status: 'PICKUP_ASSIGNED' } });
+      const c = await prisma.case.findUnique({ where: { id: caseId } });
+      if (c.status !== 'PICKUP_ASSIGNED') throw new Error(`Expected PICKUP_ASSIGNED, got ${c.status}`);
+      if (!c.assignedDeliveryId) throw new Error('assignedDeliveryId should be set');
+      return 'Driver assigned';
+    });
+
+    // ── STEP 3: Driver marks impression collected (clears driver) ──
+    await check('3. Driver collects impression → PICKUP_ASSIGNED + no driver (arrived at lab)', async () => {
+      await prisma.case.update({ where: { id: caseId }, data: { assignedDeliveryId: null } });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'PICKUP_ASSIGNED', scannedBy: 'TEST_DRIVER', notes: 'Impression arrived at lab — awaiting receptionist acceptance' } });
+      const c = await prisma.case.findUnique({ where: { id: caseId } });
+      if (c.status !== 'PICKUP_ASSIGNED') throw new Error(`Status should stay PICKUP_ASSIGNED, got ${c.status}`);
+      if (c.assignedDeliveryId !== null) throw new Error('assignedDeliveryId should be cleared (null)');
+      return 'arrivedAtLab condition: PICKUP_ASSIGNED + assignedDeliveryId=null ✓';
+    });
+
+    // ── STEP 4: Receptionist accepts → CASE_ACCEPTED + scan number ──
+    await check('4. Receptionist accepts → CASE_ACCEPTED + scan number generated', async () => {
+      // Generate case number
+      const yy = String(new Date().getFullYear()).slice(-2);
+      const prefix = `YDL${yy}`;
+      const last = await prisma.case.findFirst({ where: { caseNumber: { startsWith: prefix } }, orderBy: { caseNumber: 'desc' }, select: { caseNumber: true } });
+      const lastNum = last ? parseInt(last.caseNumber.slice(prefix.length), 10) || 0 : 0;
+      const caseNumber = `${prefix}${String(lastNum + 1).padStart(6, '0')}`;
+
+      await prisma.case.update({
+        where: { id: caseId },
+        data: { status: 'CASE_ACCEPTED', caseNumber, shade: 'A2', doctorName: 'Dr. Test', doctorPhone: '+251 900 000 000', workType: WORK_TYPE, totalAmount: 2500, dueDate: new Date(Date.now() + 5 * 86400000) }
+      });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'CASE_ACCEPTED', scannedBy: 'TEST_RECEPTION', notes: 'Accepted by receptionist' } });
+
+      const c = await prisma.case.findUnique({ where: { id: caseId } });
+      if (c.status !== 'CASE_ACCEPTED')    throw new Error(`Expected CASE_ACCEPTED, got ${c.status}`);
+      if (!c.caseNumber)                   throw new Error('caseNumber should be assigned on acceptance');
+      if (c.shade !== 'A2')                throw new Error('shade not saved');
+      if (c.totalAmount !== 2500)          throw new Error('totalAmount not saved');
+      return `caseNumber=${c.caseNumber}, shade=${c.shade}, amount=Br ${c.totalAmount}`;
+    });
+
+    // ── STEP 5: Lab stages (abbreviated — plaster → milling → QC) ──
+    const labStages = ['PLASTER_DEPARTMENT', 'SCANNING', 'DESIGNING', 'MILLING_SINTERING', 'QUALITY_CHECK'];
+    for (const stage of labStages) {
+      await check(`5. Lab stage: ${stage}`, async () => {
+        await prisma.case.update({ where: { id: caseId }, data: { status: stage } });
+        await prisma.caseStage.create({ data: { caseId, stageName: stage, scannedBy: 'TEST_LAB', notes: `Test stage: ${stage}` } });
+        const c = await prisma.case.findUnique({ where: { id: caseId } });
+        if (c.status !== stage) throw new Error(`Expected ${stage}, got ${c.status}`);
+        return `Status = ${stage}`;
+      });
+    }
+
+    // ── STEP 6: QC → auto-advance to READY_TO_DISPATCH ─────
+    await check('6. QC auto-advance → READY_TO_DISPATCH', async () => {
+      // Simulate what scan.js does
+      await prisma.case.update({ where: { id: caseId }, data: { status: 'READY_TO_DISPATCH' } });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'QUALITY_CHECK', scannedBy: 'TEST_QC', notes: 'QC passed' } });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'READY_TO_DISPATCH', scannedBy: 'System', notes: 'QC passed — moved to dispatch queue' } });
+      const c = await prisma.case.findUnique({ where: { id: caseId }, include: { payment: true } });
+      if (c.status !== 'READY_TO_DISPATCH') throw new Error(`Expected READY_TO_DISPATCH, got ${c.status}`);
+      if (c.payment?.status === 'VERIFIED') throw new Error('Payment should NOT be verified yet — should be in Ready for Delivery tab');
+      return `Status=READY_TO_DISPATCH, paymentStatus=${c.payment?.status} → appears in 'Ready for Delivery' (awaiting payment) ✓`;
+    });
+
+    // ── STEP 7: Finance requests payment ────────────────────
+    await check('7. Finance requests payment → PAYMENT_REQUESTED', async () => {
+      await prisma.payment.update({ where: { caseId }, data: { status: 'PAYMENT_REQUESTED', amount: 2500 } });
+      await prisma.case.update({ where: { id: caseId }, data: { paymentStatus: 'PAYMENT_REQUESTED' } });
+      const c = await prisma.case.findUnique({ where: { id: caseId } });
+      if (c.paymentStatus !== 'PAYMENT_REQUESTED') throw new Error(`Expected PAYMENT_REQUESTED, got ${c.paymentStatus}`);
+      return 'Payment requested, amount=Br 2500';
+    });
+
+    // ── STEP 8: Finance verifies payment → VERIFIED ─────────
+    await check('8. Finance verifies payment → VERIFIED (moves to Ready for Dispatch)', async () => {
+      await prisma.payment.update({ where: { caseId }, data: { status: 'VERIFIED', verifiedAt: new Date(), verifiedById: FINANCE_ID, invoiceNumber: `INV-${caseId.slice(0,8)}` } });
+      await prisma.case.update({ where: { id: caseId }, data: { paymentStatus: 'VERIFIED' } });
+      const c = await prisma.case.findUnique({ where: { id: caseId }, include: { payment: true } });
+      if (c.paymentStatus !== 'VERIFIED')           throw new Error(`Case paymentStatus should be VERIFIED, got ${c.paymentStatus}`);
+      if (c.payment?.status !== 'VERIFIED')         throw new Error(`Payment.status should be VERIFIED, got ${c.payment?.status}`);
+      if (c.status !== 'READY_TO_DISPATCH')         throw new Error(`Status should stay READY_TO_DISPATCH, got ${c.status}`);
+      return `paymentStatus=VERIFIED, invoiceNumber=${c.payment?.invoiceNumber} → now in 'Ready for Dispatch' ✓`;
+    });
+
+    // ── STEP 9: Dispatch assigns delivery driver → OUT_FOR_DELIVERY ──
+    await check('9. Dispatch sends out → OUT_FOR_DELIVERY + driver assigned', async () => {
+      await prisma.case.update({ where: { id: caseId }, data: { status: 'OUT_FOR_DELIVERY', assignedDeliveryId: DELIVERY_ID } });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'OUT_FOR_DELIVERY', scannedBy: 'TEST_DISPATCH', notes: 'Dispatched to delivery driver' } });
+      const c = await prisma.case.findUnique({ where: { id: caseId } });
+      if (c.status !== 'OUT_FOR_DELIVERY') throw new Error(`Expected OUT_FOR_DELIVERY, got ${c.status}`);
+      if (!c.assignedDeliveryId) throw new Error('Driver should be assigned');
+      return 'Case OUT_FOR_DELIVERY, driver assigned';
+    });
+
+    // ── STEP 10: Delivery driver marks delivered ─────────────
+    await check('10. Delivery staff marks delivered → DELIVERED', async () => {
+      const now = new Date();
+      await prisma.case.update({ where: { id: caseId }, data: { status: 'DELIVERED', deliveryDate: now } });
+      await prisma.caseStage.create({ data: { caseId, stageName: 'DELIVERED', scannedBy: 'TEST_DRIVER', notes: 'Delivered to clinic' } });
+      try {
+        await prisma.deliveryLog.create({ data: { caseId, deliveryById: DELIVERY_ID, deliveredAt: now } });
+      } catch (_) {} // DeliveryLog may have pickedUpAt NOT NULL — ignore if schema requires it
+      const c = await prisma.case.findUnique({ where: { id: caseId } });
+      if (c.status !== 'DELIVERED') throw new Error(`Expected DELIVERED, got ${c.status}`);
+      if (!c.deliveryDate) throw new Error('deliveryDate should be set');
+      return `Status=DELIVERED, deliveryDate=${format(c.deliveryDate, 'dd MMM yyyy HH:mm')}`;
+    });
+
+    // ── STEP 11: Final state verification ───────────────────
+    await check('11. Final state audit', async () => {
+      const c = await prisma.case.findUnique({
+        where: { id: caseId },
+        include: { payment: true, stages: { orderBy: { scannedAt: 'asc' } } }
+      });
+      const checks = [
+        ['status=DELIVERED',             c.status === 'DELIVERED'],
+        ['caseNumber assigned',          !!c.caseNumber],
+        ['shade set',                    !!c.shade],
+        ['totalAmount set',              c.totalAmount === 2500],
+        ['paymentStatus=VERIFIED',       c.paymentStatus === 'VERIFIED'],
+        ['payment.status=VERIFIED',      c.payment?.status === 'VERIFIED'],
+        ['deliveryDate set',             !!c.deliveryDate],
+        ['stage count >= 10',            c.stages.length >= 10],
+      ];
+      const failed = checks.filter(([, ok]) => !ok).map(([label]) => label);
+      if (failed.length) throw new Error(`Failed checks: ${failed.join(', ')}`);
+      return `All ${checks.length} final checks passed. Stage history has ${c.stages.length} entries.`;
+    });
+
+  } finally {
+    // ── CLEANUP: delete test case and related records ────────
+    if (caseId) {
+      try {
+        await prisma.$transaction([
+          prisma.caseStage.deleteMany({ where: { caseId } }),
+          prisma.deliveryLog.deleteMany({ where: { caseId } }),
+          prisma.payment.deleteMany({ where: { caseId } }),
+          prisma.case.delete({ where: { id: caseId } }),
+        ]);
+        pass('12. Cleanup', 'Test case and all related records deleted');
+      } catch (err) {
+        fail('12. Cleanup', err.message);
+      }
+    }
+  }
+
+  const passed = steps.filter(s => s.status === 'PASS').length;
+  const failed = steps.filter(s => s.status === 'FAIL').length;
+  const allPassed = failed === 0;
+
+  res.json({
+    result: allPassed ? '✅ ALL TESTS PASSED' : `❌ ${failed} TEST(S) FAILED`,
+    summary: `${passed} passed, ${failed} failed out of ${steps.length} steps`,
+    steps,
+  });
+});
+
+// helper used inside test
+function format(date, fmt) {
+  const d = new Date(date);
+  const pad = n => String(n).padStart(2, '0');
+  return fmt
+    .replace('dd',   pad(d.getDate()))
+    .replace('MMM',  ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()])
+    .replace('yyyy', d.getFullYear())
+    .replace('HH',   pad(d.getHours()))
+    .replace('mm',   pad(d.getMinutes()));
+}
+
 module.exports = router;

@@ -311,6 +311,22 @@ export default function AdminDashboard() {
   const [drillKey, setDrillKey]   = useState(null);
   const [fixingDates, setFixingDates] = useState(false);
   const [fixResult, setFixResult]     = useState(null);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult]   = useState(null);
+
+  const runWorkflowTest = async () => {
+    if (!window.confirm('Run end-to-end workflow test? This creates a real test case, walks it through every stage, then deletes it automatically.')) return;
+    setTestRunning(true);
+    setTestResult(null);
+    try {
+      const res = await api.post('/dashboard/run-workflow-test');
+      setTestResult(res.data);
+    } catch (err) {
+      setTestResult({ result: '❌ REQUEST FAILED', summary: err.response?.data?.error || err.message, steps: [] });
+    } finally {
+      setTestRunning(false);
+    }
+  };
 
   const runDateFix = async () => {
     if (!window.confirm('This will shift all future-dated records (Dec 2026 → Dec 2025) back by 1 year. Continue?')) return;
@@ -395,6 +411,11 @@ export default function AdminDashboard() {
               {fixResult.error ? `✕ ${fixResult.error}` : `✓ Fixed ${fixResult.fixed?.payments ?? 0} payments, ${fixResult.fixed?.cases ?? 0} cases`}
             </span>
           )}
+          <button onClick={runWorkflowTest} disabled={testRunning}
+            title="Run end-to-end workflow test through all lab stages"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: testRunning ? 'var(--border)' : '#0F2044', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: testRunning ? 'not-allowed' : 'pointer' }}>
+            {testRunning ? '⏳ Testing…' : '🧪 Run Test'}
+          </button>
           <ExportMenu
             data={revenueByClinic || []}
             columns={[
@@ -448,6 +469,32 @@ export default function AdminDashboard() {
 
         {error && (
           <div style={{ background: '#3d1a1a', borderRadius: 10, padding: '12px 16px', marginBottom: 20, border: '1px solid rgba(229,62,62,.3)', color: '#ef9a9a', fontSize: 13 }}>⚠️ {error}</div>
+        )}
+
+        {/* ── Workflow Test Results ── */}
+        {testResult && (
+          <div style={{ marginBottom: 20, borderRadius: 12, overflow: 'hidden', border: `2px solid ${testResult.result?.startsWith('✅') ? '#16A34A' : '#DC2626'}` }}>
+            <div style={{ background: testResult.result?.startsWith('✅') ? '#16A34A' : '#DC2626', color: '#fff', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15 }}>{testResult.result}</div>
+                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{testResult.summary}</div>
+              </div>
+              <button onClick={() => setTestResult(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', fontSize: 15 }}>×</button>
+            </div>
+            <div style={{ background: '#F9FAFB', padding: '12px 18px' }}>
+              {testResult.steps?.map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '5px 0', borderBottom: '1px solid #E5E7EB' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: s.status === 'PASS' ? '#16A34A' : '#DC2626', minWidth: 14 }}>
+                    {s.status === 'PASS' ? '✓' : '✕'}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2937' }}>{s.step}</div>
+                    {s.detail && <div style={{ fontSize: 12, color: s.status === 'PASS' ? '#6B7280' : '#DC2626', marginTop: 2 }}>{s.detail}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {loading ? (
