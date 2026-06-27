@@ -37,8 +37,6 @@ async function awardCasePoints(clinicId, caseId, caseNumber) {
   });
   await invalidate(`rewards:clinic:${clinicId}`);
 }
-module.exports.awardCasePoints = awardCasePoints;
-
 // ── GET /api/rewards/settings ─────────────────────────────
 router.get('/settings', protect, async (req, res) => {
   try {
@@ -272,3 +270,4 @@ router.patch('/redemptions/:id', protect, restrict('ADMIN'), async (req, res) =>
 });
 
 module.exports = router;
+module.exports.awardCasePoints = awardCasePoints;

@@ -289,7 +289,7 @@ export default function NewCaseScreen({ navigation }) {
             </View>
             <View style={{ width: 12 }} />
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Doctor Gender</Text>
+              <Text style={styles.label}>Patient Gender</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {['Male', 'Female'].map(g => {
                   const active = form.patientGender === g;
