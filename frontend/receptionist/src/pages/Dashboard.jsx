@@ -108,8 +108,8 @@ function AcceptCasesSection({ queryClient }) {
     queryFn: () => api.get('/cases', {
       params: { status: 'PENDING_PICKUP,PICKUP_ASSIGNED,UNDER_REVIEW', limit: 100 }
     }).then(r => r.data),
-    staleTime: 20_000,
-    refetchInterval: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   });
 
   const invalidate = () => {
@@ -118,20 +118,40 @@ function AcceptCasesSection({ queryClient }) {
     refetch();
   };
 
+  // Optimistically remove a case from the visible list immediately — no waiting for refetch
+  const removeFromList = (caseId) => {
+    queryClient.setQueryData(['cases', 'to-accept'], (old) => {
+      if (!old) return old;
+      return { ...old, cases: (old.cases ?? []).filter(c => c.id !== caseId) };
+    });
+  };
+
   const open = (id, act) => { setOpenId(openId === id && action === act ? null : id); setAction(act); };
 
   const handleAccept = async (c) => {
     const d = det(c.id);
-    if (!d.shade)              return toast.error('Shade is required to accept');
+
+    // Use effective value: form field first, fall back to existing case data
+    // (so validation passes when fields were already set on the case)
+    const effectiveDoctorName  = (d.doctorName?.trim()  || c.doctorName?.trim());
+    const effectiveDoctorPhone = (d.doctorPhone?.trim() || c.doctorPhone?.trim());
+
+    if (!d.shade)                  return toast.error('Shade is required to accept');
     if (!d.workType && !c.workType) return toast.error('Work type is required');
-    if (!d.doctorName?.trim()) return toast.error("Doctor's name is required");
-    if (!d.doctorPhone?.trim()) return toast.error("Doctor's contact is required");
+    if (!effectiveDoctorName)       return toast.error("Doctor's name is required");
+    if (!effectiveDoctorPhone)      return toast.error("Doctor's contact is required");
+
     setSubmitting(true);
+
+    // Optimistically remove from list immediately so the UI doesn't wait for refetch
+    removeFromList(c.id);
+    setOpenId(null);
+
     try {
       await api.post(`/cases/${c.id}/accept`, {
         shade:        d.shade,
-        doctorName:   d.doctorName,
-        doctorPhone:  d.doctorPhone,
+        doctorName:   effectiveDoctorName,
+        doctorPhone:  effectiveDoctorPhone,
         workType:     d.workType || c.workType,
         units:        d.units ? parseInt(d.units) : undefined,
         deliveryType: d.orderType || 'NORMAL',
@@ -140,11 +160,12 @@ function AcceptCasesSection({ queryClient }) {
         notes:        d.notes,
       });
       toast.success(`✓ Case accepted — scan number assigned`);
-      setOpenId(null);
       setDetails(prev => { const n = { ...prev }; delete n[c.id]; return n; });
-      invalidate();
+      invalidate();  // background refresh to sync exact server state
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed');
+      // On failure, restore the case in the list by refetching
+      refetch();
+      toast.error(err.response?.data?.error || 'Failed to accept case');
     } finally {
       setSubmitting(false);
     }
@@ -358,19 +379,36 @@ function AcceptCasesSection({ queryClient }) {
                 </div>
               )}
 
-              {/* Row 3: Doctor + Phone */}
+              {/* Row 3: Doctor + Phone — pre-filled and locked if already set on the case */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>DOCTOR'S NAME *</label>
-                  <input style={inputSt} placeholder="Dr. Ahmed"
-                    value={d.doctorName || c.doctorName || ''}
-                    onChange={e => setDet(c.id, 'doctorName', e.target.value)} />
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>
+                    DOCTOR'S NAME *
+                    {c.doctorName && !d.doctorName && (
+                      <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>
+                    )}
+                  </label>
+                  <input
+                    style={{ ...inputSt, background: c.doctorName && !d.doctorName ? 'var(--green-dim)' : undefined, color: c.doctorName && !d.doctorName ? 'var(--green)' : undefined }}
+                    placeholder="Dr. Ahmed"
+                    value={d.doctorName !== undefined ? d.doctorName : (c.doctorName || '')}
+                    onChange={e => setDet(c.id, 'doctorName', e.target.value)}
+                  />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>CONTACT / PHONE *</label>
-                  <input type="tel" style={inputSt} placeholder="+251 911 000 000"
-                    value={d.doctorPhone || c.doctorPhone || ''}
-                    onChange={e => setDet(c.id, 'doctorPhone', e.target.value)} />
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>
+                    CONTACT / PHONE *
+                    {c.doctorPhone && !d.doctorPhone && (
+                      <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>
+                    )}
+                  </label>
+                  <input
+                    type="tel"
+                    style={{ ...inputSt, background: c.doctorPhone && !d.doctorPhone ? 'var(--green-dim)' : undefined, color: c.doctorPhone && !d.doctorPhone ? 'var(--green)' : undefined }}
+                    placeholder="+251 911 000 000"
+                    value={d.doctorPhone !== undefined ? d.doctorPhone : (c.doctorPhone || '')}
+                    onChange={e => setDet(c.id, 'doctorPhone', e.target.value)}
+                  />
                 </div>
               </div>
 
