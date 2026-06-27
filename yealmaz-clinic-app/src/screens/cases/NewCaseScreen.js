@@ -4,8 +4,18 @@ import {
   TextInput, StatusBar, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow } from '../../utils/theme';
+
+const SHADE_GROUPS = [
+  { group: 'Vita A',  shades: ['A1', 'A2', 'A3', 'A3.5', 'A4'] },
+  { group: 'Vita B',  shades: ['B1', 'B2', 'B3', 'B4'] },
+  { group: 'Vita C',  shades: ['C1', 'C2', 'C3', 'C4'] },
+  { group: 'Vita D',  shades: ['D2', 'D3', 'D4'] },
+  { group: 'Bleach',  shades: ['BL1', 'BL2', 'BL3', 'BL4'] },
+];
+const ALL_SHADES = SHADE_GROUPS.flatMap(g => g.shades);
 
 // ── Due-date rules (mirrors backend getDueDays) ──────────
 function getDueDays(workType, priceMap = {}) {
@@ -121,6 +131,8 @@ export default function NewCaseScreen({ navigation }) {
   const [manualUnits, setManualUnits] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showWorkTypes, setShowWorkTypes] = useState(false);
+  const [showShades, setShowShades] = useState(false);
+  const [customShade, setCustomShade] = useState(false);
   const [autoCalcDays, setAutoCalcDays] = useState(null);
   // The lab's pricing list is the single source of truth for selectable work types
   const [priceList, setPriceList] = useState([]);
@@ -214,14 +226,13 @@ export default function NewCaseScreen({ navigation }) {
         deliveryDate: form.deliveryDate || undefined,
         totalAmount: selectedPrice ? selectedPrice.total : undefined,
       });
-      Alert.alert(
-        '✅ Case Submitted!',
-        `Your case has been submitted successfully. Our dispatch team will assign a driver to collect the impression from your clinic. You will be notified once the case is accepted by the lab.`,
-        [
-          { text: 'View Case', onPress: () => navigation.replace('CaseDetail', { caseId: res.data.id }) },
-          { text: 'Done', onPress: () => navigation.goBack() },
-        ]
-      );
+      Toast.show({
+        type: 'success',
+        text1: 'Case Submitted!',
+        text2: 'Dispatch will assign a driver to collect the impression.',
+        visibilityTime: 4000,
+      });
+      navigation.navigate('Main', { screen: 'Cases' });
     } catch (err) {
       Alert.alert('Submission Failed', err.response?.data?.error || 'Please try again.');
     } finally {
@@ -330,13 +341,53 @@ export default function NewCaseScreen({ navigation }) {
             <View style={{ width: 12 }} />
             <View style={[styles.formGroup, { flex: 1 }]}>
               <Text style={styles.label}>Shade *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. A2, B1"
-                placeholderTextColor={Colors.text3}
-                value={form.shade}
-                onChangeText={set('shade')}
-              />
+              <TouchableOpacity
+                style={[styles.input, styles.selectInput]}
+                onPress={() => { setShowShades(prev => !prev); setCustomShade(false); }}
+              >
+                <Text style={form.shade ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
+                  {form.shade || 'Select shade…'}
+                </Text>
+                <Text style={styles.selectArrow}>{showShades ? '▲' : '▼'}</Text>
+              </TouchableOpacity>
+              {showShades && (
+                <View style={styles.dropdown}>
+                  <ScrollView nestedScrollEnabled style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
+                    {SHADE_GROUPS.map(g => (
+                      <View key={g.group} style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
+                        <Text style={styles.shadeGroupLabel}>{g.group}</Text>
+                        <View style={styles.shadeChips}>
+                          {g.shades.map(s => (
+                            <TouchableOpacity
+                              key={s}
+                              style={[styles.shadeChip, form.shade === s && styles.shadeChipActive]}
+                              onPress={() => { set('shade')(s); setShowShades(false); setCustomShade(false); }}
+                            >
+                              <Text style={[styles.shadeChipText, form.shade === s && styles.shadeChipTextActive]}>{s}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                    <TouchableOpacity
+                      style={[styles.dropdownItem, { marginTop: 4 }]}
+                      onPress={() => { setShowShades(false); setCustomShade(true); if (ALL_SHADES.includes(form.shade)) set('shade')(''); }}
+                    >
+                      <Text style={[styles.dropdownText, { color: Colors.blue }]}>✏️  Custom shade…</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              )}
+              {customShade && (
+                <TextInput
+                  style={[styles.input, { marginTop: 6 }]}
+                  placeholder="Type shade (e.g. OM3, 3M2)…"
+                  placeholderTextColor={Colors.text3}
+                  value={form.shade}
+                  onChangeText={set('shade')}
+                  autoFocus
+                />
+              )}
             </View>
           </View>
         </View>
@@ -656,4 +707,18 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md,
   },
   cancelText: { fontSize: 15, fontWeight: '600', color: Colors.text2 },
+
+  // Shade dropdown
+  shadeGroupLabel: {
+    fontSize: 10, fontWeight: '700', color: Colors.text3,
+    letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 6,
+  },
+  shadeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  shadeChip: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md,
+    borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg,
+  },
+  shadeChipActive: { borderColor: Colors.blue, backgroundColor: Colors.blue + '15' },
+  shadeChipText: { fontSize: 13, fontWeight: '600', color: Colors.text2 },
+  shadeChipTextActive: { fontSize: 13, fontWeight: '700', color: Colors.blue },
 });
