@@ -440,7 +440,7 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE'), async (re
 
     const caseData = await prisma.case.findUnique({
       where: { id: req.params.caseId },
-      include: { clinic: { select: { id: true, name: true } } }
+      include: { clinic: { select: { id: true, name: true } }, payment: true }
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
 
@@ -452,6 +452,13 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE'), async (re
     };
     if (amount) paymentData.amount = parseFloat(amount);
     if (notes)  paymentData.invoiceNotes = notes;
+
+    // Issue a real invoice on collection (if one wasn't already issued).
+    // Real invoices only exist after payment — this is what Billing & Invoicing lists.
+    if (!caseData.payment?.invoiceNumber) {
+      paymentData.invoiceNumber   = `INV-${caseData.caseNumber}`;
+      paymentData.invoiceIssuedAt = new Date();
+    }
 
     const payment = await prisma.payment.upsert({
       where:  { caseId: req.params.caseId },
@@ -692,6 +699,47 @@ router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch payment history.' });
+  }
+});
+
+// ── GET /api/payments/invoices ───────────────────────────
+// Real invoices — only exist once payment is done (VERIFIED + invoice issued).
+// This is what the Billing & Invoicing tab lists.
+router.get('/invoices', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const { page = 1, limit = 50, search = '' } = req.query;
+  const skip = (parseInt(page) - 1) * parseInt(limit);
+  try {
+    const where = {
+      status: 'VERIFIED',
+      invoiceNumber: { not: null },
+      ...(search ? {
+        OR: [
+          { invoiceNumber: { contains: search, mode: 'insensitive' } },
+          { case: { clinic: { name: { contains: search, mode: 'insensitive' } } } },
+          { case: { patientName: { contains: search, mode: 'insensitive' } } },
+          { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
+        ]
+      } : {})
+    };
+    const [payments, total, totalAgg] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        include: { case: { include: { clinic: { select: { name: true, phone: true, address: true } } } } },
+        orderBy: { invoiceIssuedAt: 'desc' },
+        skip, take: parseInt(limit),
+      }),
+      prisma.payment.count({ where }),
+      prisma.payment.aggregate({ where, _sum: { amount: true } }),
+    ]);
+
+    res.json({
+      invoices: payments,
+      totalAmount: totalAgg._sum.amount || 0,
+      pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) },
+    });
+  } catch (err) {
+    console.error('[payments/invoices]', err);
+    res.status(500).json({ error: 'Could not fetch invoices.' });
   }
 });
 

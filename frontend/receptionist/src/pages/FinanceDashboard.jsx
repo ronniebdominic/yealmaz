@@ -521,231 +521,131 @@ function ScreenshotsTab({ queryClient }) {
 }
 
 // ── Billing & Invoicing Tab ───────────────────────────────
-const BILLING_SUB_TABS = [
-  { id: 'to-request', label: 'Send Request',        icon: '📨' },
-  { id: 'requested',  label: 'Request Sent',        icon: '⏳' },
-  { id: 'uploaded',   label: 'Screenshot Uploaded', icon: '📸' },
-];
+// Real invoices ONLY — generated after payment is done. (Quotes/payment
+// requests are auto-sent by Dispatch via 'Request Payment'; they are not
+// invoices and do not appear here.)
+function BillingTab() {
+  const [page, setPage]     = useState(1);
+  const [search, setSearch] = useState('');
+  const [submitted, setSubmitted] = useState('');
+  const [viewInvoice, setViewInvoice] = useState(null);
 
-function BillingTab({ queryClient }) {
-  const [subTab, setSubTab]         = useState('to-request');
-  const [issueModal, setIssueModal] = useState(null);
-  const [viewModal, setViewModal]   = useState(null);
-  const [collectModal, setCollect]  = useState(null);
-  const [processing, setProcessing] = useState(null);
-  const [page, setPage]             = useState(1);
-  const [search, setSearch]         = useState('');
-
-  const changeSubTab = (t) => { setSubTab(t); setPage(1); };
-  const handleSearch = (v) => { setSearch(v); setPage(1); };
-
-  const { data: cases = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['payments', 'billing'],
-    queryFn: fetchBilling,
-    staleTime: 60_000,
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['payments', 'invoices', page, submitted],
+    queryFn: () => api.get('/payments/invoices', { params: { page, limit: PAGE_SIZE, search: submitted } }).then(r => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
 
-  const verifyMutation = useMutation({
-    mutationFn: ({ caseId, action, rejectionReason }) =>
-      api.post(`/payments/${caseId}/verify`, { action, rejectionReason }),
-    onSuccess: (_, { action }) => {
-      toast.success(action === 'APPROVE' ? '✅ Payment approved — case ready for dispatch.' : '❌ Payment rejected.');
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    },
-    onError: (err) => toast.error(err.response?.data?.error || 'Action failed. Please try again.'),
-    onSettled: () => setProcessing(null),
-  });
+  const invoices   = data?.invoices ?? [];
+  const pagination = data?.pagination ?? {};
+  const totalAmount = data?.totalAmount ?? 0;
 
-  const verify = (caseId, action) => {
-    let rejectionReason;
-    if (action === 'REJECT') {
-      rejectionReason = prompt('Reason for rejection (sent to clinic):');
-      if (!rejectionReason) return;
-    }
-    setProcessing(caseId + action);
-    verifyMutation.mutate({ caseId, action, rejectionReason });
-  };
+  const doSearch = (v) => { setSearch(v); };
+  const applySearch = () => { setSubmitted(search); setPage(1); };
 
-  const sq = search.toLowerCase();
-  const matchSearch = (c) => !sq ||
-    c.clinic?.name?.toLowerCase().includes(sq) ||
-    c.patientName?.toLowerCase().includes(sq) ||
-    c.caseNumber?.toLowerCase().includes(sq) ||
-    c.payment?.invoiceNumber?.toLowerCase().includes(sq);
+  const methodLabel = (inv) => inv.chapaTxRef ? '💳 Online' : inv.screenshotUrl ? '📸 Screenshot' : '✍️ Manual';
 
-  const toRequest = useMemo(() => cases.filter(c => c.status === 'PAYMENT_INVOICING' && c.paymentStatus === 'PENDING' && matchSearch(c)), [cases, sq]);
-  const requested = useMemo(() => cases.filter(c => ['PAYMENT_REQUESTED', 'REJECTED'].includes(c.paymentStatus) && matchSearch(c)), [cases, sq]);
-  const uploaded  = useMemo(() => cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED' && matchSearch(c)), [cases, sq]);
-
-  const buckets    = { 'to-request': toRequest, requested, uploaded };
-  const shown      = buckets[subTab] || [];
-  const totalPages = Math.ceil(shown.length / PAGE_SIZE);
-  const paginated  = useMemo(() => shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [shown, page]);
-
-  const counts = { 'to-request': toRequest.length, requested: requested.length, uploaded: uploaded.length };
-
-  if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading…</div>;
-  if (isError)   return <ErrorState message="Could not load billing data." onRetry={refetch} />;
+  if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading invoices…</div>;
+  if (isError)   return <ErrorState message="Could not load invoices." onRetry={refetch} />;
 
   return (
     <>
-      {/* Sub-tabs + search */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
-        <div className="filters" style={{ margin: 0, flex: 1, flexWrap: 'wrap' }}>
-          {BILLING_SUB_TABS.map(t => (
-            <button key={t.id} className={`filter-chip ${subTab === t.id ? 'active' : ''}`} onClick={() => changeSubTab(t.id)}>
-              {t.icon} {t.label}
-              {counts[t.id] > 0 && <span className="badge-count">{counts[t.id]}</span>}
-            </button>
-          ))}
+      {/* Summary */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: 16 }}>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
+          <div className="stat-label">Invoices Issued</div>
+          <div className="stat-value" style={{ color: 'var(--blue)' }}>{pagination.total ?? invoices.length}</div>
+          <div className="stat-sub">Generated after payment</div>
         </div>
-        <div className="search-input" style={{ minWidth: 200 }}>
-          <span className="icon">🔍</span>
-          <input
-            placeholder="Search clinic, case, patient…"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-          />
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+          <div className="stat-label">Total Invoiced</div>
+          <div className="stat-value" style={{ color: 'var(--green)', fontSize: totalAmount >= 1000000 ? 16 : 22 }}>{ETB(totalAmount)}</div>
+          <div className="stat-sub">{submitted ? 'Matching search' : 'All issued invoices'}</div>
         </div>
-        {search && (
-          <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
-        )}
       </div>
 
-      {shown.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">{BILLING_SUB_TABS.find(t => t.id === subTab)?.icon}</div>
-          <div className="empty-title">
-            {subTab === 'to-request' ? 'No cases awaiting payment request'
-              : subTab === 'requested' ? 'No pending payment requests'
-              : 'No screenshots to review'}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">📄 Issued Invoices</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div className="search-input" style={{ minWidth: 220 }}>
+              <span className="icon">🔍</span>
+              <input placeholder="Search invoice #, clinic, case…" value={search}
+                onChange={e => doSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && applySearch()} />
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={applySearch}>Search</button>
+            {submitted && <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setSubmitted(''); setPage(1); }} style={{ color: 'var(--red)' }}>✕</button>}
+            <ExportMenu
+              data={invoices}
+              columns={[
+                { header: 'Invoice #',  value: i => i.invoiceNumber },
+                { header: 'Issued',     value: i => i.invoiceIssuedAt ? format(new Date(i.invoiceIssuedAt), 'dd MMM yyyy') : '' },
+                { header: 'Case #',     value: i => i.case?.caseNumber },
+                { header: 'Clinic',     value: i => i.case?.clinic?.name },
+                { header: 'Patient',    value: i => i.case?.patientName },
+                { header: 'Work Type',  value: i => i.case?.workType },
+                { header: 'Amount (Br)',value: i => i.amount ?? '' },
+                { header: 'Method',     value: i => i.chapaTxRef ? 'Online' : i.screenshotUrl ? 'Screenshot' : 'Manual' },
+              ]}
+              filename="invoices" title="Issued Invoices"
+            />
           </div>
-          <p>
-            {subTab === 'to-request' ? 'Cases that have completed all lab work and need a payment request sent to the clinic appear here.'
-              : subTab === 'requested' ? 'Cases where a payment request has been sent, waiting for the clinic to upload their receipt.'
-              : 'After a clinic uploads a payment receipt, it appears here for you to approve or reject.'}
-          </p>
         </div>
-      ) : (
-        <div className="card">
-          <div className="table-wrap">
+        <div className="table-wrap">
+          {invoices.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🧾</div>
+              <div className="empty-title">No invoices yet</div>
+              <p>Real invoices are generated automatically once a payment is verified. They will appear here, ready to view and print.</p>
+            </div>
+          ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Case</th>
-                  <th>Clinic</th>
-                  <th>Work</th>
-                  <th>Invoice</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>Invoice #</th><th>Issued</th><th>Case #</th><th>Clinic</th><th>Patient</th>
+                  <th>Work Type</th>
+                  <th style={{ textAlign: 'right' }}>Amount</th>
+                  <th>Method</th><th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {paginated.map(c => (
-                  <tr key={c.id}>
+                {invoices.map(inv => (
+                  <tr key={inv.id}>
+                    <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--blue)', fontWeight: 700 }}>{inv.invoiceNumber}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{inv.invoiceIssuedAt ? format(new Date(inv.invoiceIssuedAt), 'dd MMM yyyy') : '—'}</td>
+                    <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{inv.case?.caseNumber}</td>
+                    <td style={{ fontWeight: 600 }}>{inv.case?.clinic?.name}</td>
+                    <td>{inv.case?.patientName}</td>
+                    <td style={{ fontSize: 13 }}>{inv.case?.workType}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{inv.amount ? `Br ${inv.amount.toLocaleString('en-US')}` : '—'}</td>
+                    <td style={{ fontSize: 12 }}>{methodLabel(inv)}</td>
                     <td>
-                      <span className="case-number">{c.caseNumber}</span>
-                      <div className="patient-name" style={{ marginTop: 2 }}>{c.patientName}</div>
-                    </td>
-                    <td style={{ fontSize: 13 }}>{c.clinic?.name}</td>
-                    <td style={{ fontSize: 13 }}>
-                      {c.workType}
-                      {c.toothNumbers && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>#{c.toothNumbers}</div>}
-                    </td>
-                    <td style={{ fontSize: 12, fontFamily: 'DM Mono, monospace' }}>
-                      {c.payment?.invoiceNumber
-                        ? <span style={{ color: 'var(--blue)' }}>{c.payment.invoiceNumber}</span>
-                        : <span style={{ color: 'var(--text-3)' }}>—</span>}
-                      {c.payment?.invoiceIssuedAt && (
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'inherit', marginTop: 1 }}>
-                          {format(new Date(c.payment.invoiceIssuedAt), 'dd MMM yyyy')}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>
-                      {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
-                    </td>
-                    <td>
-                      <StatusBadge status={c.status} />
-                      <div style={{ marginTop: 4 }}><PaymentBadge status={c.paymentStatus} /></div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'].includes(c.paymentStatus) && (
-                          <button className="btn btn-primary btn-sm" onClick={() => setIssueModal(c)}>
-                            {c.paymentStatus === 'PENDING' ? '📨 Send Request' : '✏️ Edit Request'}
-                          </button>
-                        )}
-                        {c.paymentStatus === 'SCREENSHOT_UPLOADED' && (
-                          <>
-                            {c.payment?.screenshotUrl && (
-                              <button className="btn btn-ghost btn-sm" onClick={() => window.open(c.payment.screenshotUrl, '_blank')}>
-                                🖼️ Screenshot
-                              </button>
-                            )}
-                            <button
-                              className="btn btn-success btn-sm"
-                              onClick={() => verify(c.id, 'APPROVE')}
-                              disabled={!!processing}
-                            >✓ Approve</button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={() => verify(c.id, 'REJECT')}
-                              disabled={!!processing}
-                            >✗ Reject</button>
-                          </>
-                        )}
-                        {/* Manual collection — available whenever payment is not yet verified */}
-                        {c.paymentStatus !== 'VERIFIED' && (
-                          <button
-                            onClick={() => setCollect(c)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 4,
-                              background: 'rgba(22,163,74,0.07)', color: 'var(--green)',
-                              border: '1px solid rgba(22,163,74,0.25)',
-                              borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                            }}
-                          >
-                            💰 Collect Manually
-                          </button>
-                        )}
-                      </div>
+                      <button className="btn btn-primary btn-sm" onClick={() => setViewInvoice({ ...inv.case, payment: inv })}>
+                        🧾 View / Print
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <Pagination
-              page={page} totalPages={totalPages}
-              total={shown.length} pageSize={PAGE_SIZE}
-              onPrev={() => setPage(p => p - 1)}
-              onNext={() => setPage(p => p + 1)}
-            />
-          </div>
+          )}
         </div>
-      )}
+        {pagination.totalPages > 1 && (
+          <Pagination
+            page={page} totalPages={pagination.totalPages}
+            total={pagination.total} pageSize={PAGE_SIZE}
+            onPrev={() => setPage(p => p - 1)}
+            onNext={() => setPage(p => p + 1)}
+          />
+        )}
+      </div>
 
-      {issueModal && (
-        <SendPaymentRequestModal
-          caseData={issueModal}
-          onDone={() => { setIssueModal(null); queryClient.invalidateQueries({ queryKey: ['payments'] }); }}
-          onClose={() => setIssueModal(null)}
-        />
-      )}
-
-      {collectModal && (
-        <CollectModal
-          caseData={collectModal}
-          onDone={() => {
-            setCollect(null);
-            queryClient.invalidateQueries({ queryKey: ['payments'] });
-            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-          }}
-          onClose={() => setCollect(null)}
-        />
+      {viewInvoice && (
+        <InvoiceViewModal caseData={viewInvoice} onClose={() => setViewInvoice(null)} />
       )}
     </>
   );
@@ -2328,7 +2228,7 @@ const NAV_GROUPS = [
   { group: 'Operations', items: [
     { id: 'ready',          label: 'Ready for Delivery', icon: '📦' },
     { id: 'screenshots',    label: 'Payment Gateway',    icon: '💳', badge: 'payments' },
-    { id: 'billing',        label: 'Billing & Invoicing',icon: '📄', badge: 'invoice' },
+    { id: 'billing',        label: 'Billing & Invoicing',icon: '📄' },
     { id: 'trusted',        label: 'Trusted Partners',   icon: '🤝', badge: 'trusted' },
   ]},
   { group: 'Analytics', items: [
@@ -2551,9 +2451,9 @@ export default function FinanceDashboard() {
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('billing')}>
                   <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
-                  <div className="stat-label">To Invoice</div>
-                  <div className="stat-value" style={{ color: 'var(--blue)' }}>{toInvoiceCount}</div>
-                  <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>Issue invoices ↗</div>
+                  <div className="stat-label">Invoices Today</div>
+                  <div className="stat-value" style={{ color: 'var(--blue)' }}>{quickReport?.paid?.today ?? 0}</div>
+                  <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View invoices ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
                   <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
@@ -2576,7 +2476,7 @@ export default function FinanceDashboard() {
           {/* ── Tab content ─────────────────────────────── */}
           {tab === 'ready'       && <ReadyForDeliveryTab />}
           {tab === 'screenshots' && <ScreenshotsTab queryClient={queryClient} />}
-          {tab === 'billing'     && <BillingTab queryClient={queryClient} />}
+          {tab === 'billing'     && <BillingTab />}
           {tab === 'trusted'     && <TrustedPartnersTab queryClient={queryClient} />}
           {tab === 'history'     && <HistoryTab />}
           {tab === 'cases'       && <CasesTab />}
