@@ -131,10 +131,33 @@ ${inv?.invoiceNotes ? `<div class="notes"><strong>Notes:</strong> ${inv.invoiceN
 }
 
 // ── Send Payment Request Modal ────────────────────────────
+const FLAT_PRICE_TYPES = new Set([
+  'Night Guard', 'Night Guard Soft', 'Night Guard Hard',
+  'Retainer', 'Orthodontic Retainer', 'Clear Aligner', 'Clear Aligner Setup',
+  'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
+  'Sports Guard', 'Bite Splint', 'Gingival Mask',
+]);
+
 function SendPaymentRequestModal({ caseData, onDone, onClose }) {
   const [amount, setAmount]   = useState(caseData.totalAmount?.toString() || '');
   const [notes, setNotes]     = useState(caseData.payment?.invoiceNotes || '');
   const [loading, setLoading] = useState(false);
+  const [calcHint, setCalcHint] = useState(null);
+
+  useEffect(() => {
+    api.get('/prices').then(res => {
+      const entry = (res.data || []).find(p => p.workType === caseData.workType);
+      if (!entry) return;
+      const isExpress = caseData.deliveryType === 'EXPRESS' && entry.expressPrice != null;
+      const unitPrice = isExpress ? entry.expressPrice : entry.price;
+      const isFlat = FLAT_PRICE_TYPES.has(caseData.workType);
+      const count = isFlat ? 1 : Math.max(1, caseData.units || 1);
+      const total = Math.round(unitPrice * count * (caseData.isRedo ? 0.5 : 1));
+      setCalcHint({ unitPrice, count, isFlat, isExpress, isRedo: caseData.isRedo, total });
+      if (!caseData.totalAmount) setAmount(String(total));
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submit = async () => {
     const num = parseFloat(amount);
@@ -166,7 +189,7 @@ function SendPaymentRequestModal({ caseData, onDone, onClose }) {
             <div style={{ fontWeight: 700, fontSize: 15 }}>{caseData.patientName}</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'monospace' }}>{caseData.caseNumber}</div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
-              {caseData.workType}{caseData.toothNumbers ? ` · Teeth ${caseData.toothNumbers}` : ''}{caseData.shade ? ` · Shade ${caseData.shade}` : ''}
+              {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}{caseData.toothNumbers ? ` · Teeth ${caseData.toothNumbers}` : ''}{caseData.shade ? ` · Shade ${caseData.shade}` : ''}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>🏥 {caseData.clinic?.name}</div>
           </div>
@@ -179,6 +202,24 @@ function SendPaymentRequestModal({ caseData, onDone, onClose }) {
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 15, fontWeight: 700 }}
               autoFocus
             />
+            {calcHint && (
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                <span>💡</span>
+                <span>
+                  Br {calcHint.unitPrice.toLocaleString('en-US')}
+                  {!calcHint.isFlat && calcHint.count > 1 && ` × ${calcHint.count} units`}
+                  {calcHint.isExpress && ' · ⚡ express'}
+                  {calcHint.isRedo && ' · 50% redo'}
+                  {' = '}
+                  <strong style={{ color: 'var(--text-1)' }}>Br {calcHint.total.toLocaleString('en-US')}</strong>
+                  {caseData.totalAmount && caseData.totalAmount !== calcHint.total && (
+                    <span style={{ color: 'var(--amber)', marginLeft: 6 }}>
+                      (case stored Br {Number(caseData.totalAmount).toLocaleString('en-US')})
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
           <div style={{ marginBottom: 20 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Payment Instructions (optional)</label>
