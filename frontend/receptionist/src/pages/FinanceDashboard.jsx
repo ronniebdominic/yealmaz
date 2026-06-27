@@ -357,17 +357,36 @@ function ErrorState({ message, onRetry }) {
   );
 }
 
-// ── Screenshot Approvals Tab ──────────────────────────────
+// ── Payment Gateway Tab ───────────────────────────────────
+// Shows clinic-app payment transactions (online gateway + screenshot uploads)
+// with their outcome — success / pending / failed — and lets finance verify or
+// reject the ones still awaiting review.
+const OUTCOME_META = {
+  SUCCESS:         { label: '✅ Success',  color: 'var(--green)', bg: 'var(--green-dim)' },
+  FAILED:          { label: '❌ Failed',   color: 'var(--red)',   bg: '#FFF1F2' },
+  PENDING_REVIEW:  { label: '🔎 Awaiting Review', color: 'var(--amber)', bg: 'var(--amber-dim)' },
+  PENDING_GATEWAY: { label: '⏳ In Progress',     color: 'var(--blue)',  bg: '#EFF6FF' },
+  PENDING:         { label: '⏳ Pending',  color: 'var(--text-3)', bg: 'var(--surface-2)' },
+};
+const METHOD_META = {
+  GATEWAY:    { label: '💳 Online', color: 'var(--blue)' },
+  SCREENSHOT: { label: '📸 Screenshot', color: '#6D28D9' },
+  MANUAL:     { label: '✍️ Manual', color: 'var(--text-3)' },
+};
+
 function ScreenshotsTab({ queryClient }) {
   const [processing, setProcessing] = useState(null);
-  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState('all'); // all | success | pending | failed
 
-  const { data: payments = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['payments', 'pending'],
-    queryFn: fetchPending,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['payments', 'gateway'],
+    queryFn: () => api.get('/payments/gateway').then(r => r.data),
+    staleTime: 20_000,
+    refetchInterval: 30_000,
   });
+
+  const tx     = data?.transactions ?? [];
+  const counts = data?.counts ?? { success: 0, failed: 0, pending: 0 };
 
   const verifyMutation = useMutation({
     mutationFn: ({ caseId, action, rejectionReason }) =>
@@ -391,98 +410,113 @@ function ScreenshotsTab({ queryClient }) {
     verifyMutation.mutate({ caseId, action, rejectionReason });
   };
 
-  const totalPages = Math.ceil(payments.length / PAGE_SIZE);
-  const paginated  = useMemo(() => payments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [payments, page]);
+  const filtered = tx.filter(t => {
+    if (filter === 'all') return true;
+    if (filter === 'success') return t.outcome === 'SUCCESS';
+    if (filter === 'failed')  return t.outcome === 'FAILED';
+    return t.outcome !== 'SUCCESS' && t.outcome !== 'FAILED'; // pending bucket
+  });
 
-  if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading…</div>;
-  if (isError)   return <ErrorState message="Could not load pending screenshots." onRetry={refetch} />;
-
-  if (payments.length === 0) return (
-    <div className="empty-state">
-      <div className="empty-icon">📸</div>
-      <div className="empty-title">No screenshots awaiting review</div>
-      <p>When a clinic uploads a payment screenshot, it will appear here for you to approve or reject.</p>
-    </div>
-  );
+  if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading transactions…</div>;
+  if (isError)   return <ErrorState message="Could not load gateway transactions." onRetry={refetch} />;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {paginated.map(p => (
-        <div className="card" key={p.id} style={{ overflow: 'visible' }}>
-          <div style={{ display: 'flex', gap: 0 }}>
-            {/* Screenshot thumbnail */}
-            <div style={{ width: 180, flexShrink: 0, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-              {p.screenshotUrl ? (
-                <img
-                  src={p.screenshotUrl}
-                  alt="Payment screenshot"
-                  style={{ width: '100%', borderRadius: 8, cursor: 'pointer', border: '1px solid var(--border)' }}
-                  onClick={() => window.open(p.screenshotUrl, '_blank')}
-                  title="Click to view full size"
-                />
-              ) : (
-                <div style={{ color: 'var(--text-3)', textAlign: 'center', fontSize: 12 }}>No image</div>
-              )}
-            </div>
+    <>
+      {/* Outcome summary */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 16 }}>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('success')}>
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+          <div className="stat-label">Successful</div>
+          <div className="stat-value" style={{ color: 'var(--green)' }}>{counts.success}</div>
+          <div className="stat-sub">Paid via clinic app</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('pending')}>
+          <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
+          <div className="stat-label">Pending</div>
+          <div className="stat-value" style={{ color: 'var(--amber)' }}>{counts.pending}</div>
+          <div className="stat-sub">In progress / awaiting review</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('failed')}>
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}>❌</div>
+          <div className="stat-label">Failed</div>
+          <div className="stat-value" style={{ color: 'var(--red)' }}>{counts.failed}</div>
+          <div className="stat-sub">Rejected / unsuccessful</div>
+        </div>
+      </div>
 
-            {/* Details */}
-            <div style={{ flex: 1, padding: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{p.case?.patientName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'DM Mono, monospace', marginTop: 2 }}>{p.case?.caseNumber}</div>
-                </div>
-                <PaymentBadge status={p.status} />
-              </div>
-              <div className="grid-2" style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-3)' }}>Clinic: </span>
-                  <strong>{p.case?.clinic?.name}</strong>
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-3)' }}>Amount: </span>
-                  <strong>{p.amount ? `Br ${p.amount.toLocaleString('en-US')}` : '—'}</strong>
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-3)' }}>Work: </span>
-                  <strong>{p.case?.workType}</strong>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                  Uploaded: {p.uploadedAt ? format(new Date(p.uploadedAt), 'dd MMM, h:mm a') : '—'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-success"
-                  onClick={() => verify(p.caseId, 'APPROVE')}
-                  disabled={!!processing}
-                >
-                  ✓ Approve & Unlock Delivery
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => verify(p.caseId, 'REJECT')}
-                  disabled={!!processing}
-                >
-                  ✗ Reject
-                </button>
-                {p.screenshotUrl && (
-                  <button className="btn btn-ghost btn-sm" onClick={() => window.open(p.screenshotUrl, '_blank')}>
-                    🖼️ Full Image
-                  </button>
-                )}
-              </div>
-            </div>
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">💳 Payment Gateway Transactions</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['all','All'],['success','Success'],['pending','Pending'],['failed','Failed']].map(([id, label]) => (
+              <button key={id} onClick={() => setFilter(id)}
+                className={`filter-chip${filter === id ? ' active' : ''}`}
+                style={filter === id ? { background: 'var(--blue)', color: '#fff' } : {}}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
-      ))}
-      <Pagination
-        page={page} totalPages={totalPages}
-        total={payments.length} pageSize={PAGE_SIZE}
-        onPrev={() => setPage(p => p - 1)}
-        onNext={() => setPage(p => p + 1)}
-      />
-    </div>
+        <div className="table-wrap">
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">💳</div>
+              <div className="empty-title">No transactions</div>
+              <p>Payments made by clinics through the app appear here with their success / failure status.</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Case #</th><th>Clinic</th><th>Patient</th><th>Method</th>
+                  <th style={{ textAlign: 'right' }}>Amount</th>
+                  <th>Outcome</th><th>Date</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(t => {
+                  const om = OUTCOME_META[t.outcome] || OUTCOME_META.PENDING;
+                  const mm = METHOD_META[t.method] || METHOD_META.MANUAL;
+                  return (
+                    <tr key={t.id}>
+                      <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{t.caseNumber}</td>
+                      <td style={{ fontWeight: 600 }}>{t.clinicName}</td>
+                      <td>{t.patientName}</td>
+                      <td><span style={{ fontSize: 12, fontWeight: 700, color: mm.color }}>{mm.label}</span></td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{t.amount ? `Br ${t.amount.toLocaleString('en-US')}` : '—'}</td>
+                      <td>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: om.bg, color: om.color, whiteSpace: 'nowrap' }}>
+                          {om.label}
+                        </span>
+                        {t.outcome === 'FAILED' && t.rejectionReason && (
+                          <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 2 }}>{t.rejectionReason}</div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                        {t.verifiedAt ? format(new Date(t.verifiedAt), 'dd MMM, h:mm a')
+                          : t.uploadedAt ? format(new Date(t.uploadedAt), 'dd MMM, h:mm a')
+                          : format(new Date(t.updatedAt), 'dd MMM, h:mm a')}
+                      </td>
+                      <td>
+                        {t.outcome === 'PENDING_REVIEW' ? (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-success btn-sm" onClick={() => verify(t.caseId, 'APPROVE')} disabled={!!processing}>✓ Approve</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => verify(t.caseId, 'REJECT')} disabled={!!processing}>✗</button>
+                            {t.screenshotUrl && <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}>🖼️</button>}
+                          </div>
+                        ) : t.screenshotUrl ? (
+                          <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}>🖼️ View</button>
+                        ) : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

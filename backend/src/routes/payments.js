@@ -594,6 +594,60 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
   }
 });
 
+// ── GET /api/payments/gateway ────────────────────────────
+// Clinic-app payment transactions (online gateway + screenshot uploads) with
+// their outcome, so finance can see success / failed / pending at a glance.
+router.get('/gateway', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    const { limit = 100 } = req.query;
+    // Any payment that the clinic acted on through the app: started a gateway
+    // checkout (chapaTxRef), uploaded a screenshot, or reached a payment outcome.
+    const payments = await prisma.payment.findMany({
+      where: {
+        OR: [
+          { chapaTxRef:  { not: null } },
+          { screenshotUrl: { not: null } },
+          { status: { in: ['SCREENSHOT_UPLOADED', 'VERIFIED', 'REJECTED'] } },
+        ],
+      },
+      include: { case: { include: { clinic: { select: { name: true, phone: true } } } } },
+      orderBy: { updatedAt: 'desc' },
+      take: parseInt(limit),
+    });
+
+    const tx = payments.map(p => {
+      const method = p.chapaTxRef ? 'GATEWAY' : (p.screenshotUrl ? 'SCREENSHOT' : 'MANUAL');
+      let outcome;
+      if (p.status === 'VERIFIED')            outcome = 'SUCCESS';
+      else if (p.status === 'REJECTED')       outcome = 'FAILED';
+      else if (p.status === 'SCREENSHOT_UPLOADED') outcome = 'PENDING_REVIEW';
+      else if (p.chapaTxRef)                  outcome = 'PENDING_GATEWAY'; // checkout started, not yet confirmed
+      else                                    outcome = 'PENDING';
+      return {
+        id: p.id, caseId: p.caseId,
+        caseNumber: p.case?.caseNumber, patientName: p.case?.patientName,
+        clinicName: p.case?.clinic?.name, workType: p.case?.workType,
+        amount: p.amount, method, outcome, status: p.status,
+        chapaTxRef: p.chapaTxRef, screenshotUrl: p.screenshotUrl,
+        verifiedAt: p.verifiedAt, uploadedAt: p.uploadedAt, updatedAt: p.updatedAt,
+        rejectionReason: p.rejectionReason,
+      };
+    });
+
+    const counts = tx.reduce((a, t) => {
+      if (t.outcome === 'SUCCESS') a.success++;
+      else if (t.outcome === 'FAILED') a.failed++;
+      else a.pending++;
+      return a;
+    }, { success: 0, failed: 0, pending: 0 });
+
+    res.json({ transactions: tx, counts });
+  } catch (err) {
+    console.error('[payments/gateway]', err);
+    res.status(500).json({ error: 'Could not fetch gateway transactions.' });
+  }
+});
+
 // ── GET /api/payments/history ────────────────────────────
 router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
   const { page = 1, limit = 20, search = '' } = req.query;
