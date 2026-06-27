@@ -564,6 +564,16 @@ export default function DispatchDashboard() {
             </button>
           </div>
 
+           {/* ── Search / filter bar ── */}
+          <div style={{ marginBottom: 16 }}>
+            <FilterBar
+              search={search} onSearch={setSearch}
+              dateFrom={dateFrom} onDateFrom={setDateFrom}
+              dateTo={dateTo} onDateTo={setDateTo}
+              placeholder="Clinic, case no., patient…"
+            />
+          </div>
+
           {/* ── KPI pipeline — workflow stages left → right, colour-coded ── */}
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', marginBottom: 20 }}>
             {PIPELINE.map(s => (
@@ -616,16 +626,6 @@ export default function DispatchDashboard() {
               </div>
             </div>
           )}
-
-          {/* ── Search / filter bar ── */}
-          <div style={{ marginBottom: 16 }}>
-            <FilterBar
-              search={search} onSearch={setSearch}
-              dateFrom={dateFrom} onDateFrom={setDateFrom}
-              dateTo={dateTo} onDateTo={setDateTo}
-              placeholder="Clinic, case no., patient…"
-            />
-          </div>
 
           {/* ── TAB: Place Order (PENDING_PICKUP) ── */}
           {tab === 'place-order' && (
