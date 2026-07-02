@@ -2475,7 +2475,7 @@ export default function FinanceDashboard() {
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.paid?.today ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View history ↗</div>
                 </div>
-                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('overview'); setTab('report'); }}>
+                <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('balances'); setTab('report'); }}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
                   <div className="stat-label">Pending</div>
                   <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 15 : 20 }}>
