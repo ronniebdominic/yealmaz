@@ -1825,9 +1825,8 @@ function ClinicBalancesTab() {
               </thead>
               <tbody>
                 {balances.map(b => (
-                  <>
+                  <React.Fragment key={b.id}>
                     <tr
-                      key={b.id}
                       style={{ cursor: 'pointer' }}
                       onClick={() => setExpanded(expanded === b.id ? null : b.id)}
                     >
@@ -1897,7 +1896,7 @@ function ClinicBalancesTab() {
                         </tr>
                       );
                     })}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
