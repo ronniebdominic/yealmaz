@@ -362,15 +362,17 @@ function ErrorState({ message, onRetry }) {
 // with their outcome — success / pending / failed — and lets finance verify or
 // reject the ones still awaiting review.
 const OUTCOME_META = {
-  SUCCESS:         { label: '✅ Success',  color: 'var(--green)', bg: 'var(--green-dim)' },
-  FAILED:          { label: '❌ Failed',   color: 'var(--red)',   bg: '#FFF1F2' },
-  PENDING_REVIEW:  { label: '🔎 Awaiting Review', color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  PENDING_GATEWAY: { label: '⏳ In Progress',     color: 'var(--blue)',  bg: '#EFF6FF' },
-  PENDING:         { label: '⏳ Pending',  color: 'var(--text-3)', bg: 'var(--surface-2)' },
+  SUCCESS:          { label: '✅ Success',  color: 'var(--green)', bg: 'var(--green-dim)' },
+  FAILED:           { label: '❌ Failed',   color: 'var(--red)',   bg: '#FFF1F2' },
+  PENDING_REVIEW:   { label: '🔎 Awaiting Review', color: 'var(--amber)', bg: 'var(--amber-dim)' },
+  AWAITING_PAYMENT: { label: '🕒 Request Sent',    color: 'var(--blue)',  bg: '#EFF6FF' },
+  PENDING_GATEWAY:  { label: '⏳ In Progress',     color: 'var(--blue)',  bg: '#EFF6FF' },
+  PENDING:          { label: '⏳ Pending',  color: 'var(--text-3)', bg: 'var(--surface-2)' },
 };
 const METHOD_META = {
   GATEWAY:    { label: '💳 Online', color: 'var(--blue)' },
   SCREENSHOT: { label: '📸 Screenshot', color: '#6D28D9' },
+  REQUESTED:  { label: '🕒 Requested', color: 'var(--text-3)' },
   MANUAL:     { label: '✍️ Manual', color: 'var(--text-3)' },
 };
 
@@ -434,7 +436,7 @@ function ScreenshotsTab({ queryClient }) {
           <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
           <div className="stat-label">Pending</div>
           <div className="stat-value" style={{ color: 'var(--amber)' }}>{counts.pending}</div>
-          <div className="stat-sub">In progress / awaiting review</div>
+          <div className="stat-sub">Request sent · awaiting payment / review</div>
         </div>
         <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('failed')}>
           <div className="stat-icon" style={{ background: '#FFF1F2' }}>❌</div>

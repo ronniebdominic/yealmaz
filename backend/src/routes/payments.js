@@ -606,15 +606,17 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 // their outcome, so finance can see success / failed / pending at a glance.
 router.get('/gateway', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
   try {
-    const { limit = 100 } = req.query;
-    // Any payment that the clinic acted on through the app: started a gateway
-    // checkout (chapaTxRef), uploaded a screenshot, or reached a payment outcome.
+    const { limit = 200 } = req.query;
+    // Clinic-app payment lifecycle ONLY — a payment request was sent to the clinic,
+    // the clinic started an online checkout (chapaTxRef), or uploaded a receipt
+    // (screenshotUrl). This deliberately EXCLUDES in-person manual collections
+    // (VERIFIED with no chapaTxRef/screenshot), which are not "paid via clinic app".
     const payments = await prisma.payment.findMany({
       where: {
         OR: [
-          { chapaTxRef:  { not: null } },
-          { screenshotUrl: { not: null } },
-          { status: { in: ['SCREENSHOT_UPLOADED', 'VERIFIED', 'REJECTED'] } },
+          { chapaTxRef:   { not: null } },  // online gateway attempt (any outcome)
+          { screenshotUrl: { not: null } }, // clinic uploaded a receipt (pending/verified/rejected)
+          { status: { in: ['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } }, // request sent / awaiting review
         ],
       },
       include: { case: { include: { clinic: { select: { name: true, phone: true } } } } },
@@ -623,13 +625,14 @@ router.get('/gateway', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
     });
 
     const tx = payments.map(p => {
-      const method = p.chapaTxRef ? 'GATEWAY' : (p.screenshotUrl ? 'SCREENSHOT' : 'MANUAL');
+      const method = p.chapaTxRef ? 'GATEWAY' : (p.screenshotUrl ? 'SCREENSHOT' : 'REQUESTED');
       let outcome;
-      if (p.status === 'VERIFIED')            outcome = 'SUCCESS';
-      else if (p.status === 'REJECTED')       outcome = 'FAILED';
-      else if (p.status === 'SCREENSHOT_UPLOADED') outcome = 'PENDING_REVIEW';
-      else if (p.chapaTxRef)                  outcome = 'PENDING_GATEWAY'; // checkout started, not yet confirmed
-      else                                    outcome = 'PENDING';
+      if (p.status === 'VERIFIED')                 outcome = 'SUCCESS';        // paid via app + approved
+      else if (p.status === 'REJECTED')            outcome = 'FAILED';         // rejected / unsuccessful
+      else if (p.status === 'SCREENSHOT_UPLOADED') outcome = 'PENDING_REVIEW'; // receipt uploaded, needs approval
+      else if (p.status === 'PAYMENT_REQUESTED')   outcome = 'AWAITING_PAYMENT'; // request sent, awaiting clinic
+      else if (p.chapaTxRef)                       outcome = 'PENDING_GATEWAY'; // checkout started, not yet confirmed
+      else                                         outcome = 'PENDING';
       return {
         id: p.id, caseId: p.caseId,
         caseNumber: p.case?.caseNumber, patientName: p.case?.patientName,
