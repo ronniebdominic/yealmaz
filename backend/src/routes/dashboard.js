@@ -139,8 +139,11 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       prisma.case.aggregate({ where: { deliveryDate: { gte: startOfMonth } }, _sum: { units: true } }),
       prisma.case.aggregate({ where: { deliveryDate: { gte: startOfYear } }, _sum: { units: true } }),
       prisma.payment.count({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfToday } } }),
-      prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } } }),
-      prisma.payment.aggregate({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] } }, _sum: { amount: true } }),
+      // Only count payments that actually have a Br amount owed, so the count matches
+      // the amount below (and the Clinic Balances view). Pending-but-unpriced payments
+      // aren't billable outstanding, so they don't belong in this figure.
+      prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } } }),
+      prisma.payment.aggregate({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } }, _sum: { amount: true } }),
       prisma.payment.findMany({
         where: { status: 'VERIFIED', verifiedAt: { gte: dateFrom, lte: dateTo }, ...searchWhere },
         include: { case: { include: { clinic: { select: { name: true } } } } },
