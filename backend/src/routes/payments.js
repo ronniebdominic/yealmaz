@@ -759,12 +759,11 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
     const where = {
       clinic: { isExcluded: true },
       // When drilling into a specific clinic, show its OUTSTANDING (unpaid) cases —
-      // i.e. anything not yet VERIFIED. Trusted clinics are billed on credit, so
-      // these are almost always already DELIVERED; excluding DELIVERED here is what
-      // made the drill-down show "No cases found". Cancelled/rejected are dropped.
+      // finance only collects on cases that have actually been DELIVERED, so
+      // in-progress lab cases (still being scanned/designed/milled) are excluded here.
       // Without a clinicId, only cases still awaiting collection (PENDING).
       ...(clinicId
-        ? { clinicId, paymentStatus: { not: 'VERIFIED' }, status: { notIn: ['CANCELLED', 'REJECTED'] } }
+        ? { clinicId, paymentStatus: { not: 'VERIFIED' }, status: 'DELIVERED' }
         : { paymentStatus: 'PENDING' }),
       ...(search ? {
         OR: [
