@@ -379,6 +379,7 @@ const METHOD_META = {
 function ScreenshotsTab({ queryClient }) {
   const [processing, setProcessing] = useState(null);
   const [filter, setFilter] = useState('all'); // all | success | pending | failed
+  const [collectModal, setCollect] = useState(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['payments', 'gateway'],
@@ -500,15 +501,26 @@ function ScreenshotsTab({ queryClient }) {
                           : format(new Date(t.updatedAt), 'dd MMM, h:mm a')}
                       </td>
                       <td>
-                        {t.outcome === 'PENDING_REVIEW' ? (
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-success btn-sm" onClick={() => verify(t.caseId, 'APPROVE')} disabled={!!processing}>✓ Approve</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => verify(t.caseId, 'REJECT')} disabled={!!processing}>✗</button>
-                            {t.screenshotUrl && <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}>🖼️</button>}
-                          </div>
-                        ) : t.screenshotUrl ? (
-                          <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}>🖼️ View</button>
-                        ) : <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {t.outcome === 'PENDING_REVIEW' && (
+                            <>
+                              <button className="btn btn-success btn-sm" onClick={() => verify(t.caseId, 'APPROVE')} disabled={!!processing}>✓ Approve</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => verify(t.caseId, 'REJECT')} disabled={!!processing}>✗</button>
+                            </>
+                          )}
+                          {/* Manual cash / bank collection — for any payment still outstanding */}
+                          {t.outcome !== 'SUCCESS' && t.outcome !== 'FAILED' && (
+                            <button
+                              onClick={() => setCollect({
+                                id: t.caseId, caseNumber: t.caseNumber, patientName: t.patientName,
+                                workType: t.workType, totalAmount: t.amount, clinic: { name: t.clinicName },
+                              })}
+                              style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >💰 Collect</button>
+                          )}
+                          {t.screenshotUrl && <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}>🖼️</button>}
+                          {t.outcome === 'SUCCESS' && !t.screenshotUrl && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -518,6 +530,18 @@ function ScreenshotsTab({ queryClient }) {
           )}
         </div>
       </div>
+
+      {collectModal && (
+        <CollectModal
+          caseData={collectModal}
+          onDone={() => {
+            setCollect(null);
+            queryClient.invalidateQueries({ queryKey: ['payments'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+          }}
+          onClose={() => setCollect(null)}
+        />
+      )}
     </>
   );
 }
