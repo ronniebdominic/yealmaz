@@ -48,9 +48,10 @@ async function getDueDays(workType, isExpress = false) {
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', dateFrom, dateTo, remake, redo } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', sortBy = 'date', dateFrom, dateTo, remake, redo } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const dateOrder = sortDir === 'asc' ? 'asc' : 'desc';
+    const dateOrder  = sortDir === 'asc' ? 'asc' : 'desc';
+    const orderByCol  = sortBy === 'caseNumber' ? 'caseNumber' : 'createdAt';
 
     const where = {};
     if (req.user.role === 'CLINIC') where.clinicId = req.user.id;
@@ -82,7 +83,7 @@ router.get('/', protect, async (req, res) => {
     if (redo   === 'true')  where.redo   = true;
     if (redo   === 'false') where.redo   = false;
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, dateFrom, dateTo, remake, redo })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, sortBy, dateFrom, dateTo, remake, redo })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -95,7 +96,7 @@ router.get('/', protect, async (req, res) => {
           payment:          true,
           assignedDelivery: { select: { id: true, name: true } },
         },
-        orderBy: { createdAt: dateOrder },
+        orderBy: { [orderByCol]: dateOrder },
         skip,
         take: parseInt(limit)
       }),

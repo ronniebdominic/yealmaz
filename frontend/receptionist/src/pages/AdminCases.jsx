@@ -386,6 +386,7 @@ export default function AdminCases() {
   const [statusFilter,   setStatusFilter]  = useState('');
   const [payFilter,      setPayFilter]     = useState('');
   const [clinicId,       setClinicId]      = useState('');
+  const [sortBy,         setSortBy]        = useState('caseNumber');
   const [sortDir,        setSortDir]       = useState('desc');
   const [page,           setPage]          = useState(1);
   const [viewCase,       setViewCase]      = useState(null);
@@ -402,13 +403,13 @@ export default function AdminCases() {
   });
 
   const params = useMemo(() => {
-    const p = { limit: PAGE_SIZE, page, sortDir };
+    const p = { limit: PAGE_SIZE, page, sortDir, sortBy };
     if (statusFilter) p.status        = statusFilter;
     if (payFilter)    p.paymentStatus = payFilter;
     if (search)       p.search        = search;
     if (clinicId)     p.clinicId      = clinicId;
     return p;
-  }, [statusFilter, payFilter, search, clinicId, sortDir, page]);
+  }, [statusFilter, payFilter, search, clinicId, sortBy, sortDir, page]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'cases', params],
@@ -430,7 +431,7 @@ export default function AdminCases() {
     setExporting(true);
     try {
       // Fetch all matching cases (no pagination limit)
-      const exportParams = { limit: 9999, page: 1, sortDir };
+      const exportParams = { limit: 9999, page: 1, sortDir, sortBy };
       if (statusFilter) exportParams.status        = statusFilter;
       if (payFilter)    exportParams.paymentStatus = payFilter;
       if (search)       exportParams.search        = search;
@@ -606,7 +607,23 @@ export default function AdminCases() {
               <table>
                 <thead>
                   <tr>
-                    <th>Case #</th>
+                    <th>
+                      <button
+                        onClick={() => {
+                          setSortDir(d => (sortBy === 'caseNumber' && d === 'desc') ? 'asc' : 'desc');
+                          setSortBy('caseNumber');
+                          setPage(1);
+                        }}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          fontWeight: 700, fontSize: 'inherit', color: 'var(--text-2)',
+                          padding: 0, fontFamily: 'inherit',
+                        }}
+                      >
+                        Case # {sortBy === 'caseNumber' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+                      </button>
+                    </th>
                     <th>Clinic</th>
                     <th>Patient</th>
                     <th>Work Type</th>
@@ -617,7 +634,11 @@ export default function AdminCases() {
                     <th>Payment</th>
                     <th>
                       <button
-                        onClick={() => { setSortDir(d => d === 'desc' ? 'asc' : 'desc'); setPage(1); }}
+                        onClick={() => {
+                          setSortDir(d => (sortBy === 'date' && d === 'desc') ? 'asc' : 'desc');
+                          setSortBy('date');
+                          setPage(1);
+                        }}
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer',
                           display: 'flex', alignItems: 'center', gap: 4,
@@ -625,7 +646,7 @@ export default function AdminCases() {
                           padding: 0, fontFamily: 'inherit',
                         }}
                       >
-                        Date {sortDir === 'desc' ? '↓' : '↑'}
+                        Date {sortBy === 'date' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
                       </button>
                     </th>
                     <th style={{ minWidth: 200 }}>Actions</th>
