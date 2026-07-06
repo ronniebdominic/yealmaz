@@ -10,19 +10,13 @@ const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Case numbers continue the imported sequence: YDL26005688, YDL26005689, …
+// Backed by the Postgres sequence `case_number_seq` (seeded to 26005687), so
+// numbering is atomic/concurrency-safe and unaffected by out-of-band imported
+// numbers (e.g. the in-progress YDL2680xxxxx series).
 async function generateCaseNumber() {
-  const yy = String(new Date().getFullYear()).slice(-2);
-  const prefix = `YDL${yy}`;
-
-  const last = await prisma.case.findFirst({
-    where: { caseNumber: { startsWith: prefix } },
-    orderBy: { caseNumber: 'desc' },
-    select: { caseNumber: true },
-  });
-
-  const lastNum = last ? parseInt(last.caseNumber.slice(prefix.length), 10) || 0 : 0;
-  const padded = String(lastNum + 1).padStart(6, '0');
-  return `${prefix}${padded}`;
+  const rows = await prisma.$queryRaw`SELECT nextval('case_number_seq') AS n`;
+  return `YDL${rows[0].n.toString()}`;
 }
 
 // ── Auto due-date rules ───────────────────────────────────
