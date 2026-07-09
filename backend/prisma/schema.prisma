@@ -223,7 +223,8 @@ model Payment {
   caseId          String        @unique
   case            Case          @relation(fields: [caseId], references: [id])
   screenshotUrl   String?       // Cloudinary URL
-  amount          Float?
+  amount          Float?        // full amount due for this case
+  amountReceived  Float?        // partial amount already collected (status stays PENDING until amount is met in full)
   status          PaymentStatus @default(PENDING)
   rejectionReason String?
   uploadedAt      DateTime?

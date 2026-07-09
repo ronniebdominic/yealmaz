@@ -143,7 +143,10 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       // the amount below (and the Clinic Balances view). Pending-but-unpriced payments
       // aren't billable outstanding, so they don't belong in this figure.
       prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } } }),
-      prisma.payment.aggregate({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } }, _sum: { amount: true } }),
+      // Sum of amount still OWED (amount minus any partial amountReceived) — can't be
+      // expressed as a Prisma aggregate (no cross-field subtraction), so sum in JS.
+      prisma.payment.findMany({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } }, select: { amount: true, amountReceived: true } })
+        .then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
       prisma.payment.findMany({
         where: { status: 'VERIFIED', verifiedAt: { gte: dateFrom, lte: dateTo }, ...searchWhere },
         include: { case: { include: { clinic: { select: { name: true } } } } },
@@ -171,7 +174,7 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
         YTD:   unitsYTD._sum.units   || 0,
       },
       paid: { today: paidToday },
-      pending: { count: pendingCount, amount: pendingAmount._sum.amount || 0 },
+      pending: { count: pendingCount, amount: pendingAmount },
       recentVerified,
       recentPending,
     });
@@ -421,7 +424,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
         amount: { gt: 0 },   // only include cases where a non-zero amount is set
       },
       select: {
-        id: true, status: true, amount: true, updatedAt: true,
+        id: true, status: true, amount: true, amountReceived: true, updatedAt: true,
         case: {
           select: {
             id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true, deliveryDate: true, createdAt: true,
@@ -436,6 +439,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
     for (const p of payments) {
       const clinic = p.case?.clinic;
       if (!clinic) continue;
+      const remaining = (p.amount || 0) - (p.amountReceived || 0); // still owed, after any partial collection
       if (!clinicMap[clinic.id]) {
         clinicMap[clinic.id] = {
           id: clinic.id, name: clinic.name, isExcluded: clinic.isExcluded,
@@ -443,13 +447,13 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
         };
       }
       clinicMap[clinic.id].pendingCount++;
-      clinicMap[clinic.id].pendingAmount += p.amount || 0;
+      clinicMap[clinic.id].pendingAmount += remaining;
       clinicMap[clinic.id].cases.push({
         caseId: p.case.id, caseNumber: p.case.caseNumber,
         patientName: p.case.patientName, workType: p.case.workType,
         units: p.case.units, dueDate: p.case.dueDate,
         deliveryDate: p.case.deliveryDate, createdAt: p.case.createdAt,
-        paymentStatus: p.status, amount: p.amount, updatedAt: p.updatedAt,
+        paymentStatus: p.status, amount: remaining, amountReceived: p.amountReceived || 0, updatedAt: p.updatedAt,
       });
     }
 
@@ -475,7 +479,7 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
         cases: {
           select: {
             id: true, status: true, units: true, createdAt: true,
-            payment: { select: { status: true, amount: true } }
+            payment: { select: { status: true, amount: true, amountReceived: true } }
           }
         }
       },
@@ -513,12 +517,17 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
       const deliveredOrders = cases.filter(c => c.status === 'DELIVERED').length;
       const inProgress      = cases.filter(c => IN_PROGRESS_STATUSES.has(c.status)).length;
       const totalRevenue    = cases.reduce((s, c) => s + (c.payment?.amount || 0), 0);
-      const paymentsReceived = cases.filter(c => c.payment?.status === 'VERIFIED')
-                                    .reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      // Paid so far = full amount for VERIFIED cases + any partial amountReceived
+      // collected on cases still awaiting the rest of their balance.
+      const paymentsReceived = cases.reduce((s, c) => {
+        if (c.payment?.status === 'VERIFIED') return s + (c.payment?.amount || 0);
+        return s + (c.payment?.amountReceived || 0);
+      }, 0);
       // Only count outstanding where an amount has actually been set — cases
       // with no payment amount yet would inflate the count with Br 0 entries.
+      // Outstanding = what's still owed (full amount minus any partial collected).
       const outstandingCases = cases.filter(c => c.payment?.status !== 'VERIFIED' && c.payment?.amount);
-      const outstanding      = outstandingCases.reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      const outstanding      = outstandingCases.reduce((s, c) => s + (c.payment.amount - (c.payment.amountReceived || 0)), 0);
       const outstandingCount = outstandingCases.length;
 
       // Aging — days since the oldest unpaid case was created
