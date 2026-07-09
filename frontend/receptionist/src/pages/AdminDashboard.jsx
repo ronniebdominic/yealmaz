@@ -309,8 +309,6 @@ export default function AdminDashboard() {
   const [fromDate, setFromDate] = useState(`${thisYear}-01-01`);
   const [toDate, setToDate]     = useState(new Date().toISOString().slice(0, 10));
   const [drillKey, setDrillKey]   = useState(null);
-  const [fixingDates, setFixingDates] = useState(false);
-  const [fixResult, setFixResult]     = useState(null);
   const [testRunning, setTestRunning] = useState(false);
   const [testResult, setTestResult]   = useState(null);
 
@@ -325,20 +323,6 @@ export default function AdminDashboard() {
       setTestResult({ result: '❌ REQUEST FAILED', summary: err.response?.data?.error || err.message, steps: [] });
     } finally {
       setTestRunning(false);
-    }
-  };
-
-  const runDateFix = async () => {
-    if (!window.confirm('This will shift all future-dated records (Dec 2026 → Dec 2025) back by 1 year. Continue?')) return;
-    setFixingDates(true);
-    setFixResult(null);
-    try {
-      const res = await api.post('/dashboard/fix-future-dates');
-      setFixResult(res.data);
-    } catch (err) {
-      setFixResult({ error: err.response?.data?.error || 'Failed' });
-    } finally {
-      setFixingDates(false);
     }
   };
 
@@ -401,16 +385,6 @@ export default function AdminDashboard() {
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: loading || !data ? 'var(--border)' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: loading || !data ? 'not-allowed' : 'pointer' }}>
             <span>📊</span> Export Excel
           </button>
-          <button onClick={runDateFix} disabled={fixingDates}
-            title="Fix imported records showing Dec 2026 instead of Dec 2025"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: fixingDates ? 'var(--border)' : '#7C3AED', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: fixingDates ? 'not-allowed' : 'pointer' }}>
-            {fixingDates ? '⏳ Fixing…' : '🗓 Fix Dates'}
-          </button>
-          {fixResult && (
-            <span style={{ fontSize: 12, color: fixResult.error ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>
-              {fixResult.error ? `✕ ${fixResult.error}` : `✓ Fixed ${fixResult.fixed?.payments ?? 0} payments, ${fixResult.fixed?.cases ?? 0} cases`}
-            </span>
-          )}
           <button onClick={runWorkflowTest} disabled={testRunning}
             title="Run end-to-end workflow test through all lab stages"
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: testRunning ? 'var(--border)' : '#0F2044', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: testRunning ? 'not-allowed' : 'pointer' }}>
