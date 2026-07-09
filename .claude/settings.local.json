@@ -18,5 +18,8 @@
       "Bash(Select-Object FullName)",
       "Bash(node -e \"const p = require\\('c:/yealmaz/yealmaz-clinic-app/node_modules/expo/package.json'\\); console.log\\('expo:', p.version\\); console.log\\('peerDeps:', JSON.stringify\\(p.peerDependencies, null, 2\\)\\)\")"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
