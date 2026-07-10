@@ -764,6 +764,7 @@ export default function DispatchDashboard() {
                         <Th>Patient</Th>
                         <Th>Driver</Th>
                         <Th>Registered</Th>
+                        <Th>Actions</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -781,6 +782,15 @@ export default function DispatchDashboard() {
                           </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                             {format(new Date(c.createdAt), 'dd MMM yyyy')}
+                          </Td>
+                          <Td>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
+                              title="Reassign to a different driver"
+                            >
+                              🔄 Reassign
+                            </button>
                           </Td>
                         </tr>
                       ))}
