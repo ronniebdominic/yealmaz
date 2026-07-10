@@ -147,38 +147,39 @@ export default function CaseDetailModal({ caseId, onClose }) {
       background: #fff;
       display: flex;
       flex-direction: column;
-      padding: 9mm;
+      padding: 6mm;
+      overflow: hidden;
     }
 
     /* ── Header ── */
     .header {
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding-bottom: 6mm;
-      border-bottom: 3px solid #1A56A0;
-      margin-bottom: 6mm;
+      gap: 8px;
+      padding-bottom: 3mm;
+      border-bottom: 2.5px solid #1A56A0;
+      margin-bottom: 4mm;
     }
-    .header-icon { font-size: 30px; }
+    .header-icon { font-size: 22px; }
     .header-text { flex: 1; }
     .lab-name {
-      font-size: 17px;
+      font-size: 14px;
       font-weight: 800;
       color: #1A56A0;
       letter-spacing: 0.3px;
       line-height: 1.2;
     }
-    .lab-sub { font-size: 12px; font-weight: 600; color: #777; margin-top: 2px; }
+    .lab-sub { font-size: 10px; font-weight: 600; color: #777; margin-top: 1px; }
 
     /* ── QR block ── */
     .qr-wrap {
       display: flex;
       justify-content: center;
-      margin-bottom: 6mm;
+      margin-bottom: 4mm;
     }
     .qr-wrap img {
-      width: 74mm;
-      height: 74mm;
+      width: 48mm;
+      height: 48mm;
       border: 2px solid #ddd;
       border-radius: 5px;
       display: block;
@@ -188,43 +189,43 @@ export default function CaseDetailModal({ caseId, onClose }) {
     .case-number {
       text-align: center;
       font-family: 'Courier New', monospace;
-      font-size: 22px;
+      font-size: 18px;
       font-weight: 800;
       color: #1A56A0;
-      letter-spacing: 1.5px;
-      margin-bottom: 5mm;
+      letter-spacing: 1.2px;
+      margin-bottom: 3mm;
     }
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 3mm 4mm;
-      margin-bottom: 4mm;
+      gap: 2mm 3mm;
+      margin-bottom: 3mm;
     }
     .info-cell {
       background: #F4F7FF;
       border-radius: 4px;
-      padding: 3mm 4mm;
+      padding: 2mm 3mm;
     }
     .info-cell.teeth {
       background: #FFFBEB;
       border: 1.5px solid #FDE68A;
     }
     .info-label {
-      font-size: 10px;
+      font-size: 8.5px;
       font-weight: 800;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 0.6px;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     .info-value {
-      font-size: 15px;
+      font-size: 12.5px;
       font-weight: 800;
       color: #1a1a2e;
-      line-height: 1.25;
+      line-height: 1.2;
     }
     .info-cell.teeth .info-value {
-      font-size: 18px;
+      font-size: 15px;
       letter-spacing: 0.5px;
     }
     .info-cell.full { grid-column: 1 / -1; }
@@ -232,9 +233,9 @@ export default function CaseDetailModal({ caseId, onClose }) {
     /* ── Delivery badge ── */
     .delivery-badge {
       display: inline-block;
-      padding: 2px 9px;
+      padding: 1px 8px;
       border-radius: 12px;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: 0.5px;
     }
@@ -244,10 +245,10 @@ export default function CaseDetailModal({ caseId, onClose }) {
     /* ── Footer ── */
     .footer {
       margin-top: auto;
-      padding-top: 5mm;
+      padding-top: 2.5mm;
       border-top: 1.5px solid #eee;
       text-align: center;
-      font-size: 10px;
+      font-size: 8.5px;
       font-weight: 600;
       color: #999;
     }
