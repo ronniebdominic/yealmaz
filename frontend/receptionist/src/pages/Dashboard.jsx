@@ -36,6 +36,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const [doctorName,  setDoctorName]  = useState(c.doctorName   || '');
   const [doctorPhone, setDoctorPhone] = useState(c.doctorPhone  || '');
   const [units,       setUnits]       = useState(c.units ? String(c.units) : '');
+  const [toothNumbers, setToothNumbers] = useState(c.toothNumbers || '');
   const [orderType,   setOrderType]   = useState(c.deliveryType || 'NORMAL');
   const [totalAmount, setTotalAmount] = useState('');
   const [dueDate,     setDueDate]     = useState('');
@@ -57,6 +58,15 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const handleWT = (wt)  => { setWorkType(wt);    calcPriceAndDate(wt, orderType, units); };
   const handleOT = (ot)  => { setOrderType(ot);   calcPriceAndDate(workType, ot, units); };
   const handleU  = (u)   => { setUnits(u);        calcPriceAndDate(workType, orderType, u); };
+  // Auto-fill units from the tooth count when units hasn't been entered manually —
+  // mirrors the backend's own fallback (units derived from toothNumbers on accept).
+  const handleTooth = (val) => {
+    setToothNumbers(val);
+    if (!units.trim()) {
+      const count = val.split(',').map(t => t.trim()).filter(Boolean).length;
+      if (count > 0) { setUnits(String(count)); calcPriceAndDate(workType, orderType, String(count)); }
+    }
+  };
 
   const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
   const lbl     = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
@@ -67,7 +77,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const count       = selWorkType && FLAT_PRICE_TYPES.has(selWorkType) ? 1 : Math.max(1, parseInt(units) || 1);
   const calcAmt     = unitPrice != null ? unitPrice * count : null;
 
-  const submit = () => onAccept({ shade, workType: selWorkType, doctorName, doctorPhone, units, orderType, totalAmount, dueDate, notes });
+  const submit = () => onAccept({ shade, workType: selWorkType, doctorName, doctorPhone, units, toothNumbers, orderType, totalAmount, dueDate, notes });
 
   return (
     <div style={{ marginTop: 14, padding: '16px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
@@ -90,6 +100,12 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
             {pricesData.map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
           </select>
         </div>
+      </div>
+      {/* Tooth Numbers */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={lbl}>TOOTH NUMBERS{c.toothNumbers && !toothNumbers.trim() && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>}</label>
+        <input style={{ ...inputSt, ...(c.toothNumbers && !toothNumbers.trim() ? { background: 'var(--green-dim)', color: 'var(--green)' } : {}) }}
+          placeholder="e.g. 14, 15, 16" value={toothNumbers} onChange={e => handleTooth(e.target.value)} />
       </div>
       {/* Units + Order Type */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
@@ -250,6 +266,7 @@ function AcceptCasesSection({ queryClient }) {
         doctorPhone:  effectiveDoctorPhone,
         workType:     formData.workType || c.workType,
         units:        formData.units ? parseInt(formData.units) : undefined,
+        toothNumbers: formData.toothNumbers || undefined,
         deliveryType: formData.orderType || 'NORMAL',
         totalAmount:  formData.totalAmount != null && formData.totalAmount !== '' ? parseFloat(formData.totalAmount) : undefined,
         dueDate:      formData.dueDate || undefined,
@@ -333,6 +350,7 @@ function AcceptCasesSection({ queryClient }) {
             {c.clinic?.address && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📍 {c.clinic.address}</div>}
             {c.doctorName && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>👨‍⚕️ {c.doctorName}{c.doctorPhone ? ` · ${c.doctorPhone}` : ''}</div>}
             {c.shade && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🎨 Shade: <strong>{c.shade}</strong></div>}
+            {c.toothNumbers && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🦷 Teeth: <strong>{c.toothNumbers}</strong></div>}
             {c.notes && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>📋 {c.notes}</div>}
             {c.assignedDelivery && <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>🛵 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}</div>}
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
