@@ -20,6 +20,7 @@ const SHADE_OPTIONS = [
   'OM1','OM2','OM3',
   'W1','W2','W3',
   '0M1','0M2','0M3',
+  'To Be Advised Later',
 ];
 
 // Work types charged per full dentition (not per unit)
