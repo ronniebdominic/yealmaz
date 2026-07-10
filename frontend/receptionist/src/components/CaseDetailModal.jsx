@@ -135,52 +135,52 @@ export default function CaseDetailModal({ caseId, onClose }) {
   <title>QR — ${data.caseNumber}</title>
   <style>
     @page {
-      size: A6 portrait;
+      size: A5 portrait;
       margin: 0;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 105mm;
-      height: 148mm;
+      width: 148mm;
+      height: 210mm;
       font-family: Arial, Helvetica, sans-serif;
       color: #1a1a2e;
       background: #fff;
       display: flex;
       flex-direction: column;
-      padding: 5mm;
+      padding: 9mm;
     }
 
     /* ── Header ── */
     .header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding-bottom: 4mm;
-      border-bottom: 2px solid #1A56A0;
-      margin-bottom: 4mm;
+      gap: 9px;
+      padding-bottom: 6mm;
+      border-bottom: 3px solid #1A56A0;
+      margin-bottom: 6mm;
     }
-    .header-icon { font-size: 20px; }
+    .header-icon { font-size: 30px; }
     .header-text { flex: 1; }
     .lab-name {
-      font-size: 11px;
+      font-size: 17px;
       font-weight: 800;
       color: #1A56A0;
       letter-spacing: 0.3px;
       line-height: 1.2;
     }
-    .lab-sub { font-size: 8px; color: #888; margin-top: 1px; }
+    .lab-sub { font-size: 12px; font-weight: 600; color: #777; margin-top: 2px; }
 
     /* ── QR block ── */
     .qr-wrap {
       display: flex;
       justify-content: center;
-      margin-bottom: 4mm;
+      margin-bottom: 6mm;
     }
     .qr-wrap img {
-      width: 52mm;
-      height: 52mm;
-      border: 1.5px solid #ddd;
-      border-radius: 4px;
+      width: 74mm;
+      height: 74mm;
+      border: 2px solid #ddd;
+      border-radius: 5px;
       display: block;
     }
 
@@ -188,47 +188,53 @@ export default function CaseDetailModal({ caseId, onClose }) {
     .case-number {
       text-align: center;
       font-family: 'Courier New', monospace;
-      font-size: 13px;
+      font-size: 22px;
       font-weight: 800;
       color: #1A56A0;
-      letter-spacing: 1px;
-      margin-bottom: 3mm;
+      letter-spacing: 1.5px;
+      margin-bottom: 5mm;
     }
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 2mm 3mm;
-      margin-bottom: 3mm;
+      gap: 3mm 4mm;
+      margin-bottom: 4mm;
     }
     .info-cell {
       background: #F4F7FF;
-      border-radius: 3px;
-      padding: 2mm 2.5mm;
+      border-radius: 4px;
+      padding: 3mm 4mm;
+    }
+    .info-cell.teeth {
+      background: #FFFBEB;
+      border: 1.5px solid #FDE68A;
     }
     .info-label {
-      font-size: 7px;
-      font-weight: 700;
-      color: #999;
+      font-size: 10px;
+      font-weight: 800;
+      color: #888;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 1px;
+      letter-spacing: 0.6px;
+      margin-bottom: 2px;
     }
     .info-value {
-      font-size: 9px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       color: #1a1a2e;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.25;
+    }
+    .info-cell.teeth .info-value {
+      font-size: 18px;
+      letter-spacing: 0.5px;
     }
     .info-cell.full { grid-column: 1 / -1; }
 
     /* ── Delivery badge ── */
     .delivery-badge {
       display: inline-block;
-      padding: 1px 6px;
-      border-radius: 10px;
-      font-size: 8px;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 13px;
       font-weight: 800;
       letter-spacing: 0.5px;
     }
@@ -238,11 +244,12 @@ export default function CaseDetailModal({ caseId, onClose }) {
     /* ── Footer ── */
     .footer {
       margin-top: auto;
-      padding-top: 3mm;
-      border-top: 1px solid #eee;
+      padding-top: 5mm;
+      border-top: 1.5px solid #eee;
       text-align: center;
-      font-size: 7px;
-      color: #aaa;
+      font-size: 10px;
+      font-weight: 600;
+      color: #999;
     }
   </style>
 </head>
@@ -266,19 +273,23 @@ export default function CaseDetailModal({ caseId, onClose }) {
       <div class="info-label">Patient</div>
       <div class="info-value">${data.patientName}${data.patientAge ? ' · Age ' + data.patientAge : ''}</div>
     </div>
+    ${data.toothNumbers ? `
+    <div class="info-cell full teeth">
+      <div class="info-label">Teeth</div>
+      <div class="info-value">${data.toothNumbers}</div>
+    </div>` : ''}
     <div class="info-cell">
       <div class="info-label">Work Type</div>
       <div class="info-value">${data.workType}</div>
     </div>
     <div class="info-cell">
+      <div class="info-label">Units</div>
+      <div class="info-value">${data.units ?? '—'}</div>
+    </div>
+    <div class="info-cell">
       <div class="info-label">Clinic</div>
       <div class="info-value">${data.clinic?.name || '—'}</div>
     </div>
-    ${data.toothNumbers ? `
-    <div class="info-cell">
-      <div class="info-label">Teeth</div>
-      <div class="info-value">${data.toothNumbers}</div>
-    </div>` : ''}
     ${data.shade ? `
     <div class="info-cell">
       <div class="info-label">Shade</div>
