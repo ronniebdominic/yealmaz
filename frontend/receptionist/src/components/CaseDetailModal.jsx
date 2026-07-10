@@ -160,7 +160,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
       border-bottom: 2.5px solid #1A56A0;
       margin-bottom: 4mm;
     }
-    .header-icon { font-size: 22px; }
+    .header-icon { width: 12mm; height: 12mm; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
     .header-text { flex: 1; }
     .lab-name {
       font-size: 14px;
@@ -256,7 +256,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
 </head>
 <body>
   <div class="header">
-    <div class="header-icon">🦷</div>
+    <img class="header-icon" src="${window.location.origin}/logo.png" alt="Ye-Almaz" />
     <div class="header-text">
       <div class="lab-name">Ye-Almaz Dental Laboratory</div>
       <div class="lab-sub">Addis Ababa, Ethiopia &nbsp;·&nbsp; Production Tracking Label</div>
