@@ -446,6 +446,19 @@ router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
       prisma.case.delete({ where: { id: req.params.id } }),
     ]);
 
+    // Reclaim the scan number if it was the most recently issued one, so a deleted
+    // case doesn't leave a permanent gap — the next new case reuses it instead of
+    // the sequence skipping ahead. Only safe when it's exactly the last number
+    // issued (nothing has been generated after it).
+    const numMatch = existing.caseNumber && existing.caseNumber.match(/^YDL(\d+)$/);
+    if (numMatch) {
+      const deletedNum = BigInt(numMatch[1]);
+      const [seqRow] = await prisma.$queryRawUnsafe(`SELECT last_value, is_called FROM case_number_seq`);
+      if (seqRow.is_called && seqRow.last_value === deletedNum) {
+        await prisma.$executeRawUnsafe(`SELECT setval('case_number_seq', ${(deletedNum - 1n).toString()}, true)`);
+      }
+    }
+
     await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
