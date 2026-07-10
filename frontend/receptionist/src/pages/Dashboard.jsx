@@ -31,7 +31,14 @@ const FLAT_PRICE_TYPES = new Set([
 // ─── Stable sub-forms (module-level so React never unmounts on parent re-render) ─
 
 // AcceptForm — owns all its form state locally so typing doesn't re-render parent
+// Some legacy/imported cases carry a reference code or placeholder instead of a
+// real patient name — treat those as "not provided" so the field starts blank
+// and prompts the receptionist to fill in the actual name.
+const PLACEHOLDER_NAME_RE = /^[A-Z]{2,4}-\d{4}-\d+$/;
+const isPlaceholderName = (name) => !name || PLACEHOLDER_NAME_RE.test(name) || name === 'Imported Patient';
+
 function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, expressDurMap, onAccept, onCancel, submitting }) {
+  const [patientName, setPatientName] = useState(isPlaceholderName(c.patientName) ? '' : c.patientName);
   const [shade,       setShade]       = useState(c.shade        || '');
   const [workType,    setWorkType]    = useState((c.workType !== 'TBD' ? c.workType : '') || '');
   const [doctorName,  setDoctorName]  = useState(c.doctorName   || '');
@@ -86,7 +93,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const calcAmt     = unitPrice != null ? unitPrice * count : null;
 
   const submit = () => onAccept({
-    shade, workType: selWorkType, doctorName, doctorPhone, units,
+    shade, patientName, workType: selWorkType, doctorName, doctorPhone, units,
     toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
     orderType, totalAmount, dueDate, notes,
   });
@@ -95,6 +102,11 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     <div style={{ marginTop: 14, padding: '16px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 14 }}>
         ✓ Accept Case — Fill in Details & Assign Scan Number
+      </div>
+      {/* Patient Name */}
+      <div style={{ marginBottom: 10 }}>
+        <label style={lbl}>PATIENT NAME *</label>
+        <input style={inputSt} placeholder="Patient's full name" value={patientName} onChange={e => setPatientName(e.target.value)} />
       </div>
       {/* Shade + Work Type */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
@@ -267,9 +279,11 @@ function AcceptCasesSection({ queryClient }) {
 
   // handleAccept receives formData from <AcceptForm> — no closure over local state
   const handleAccept = async (c, formData) => {
+    const effectivePatientName = formData.patientName?.trim() || (isPlaceholderName(c.patientName) ? '' : c.patientName.trim());
     const effectiveDoctorName  = formData.doctorName?.trim()  || c.doctorName?.trim();
     const effectiveDoctorPhone = formData.doctorPhone?.trim() || c.doctorPhone?.trim();
 
+    if (!effectivePatientName)                     return toast.error('Patient name is required');
     if (!formData.shade)                           return toast.error('Shade is required');
     if (!formData.workType && !c.workType)         return toast.error('Work type is required');
     if (!effectiveDoctorName)                      return toast.error("Doctor's name is required");
@@ -282,6 +296,7 @@ function AcceptCasesSection({ queryClient }) {
     try {
       await api.post(`/cases/${c.id}/accept`, {
         shade:        formData.shade,
+        patientName:  effectivePatientName,
         doctorName:   effectiveDoctorName,
         doctorPhone:  effectiveDoctorPhone,
         workType:     formData.workType || c.workType,
@@ -361,7 +376,11 @@ function AcceptCasesSection({ queryClient }) {
               {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)' }}>🔄 Remake</span>}
               {c.redo   && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>♻️ Redo</span>}
             </div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{c.patientName}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>
+              {isPlaceholderName(c.patientName)
+                ? <span style={{ color: 'var(--amber)', fontStyle: 'italic' }}>Patient name not provided</span>
+                : c.patientName}
+            </div>
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
               {c.workType && c.workType !== 'TBD' ? c.workType : <span style={{ color: 'var(--amber)' }}>Work type TBD</span>}
               {c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}{' · '}🏥 {c.clinic?.name}
