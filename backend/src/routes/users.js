@@ -7,9 +7,23 @@ const { protect, restrict } = require('../middleware/auth');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Same department codes used by the scan station picker (scan.js DEPARTMENTS).
+const VALID_DEPARTMENTS = new Set([
+  'PLASTER', 'MARGIN', 'SCANNING', 'DESIGNING', 'MILLING', 'RESIN_PRINT',
+  'METAL_PRINT', 'METAL_FINISH', 'OPAQUE', 'CERAMIC', 'ZIRCONIA',
+  'GLAZING', 'THERMO', 'TRIMMING', 'QC',
+]);
+
+function parseDepartments(input) {
+  const list = Array.isArray(input) ? input : (input ? [input] : []);
+  const cleaned = [...new Set(list.map(d => String(d).trim().toUpperCase()).filter(Boolean))];
+  const invalid = cleaned.filter(d => !VALID_DEPARTMENTS.has(d));
+  return { cleaned, invalid };
+}
+
 const SAFE_SELECT = {
   id: true, name: true, email: true, role: true,
-  department: true, phone: true, isActive: true, createdAt: true,
+  departments: true, phone: true, isActive: true, createdAt: true,
 };
 
 // ── GET /api/users ───────────────────────────────────────
@@ -30,7 +44,7 @@ router.get('/', protect, restrict('ADMIN'), async (req, res) => {
 // ── POST /api/users ──────────────────────────────────────
 router.post('/', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, email, password, role, department, phone } = req.body;
+    const { name, email, password, role, departments, phone } = req.body;
 
     if (!name?.trim())     return res.status(400).json({ error: 'Name is required.' });
     if (!email?.trim())    return res.status(400).json({ error: 'Email is required.' });
@@ -41,16 +55,19 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) return res.status(409).json({ error: 'A user with this email already exists.' });
 
+    const { cleaned, invalid } = parseDepartments(departments);
+    if (invalid.length) return res.status(400).json({ error: `Unknown department(s): ${invalid.join(', ')}` });
+
     const hashed = await bcrypt.hash(password.trim(), 10);
 
     const user = await prisma.user.create({
       data: {
-        name:       name.trim(),
-        email:      email.trim().toLowerCase(),
-        password:   hashed,
+        name:        name.trim(),
+        email:       email.trim().toLowerCase(),
+        password:    hashed,
         role,
-        department: role === 'LAB_TECH' ? (department?.trim() || null) : null,
-        phone:      phone?.trim() || null,
+        departments: role === 'LAB_TECH' ? cleaned : [],
+        phone:       phone?.trim() || null,
       },
       select: SAFE_SELECT,
     });
@@ -65,7 +82,7 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
 // ── PATCH /api/users/:id ─────────────────────────────────
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, email, password, role, department, phone, isActive } = req.body;
+    const { name, email, password, role, departments, phone, isActive } = req.body;
 
     // Prevent modifying other admins
     const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { role: true } });
@@ -78,11 +95,15 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
     if (role     !== undefined && role !== 'ADMIN') data.role = role;
     if (phone    !== undefined) data.phone      = phone?.trim() || null;
     if (isActive !== undefined) data.isActive   = isActive;
-    if (department !== undefined) data.department = department?.trim() || null;
+    if (departments !== undefined) {
+      const { cleaned, invalid } = parseDepartments(departments);
+      if (invalid.length) return res.status(400).json({ error: `Unknown department(s): ${invalid.join(', ')}` });
+      data.departments = cleaned;
+    }
     if (password?.trim()) data.password = await bcrypt.hash(password.trim(), 10);
 
-    // Clear department if role changed away from LAB_TECH
-    if (data.role && data.role !== 'LAB_TECH') data.department = null;
+    // Clear departments if role changed away from LAB_TECH
+    if (data.role && data.role !== 'LAB_TECH') data.departments = [];
 
     const user = await prisma.user.update({
       where: { id: req.params.id },

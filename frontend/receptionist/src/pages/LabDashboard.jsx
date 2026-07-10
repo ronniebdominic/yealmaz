@@ -291,8 +291,13 @@ export default function LabDashboard() {
   const [recentScans, setRecentScans] = useState([]);
   const confirmingRef = useRef(false); // guard: prevents double-submit
 
-  // Auto-select dept from login if user has one assigned
-  const lockedDept = user?.department || null;
+  // Empty list = unrestricted (all 15). One department = auto-locked, no
+  // picker needed. Multiple = picker shown, but restricted to just these.
+  const myDepartments = user?.departments || [];
+  const lockedDept = myDepartments.length === 1 ? myDepartments[0] : null;
+  const pickableDepartments = myDepartments.length > 0
+    ? DEPARTMENTS.filter(d => myDepartments.includes(d.code))
+    : DEPARTMENTS;
   const queryClient = useQueryClient();
 
   // If locked dept from login, use it; otherwise use manually selected
@@ -379,13 +384,14 @@ export default function LabDashboard() {
             </div>
           </div>
         ) : (
-          // No dept on account — show selector
+          // Multiple departments (or none/flexible) — show selector, scoped to
+          // this account's assigned departments if any are set.
           <div className="card" style={{ marginBottom: 16, padding: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-              Select Your Department
+              {myDepartments.length > 0 ? 'Select Your Department' : 'Select Your Department (unrestricted)'}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {DEPARTMENTS.map(d => (
+              {pickableDepartments.map(d => (
                 <button key={d.code} onClick={() => setDepartment(d.code)}
                   style={{
                     padding: '10px 8px', borderRadius: 10,

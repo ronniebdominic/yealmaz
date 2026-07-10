@@ -50,21 +50,27 @@ const ROLE_COLORS = {
 function UserFormModal({ initial, onSaved, onClose }) {
   const isEdit = !!initial?.id;
   const [form, setForm] = useState(initial ? {
-    name:       initial.name       || '',
-    email:      initial.email      || '',
-    phone:      initial.phone      || '',
-    role:       initial.role       || 'RECEPTIONIST',
-    department: initial.department || '',
-    password:   '',
+    name:        initial.name        || '',
+    email:       initial.email       || '',
+    phone:       initial.phone       || '',
+    role:        initial.role        || 'RECEPTIONIST',
+    departments: initial.departments || [],
+    password:    '',
   } : {
     name: '', email: '', phone: '',
-    role: 'RECEPTIONIST', department: '', password: generatePassword(),
+    role: 'RECEPTIONIST', departments: [], password: generatePassword(),
   });
   const [showPass,           setShowPass]           = useState(!isEdit);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [saving,             setSaving]             = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const toggleDept = (code) => setForm(f => ({
+    ...f,
+    departments: f.departments.includes(code)
+      ? f.departments.filter(d => d !== code)
+      : [...f.departments, code],
+  }));
 
   const submit = async () => {
     if (!form.name.trim())  { toast.error('Name is required');  return; }
@@ -78,7 +84,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
         email: form.email.trim(),
         phone: form.phone.trim() || undefined,
         role:  form.role,
-        department: form.role === 'LAB_TECH' ? (form.department || undefined) : undefined,
+        departments: form.role === 'LAB_TECH' ? form.departments : [],
       };
       if (form.password.trim()) payload.password = form.password.trim();
 
@@ -128,7 +134,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
               <select
                 style={{ ...inputStyle, cursor: 'pointer' }}
                 value={form.role}
-                onChange={e => { set('role', e.target.value); set('department', ''); }}
+                onChange={e => { set('role', e.target.value); set('departments', []); }}
               >
                 {ROLES.map(r => (
                   <option key={r.value} value={r.value}>{r.icon} {r.label}</option>
@@ -136,23 +142,35 @@ function UserFormModal({ initial, onSaved, onClose }) {
               </select>
             </Field>
 
-            {/* Department — LAB_TECH only */}
-            <Field
-              label="Department"
-              hint={form.role === 'LAB_TECH' ? 'locks them to one dept' : 'only for Lab Technician'}
-            >
-              <select
-                style={{ ...inputStyle, cursor: 'pointer', opacity: form.role === 'LAB_TECH' ? 1 : 0.4 }}
-                value={form.department}
-                onChange={e => set('department', e.target.value)}
-                disabled={form.role !== 'LAB_TECH'}
-              >
-                <option value="">— None / Flexible —</option>
-                {DEPARTMENTS.map(d => (
-                  <option key={d.code} value={d.code}>{d.label}</option>
-                ))}
-              </select>
-            </Field>
+            {/* Departments — LAB_TECH only, multi-select */}
+            {form.role === 'LAB_TECH' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Field
+                  label="Departments"
+                  hint={form.departments.length ? `scoped to ${form.departments.length} selected` : 'none selected = unrestricted (all departments)'}
+                >
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6,
+                    padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface-2)',
+                  }}>
+                    {DEPARTMENTS.map(d => {
+                      const checked = form.departments.includes(d.code);
+                      return (
+                        <label key={d.code} style={{
+                          display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                          fontSize: 12, fontWeight: checked ? 700 : 400,
+                          color: checked ? 'var(--blue)' : 'var(--text-2)',
+                        }}>
+                          <input type="checkbox" checked={checked} onChange={() => toggleDept(d.code)}
+                            style={{ width: 14, height: 14, accentColor: 'var(--blue)', cursor: 'pointer' }} />
+                          {d.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </Field>
+              </div>
+            )}
 
             {/* Email */}
             <div style={{ gridColumn: '1 / -1' }}>
@@ -315,7 +333,7 @@ export default function AdminUsers() {
     const matchSearch = !search.trim() ||
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
-      (u.department || '').toLowerCase().includes(search.toLowerCase());
+      (u.departments || []).join(' ').toLowerCase().includes(search.toLowerCase());
     return matchRole && matchSearch;
   });
 
@@ -415,9 +433,12 @@ export default function AdminUsers() {
                             {roleInfo.icon} {roleInfo.label || u.role}
                           </span>
                         </td>
-                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                          title={u.role === 'LAB_TECH' ? (u.departments || []).map(c => DEPARTMENTS.find(d => d.code === c)?.label || c).join(', ') : ''}>
                           {u.role === 'LAB_TECH'
-                            ? (DEPARTMENTS.find(d => d.code === u.department)?.label || (u.department ? u.department : <span style={{ color: 'var(--text-3)' }}>Flexible</span>))
+                            ? ((u.departments?.length)
+                                ? u.departments.map(c => DEPARTMENTS.find(d => d.code === c)?.label || c).join(', ')
+                                : <span style={{ color: 'var(--text-3)' }}>Flexible</span>)
                             : <span style={{ color: 'var(--text-3)' }}>—</span>}
                         </td>
                         <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>

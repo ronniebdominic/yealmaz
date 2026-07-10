@@ -19,7 +19,7 @@ model User {
   email     String   @unique
   password  String
   role       Role
-  department String?  // For LAB_TECH: locks them to a specific department
+  departments String[] @default([]) // For LAB_TECH: scopes them to these department(s). Empty = unrestricted (all departments).
   phone      String?
   isActive   Boolean  @default(true)
   createdAt DateTime @default(now())

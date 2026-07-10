@@ -3,6 +3,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -110,13 +111,19 @@ router.get('/departments', (req, res) => {
 // ── POST /api/scan/:caseId ───────────────────────────────
 // Called when a QR is scanned at a department
 // Body: { department: 'CAD_CAM', techName: 'Ahmed' }
-router.post('/:caseId', async (req, res) => {
+router.post('/:caseId', protect, async (req, res) => {
   try {
     const { caseId } = req.params;
     const { department, techName } = req.body;
 
     if (!department || !DEPT_TO_STAGE[department]) {
       return res.status(400).json({ error: 'Invalid department code.' });
+    }
+
+    // Lab techs scoped to specific department(s) can only scan those — an empty
+    // list means unrestricted (matches the "Flexible" option in account setup).
+    if (req.user.role === 'LAB_TECH' && req.user.departments?.length && !req.user.departments.includes(department)) {
+      return res.status(403).json({ error: `You are not assigned to the ${DEPARTMENTS[department]?.label || department} department.` });
     }
 
     const caseData = await prisma.case.findUnique({
