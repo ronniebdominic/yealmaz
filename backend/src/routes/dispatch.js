@@ -250,8 +250,10 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
     const {
       clinicId, clinicName, clinicPhone, clinicAddress,
       patientName, workType, doctorName, doctorPhone, notes,
-      assignToExecutiveId,
+      assignToExecutiveId, deliveryType,
     } = req.body;
+
+    const resolvedDeliveryType = deliveryType === 'EXPRESS' ? 'EXPRESS' : 'NORMAL';
 
     // patientName is filled in by the receptionist when accepting the case;
     // dispatcher only needs to provide clinic info for the pickup.
@@ -290,6 +292,7 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
         doctorPhone: doctorPhone || null,
         notes:       notes || null,
         dueDate,
+        deliveryType: resolvedDeliveryType,
         clinicId:    resolvedClinicId,
         status,
         ...(assignToExecutiveId ? { assignedDeliveryId: assignToExecutiveId } : {}),
@@ -302,7 +305,7 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
         caseId:    newCase.id,
         stageName: status,
         scannedBy: req.user.name,
-        notes:     `Phone order placed by dispatcher${assignToExecutiveId ? ' — pickup assigned' : ''}`,
+        notes:     `Phone order placed by dispatcher${resolvedDeliveryType === 'EXPRESS' ? ' — ⚡ Express' : ''}${assignToExecutiveId ? ' — pickup assigned' : ''}`,
       },
     });
 

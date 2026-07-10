@@ -208,7 +208,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
   const [form, setForm] = useState({
     existingClinicId: '', clinicName: '', clinicPhone: '', clinicAddress: '',
     doctorName: '', doctorPhone: '', notes: '',
-    assignToExecutiveId: '',
+    assignToExecutiveId: '', deliveryType: 'NORMAL',
   });
   const [clinics, setClinics] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -238,6 +238,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
         doctorPhone:   form.doctorPhone || undefined,
         notes:         form.notes || undefined,
         assignToExecutiveId: form.assignToExecutiveId || undefined,
+        deliveryType:  form.deliveryType,
       });
       toast.success('📞 Phone order placed!');
       onSuccess();
@@ -310,6 +311,31 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
             <textarea rows={2} style={{ ...inp, resize: 'vertical' }}
               placeholder="Any details mentioned on the call…"
               value={form.notes} onChange={set('notes')} />
+          </div>
+
+          {/* Delivery Type — so the receptionist knows before accepting */}
+          <div>
+            <label style={lbl}>DELIVERY TYPE</label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[
+                { value: 'NORMAL',  label: 'Normal',  icon: '🚚' },
+                { value: 'EXPRESS', label: 'Express', icon: '⚡' },
+              ].map(opt => (
+                <button key={opt.value} type="button"
+                  onClick={() => setForm(prev => ({ ...prev, deliveryType: opt.value }))}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    padding: '9px 14px', borderRadius: 8, cursor: 'pointer',
+                    border: `2px solid ${form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
+                    background: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'rgba(240,165,0,0.08)' : 'var(--blue-dim, #EEF2FF)') : 'var(--surface)',
+                  }}>
+                  <span style={{ fontSize: 16 }}>{opt.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-1)' }}>
+                    {opt.label}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Assign driver immediately */}

@@ -374,6 +374,7 @@ function AcceptCasesSection({ queryClient }) {
                 : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--amber-dim)', color: 'var(--amber)', fontFamily: 'DM Mono, monospace' }}>No Scan # Yet</span>
               }
               <StatusBadge status={c.status} />
+              {c.deliveryType === 'EXPRESS' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(240,165,0,0.12)', color: 'var(--amber)' }}>⚡ Express</span>}
               {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)' }}>🔄 Remake</span>}
               {c.redo   && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>♻️ Redo</span>}
             </div>
