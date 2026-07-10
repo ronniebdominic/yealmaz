@@ -113,7 +113,14 @@ export default function NewCase() {
     workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
     deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
     remake: false, redo: false, remakeReason: '',
+    archUpper: false, archLower: false,
   });
+
+  // Digital-scan intake fee: Br 500 per arch, on top of the work-type price.
+  const ARCH_FEE = 500;
+  const archFee = (form.intakeMethod === 'EMAIL_3D_FILE')
+    ? (form.archUpper ? ARCH_FEE : 0) + (form.archLower ? ARCH_FEE : 0)
+    : 0;
 
   const { data: pricesData = [] } = useQuery({
     queryKey: ['prices'],
@@ -169,20 +176,22 @@ export default function NewCase() {
     return unitPrice * count;
   }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
 
-  // Auto-calculate price with remake/redo modifier
+  // Auto-calculate price with remake/redo modifier — includes the arch scan
+  // fee (Br 500/arch) on top of the work-type price for 3D-file intake.
   useEffect(() => {
     if (basePrice === null) return;
+    const combined = basePrice + archFee;
     let amount;
     if (form.remake) {
       amount = '0';
     } else if (form.redo) {
-      amount = String(Math.round(basePrice * 0.5 * 100) / 100);
+      amount = String(Math.round(combined * 0.5 * 100) / 100);
     } else {
-      amount = String(basePrice);
+      amount = String(combined);
     }
     setForm(prev => ({ ...prev, totalAmount: amount }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basePrice, form.remake, form.redo]);
+  }, [basePrice, archFee, form.remake, form.redo]);
 
   // Auto-set due date
   useEffect(() => {
@@ -235,6 +244,9 @@ export default function NewCase() {
     if (!form.clinicId)    return toast.error('Please select a clinic');
     if (!form.patientName) return toast.error('Patient name is required');
     if (!form.workType)    return toast.error('Work type is required');
+    if (form.intakeMethod === 'EMAIL_3D_FILE' && !form.archUpper && !form.archLower) {
+      return toast.error('Select at least one arch (Upper/Lower) that was scanned');
+    }
 
     const errs = validate();
     if (Object.keys(errs).length > 0) {
@@ -249,12 +261,19 @@ export default function NewCase() {
       const resolvedUnits = selectedTeeth.length > 0
         ? selectedTeeth.length
         : manualUnits ? parseInt(manualUnits) : undefined;
+      const isEmailFile = form.intakeMethod === 'EMAIL_3D_FILE';
+      const archLabel = [form.archUpper && 'Upper', form.archLower && 'Lower'].filter(Boolean).join(' & ');
+      const scanNote = isEmailFile
+        ? `📧 3D file intake — Arches scanned: ${archLabel || 'none selected'}${archFee > 0 ? ` (Br ${archFee.toLocaleString('en-US')} scan fee)` : ''}`
+        : null;
       const res = await api.post('/cases', {
         ...form,
+        notes: [scanNote, form.notes].filter(Boolean).join('\n'),
         toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
         units: resolvedUnits,
         deliveryDate: form.deliveryDate || undefined,
-        dropOffAtLab: form.intakeMethod === 'DROP_OFF',
+        // Digital-file intake has no physical pickup step — accept immediately, same as a lab drop-off.
+        dropOffAtLab: form.intakeMethod === 'DROP_OFF' || isEmailFile,
       });
       toast.success(`Case ${res.data.caseNumber} created!`);
       navigate('/cases');
@@ -271,7 +290,11 @@ export default function NewCase() {
     const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
     const unitPrice  = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
     const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
-    const full  = unitPrice * count;
+    const workTypeFull = unitPrice * count;
+    const full = workTypeFull + archFee;
+    const archNote = archFee > 0
+      ? <> + Br {archFee.toLocaleString('en-US')} scan fee</>
+      : null;
     if (form.remake) {
       return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>Remake — <strong style={{ color: 'var(--red)' }}>Free (Br 0)</strong></span>;
     }
@@ -282,11 +305,11 @@ export default function NewCase() {
     }
     return FLAT_PRICE_TYPES.has(form.workType) ? (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? '⚡ ' : ''}flat — <strong style={{ color: 'var(--green)' }}>Br {unitPrice.toLocaleString('en-US')}</strong>
+        {useExpress ? '⚡ ' : ''}flat — Br {unitPrice.toLocaleString('en-US')}{archNote} = <strong style={{ color: 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
       </span>
     ) : (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? '⚡ ' : ''}Br {unitPrice.toLocaleString('en-US')} × {count} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+        {useExpress ? '⚡ ' : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
       </span>
     );
   })();
@@ -483,17 +506,18 @@ export default function NewCase() {
               {/* Intake Method */}
               <div className="form-group">
                 <label>Intake Method</label>
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {[
-                    { value: 'PICKUP',   label: 'To Be Picked Up', icon: '🛵', desc: 'Delivery exec will collect from clinic' },
-                    { value: 'DROP_OFF', label: 'Dropped at Lab',  icon: '📥', desc: 'Impression already received at lab' },
+                    { value: 'PICKUP',        label: 'To Be Picked Up',  icon: '🛵', desc: 'Delivery exec will collect from clinic' },
+                    { value: 'DROP_OFF',      label: 'Dropped at Lab',   icon: '📥', desc: 'Impression already received at lab' },
+                    { value: 'EMAIL_3D_FILE', label: '3D File (Emailed)', icon: '📧', desc: 'Digital scan file sent by dentist via email' },
                   ].map(opt => (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => setForm(prev => ({ ...prev, intakeMethod: opt.value }))}
                       style={{
-                        flex: 1, display: 'flex', alignItems: 'center', gap: 10,
+                        flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: 10,
                         padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                         border: `2px solid ${form.intakeMethod === opt.value ? 'var(--blue)' : 'var(--border)'}`,
                         background: form.intakeMethod === opt.value ? 'var(--blue-dim, #EEF2FF)' : 'var(--surface)',
@@ -510,6 +534,40 @@ export default function NewCase() {
                     </button>
                   ))}
                 </div>
+
+                {form.intakeMethod === 'EMAIL_3D_FILE' && (
+                  <div style={{ marginTop: 10, padding: '12px 14px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', marginBottom: 8 }}>
+                      Arch(es) Scanned — Br {ARCH_FEE.toLocaleString('en-US')} per arch
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {[
+                        { field: 'archUpper', label: 'Upper Arch', checked: form.archUpper },
+                        { field: 'archLower', label: 'Lower Arch', checked: form.archLower },
+                      ].map(opt => (
+                        <label key={opt.field} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+                          border: `2px solid ${opt.checked ? 'var(--blue)' : 'var(--border)'}`,
+                          background: opt.checked ? '#fff' : 'var(--surface)',
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={opt.checked}
+                            onChange={e => setForm(prev => ({ ...prev, [opt.field]: e.target.checked }))}
+                            style={{ width: 16, height: 16, accentColor: 'var(--blue)', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? 'var(--blue)' : 'var(--text-1)' }}>{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {archFee > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--blue)', marginTop: 8, fontWeight: 600 }}>
+                        Scan fee: Br {archFee.toLocaleString('en-US')} — added on top of the work-type price below.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Delivery Type */}
