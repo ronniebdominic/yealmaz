@@ -124,6 +124,13 @@ model Case {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([clinicId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([dueDate])
+  @@index([deliveryDate])
+  @@index([assignedDeliveryId])
   @@map("cases")
 }
 
@@ -200,6 +207,7 @@ model CaseStage {
   location    String?   // optional lab section name
   notes       String?
 
+  @@index([caseId])
   @@map("case_stages")
 }
 
@@ -243,6 +251,8 @@ model Payment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([status])
+  @@index([verifiedAt])
   @@map("payments")
 }
 
@@ -260,6 +270,7 @@ model DeliveryLog {
 
   createdAt DateTime @default(now())
 
+  @@index([caseId])
   @@map("delivery_logs")
 }
 
@@ -303,6 +314,8 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  @@index([userId])
+  @@index([caseId])
   @@map("notifications")
 }
 
