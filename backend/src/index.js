@@ -84,6 +84,7 @@ app.use('/api/scan',          require('./routes/scan'));      // Public QR scan 
 app.use('/api/prices',        require('./routes/prices'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/rewards',       require('./routes/rewards'));
+app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────
 const { appCache, invalidate } = require('./cache');

@@ -362,3 +362,14 @@ model RewardRedemption {
   updatedAt    DateTime   @updatedAt
   @@map("reward_redemptions")
 }
+
+// ── GOOGLE SHEETS SYNC ─────────────────────────────────
+// Tracks which spreadsheet row a case occupies, so the sync webhook can update
+// the existing row (upsert) instead of re-scanning the whole sheet every time.
+model SheetSyncRow {
+  id        String   @id @default(uuid())
+  caseId    String   @unique
+  rowNumber Int
+  updatedAt DateTime @updatedAt
+  @@map("sheet_sync_rows")
+}
