@@ -4,6 +4,7 @@ import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import FilterBar from '../components/FilterBar';
 import ExportMenu from '../components/ExportMenu';
+import Odontogram from '../components/Odontogram';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -35,12 +36,20 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const [workType,    setWorkType]    = useState((c.workType !== 'TBD' ? c.workType : '') || '');
   const [doctorName,  setDoctorName]  = useState(c.doctorName   || '');
   const [doctorPhone, setDoctorPhone] = useState(c.doctorPhone  || '');
-  const [units,       setUnits]       = useState(c.units ? String(c.units) : '');
-  const [toothNumbers, setToothNumbers] = useState(c.toothNumbers || '');
+  const [manualUnits, setManualUnits] = useState(c.units ? String(c.units) : '');
+  // Pre-select teeth on the chart if the clinic already submitted a tooth list.
+  const [selectedTeeth, setSelectedTeeth] = useState(() => {
+    if (!c.toothNumbers) return [];
+    return c.toothNumbers.split(',').map(t => parseInt(t.trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b);
+  });
   const [orderType,   setOrderType]   = useState(c.deliveryType || 'NORMAL');
   const [totalAmount, setTotalAmount] = useState('');
   const [dueDate,     setDueDate]     = useState('');
   const [notes,       setNotes]       = useState('');
+
+  // Units follow the odontogram selection once teeth are picked (same rule as
+  // New Case's tooth chart) — manual entry only applies when nothing's selected.
+  const units = selectedTeeth.length > 0 ? String(selectedTeeth.length) : manualUnits;
 
   const calcPriceAndDate = (wt, ot, u) => {
     if (!wt || !priceMap[wt]) return;
@@ -57,16 +66,15 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
 
   const handleWT = (wt)  => { setWorkType(wt);    calcPriceAndDate(wt, orderType, units); };
   const handleOT = (ot)  => { setOrderType(ot);   calcPriceAndDate(workType, ot, units); };
-  const handleU  = (u)   => { setUnits(u);        calcPriceAndDate(workType, orderType, u); };
-  // Auto-fill units from the tooth count when units hasn't been entered manually —
-  // mirrors the backend's own fallback (units derived from toothNumbers on accept).
-  const handleTooth = (val) => {
-    setToothNumbers(val);
-    if (!units.trim()) {
-      const count = val.split(',').map(t => t.trim()).filter(Boolean).length;
-      if (count > 0) { setUnits(String(count)); calcPriceAndDate(workType, orderType, String(count)); }
-    }
+  const handleManualUnits = (u) => { setManualUnits(u); calcPriceAndDate(workType, orderType, u); };
+  const toggleTooth = (num) => {
+    setSelectedTeeth(prev => {
+      const next = prev.includes(num) ? prev.filter(t => t !== num) : [...prev, num].sort((a, b) => a - b);
+      calcPriceAndDate(workType, orderType, String(next.length || parseInt(manualUnits) || 1));
+      return next;
+    });
   };
+  const clearTeeth = () => { setSelectedTeeth([]); calcPriceAndDate(workType, orderType, manualUnits); };
 
   const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
   const lbl     = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
@@ -77,7 +85,11 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const count       = selWorkType && FLAT_PRICE_TYPES.has(selWorkType) ? 1 : Math.max(1, parseInt(units) || 1);
   const calcAmt     = unitPrice != null ? unitPrice * count : null;
 
-  const submit = () => onAccept({ shade, workType: selWorkType, doctorName, doctorPhone, units, toothNumbers, orderType, totalAmount, dueDate, notes });
+  const submit = () => onAccept({
+    shade, workType: selWorkType, doctorName, doctorPhone, units,
+    toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
+    orderType, totalAmount, dueDate, notes,
+  });
 
   return (
     <div style={{ marginTop: 14, padding: '16px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
@@ -101,17 +113,25 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           </select>
         </div>
       </div>
-      {/* Tooth Numbers */}
+      {/* Tooth Numbers — odontogram */}
       <div style={{ marginBottom: 10 }}>
-        <label style={lbl}>TOOTH NUMBERS{c.toothNumbers && !toothNumbers.trim() && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>✓ pre-filled</span>}</label>
-        <input style={{ ...inputSt, ...(c.toothNumbers && !toothNumbers.trim() ? { background: 'var(--green-dim)', color: 'var(--green)' } : {}) }}
-          placeholder="e.g. 14, 15, 16" value={toothNumbers} onChange={e => handleTooth(e.target.value)} />
+        <label style={lbl}>TOOTH NUMBERS (ODONTOGRAM)</label>
+        <div style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+          <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={clearTeeth} />
+        </div>
+        {c.toothNumbers && selectedTeeth.length === 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+            Clinic submitted: "{c.toothNumbers}" — couldn't auto-mark on the chart, verify manually
+          </div>
+        )}
       </div>
       {/* Units + Order Type */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div>
-          <label style={lbl}>UNITS</label>
-          <input type="number" min="1" style={inputSt} placeholder="1" value={units} onChange={e => handleU(e.target.value)} />
+          <label style={lbl}>UNITS{selectedTeeth.length > 0 && <span style={{ marginLeft: 6, fontWeight: 400 }}>(from chart)</span>}</label>
+          <input type="number" min="1" style={{ ...inputSt, ...(selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+            placeholder="1" value={units} readOnly={selectedTeeth.length > 0}
+            onChange={e => handleManualUnits(e.target.value)} />
         </div>
         <div>
           <label style={lbl}>ORDER TYPE</label>
