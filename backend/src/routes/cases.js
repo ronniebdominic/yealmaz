@@ -526,13 +526,37 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
       return res.status(403).json({ error: `Delivery role cannot set status to ${status}.` });
     }
 
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    // Any status past PENDING_PICKUP needs a scan/case number. The dedicated /accept
+    // endpoint assigns one, but this generic status override (used for manual
+    // corrections) previously didn't — a case could be pushed to CASE_ACCEPTED (or
+    // further) here and be stuck with no scan number. Assign one here too, same rule
+    // as case creation/acceptance.
+    let caseNumber = existing.caseNumber;
+    let assignedNumber = false;
+    if (!caseNumber && status !== 'PENDING_PICKUP') {
+      caseNumber = await generateCaseNumber();
+      assignedNumber = true;
+    }
+
     const updated = await prisma.case.update({
       where: { id: req.params.id },
       data: {
         status,
+        ...(assignedNumber ? { caseNumber } : {}),
         ...(status === 'DELIVERED' ? { deliveryDate: new Date() } : {}),
       }
     });
+
+    // QR code is tied to having a scan number — generate it now if this transition
+    // just assigned the case's first one (mirrors /accept's behavior).
+    if (assignedNumber && !existing.qrCodeUrl) {
+      const qrData = `${process.env.APP_URL}/api/scan/${req.params.id}`;
+      const qrCodeUrl = await QRCode.toDataURL(qrData, { width: 300, margin: 2, color: { dark: '#1A56A0', light: '#FFFFFF' } });
+      await prisma.case.update({ where: { id: req.params.id }, data: { qrCodeUrl, qrCodeData: qrData } });
+    }
 
     await prisma.caseStage.create({
       data: {
