@@ -141,7 +141,7 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
 
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
 
-    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'delivery:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${caseData.clinicId}`).emit('case_updated', {

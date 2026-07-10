@@ -605,8 +605,12 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 // Clinic-app payment transactions (online gateway + screenshot uploads) with
 // their outcome, so finance can see success / failed / pending at a glance.
 router.get('/gateway', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const { limit = 200 } = req.query;
+  const cacheKey = `payments:gateway:${limit}`;
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
-    const { limit = 200 } = req.query;
     // Clinic-app payment lifecycle ONLY — a payment request was sent to the clinic,
     // the clinic started an online checkout (chapaTxRef), or uploaded a receipt
     // (screenshotUrl). This deliberately EXCLUDES in-person manual collections
@@ -651,7 +655,9 @@ router.get('/gateway', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
       return a;
     }, { success: 0, failed: 0, pending: 0 });
 
-    res.json({ transactions: tx, counts });
+    const result = { transactions: tx, counts };
+    await appCache.set(cacheKey, result);
+    res.json(result);
   } catch (err) {
     console.error('[payments/gateway]', err);
     res.status(500).json({ error: 'Could not fetch gateway transactions.' });

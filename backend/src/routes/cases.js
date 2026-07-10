@@ -338,7 +338,7 @@ router.post('/', protect, async (req, res) => {
       awardCasePoints(req.user.id, newCase.id, newCase.caseNumber).catch(() => {});
     }
 
-    await invalidate('cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
+    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('new_case', {
@@ -418,7 +418,7 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       },
     });
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dispatch:queue');
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dispatch:queue');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
@@ -460,7 +460,7 @@ router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
       }
     }
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_deleted', { caseId: req.params.id, caseNumber: existing.caseNumber });
@@ -581,7 +581,7 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
       }
     });
 
-    invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'lab:active');
+    invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'lab:active');
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', {

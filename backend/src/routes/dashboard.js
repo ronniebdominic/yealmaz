@@ -417,6 +417,10 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 // ── GET /api/dashboard/clinic-balances ──────────────────
 // Per-clinic outstanding payment totals for Finance dashboard
 router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const cacheKey = 'payments:clinic-balances';
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
     const payments = await prisma.payment.findMany({
       where: {
@@ -460,6 +464,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
     const balances = Object.values(clinicMap)
       .sort((a, b) => b.pendingAmount - a.pendingAmount);
 
+    await appCache.set(cacheKey, balances);
     res.json(balances);
   } catch (err) {
     console.error('[clinic-balances]', err);
@@ -470,6 +475,10 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
 // ── GET /api/dashboard/trusted-partners-summary ──────────
 // Per-clinic aggregated stats for trusted partner (isExcluded) clinics
 router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const cacheKey = 'payments:trusted-summary';
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
     const clinics = await prisma.clinic.findMany({
       where: { isExcluded: true, isActive: true },
@@ -550,6 +559,7 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
     }).filter(c => c.totalOrders > 0)
       .sort((a, b) => b.outstanding - a.outstanding);
 
+    await appCache.set(cacheKey, summary);
     res.json(summary);
   } catch (err) {
     console.error('[trusted-partners-summary]', err);

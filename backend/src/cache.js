@@ -19,6 +19,10 @@ const TTL_RULES = [
   { prefix: 'lab:',                  ttl: 30    }, // 30s  — lab queue
   { prefix: 'payments:pending',      ttl: 30    }, // 30s  — live verification queue
   { prefix: 'payments:billing',      ttl: 60    }, // 1 m  — billing list
+  { prefix: 'payments:gateway',      ttl: 30    }, // 30s  — live gateway/verify queue
+  { prefix: 'payments:trusted-summary', ttl: 60 }, // 1 m  — heavy per-clinic aggregation
+  { prefix: 'payments:trusted:',     ttl: 30    }, // 30s  — per-clinic case drill-down
+  { prefix: 'payments:clinic-balances', ttl: 30 }, // 30s  — outstanding-balance aggregation
   { prefix: 'delivery:',             ttl: 60    }, // 1 m  — dispatch queue
 ];
 const DEFAULT_TTL = 300; // 5 m fallback
