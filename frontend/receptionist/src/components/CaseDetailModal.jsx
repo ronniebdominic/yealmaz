@@ -127,6 +127,15 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const printQR = () => {
     if (!data?.qrCodeUrl) return;
     const due = data.dueDate ? new Date(data.dueDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+
+    // Pull the 3D-file/arch-fee line (recorded by New Case's "3D File (Emailed)"
+    // intake) out of notes so it prints as its own highlighted row; anything
+    // else in notes prints below as free-text.
+    const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const notesLines = (data.notes || '').split('\n').filter(Boolean);
+    const threeDLine = notesLines.find(l => l.startsWith('📧 3D file intake'));
+    const otherNotes = notesLines.filter(l => l !== threeDLine).join('\n');
+
     const w = window.open('', '_blank');
     w.document.write(`<!DOCTYPE html>
 <html>
@@ -210,6 +219,24 @@ export default function CaseDetailModal({ caseId, onClose }) {
       background: #FFFBEB;
       border: 1.5px solid #FDE68A;
     }
+    .info-cell.threed {
+      background: #EFF6FF;
+      border: 1.5px solid #BFDBFE;
+    }
+    .notes-block {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 4px;
+      padding: 2mm 3mm;
+      margin-bottom: 3mm;
+    }
+    .notes-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1a1a2e;
+      line-height: 1.3;
+      white-space: pre-line;
+    }
     .info-label {
       font-size: 8.5px;
       font-weight: 800;
@@ -279,6 +306,11 @@ export default function CaseDetailModal({ caseId, onClose }) {
       <div class="info-label">Teeth</div>
       <div class="info-value">${data.toothNumbers}</div>
     </div>` : ''}
+    ${threeDLine ? `
+    <div class="info-cell full threed">
+      <div class="info-label">3D File Intake</div>
+      <div class="info-value">${escapeHtml(threeDLine.replace('📧 ', ''))}</div>
+    </div>` : ''}
     <div class="info-cell">
       <div class="info-label">Work Type</div>
       <div class="info-value">${data.workType}</div>
@@ -310,6 +342,12 @@ export default function CaseDetailModal({ caseId, onClose }) {
       </div>
     </div>
   </div>
+
+  ${otherNotes ? `
+  <div class="notes-block">
+    <div class="info-label">Notes</div>
+    <div class="notes-text">${escapeHtml(otherNotes)}</div>
+  </div>` : ''}
 
   <div class="footer">Scan QR to update production stage &nbsp;·&nbsp; yealmaz.com</div>
 
