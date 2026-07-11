@@ -87,12 +87,19 @@ router.get('/', protect, async (req, res) => {
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
+    // Stage `notes` are internal LMS-staff comments (e.g. from Milling/Margin
+    // scans) — never expose them to the clinic portal. Clinics still see the
+    // stage name/timestamp for tracking, just not the free-text note.
+    const stagesRelation = req.user.role === 'CLINIC'
+      ? { select: { id: true, stageName: true, scannedAt: true, location: true }, orderBy: { scannedAt: 'desc' }, take: 1 }
+      : { orderBy: { scannedAt: 'desc' }, take: 1 };
+
     const [cases, total] = await Promise.all([
       prisma.case.findMany({
         where,
         include: {
           clinic:           { select: { id: true, name: true, phone: true, isExcluded: true } },
-          stages:           { orderBy: { scannedAt: 'desc' }, take: 1 },
+          stages:           stagesRelation,
           payment:          true,
           assignedDelivery: { select: { id: true, name: true } },
         },
@@ -188,13 +195,22 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
 // ── GET /api/cases/:id ───────────────────────────────────
 router.get('/:id', protect, async (req, res) => {
   try {
+    // Stage `notes` are internal LMS-staff comments — never send them to the
+    // clinic portal. The cache entry is shared across all roles (it's the same
+    // underlying case), so strip notes on the way out rather than fragmenting
+    // the cache per-role.
+    const forClinic = (data) => {
+      if (req.user.role !== 'CLINIC' || !data) return data;
+      return { ...data, stages: data.stages?.map(({ notes, ...s }) => s) };
+    };
+
     const cacheKey = `case:${req.params.id}`;
     const cached = await appCache.get(cacheKey);
     if (cached) {
       if (req.user.role === 'CLINIC' && cached.clinicId !== req.user.id) {
         return res.status(403).json({ error: 'Access denied.' });
       }
-      return res.json(cached);
+      return res.json(forClinic(cached));
     }
 
     const caseData = await prisma.case.findUnique({
@@ -213,7 +229,7 @@ router.get('/:id', protect, async (req, res) => {
     }
 
     await appCache.set(cacheKey, caseData);
-    res.json(caseData);
+    res.json(forClinic(caseData));
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch case.' });
   }

@@ -110,11 +110,11 @@ router.get('/departments', (req, res) => {
 
 // ── POST /api/scan/:caseId ───────────────────────────────
 // Called when a QR is scanned at a department
-// Body: { department: 'CAD_CAM', techName: 'Ahmed' }
+// Body: { department: 'CAD_CAM', techName: 'Ahmed', comment: 'optional note' }
 router.post('/:caseId', protect, async (req, res) => {
   try {
     const { caseId } = req.params;
-    const { department, techName } = req.body;
+    const { department, techName, comment } = req.body;
 
     if (!department || !DEPT_TO_STAGE[department]) {
       return res.status(400).json({ error: 'Invalid department code.' });
@@ -176,10 +176,16 @@ router.post('/:caseId', protect, async (req, res) => {
         finalStatus = 'READY_TO_DISPATCH';
       }
     } else {
-      // Normal status update
+      // Normal status update. A tech-entered comment (only offered by the
+      // frontend for Milling/Margin) is appended — visible to other LMS staff
+      // via the case's stage history, but stripped from clinic-facing responses
+      // (see cases.js GET / and GET /:id).
       await prisma.case.update({ where: { id: caseId }, data: { status: newStatus } });
       await prisma.caseStage.create({
-        data: { caseId, stageName: newStatus, scannedBy, location: dept.label, notes: `Scanned at ${dept.label} department` }
+        data: {
+          caseId, stageName: newStatus, scannedBy, location: dept.label,
+          notes: comment?.trim() ? `Scanned at ${dept.label} department — ${comment.trim()}` : `Scanned at ${dept.label} department`,
+        }
       });
     }
 

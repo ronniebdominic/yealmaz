@@ -1,14 +1,16 @@
 // Ye-Almaz — Lab Tech Routes
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
-const { protect } = require('../middleware/auth');
+const { protect, restrict } = require('../middleware/auth');
 const { appCache } = require('../cache');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Internal lab-floor endpoints — includes full stage notes (incl. Milling/Margin
+// tech comments), so these are never reachable by the CLINIC role.
 // GET /api/lab/active — cases currently in production
-router.get('/active', protect, async (req, res) => {
+router.get('/active', protect, restrict('ADMIN', 'LAB_TECH'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `lab:active:${page}:${limit}`;
@@ -40,7 +42,7 @@ router.get('/active', protect, async (req, res) => {
 });
 
 // GET /api/lab/case/:caseId — case details for QR scan result
-router.get('/case/:caseId', protect, async (req, res) => {
+router.get('/case/:caseId', protect, restrict('ADMIN', 'LAB_TECH'), async (req, res) => {
   const cacheKey = `case:lab:${req.params.caseId}`;
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);

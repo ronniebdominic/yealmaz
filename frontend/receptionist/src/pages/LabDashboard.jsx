@@ -223,9 +223,15 @@ function ManualEntryModal({ onSubmit, onClose }) {
 }
 
 // ── Scan Result modal ─────────────────────────────────────
-function ScanResultModal({ result, onConfirm, onClose, loading, department }) {
+// Departments where a tech comment is offered at scan time — visible to other
+// LMS staff (stage history), never exposed to the clinic portal (backend strips
+// stage notes from clinic-facing case responses).
+const COMMENT_DEPARTMENTS = new Set(['MILLING', 'MARGIN']);
+
+function ScanResultModal({ result, onConfirm, onClose, loading, department, comment, onCommentChange }) {
   if (!result) return null;
   const dept = DEPARTMENTS.find(d => d.code === department);
+  const showComment = COMMENT_DEPARTMENTS.has(department);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}>
@@ -269,6 +275,21 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department }) {
           </div>
         )}
 
+        {showComment && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Comment (optional) — visible to lab staff only, not the clinic
+            </div>
+            <textarea
+              rows={2}
+              value={comment}
+              onChange={e => onCommentChange(e.target.value)}
+              placeholder={`Note for other departments about this ${dept?.label.toLowerCase()} step…`}
+              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'inherit', resize: 'vertical' }}
+            />
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
           <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={onConfirm} disabled={loading}>
@@ -287,6 +308,7 @@ export default function LabDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [scanComment, setScanComment] = useState('');
   const [processing, setProcessing] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
   const confirmingRef = useRef(false); // guard: prevents double-submit
@@ -327,11 +349,13 @@ export default function LabDashboard() {
     try {
       const res = await api.post(`/scan/${scanResult.id}`, {
         department: activeDept,
-        techName: user?.name
+        techName: user?.name,
+        comment: scanComment.trim() || undefined,
       });
       toast.success(`✅ ${res.data.statusLabel} — logged successfully!`);
       setRecentScans(prev => [{ ...scanResult, dept: selectedDept?.label, scannedAt: new Date(), newStatus: res.data.newStatus }, ...prev.slice(0, 9)]);
       setScanResult(null);
+      setScanComment('');
       queryClient.invalidateQueries({ queryKey: ['lab', 'active'] });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Scan failed');
@@ -484,8 +508,10 @@ export default function LabDashboard() {
           result={scanResult}
           department={activeDept}
           onConfirm={confirmScan}
-          onClose={() => setScanResult(null)}
+          onClose={() => { setScanResult(null); setScanComment(''); }}
           loading={processing}
+          comment={scanComment}
+          onCommentChange={setScanComment}
         />
       )}
     </div>
