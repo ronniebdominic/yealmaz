@@ -3,7 +3,7 @@ import AdminLayout from '../components/AdminLayout';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportMenu from '../components/ExportMenu';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
-import api from '../api';
+import api, { downloadExport } from '../api';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -67,20 +67,10 @@ const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
 };
 
 // ── Drill-down case list panel ────────────────────────────
-const CASE_COLS = [
-  { header: 'Case #',      value: c => c.caseNumber ?? '(no scan #)' },
-  { header: 'Clinic',      value: c => c.clinic?.name },
-  { header: 'Patient',     value: c => c.patientName },
-  { header: 'Work Type',   value: c => c.workType },
-  { header: 'Status',      value: c => c.status },
-  { header: 'Payment',     value: c => c.paymentStatus },
-  { header: 'Amount (Br)', value: c => c.payment?.amount ?? c.totalAmount ?? '' },
-  { header: 'Date',        value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
-];
-
 function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const params = {
     ...drill.params,
@@ -98,8 +88,19 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
     placeholderData: keepPreviousData,
   });
 
-  const fetchAllForExport = () =>
-    api.get('/cases', { params: { ...params, page: 1, limit: 2000 } }).then(r => r.data.cases ?? []);
+  // Full-dataset export (all matching rows, not just the current page) —
+  // hits the backend /cases/export route so a 230-page result set downloads in one click.
+  const exportAll = async () => {
+    setExporting(true);
+    try {
+      const exportParams = { ...params };
+      delete exportParams.page;
+      delete exportParams.limit;
+      await downloadExport('/cases/export', exportParams, `admin-${drill.key}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const cases = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
@@ -117,7 +118,10 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ExportMenu fetchData={fetchAllForExport} columns={CASE_COLS} filename={`admin-${drill.key}`} title={drill.label} />
+          <button className="btn btn-ghost btn-sm" onClick={exportAll} disabled={exporting}
+            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
+            {exporting ? 'Exporting…' : '⬇ Export All (Excel)'}
+          </button>
           <button onClick={onClose}
             style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             ×
@@ -488,7 +492,8 @@ export default function AdminDashboard() {
                 bg="#EEF2FF" color="var(--blue)" sub="In selected range"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
               <KpiCard icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'}
-                bg="var(--accent-dim)" color="var(--accent)" sub="In selected range" />
+                bg="var(--accent-dim)" color="var(--accent)" sub="In selected range"
+                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
               <KpiCard icon="⚙️" label="Active Cases" value={kpi?.activeCases ?? '—'}
                 bg="var(--amber-dim)" color="var(--amber)" sub="In production"
                 active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')} />

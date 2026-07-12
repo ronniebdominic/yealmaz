@@ -1617,25 +1617,13 @@ const PRODUCTION_STATUSES = [
   'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
 ];
 
-const CASES_COLS = [
-  { header: 'Case #',      value: c => c.caseNumber },
-  { header: 'Clinic',      value: c => c.clinic?.name },
-  { header: 'Patient',     value: c => c.patientName },
-  { header: 'Work Type',   value: c => c.workType },
-  { header: 'Units',       value: c => c.units ?? '' },
-  { header: 'Status',      value: c => c.status },
-  { header: 'Payment',     value: c => c.paymentStatus },
-  { header: 'Amount (Br)',   value: c => c.payment?.amount ?? c.totalAmount ?? '' },
-  { header: 'Order Date',    value: c => format(new Date(c.createdAt), 'dd MMM yyyy') },
-  { header: 'Delivery Date', value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
-];
-
 function CasesTab() {
   const [group, setGroup]       = useState('all');
   const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
   const [page, setPage]         = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   // 'all' → no status filter (returns every case)
   const statusParam = group === 'all'
@@ -1659,8 +1647,16 @@ function CasesTab() {
     placeholderData: keepPreviousData,
   });
 
-  const fetchAllForExport = () =>
-    api.get('/cases', { params: queryParams({ limit: 1000 }) }).then(r => r.data.cases ?? []);
+  // Full-dataset export (all matching rows, not just the current page) —
+  // hits the backend /cases/export route so large result sets download in one click.
+  const exportAll = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('/cases/export', queryParams(), `finance-cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const cases = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
@@ -1693,12 +1689,9 @@ function CasesTab() {
             {pagination.total != null && (
               <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} total</span>
             )}
-            <ExportMenu
-              fetchData={fetchAllForExport}
-              columns={CASES_COLS}
-              filename="finance-cases"
-              title={`Cases — ${CASE_STATUS_GROUPS.find(g2 => g2.value === group)?.label || ''}`}
-            />
+            <button className="btn btn-ghost btn-sm" onClick={exportAll} disabled={exporting}>
+              {exporting ? 'Exporting…' : '⬇ Export All (Excel)'}
+            </button>
           </div>
         </div>
         <div className="table-wrap">
@@ -1871,6 +1864,29 @@ function ClinicBalancesTab() {
                       </td>
                       <td style={{ fontSize: 13, color: 'var(--text-3)' }}>{expanded === b.id ? '▲' : '▼'}</td>
                     </tr>
+                    {expanded === b.id && (
+                      <tr style={{ background: 'var(--surface-2)' }}>
+                        <td colSpan={4} style={{ padding: '6px 16px 0 52px' }}>
+                          <div onClick={e => e.stopPropagation()}>
+                            <ExportMenu
+                              data={b.cases}
+                              columns={[
+                                { header: 'Case #',        value: c => c.caseNumber || '' },
+                                { header: 'Patient',       value: c => c.patientName || '' },
+                                { header: 'Work Type',     value: c => c.workType },
+                                { header: 'Units',         value: c => c.units ?? '' },
+                                { header: 'Order Date',    value: c => c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : '' },
+                                { header: 'Delivery Date', value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
+                                { header: 'Amount (Br)',   value: c => c.amount ?? '' },
+                                { header: 'Payment Status', value: c => c.paymentStatus },
+                              ]}
+                              filename={`outstanding-${b.name.replace(/\s+/g, '-').toLowerCase()}`}
+                              title={`Outstanding — ${b.name}`}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {expanded === b.id && b.cases.map(c => {
                       const isOldFormat = c.patientName && /^[A-Z]{2,4}-\d{4}-\d+$/.test(c.patientName);
                       return (

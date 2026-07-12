@@ -133,7 +133,7 @@ router.get('/', protect, async (req, res) => {
 // Defined before /:id so "export" isn't captured as an :id.
 router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, sortDir = 'desc', dateFrom, dateTo } = req.query;
+    const { status, paymentStatus, search, clinicId, sortDir = 'desc', dateFrom, dateTo, remake, redo } = req.query;
 
     const where = {};
     if (clinicId) where.clinicId = clinicId;
@@ -158,6 +158,10 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
       if (dateFrom) where.createdAt.gte = new Date(dateFrom);
       if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.createdAt.lte = end; }
     }
+    if (remake === 'true')  where.remake = true;
+    if (remake === 'false') where.remake = false;
+    if (redo   === 'true')  where.redo   = true;
+    if (redo   === 'false') where.redo   = false;
 
     const cases = await prisma.case.findMany({
       where,
