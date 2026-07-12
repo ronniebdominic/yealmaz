@@ -764,13 +764,13 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
   try {
     const where = {
       clinic: { isExcluded: true },
-      // When drilling into a specific clinic, show its OUTSTANDING (unpaid) cases —
-      // finance only collects on cases that have actually been DELIVERED, so
-      // in-progress lab cases (still being scanned/designed/milled) are excluded here.
-      // Without a clinicId, only cases still awaiting collection (PENDING).
+      // Outstanding is always exclusive of in-progress cases — finance only
+      // collects on cases that have actually been DELIVERED, so in-progress lab
+      // cases (still being scanned/designed/milled) are excluded here regardless
+      // of whether a specific clinic is selected.
       ...(clinicId
         ? { clinicId, paymentStatus: { not: 'VERIFIED' }, status: 'DELIVERED' }
-        : { paymentStatus: 'PENDING' }),
+        : { paymentStatus: 'PENDING', status: 'DELIVERED' }),
       ...(search ? {
         OR: [
           { clinic: { name: { contains: search, mode: 'insensitive' } } },

@@ -141,11 +141,13 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       prisma.payment.count({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfToday } } }),
       // Only count payments that actually have a Br amount owed, so the count matches
       // the amount below (and the Clinic Balances view). Pending-but-unpriced payments
-      // aren't billable outstanding, so they don't belong in this figure.
-      prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } } }),
+      // aren't billable outstanding, so they don't belong in this figure. Outstanding is
+      // ALWAYS exclusive of in-progress cases — only money owed after delivery counts;
+      // an unpaid case still in the lab isn't "outstanding" (nothing's been delivered yet).
+      prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 }, case: { status: 'DELIVERED' } } }),
       // Sum of amount still OWED (amount minus any partial amountReceived) — can't be
       // expressed as a Prisma aggregate (no cross-field subtraction), so sum in JS.
-      prisma.payment.findMany({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 } }, select: { amount: true, amountReceived: true } })
+      prisma.payment.findMany({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 }, case: { status: 'DELIVERED' } }, select: { amount: true, amountReceived: true } })
         .then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
       prisma.payment.findMany({
         where: { status: 'VERIFIED', verifiedAt: { gte: dateFrom, lte: dateTo }, ...searchWhere },
@@ -304,7 +306,9 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.payment.aggregate({
         where: {
           status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
-          ...(clinicId ? { case: { clinicId } } : {}),
+          // Outstanding excludes in-progress cases — only unpaid balances on
+          // DELIVERED cases count as outstanding.
+          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}) },
         },
         _sum: { amount: true },
         _count: true,
@@ -426,6 +430,9 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
       where: {
         status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
         amount: { gt: 0 },   // only include cases where a non-zero amount is set
+        // Outstanding excludes in-progress cases — only unpaid balances on
+        // DELIVERED cases count as outstanding.
+        case: { status: 'DELIVERED' },
       },
       select: {
         id: true, status: true, amount: true, amountReceived: true, updatedAt: true,
@@ -534,8 +541,9 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), a
       }, 0);
       // Only count outstanding where an amount has actually been set — cases
       // with no payment amount yet would inflate the count with Br 0 entries.
-      // Outstanding = what's still owed (full amount minus any partial collected).
-      const outstandingCases = cases.filter(c => c.payment?.status !== 'VERIFIED' && c.payment?.amount);
+      // Outstanding = what's still owed (full amount minus any partial collected),
+      // exclusive of in-progress cases — only unpaid balances on DELIVERED cases count.
+      const outstandingCases = cases.filter(c => c.status === 'DELIVERED' && c.payment?.status !== 'VERIFIED' && c.payment?.amount);
       const outstanding      = outstandingCases.reduce((s, c) => s + (c.payment.amount - (c.payment.amountReceived || 0)), 0);
       const outstandingCount = outstandingCases.length;
 
