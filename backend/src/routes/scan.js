@@ -184,7 +184,10 @@ router.post('/:caseId', protect, async (req, res) => {
       await prisma.caseStage.create({
         data: {
           caseId, stageName: newStatus, scannedBy, location: dept.label,
-          notes: comment?.trim() ? `Scanned at ${dept.label} department — ${comment.trim()}` : `Scanned at ${dept.label} department`,
+          notes: (() => {
+            const at = /department$/i.test(dept.label) ? dept.label : `${dept.label} department`;
+            return comment?.trim() ? `Scanned at ${at} — ${comment.trim()}` : `Scanned at ${at}`;
+          })(),
         }
       });
     }

@@ -575,8 +575,12 @@ export default function CaseDetailModal({ caseId, onClose }) {
                     <div className="timeline-label">{STATUS_LABELS[s.stageName]}</div>
                     <div className="timeline-time">
                       {format(new Date(s.scannedAt), 'dd MMM yyyy, h:mm a')}
-                      {s.scannedBy && ` · ${s.scannedBy}`}
                     </div>
+                    {s.scannedBy && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '2px' }}>
+                        Scanned by: <strong style={{ color: 'var(--text-2)' }}>{s.scannedBy}</strong>
+                      </div>
+                    )}
                     {s.notes && <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: '2px' }}>{s.notes}</div>}
                   </div>
                 </div>
