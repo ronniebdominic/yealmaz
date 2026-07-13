@@ -16,10 +16,19 @@ import * as XLSX from 'xlsx';
 
 const PAGE_SIZE = 20;
 
+// Every lab-floor stage between acceptance and QC — "In Production" should
+// match a case at ANY of these, not just Milling/Sintering.
+const PRODUCTION_STATUSES = [
+  'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT', 'SCANNING', 'DESIGNING',
+  'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING', 'METAL_FINISHING',
+  'OPAQUE_APPLICATION', 'CERAMIC_LAYERING', 'ZIRCONIA_FITTING_FINISHING', 'GLAZING',
+  'THERMO_PRESS', 'TRIMMING',
+].join(',');
+
 const STATUS_FILTERS = [
   { label: 'All',            value: '' },
   { label: 'Accepted',       value: 'CASE_ACCEPTED' },
-  { label: 'In Production',  value: 'MILLING_SINTERING' },
+  { label: 'In Production',  value: PRODUCTION_STATUSES },
   { label: 'Quality Check',  value: 'QUALITY_CHECK' },
   { label: 'Ready to Ship',  value: 'READY_TO_DISPATCH' },
   { label: 'Delivered',      value: 'DELIVERED' },
@@ -683,7 +692,7 @@ export default function AdminCases() {
         const clinic = clinicList.find(c => c.id === clinicId);
         if (clinic) parts.push(clinic.name.replace(/\s+/g, '-'));
       }
-      if (statusFilter) parts.push(STATUS_LABELS[statusFilter] || statusFilter);
+      if (statusFilter) parts.push(STATUS_FILTERS.find(f => f.value === statusFilter)?.label || STATUS_LABELS[statusFilter] || statusFilter);
       if (payFilter)    parts.push(PAYMENT_LABELS[payFilter]   || payFilter);
       parts.push(format(new Date(), 'yyyy-MM-dd'));
 
