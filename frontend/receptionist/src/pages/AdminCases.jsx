@@ -593,7 +593,7 @@ export default function AdminCases() {
   const [statusFilter,   setStatusFilter]  = useState('');
   const [payFilter,      setPayFilter]     = useState('');
   const [clinicId,       setClinicId]      = useState('');
-  const [sortBy,         setSortBy]        = useState('caseNumber');
+  const [sortBy,         setSortBy]        = useState('date');
   const [sortDir,        setSortDir]       = useState('desc');
   const [page,           setPage]          = useState(1);
   const [viewCase,       setViewCase]      = useState(null);
