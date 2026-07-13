@@ -617,4 +617,65 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
   }
 });
 
+// ── PATCH /api/cases/:id ─────────────────────────────────
+// Admin-only: edit core case details (patient/doctor info, work type, tooth
+// numbers, units, shade, pricing, dates, remake/redo flags). Status and
+// payment status are changed via their own dedicated endpoints, not here.
+const EDITABLE_FIELDS = [
+  'patientName', 'patientAge', 'doctorName', 'doctorPhone', 'patientGender',
+  'workType', 'toothNumbers', 'units', 'shade', 'notes',
+  'remake', 'redo', 'remakeReason', 'isRedo',
+  'dueDate', 'deliveryDate', 'totalAmount', 'deliveryType',
+];
+const INT_FIELDS   = new Set(['patientAge', 'units']);
+const FLOAT_FIELDS = new Set(['totalAmount']);
+const DATE_FIELDS  = new Set(['dueDate', 'deliveryDate']);
+const BOOL_FIELDS  = new Set(['remake', 'redo', 'isRedo']);
+
+router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    const data = {};
+    for (const field of EDITABLE_FIELDS) {
+      if (!(field in req.body)) continue;
+      const raw = req.body[field];
+      if (INT_FIELDS.has(field))        data[field] = raw === '' || raw == null ? null : parseInt(raw, 10);
+      else if (FLOAT_FIELDS.has(field)) data[field] = raw === '' || raw == null ? null : parseFloat(raw);
+      else if (DATE_FIELDS.has(field))  data[field] = raw ? new Date(raw) : null;
+      else if (BOOL_FIELDS.has(field))  data[field] = Boolean(raw);
+      else                              data[field] = raw === '' ? null : raw;
+    }
+
+    if ('patientName' in data && !data.patientName) {
+      return res.status(400).json({ error: 'Patient name cannot be empty.' });
+    }
+    if ('workType' in data && !data.workType) {
+      return res.status(400).json({ error: 'Work type cannot be empty.' });
+    }
+
+    const updated = await prisma.case.update({ where: { id: req.params.id }, data });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.id,
+        stageName: existing.status,
+        scannedBy: req.user.name,
+        notes: `Case details edited by ${req.user.name} (admin)`,
+      }
+    });
+
+    await invalidate(`case:${req.params.id}`, `case:lab:${req.params.id}`, 'cases:*', 'lab:active:*', 'dashboard:summary', 'dashboard:analytics:*');
+
+    const io = req.app.get('io');
+    io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
+
+    res.json(updated);
+  } catch (err) {
+    console.error('[PATCH /cases/:id]', err);
+    res.status(500).json({ error: 'Could not update case.' });
+  }
+});
+
 module.exports = router;

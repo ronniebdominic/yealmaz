@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import CaseDetailModal from '../components/CaseDetailModal';
+import Odontogram from '../components/Odontogram';
 import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
 import api from '../api';
@@ -379,6 +380,203 @@ const selectStyle = {
   fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
 };
 
+const fieldLabel = { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 };
+const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)', fontFamily: 'DM Sans, sans-serif' };
+
+// ── Edit Case Modal ────────────────────────────────────────
+// Admin-only — edits core case details. Status/payment are changed via their
+// own dedicated actions (Override, status changes elsewhere), not here.
+function EditCaseModal({ caseData, onDone, onClose }) {
+  const toDateInput = (d) => d ? new Date(d).toISOString().slice(0, 10) : '';
+  const [form, setForm] = useState({
+    patientName:   caseData.patientName || '',
+    patientAge:    caseData.patientAge?.toString() || '',
+    patientGender: caseData.patientGender || '',
+    doctorName:    caseData.doctorName || '',
+    doctorPhone:   caseData.doctorPhone || '',
+    workType:      caseData.workType || '',
+    units:         caseData.units?.toString() || '',
+    shade:         caseData.shade || '',
+    toothNumbers:  caseData.toothNumbers || '',
+    dueDate:       toDateInput(caseData.dueDate),
+    deliveryDate:  toDateInput(caseData.deliveryDate),
+    totalAmount:   caseData.totalAmount?.toString() || '',
+    deliveryType:  caseData.deliveryType || 'NORMAL',
+    remake:        caseData.remake || false,
+    remakeReason:  caseData.remakeReason || '',
+    redo:          caseData.redo || false,
+    isRedo:        caseData.isRedo || false,
+    notes:         caseData.notes || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const selectedTeeth = form.toothNumbers
+    ? form.toothNumbers.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+    : [];
+  const toggleTooth = (num) => {
+    const next = selectedTeeth.includes(num) ? selectedTeeth.filter(n => n !== num) : [...selectedTeeth, num];
+    setForm(f => ({ ...f, toothNumbers: next.join(', ') }));
+  };
+  const clearTeeth = () => setForm(f => ({ ...f, toothNumbers: '' }));
+
+  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
+  const setBool = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.checked }));
+
+  const submit = async () => {
+    if (!form.patientName.trim()) { toast.error('Patient name is required'); return; }
+    if (!form.workType.trim())    { toast.error('Work type is required'); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/cases/${caseData.id}`, {
+        patientName:   form.patientName.trim(),
+        patientAge:    form.patientAge || null,
+        patientGender: form.patientGender || null,
+        doctorName:    form.doctorName.trim() || null,
+        doctorPhone:   form.doctorPhone.trim() || null,
+        workType:      form.workType.trim(),
+        units:         form.units || null,
+        shade:         form.shade.trim() || null,
+        toothNumbers:  form.toothNumbers.trim() || null,
+        dueDate:       form.dueDate || null,
+        deliveryDate:  form.deliveryDate || null,
+        totalAmount:   form.totalAmount || null,
+        deliveryType:  form.deliveryType,
+        remake:        form.remake,
+        remakeReason:  form.remake ? (form.remakeReason.trim() || null) : null,
+        redo:          form.redo,
+        isRedo:        form.isRedo,
+        notes:         form.notes.trim() || null,
+      });
+      toast.success(`Case ${caseData.caseNumber} updated`);
+      onDone();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update case');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 640 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">✏️ Edit Case Details</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{caseData.caseNumber} · {caseData.clinic?.name}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div>
+              <label style={fieldLabel}>Patient Name <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input style={fieldInput} value={form.patientName} onChange={set('patientName')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Patient Age</label>
+              <input type="number" min="0" style={fieldInput} value={form.patientAge} onChange={set('patientAge')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Patient Gender</label>
+              <select style={{ ...fieldInput, cursor: 'pointer' }} value={form.patientGender} onChange={set('patientGender')}>
+                <option value="">—</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+            <div>
+              <label style={fieldLabel}>Delivery Type</label>
+              <select style={{ ...fieldInput, cursor: 'pointer' }} value={form.deliveryType} onChange={set('deliveryType')}>
+                <option value="NORMAL">Normal</option>
+                <option value="EXPRESS">Express</option>
+              </select>
+            </div>
+            <div>
+              <label style={fieldLabel}>Doctor Name</label>
+              <input style={fieldInput} value={form.doctorName} onChange={set('doctorName')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Doctor Phone</label>
+              <input style={fieldInput} value={form.doctorPhone} onChange={set('doctorPhone')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Work Type <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input style={fieldInput} value={form.workType} onChange={set('workType')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Units</label>
+              <input type="number" min="0" style={fieldInput} value={form.units} onChange={set('units')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Shade</label>
+              <input style={fieldInput} value={form.shade} onChange={set('shade')} placeholder="e.g. A2, To Be Advised Later" />
+            </div>
+            <div>
+              <label style={fieldLabel}>Total Amount (Br)</label>
+              <input type="number" min="0" style={fieldInput} value={form.totalAmount} onChange={set('totalAmount')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Due Date</label>
+              <input type="date" style={fieldInput} value={form.dueDate} onChange={set('dueDate')} />
+            </div>
+            <div>
+              <label style={fieldLabel}>Delivery Date</label>
+              <input type="date" style={fieldInput} value={form.deliveryDate} onChange={set('deliveryDate')} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={fieldLabel}>Tooth Numbers</label>
+            <div style={{ overflowX: 'auto', padding: '10px 0' }}>
+              <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={clearTeeth} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 18, marginBottom: 14, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.remake} onChange={setBool('remake')} /> Remake
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.redo} onChange={setBool('redo')} /> Redo
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.isRedo} onChange={setBool('isRedo')} /> Redo / Replacement (50% charge)
+            </label>
+          </div>
+
+          {form.remake && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={fieldLabel}>Remake Reason</label>
+              <input style={fieldInput} value={form.remakeReason} onChange={set('remakeReason')} />
+            </div>
+          )}
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={fieldLabel}>Notes</label>
+            <textarea rows={3} style={{ ...fieldInput, resize: 'vertical' }} value={form.notes} onChange={set('notes')} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button
+              onClick={submit} disabled={saving}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: saving ? 'var(--border)' : 'var(--accent)',
+                color: '#fff', border: 'none', borderRadius: 8,
+                padding: '10px 18px', fontSize: 13, fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {saving ? 'Saving…' : '✓ Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────
 export default function AdminCases() {
   const queryClient = useQueryClient();
@@ -390,6 +588,7 @@ export default function AdminCases() {
   const [sortDir,        setSortDir]       = useState('desc');
   const [page,           setPage]          = useState(1);
   const [viewCase,       setViewCase]      = useState(null);
+  const [editTarget,     setEditTarget]    = useState(null);
   const [deleteTarget,   setDeleteTarget]  = useState(null);
   const [collectTarget,  setCollectTarget] = useState(null);
   const [overrideTarget, setOverrideTarget]= useState(null);
@@ -686,6 +885,20 @@ export default function AdminCases() {
                             👁 View
                           </button>
 
+                          {/* Edit — admin-only detail editor */}
+                          <button
+                            onClick={() => setEditTarget(c)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 3,
+                              background: 'rgba(37,99,235,0.08)', color: '#2563EB',
+                              border: '1px solid rgba(37,99,235,0.25)',
+                              borderRadius: 6, padding: '4px 9px',
+                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+
                           {/* Collect — dispatched/delivered & unpaid */}
                           {canCollect(c) && (
                             <button
@@ -755,6 +968,14 @@ export default function AdminCases() {
         <CaseDetailModal
           caseId={viewCase.id}
           onClose={() => { setViewCase(null); refresh(); }}
+        />
+      )}
+
+      {editTarget && (
+        <EditCaseModal
+          caseData={editTarget}
+          onDone={() => { setEditTarget(null); refresh(); }}
+          onClose={() => setEditTarget(null)}
         />
       )}
 
