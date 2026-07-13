@@ -741,6 +741,58 @@ function ReadyOrdersSection() {
   );
 }
 
+// ─── In Finishing Section ─────────────────────────────────
+// Informational only — notifies reception once a case reaches the Metal
+// Finishing department, mirroring the Dispatch dashboard's "In Milling" list.
+function FinishingSection() {
+  const [search, setSearch]     = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+  const [applied, setApplied]   = useState({ search: '', dateFrom: '', dateTo: '' });
+  const [page, setPage]         = useState(1);
+
+  const apply = () => { setApplied({ search, dateFrom, dateTo }); setPage(1); };
+  const clear  = () => { setSearch(''); setDateFrom(''); setDateTo(''); setApplied({ search: '', dateFrom: '', dateTo: '' }); setPage(1); };
+
+  return (
+    <>
+      <div className="card" style={{ marginBottom: 16, padding: '14px 18px' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <FilterBar
+            search={search} onSearch={setSearch}
+            dateFrom={dateFrom} onDateFrom={setDateFrom}
+            dateTo={dateTo} onDateTo={setDateTo}
+            placeholder="Clinic name, case no., patient…"
+            style={{ flex: 1 }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={apply}>Apply</button>
+            {(applied.search || applied.dateFrom || applied.dateTo) && (
+              <button className="btn btn-ghost btn-sm" onClick={clear}>Clear</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600 }}>
+        ✨ These cases have reached the <strong>Metal Finishing department</strong> — informational only, no action needed here. They'll continue on through Opaque/Ceramic/Glazing before QC and dispatch.
+      </div>
+
+      <OrdersTab
+        status="METAL_FINISHING"
+        title="In Finishing"
+        icon="✨"
+        accentColor="#7C3AED"
+        emptyText="No cases in finishing right now"
+        emptyNote="Cases will show up here as soon as the lab scans them into the Metal Finishing department."
+        applied={applied}
+        page={page}
+        setPage={setPage}
+      />
+    </>
+  );
+}
+
 // ─── Track Order Section ──────────────────────────────────
 function TrackOrderSection() {
   const [search, setSearch] = useState('');
@@ -870,10 +922,11 @@ function TrackOrderSection() {
 
 // ─── Main Reception Dashboard ─────────────────────────────
 const SECTIONS = [
-  { id: 'dashboard', label: 'Dashboard',      icon: '📊' },
-  { id: 'accept',    label: 'Accept Case',    icon: '📥' },
-  { id: 'ready',     label: 'Ready Orders',   icon: '🚚' },
-  { id: 'track',     label: 'Track Order',    icon: '🔍' },
+  { id: 'dashboard',  label: 'Dashboard',      icon: '📊' },
+  { id: 'accept',     label: 'Accept Case',    icon: '📥' },
+  { id: 'finishing',  label: 'In Finishing',   icon: '✨' },
+  { id: 'ready',      label: 'Ready Orders',   icon: '🚚' },
+  { id: 'track',      label: 'Track Order',    icon: '🔍' },
 ];
 
 export default function Dashboard() {
@@ -910,6 +963,12 @@ export default function Dashboard() {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
+  const { data: finishingBadge } = useQuery({
+    queryKey: ['cases', 'finishing-badge'],
+    queryFn: () => api.get('/cases', { params: { status: 'METAL_FINISHING', limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
 
   const { stats } = summary || {};
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'RX';
@@ -917,8 +976,9 @@ export default function Dashboard() {
   const nav = (id) => { setSection(id); setOpen(false); };
 
   const badges = {
-    accept: acceptBadge || 0,
-    ready:  readyBadge  || 0,
+    accept:    acceptBadge    || 0,
+    finishing: finishingBadge || 0,
+    ready:     readyBadge     || 0,
   };
 
   const NavList = ({ close }) => (
@@ -1091,6 +1151,11 @@ export default function Dashboard() {
           {/* ── Accept Case ── */}
           {section === 'accept' && (
             <AcceptCasesSection queryClient={queryClient} />
+          )}
+
+          {/* ── In Finishing ── */}
+          {section === 'finishing' && (
+            <FinishingSection />
           )}
 
           {/* ── Ready Orders ── */}
