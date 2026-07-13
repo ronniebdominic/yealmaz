@@ -402,7 +402,14 @@ export default function DispatchDashboard() {
     staleTime: 60_000,
   });
 
-  const refetchAll = () => { refetchQueue(); refetchSummary(); };
+  const { data: millingCases = [], refetch: refetchMilling } = useQuery({
+    queryKey: ['dispatch', 'milling'],
+    queryFn: () => api.get('/dispatch/milling').then(r => r.data),
+    staleTime: 20_000,
+    refetchInterval: 30_000,
+  });
+
+  const refetchAll = () => { refetchQueue(); refetchSummary(); refetchMilling(); };
 
   const openTodayOrders = async () => {
     if (todayOrders !== null) { setTodayOrders(null); return; } // toggle off
@@ -416,11 +423,11 @@ export default function DispatchDashboard() {
   };
 
   // ── Filtering ────────────────────────────────────────────
-  const filtered = useMemo(() => {
+  const applyFilters = (list) => {
     const q = search.toLowerCase();
     const from = dateFrom ? new Date(dateFrom) : null;
     const to   = dateTo   ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
-    return allCases.filter(c => {
+    return list.filter(c => {
       if (q && !c.clinic?.name?.toLowerCase().includes(q) &&
                !c.caseNumber?.toLowerCase().includes(q) &&
                !c.patientName?.toLowerCase().includes(q)) return false;
@@ -428,7 +435,10 @@ export default function DispatchDashboard() {
       if (to   && new Date(c.createdAt) > to)   return false;
       return true;
     });
-  }, [allCases, search, dateFrom, dateTo]);
+  };
+
+  const filtered = useMemo(() => applyFilters(allCases), [allCases, search, dateFrom, dateTo]);
+  const milling  = useMemo(() => applyFilters(millingCases), [millingCases, search, dateFrom, dateTo]);
 
   const placeOrder        = filtered.filter(c => c.status === 'PENDING_PICKUP');
   const pickupInProgress  = filtered.filter(c => c.status === 'PICKUP_ASSIGNED' && c.assignedDelivery);
@@ -456,6 +466,7 @@ export default function DispatchDashboard() {
   const tabCount = {
     'place-order':       placeOrder.length,
     'pickup-progress':   pickupInProgress.length,
+    'in-milling':        milling.length,
     'ready-delivery':    readyDelivery.length,
     'ready-dispatch':    readyDispatch.length,
     'en-route':          enRoute.length,
@@ -488,14 +499,15 @@ export default function DispatchDashboard() {
   // Each tab carries a workflow `group` used to section the sidebar nav,
   // matching how Reception/Finance group their nav under section labels.
   const TABS = [
-    { id: 'place-order',      label: 'Place Order',        icon: '📋', group: 'Pickup',    sub: 'Awaiting pickup'        },
-    { id: 'pickup-progress',  label: 'Pickup In Progress', icon: '🛵', group: 'Pickup',    sub: 'Driver collecting'      },
-    { id: 'ready-delivery',   label: 'Ready for Delivery', icon: '📦', group: 'Delivery',  sub: 'QC done · awaiting pay' },
-    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: '🚚', group: 'Delivery',  sub: 'Paid · assign driver'   },
-    { id: 'en-route',         label: 'En Route',           icon: '🚴', group: 'Delivery',  sub: 'Out for delivery'       },
-    { id: 'delivered',        label: 'Delivered',          icon: '✅', group: 'Completed', sub: 'Done'                   },
+    { id: 'place-order',      label: 'Place Order',        icon: '📋', group: 'Pickup',     sub: 'Awaiting pickup'        },
+    { id: 'pickup-progress',  label: 'Pickup In Progress', icon: '🛵', group: 'Pickup',     sub: 'Driver collecting'      },
+    { id: 'in-milling',       label: 'In Milling',         icon: '⚙️', group: 'Production', sub: 'At milling stage'       },
+    { id: 'ready-delivery',   label: 'Ready for Delivery', icon: '📦', group: 'Delivery',   sub: 'QC done · awaiting pay' },
+    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: '🚚', group: 'Delivery',   sub: 'Paid · assign driver'   },
+    { id: 'en-route',         label: 'En Route',           icon: '🚴', group: 'Delivery',   sub: 'Out for delivery'       },
+    { id: 'delivered',        label: 'Delivered',          icon: '✅', group: 'Completed',  sub: 'Done'                   },
   ];
-  const NAV_GROUPS = ['Pickup', 'Delivery', 'Completed'];
+  const NAV_GROUPS = ['Pickup', 'Production', 'Delivery', 'Completed'];
 
   // ── Sidebar nav (grouped by workflow stage, matching the rest of the app) ──
   const SidebarNav = ({ close }) => (
@@ -526,6 +538,7 @@ export default function DispatchDashboard() {
   const PIPELINE = [
     { tab: 'place-order',     label: 'Pending Pickup',     icon: '📋', count: placeOrder.length,      hint: 'Needs driver',     color: '#DC2626', bg: '#FEF2F2' },
     { tab: 'pickup-progress', label: 'Pickup In Progress', icon: '🛵', count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: '#EFF6FF' },
+    { tab: 'in-milling',      label: 'In Milling',         icon: '⚙️', count: milling.length,           hint: 'In production',    color: '#0891B2', bg: '#ECFEFF' },
     { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: '📦', count: readyDelivery.length,    hint: 'Awaiting payment', color: '#D97706', bg: '#FFFBEB' },
     { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: '🚚', count: readyDispatch.length,    hint: 'Payment verified', color: '#16A34A', bg: '#F0FDF4' },
     { tab: 'en-route',        label: 'En Route',           icon: '🚴', count: enRoute.length,          hint: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF' },
@@ -612,7 +625,7 @@ export default function DispatchDashboard() {
           </div>
 
           {/* ── KPI pipeline — workflow stages left → right, colour-coded ── */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', marginBottom: 20 }}>
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', marginBottom: 20 }}>
             {PIPELINE.map(s => (
               <div key={s.tab} className="stat-card"
                 style={{ cursor: 'pointer', borderTop: `3px solid ${s.color}`, outline: tab === s.tab ? `2px solid ${s.color}` : 'none', outlineOffset: 2 }}
@@ -820,6 +833,75 @@ export default function DispatchDashboard() {
                           </Td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: In Milling (MILLING_SINTERING) — informational only ── */}
+          {tab === 'in-milling' && (
+            <div className="card">
+              <div style={{ padding: '10px 18px 0', background: '#ECFEFF', borderRadius: '10px 10px 0 0' }}>
+                <div style={{ fontSize: 12, color: '#0E7490', fontWeight: 600, paddingBottom: 10 }}>
+                  ⚙️ These cases have <strong>reached the Milling / Sintering department</strong> — informational only, no dispatch action needed yet. They'll move to Ready for Delivery once QC passes.
+                </div>
+              </div>
+              <div className="card-header">
+                <div className="card-title">⚙️ In Milling <span style={{ fontSize: 12, color: '#0891B2', fontWeight: 600, marginLeft: 6 }}>— At Production Stage</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{milling.length} cases</span>
+                  <ExportMenu
+                    data={milling}
+                    columns={[
+                      { header: 'Clinic Name', value: c => c.clinic?.name },
+                      { header: 'Patient',     value: c => c.patientName },
+                      { header: 'Case No.',    value: c => c.caseNumber },
+                      { header: 'Product',     value: c => c.workType },
+                      { header: 'Unit',        value: c => c.units ?? '' },
+                      { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+                    ]}
+                    filename="in-milling"
+                    title="In Milling"
+                  />
+                </div>
+              </div>
+              <div className="table-wrap">
+                {milling.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">⚙️</div>
+                    <div className="empty-title">No cases in milling right now</div>
+                    <p>Cases will show up here as soon as the lab scans them into the Milling / Sintering department.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <Th>Clinic Name</Th>
+                        <Th>Patient</Th>
+                        <Th>Case No.</Th>
+                        <Th>Product</Th>
+                        <Th>Unit</Th>
+                        <Th>Due Date</Th>
+                        <Th>Reached Milling</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {milling.map(c => {
+                        const stage = c.stages?.[0];
+                        return (
+                          <tr key={c.id}>
+                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td><span className="patient-name">{c.patientName}</span></Td>
+                            <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
+                            <Td style={{ fontSize: 12 }}>{c.workType}</Td>
+                            <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
+                            <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}</Td>
+                            <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>{stage ? format(new Date(stage.scannedAt), 'dd MMM yyyy, h:mm a') : '—'}</Td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}

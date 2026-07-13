@@ -102,6 +102,32 @@ router.get('/queue', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) =>
   }
 });
 
+// ── GET /api/dispatch/milling ────────────────────────────
+// Cases currently at the Milling / Sintering stage — informational heads-up
+// so dispatch knows what's coming down the pipeline before it hits QC/delivery.
+router.get('/milling', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  const cacheKey = 'dispatch:milling';
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const cases = await prisma.case.findMany({
+      where: { status: 'MILLING_SINTERING' },
+      include: {
+        clinic: { select: { id: true, code: true, name: true } },
+        stages: { where: { stageName: 'MILLING_SINTERING' }, orderBy: { scannedAt: 'desc' }, take: 1 }
+      },
+      orderBy: { dueDate: 'asc' }
+    });
+
+    await appCache.set(cacheKey, cases, 20);
+    res.json(cases);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not fetch milling cases.' });
+  }
+});
+
 // ── POST /api/dispatch/:caseId/assign ────────────────────
 // Assign a delivery executive to a case
 router.post('/:caseId/assign', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
