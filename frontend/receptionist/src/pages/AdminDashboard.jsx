@@ -437,6 +437,7 @@ export default function AdminDashboard() {
             </div>
             <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
               {[
+                { label: 'Today',      f: () => { const n=new Date().toISOString().slice(0,10); setFromDate(n); setToDate(n); setDrillKey(null); } },
                 { label: 'This Month', f: () => { const n=new Date(); setFromDate(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`); setToDate(n.toISOString().slice(0,10)); setDrillKey(null); } },
                 { label: 'This Year',  f: () => { setFromDate(`${thisYear}-01-01`); setToDate(new Date().toISOString().slice(0,10)); setDrillKey(null); } },
                 { label: 'All Time',   f: () => { setFromDate('2020-01-01'); setToDate(new Date().toISOString().slice(0,10)); setDrillKey(null); } },
