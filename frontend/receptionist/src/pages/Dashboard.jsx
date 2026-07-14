@@ -742,8 +742,11 @@ function ReadyOrdersSection() {
 }
 
 // ─── In Finishing Section ─────────────────────────────────
-// Informational only — notifies reception once a case reaches the Metal
-// Finishing department, mirroring the Dispatch dashboard's "In Milling" list.
+// Informational only — notifies reception once a case reaches a finishing
+// stage (Metal Finishing for metal/PFM work, Zirconia Fitting & Finishing
+// for zirconia work), mirroring the Dispatch dashboard's "In Milling" list.
+const FINISHING_STATUSES = 'METAL_FINISHING,ZIRCONIA_FITTING_FINISHING';
+
 function FinishingSection() {
   const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -775,16 +778,16 @@ function FinishingSection() {
       </div>
 
       <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600 }}>
-        ✨ These cases have reached the <strong>Metal Finishing department</strong> — informational only, no action needed here. They'll continue on through Opaque/Ceramic/Glazing before QC and dispatch.
+        ✨ These cases have reached a <strong>finishing stage</strong> (Metal Finishing or Zirconia Fitting & Finishing) — informational only, no action needed here. They'll continue on through Ceramic/Glazing before QC and dispatch.
       </div>
 
       <OrdersTab
-        status="METAL_FINISHING"
+        status={FINISHING_STATUSES}
         title="In Finishing"
         icon="✨"
         accentColor="#7C3AED"
         emptyText="No cases in finishing right now"
-        emptyNote="Cases will show up here as soon as the lab scans them into the Metal Finishing department."
+        emptyNote="Cases will show up here as soon as the lab scans them into Metal Finishing or Zirconia Fitting & Finishing."
         applied={applied}
         page={page}
         setPage={setPage}
@@ -965,7 +968,7 @@ export default function Dashboard() {
   });
   const { data: finishingBadge } = useQuery({
     queryKey: ['cases', 'finishing-badge'],
-    queryFn: () => api.get('/cases', { params: { status: 'METAL_FINISHING', limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
+    queryFn: () => api.get('/cases', { params: { status: FINISHING_STATUSES, limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
     staleTime: 30_000,
     refetchInterval: 30_000,
   });
