@@ -5,6 +5,8 @@ import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import FilterBar from '../components/FilterBar';
 import ExportMenu from '../components/ExportMenu';
 import Odontogram from '../components/Odontogram';
+import CaseDetailModal from '../components/CaseDetailModal';
+import { printCaseLabel } from '../utils/printLabel';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -754,6 +756,7 @@ function FinishingSection() {
   const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
+  const [viewCase, setViewCase] = useState(null);
 
   const { data: log = [], isLoading } = useQuery({
     queryKey: ['cases', 'finishing-log'],
@@ -832,6 +835,7 @@ function FinishingSection() {
                 <tr>
                   <th>Case #</th><th>Clinic</th><th>Patient</th><th>Work Type</th>
                   <th>Units</th><th>Finishing Stage</th><th>Reached Finishing</th><th>Scanned By</th><th>Current Status</th>
+                  <th style={{ minWidth: 170 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -846,6 +850,19 @@ function FinishingSection() {
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(c.finishingScannedAt), 'dd MMM yyyy, h:mm a')}</td>
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.finishingScannedBy || '—'}</td>
                     <td><StatusBadge status={c.status} /></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setViewCase(c)}>👁 View</button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          disabled={!c.qrCodeUrl}
+                          title={c.qrCodeUrl ? 'Print production label' : 'No QR code on this case yet'}
+                          onClick={() => printCaseLabel(c)}
+                        >
+                          🖨️ Print Label
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -853,6 +870,10 @@ function FinishingSection() {
           )}
         </div>
       </div>
+
+      {viewCase && (
+        <CaseDetailModal caseId={viewCase.id} onClose={() => setViewCase(null)} />
+      )}
     </>
   );
 }
