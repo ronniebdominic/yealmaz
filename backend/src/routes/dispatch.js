@@ -86,7 +86,7 @@ router.get('/queue', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) =>
         ]
       },
       include: {
-        clinic: { select: { id: true, code: true, name: true, station: true, address: true, phone: true } },
+        clinic: { select: { id: true, code: true, name: true, station: true, address: true, phone: true, isExcluded: true } },
         payment: { select: { status: true, amount: true } },
         assignedDelivery: { select: { id: true, name: true, email: true } },
         deliveryLogs: { orderBy: { deliveredAt: 'desc' }, take: 1 }

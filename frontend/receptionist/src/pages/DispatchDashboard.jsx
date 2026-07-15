@@ -444,20 +444,26 @@ export default function DispatchDashboard() {
   const pickupInProgress  = filtered.filter(c => c.status === 'PICKUP_ASSIGNED' && c.assignedDelivery);
 
   // ── FINAL DEFINITION (locked) ─────────────────────────────
+  // Trusted-partner clinics (clinic.isExcluded) are billed later on a
+  // consolidated cycle, not per case — their cases never get an individual
+  // paymentStatus of VERIFIED, so they must skip the payment gate entirely
+  // or they'd sit in "Ready for Delivery" forever with no way to dispatch.
+  const isPaymentClear = (c) => c.paymentStatus === 'VERIFIED' || c.clinic?.isExcluded;
+
   // Ready for Delivery  = QC passed → READY_TO_DISPATCH, payment NOT yet verified
   //   These orders just left QC. Finance still needs to request/confirm payment.
   //   Action: Request Payment
   const readyDelivery = filtered.filter(c =>
     c.status === 'READY_TO_DISPATCH' &&
-    c.paymentStatus !== 'VERIFIED'
+    !isPaymentClear(c)
   );
 
-  // Ready for Dispatch  = READY_TO_DISPATCH + payment VERIFIED
-  //   Payment confirmed. Case can be physically dispatched to clinic at any time.
+  // Ready for Dispatch  = READY_TO_DISPATCH + payment VERIFIED (or trusted partner)
+  //   Payment confirmed (or clinic bills later). Case can be physically dispatched.
   //   Action: Assign delivery driver
   const readyDispatch = filtered.filter(c =>
     c.status === 'READY_TO_DISPATCH' &&
-    c.paymentStatus === 'VERIFIED'
+    isPaymentClear(c)
   );
 
   const enRoute   = filtered.filter(c => c.status === 'OUT_FOR_DELIVERY');
@@ -503,7 +509,7 @@ export default function DispatchDashboard() {
     { id: 'pickup-progress',  label: 'Pickup In Progress', icon: '🛵', group: 'Pickup',     sub: 'Driver collecting'      },
     { id: 'in-milling',       label: 'In Milling',         icon: '⚙️', group: 'Production', sub: 'At milling stage'       },
     { id: 'ready-delivery',   label: 'Ready for Delivery', icon: '📦', group: 'Delivery',   sub: 'QC done · awaiting pay' },
-    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: '🚚', group: 'Delivery',   sub: 'Paid · assign driver'   },
+    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: '🚚', group: 'Delivery',   sub: 'Paid/trusted · assign driver' },
     { id: 'en-route',         label: 'En Route',           icon: '🚴', group: 'Delivery',   sub: 'Out for delivery'       },
     { id: 'delivered',        label: 'Delivered',          icon: '✅', group: 'Completed',  sub: 'Done'                   },
   ];
@@ -540,7 +546,7 @@ export default function DispatchDashboard() {
     { tab: 'pickup-progress', label: 'Pickup In Progress', icon: '🛵', count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: '#EFF6FF' },
     { tab: 'in-milling',      label: 'In Milling',         icon: '⚙️', count: milling.length,           hint: 'In production',    color: '#0891B2', bg: '#ECFEFF' },
     { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: '📦', count: readyDelivery.length,    hint: 'Awaiting payment', color: '#D97706', bg: '#FFFBEB' },
-    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: '🚚', count: readyDispatch.length,    hint: 'Payment verified', color: '#16A34A', bg: '#F0FDF4' },
+    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: '🚚', count: readyDispatch.length,    hint: 'Payment cleared', color: '#16A34A', bg: '#F0FDF4' },
     { tab: 'en-route',        label: 'En Route',           icon: '🚴', count: enRoute.length,          hint: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF' },
     { tab: 'delivered',       label: 'Delivered',          icon: '✅', count: delivered.length,        hint: 'Completed',        color: '#16A34A', bg: '#F0FDF4' },
   ];
@@ -994,16 +1000,16 @@ export default function DispatchDashboard() {
             </div>
           )}
 
-          {/* ── TAB: Ready for Dispatch (READY_TO_DISPATCH + payment VERIFIED) ── */}
+          {/* ── TAB: Ready for Dispatch (READY_TO_DISPATCH + payment VERIFIED or trusted partner) ── */}
           {tab === 'ready-dispatch' && (
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: 'var(--green-dim)', borderRadius: '10px 10px 0 0' }}>
                 <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10 }}>
-                  ✅ Payment is <strong>verified</strong> for these cases — assign a delivery driver to dispatch them to the clinic at any time.
+                  ✅ Payment is <strong>verified</strong> (or the clinic is a 🤝 trusted partner billed later) for these cases — assign a delivery driver to dispatch them to the clinic at any time.
                 </div>
               </div>
               <div className="card-header">
-                <div className="card-title">🚚 Ready for Dispatch <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, marginLeft: 6 }}>— Payment Verified</span></div>
+                <div className="card-title">🚚 Ready for Dispatch <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, marginLeft: 6 }}>— Payment Verified / Trusted Partner</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDispatch.length} cases</span>
                   <ExportMenu
@@ -1059,7 +1065,7 @@ export default function DispatchDashboard() {
                               {c.dueDate ? format(new Date(c.dueDate), 'dd MMM') : '—'}
                               {overdue ? ' ⚠' : ''}
                             </Td>
-                            <Td><PaymentBadge status={c.paymentStatus} /></Td>
+                            <Td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></Td>
                             <Td>
                               <button
                                 className="btn btn-primary btn-sm"
