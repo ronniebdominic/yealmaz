@@ -742,20 +742,39 @@ function ReadyOrdersSection() {
 }
 
 // ─── In Finishing Section ─────────────────────────────────
-// Informational only — notifies reception once a case reaches a finishing
+// Informational only — notifies reception once a case REACHES a finishing
 // stage (Metal Finishing for metal/PFM work, Zirconia Fitting & Finishing
-// for zirconia work), mirroring the Dispatch dashboard's "In Milling" list.
-const FINISHING_STATUSES = 'METAL_FINISHING,ZIRCONIA_FITTING_FINISHING';
+// for zirconia work). Backed by a rolling log of finishing scans (last 3
+// days), not the case's live status — techs often scan a case through
+// several stages within minutes, so filtering on "current status" would
+// make it disappear from this list before reception ever sees it.
+const FINISHING_LABELS = { METAL_FINISHING: 'Metal Finishing', ZIRCONIA_FITTING_FINISHING: 'Zirconia Fitting & Finishing' };
 
 function FinishingSection() {
   const [search, setSearch]     = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
-  const [applied, setApplied]   = useState({ search: '', dateFrom: '', dateTo: '' });
-  const [page, setPage]         = useState(1);
 
-  const apply = () => { setApplied({ search, dateFrom, dateTo }); setPage(1); };
-  const clear  = () => { setSearch(''); setDateFrom(''); setDateTo(''); setApplied({ search: '', dateFrom: '', dateTo: '' }); setPage(1); };
+  const { data: log = [], isLoading } = useQuery({
+    queryKey: ['cases', 'finishing-log'],
+    queryFn: () => api.get('/cases/finishing-log').then(r => r.data),
+    staleTime: 20_000,
+    refetchInterval: 30_000,
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to   = dateTo   ? (() => { const d = new Date(dateTo); d.setHours(23,59,59,999); return d; })() : null;
+    return log.filter(c => {
+      if (q && !c.clinic?.name?.toLowerCase().includes(q) &&
+               !c.caseNumber?.toLowerCase().includes(q) &&
+               !c.patientName?.toLowerCase().includes(q)) return false;
+      if (from && new Date(c.finishingScannedAt) < from) return false;
+      if (to   && new Date(c.finishingScannedAt) > to)   return false;
+      return true;
+    });
+  }, [log, search, dateFrom, dateTo]);
 
   return (
     <>
@@ -768,30 +787,72 @@ function FinishingSection() {
             placeholder="Clinic name, case no., patient…"
             style={{ flex: 1 }}
           />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" onClick={apply}>Apply</button>
-            {(applied.search || applied.dateFrom || applied.dateTo) && (
-              <button className="btn btn-ghost btn-sm" onClick={clear}>Clear</button>
-            )}
-          </div>
         </div>
       </div>
 
       <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600 }}>
-        ✨ These cases have reached a <strong>finishing stage</strong> (Metal Finishing or Zirconia Fitting & Finishing) — informational only, no action needed here. They'll continue on through Ceramic/Glazing before QC and dispatch.
+        ✨ These cases have <strong>reached a finishing stage</strong> (Metal Finishing or Zirconia Fitting & Finishing) in the last 3 days — informational only. They stay listed here even after moving on to Ceramic/Glazing/QC, so you don't miss one that moved through quickly.
       </div>
 
-      <OrdersTab
-        status={FINISHING_STATUSES}
-        title="In Finishing"
-        icon="✨"
-        accentColor="#7C3AED"
-        emptyText="No cases in finishing right now"
-        emptyNote="Cases will show up here as soon as the lab scans them into Metal Finishing or Zirconia Fitting & Finishing."
-        applied={applied}
-        page={page}
-        setPage={setPage}
-      />
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title" style={{ color: '#7C3AED' }}>✨ In Finishing</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{filtered.length} case{filtered.length !== 1 ? 's' : ''}</span>
+            <ExportMenu
+              data={filtered}
+              columns={[
+                { header: 'Clinic',            value: c => c.clinic?.name },
+                { header: 'Patient',            value: c => c.patientName },
+                { header: 'Case #',             value: c => c.caseNumber },
+                { header: 'Work Type',          value: c => c.workType },
+                { header: 'Units',              value: c => c.units ?? '' },
+                { header: 'Finishing Stage',    value: c => FINISHING_LABELS[c.finishingStage] || c.finishingStage },
+                { header: 'Reached Finishing',  value: c => format(new Date(c.finishingScannedAt), 'dd MMM yyyy, h:mm a') },
+                { header: 'Scanned By',         value: c => c.finishingScannedBy },
+                { header: 'Current Status',     value: c => c.status },
+              ]}
+              filename="in-finishing"
+              title="In Finishing"
+            />
+          </div>
+        </div>
+        <div className="table-wrap">
+          {isLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
+          ) : filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">✨</div>
+              <div className="empty-title">No cases in finishing right now</div>
+              <p>Cases will show up here as soon as the lab scans them into Metal Finishing or Zirconia Fitting & Finishing, and stay listed for 3 days.</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Case #</th><th>Clinic</th><th>Patient</th><th>Work Type</th>
+                  <th>Units</th><th>Finishing Stage</th><th>Reached Finishing</th><th>Scanned By</th><th>Current Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(c => (
+                  <tr key={c.id}>
+                    <td>{c.caseNumber ? <span className="case-number">{c.caseNumber}</span> : '—'}</td>
+                    <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
+                    <td><span className="patient-name">{c.patientName}</span></td>
+                    <td style={{ fontSize: 13 }}>{c.workType}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{c.units ?? '—'}</td>
+                    <td style={{ fontSize: 12 }}>{FINISHING_LABELS[c.finishingStage] || c.finishingStage}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(c.finishingScannedAt), 'dd MMM yyyy, h:mm a')}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.finishingScannedBy || '—'}</td>
+                    <td><StatusBadge status={c.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -967,9 +1028,9 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
   const { data: finishingBadge } = useQuery({
-    queryKey: ['cases', 'finishing-badge'],
-    queryFn: () => api.get('/cases', { params: { status: FINISHING_STATUSES, limit: 1 } }).then(r => r.data.pagination?.total ?? 0),
-    staleTime: 30_000,
+    queryKey: ['cases', 'finishing-log'],
+    queryFn: () => api.get('/cases/finishing-log').then(r => r.data.length ?? 0),
+    staleTime: 20_000,
     refetchInterval: 30_000,
   });
 

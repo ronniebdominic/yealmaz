@@ -196,6 +196,59 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
   }
 });
 
+// ── GET /api/cases/finishing-log ─────────────────────────
+// Reception notification feed: cases that have REACHED a finishing stage
+// (Metal Finishing or Zirconia Fitting & Finishing) recently — not just
+// cases currently parked there. Lab techs often scan a case through several
+// stages within minutes, so a "current status" filter would miss it by the
+// time reception checks. Defined before /:id so it isn't captured as an id.
+const FINISHING_STAGES = ['METAL_FINISHING', 'ZIRCONIA_FITTING_FINISHING'];
+router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  const cacheKey = 'cases:finishing-log';
+  const cached = await appCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  try {
+    const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000); // rolling 3-day window
+    const stages = await prisma.caseStage.findMany({
+      where: { stageName: { in: FINISHING_STAGES }, scannedAt: { gte: since } },
+      orderBy: { scannedAt: 'desc' },
+      select: { caseId: true, stageName: true, scannedAt: true, scannedBy: true },
+    });
+
+    // Keep only the most recent finishing scan per case (stages is already
+    // ordered newest-first, so the first occurrence per caseId wins).
+    const seen = new Set();
+    const latestPerCase = [];
+    for (const s of stages) {
+      if (seen.has(s.caseId)) continue;
+      seen.add(s.caseId);
+      latestPerCase.push(s);
+    }
+
+    const cases = await prisma.case.findMany({
+      where: { id: { in: latestPerCase.map(s => s.caseId) }, status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+      include: { clinic: { select: { name: true } }, payment: { select: { amount: true, status: true } } },
+    });
+    const caseMap = new Map(cases.map(c => [c.id, c]));
+
+    const result = latestPerCase
+      .filter(s => caseMap.has(s.caseId))
+      .map(s => ({
+        ...caseMap.get(s.caseId),
+        finishingStage:     s.stageName,
+        finishingScannedAt: s.scannedAt,
+        finishingScannedBy: s.scannedBy,
+      }));
+
+    await appCache.set(cacheKey, result, 20);
+    res.json(result);
+  } catch (err) {
+    console.error('[cases finishing-log]', err);
+    res.status(500).json({ error: 'Could not fetch finishing log.' });
+  }
+});
+
 // ── GET /api/cases/:id ───────────────────────────────────
 router.get('/:id', protect, async (req, res) => {
   try {
