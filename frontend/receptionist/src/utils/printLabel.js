@@ -34,6 +34,7 @@ export function printCaseLabel(data) {
       background: #fff;
       display: flex;
       flex-direction: column;
+      text-align: center;
       padding: 6mm;
       overflow: hidden;
     }
@@ -41,14 +42,16 @@ export function printCaseLabel(data) {
     /* ── Header ── */
     .header {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 3px;
+      width: 100%;
       padding-bottom: 3mm;
       border-bottom: 2.5px solid #1A56A0;
       margin-bottom: 4mm;
     }
     .header-icon { width: 12mm; height: 12mm; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-    .header-text { flex: 1; }
+    .header-text { width: 100%; }
     .lab-name {
       font-size: 14px;
       font-weight: 800;
