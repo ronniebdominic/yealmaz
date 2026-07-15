@@ -1048,12 +1048,17 @@ export default function Dashboard() {
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
-  const { data: finishingBadge } = useQuery({
+  // Same queryKey + queryFn shape as FinishingSection's own useQuery below —
+  // React Query dedupes by key alone, so a mismatched shape here (e.g.
+  // returning a count instead of the array) would silently clobber the other
+  // observer's data and crash FinishingSection's log.filter(...).
+  const { data: finishingLog = [] } = useQuery({
     queryKey: ['cases', 'finishing-log'],
-    queryFn: () => api.get('/cases/finishing-log').then(r => r.data.length ?? 0),
+    queryFn: () => api.get('/cases/finishing-log').then(r => r.data),
     staleTime: 20_000,
     refetchInterval: 30_000,
   });
+  const finishingBadge = finishingLog.length;
 
   const { stats } = summary || {};
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'RX';
