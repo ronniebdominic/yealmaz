@@ -126,7 +126,8 @@ export default function CaseDetailModal({ caseId, onClose }) {
 
   const printQR = () => {
     if (!data?.qrCodeUrl) return;
-    const due = data.dueDate ? new Date(data.dueDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+    const due   = data.dueDate   ? new Date(data.dueDate).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+    const order = data.createdAt ? new Date(data.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
 
     // Pull the 3D-file/arch-fee line (recorded by New Case's "3D File (Emailed)"
     // intake) out of notes so it prints as its own highlighted row; anything
@@ -198,10 +199,14 @@ export default function CaseDetailModal({ caseId, onClose }) {
     .case-number {
       text-align: center;
       font-family: 'Courier New', monospace;
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 800;
       color: #1A56A0;
-      letter-spacing: 1.2px;
+      letter-spacing: 1.4px;
+      background: #F4F7FF;
+      border: 1.5px solid #C7D7F5;
+      border-radius: 5px;
+      padding: 1.5mm;
       margin-bottom: 3mm;
     }
     .info-grid {
@@ -231,14 +236,14 @@ export default function CaseDetailModal({ caseId, onClose }) {
       margin-bottom: 3mm;
     }
     .notes-text {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
       color: #1a1a2e;
-      line-height: 1.3;
+      line-height: 1.35;
       white-space: pre-line;
     }
     .info-label {
-      font-size: 8.5px;
+      font-size: 9.5px;
       font-weight: 800;
       color: #888;
       text-transform: uppercase;
@@ -246,13 +251,13 @@ export default function CaseDetailModal({ caseId, onClose }) {
       margin-bottom: 1px;
     }
     .info-value {
-      font-size: 12.5px;
+      font-size: 14px;
       font-weight: 800;
       color: #1a1a2e;
-      line-height: 1.2;
+      line-height: 1.25;
     }
     .info-cell.teeth .info-value {
-      font-size: 15px;
+      font-size: 18px;
       letter-spacing: 0.5px;
     }
     .info-cell.full { grid-column: 1 / -1; }
@@ -298,41 +303,38 @@ export default function CaseDetailModal({ caseId, onClose }) {
 
   <div class="info-grid">
     <div class="info-cell full">
+      <div class="info-label">Clinic</div>
+      <div class="info-value">${data.clinic?.name || '—'}</div>
+    </div>
+    <div class="info-cell full">
       <div class="info-label">Patient</div>
       <div class="info-value">${data.patientName}${data.patientAge ? ' · Age ' + data.patientAge : ''}</div>
     </div>
-    ${data.toothNumbers ? `
-    <div class="info-cell full teeth">
-      <div class="info-label">Teeth</div>
-      <div class="info-value">${data.toothNumbers}</div>
-    </div>` : ''}
-    ${threeDLine ? `
-    <div class="info-cell full threed">
-      <div class="info-label">3D File Intake</div>
-      <div class="info-value">${escapeHtml(threeDLine.replace('📧 ', ''))}</div>
-    </div>` : ''}
     <div class="info-cell">
-      <div class="info-label">Work Type</div>
-      <div class="info-value">${data.workType}</div>
+      <div class="info-label">Order Date</div>
+      <div class="info-value">${order || '—'}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-label">Due Date</div>
+      <div class="info-value">${due || '—'}</div>
     </div>
     <div class="info-cell">
       <div class="info-label">Units</div>
       <div class="info-value">${data.units ?? '—'}</div>
     </div>
     <div class="info-cell">
-      <div class="info-label">Clinic</div>
-      <div class="info-value">${data.clinic?.name || '—'}</div>
-    </div>
-    ${data.shade ? `
-    <div class="info-cell">
       <div class="info-label">Shade</div>
-      <div class="info-value">${data.shade}</div>
+      <div class="info-value">${data.shade || '—'}</div>
+    </div>
+    ${data.toothNumbers ? `
+    <div class="info-cell full teeth">
+      <div class="info-label">Teeth</div>
+      <div class="info-value">${data.toothNumbers}</div>
     </div>` : ''}
-    ${due ? `
     <div class="info-cell">
-      <div class="info-label">Due Date</div>
-      <div class="info-value">${due}</div>
-    </div>` : ''}
+      <div class="info-label">Work Type</div>
+      <div class="info-value">${data.workType}</div>
+    </div>
     <div class="info-cell">
       <div class="info-label">Delivery</div>
       <div class="info-value">
@@ -341,6 +343,11 @@ export default function CaseDetailModal({ caseId, onClose }) {
         </span>
       </div>
     </div>
+    ${threeDLine ? `
+    <div class="info-cell full threed">
+      <div class="info-label">3D File Intake</div>
+      <div class="info-value">${escapeHtml(threeDLine.replace('📧 ', ''))}</div>
+    </div>` : ''}
   </div>
 
   ${otherNotes ? `
