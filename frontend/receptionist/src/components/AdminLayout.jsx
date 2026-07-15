@@ -9,6 +9,9 @@ function NavItems({ active, onNav }) {
       <button className={active('/admin')} onClick={() => onNav('/admin')}>
         <span>📊</span> Analytics Dashboard
       </button>
+      <button className={active('/admin/case-status')} onClick={() => onNav('/admin/case-status')}>
+        <span>🏭</span> Case Status Board
+      </button>
 
       <div className="nav-section-label">Management</div>
       <button className={active('/admin/cases')} onClick={() => onNav('/admin/cases')}>
