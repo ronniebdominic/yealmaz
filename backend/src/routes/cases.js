@@ -601,6 +601,47 @@ router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), a
   }
 });
 
+// ── PATCH /api/cases/:id/remake ──────────────────────────
+// Mark an EXISTING case as remake/redo (or clear it) — reception, not just
+// admin. Only touches these four flag fields; caseNumber is never reassigned,
+// so the case keeps the exact scan number it already has.
+router.patch('/:id/remake', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    const { remake, remakeReason, redo, isRedo } = req.body;
+    const data = {
+      remake:       Boolean(remake),
+      remakeReason: remake ? (remakeReason?.trim() || null) : null,
+      redo:         Boolean(redo),
+      isRedo:       Boolean(isRedo),
+    };
+
+    const updated = await prisma.case.update({ where: { id: req.params.id }, data });
+
+    const flags = [
+      data.remake ? `Remake${data.remakeReason ? ' — ' + data.remakeReason : ''}` : null,
+      data.redo ? 'Redo' : null,
+      data.isRedo ? 'Redo/Replacement (50%)' : null,
+    ].filter(Boolean);
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.id,
+        stageName: existing.status,
+        scannedBy: req.user.name,
+        notes: flags.length ? `Marked as ${flags.join(', ')} by ${req.user.name}` : `Remake/Redo flags cleared by ${req.user.name}`,
+      }
+    });
+
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
+    res.json(updated);
+  } catch (err) {
+    console.error('[PATCH /cases/:id/remake]', err);
+    res.status(500).json({ error: 'Could not update remake/redo status.' });
+  }
+});
+
 // ── PATCH /api/cases/:id/status ──────────────────────────
 // RECEPTIONIST/ADMIN can set any status (incl. REJECTED, UNDER_REVIEW).
 // DELIVERY role is limited to delivery-workflow transitions only.

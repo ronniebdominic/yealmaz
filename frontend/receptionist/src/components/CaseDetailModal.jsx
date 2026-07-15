@@ -54,6 +54,11 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [statusNotes, setStatusNotes] = useState('');
   const [deliveryDateInput, setDeliveryDateInput] = useState('');
   const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
+  const [remakeInput, setRemakeInput] = useState(false);
+  const [remakeReasonInput, setRemakeReasonInput] = useState('');
+  const [redoInput, setRedoInput] = useState(false);
+  const [isRedoInput, setIsRedoInput] = useState(false);
+  const [savingRemake, setSavingRemake] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
@@ -90,10 +95,32 @@ export default function CaseDetailModal({ caseId, onClose }) {
       setData(res.data);
       setNewStatus(res.data.status);
       setDeliveryDateInput(res.data.deliveryDate ? res.data.deliveryDate.slice(0, 10) : '');
+      setRemakeInput(res.data.remake || false);
+      setRemakeReasonInput(res.data.remakeReason || '');
+      setRedoInput(res.data.redo || false);
+      setIsRedoInput(res.data.isRedo || false);
     } catch (err) {
       toast.error('Could not load case');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveRemake = async () => {
+    setSavingRemake(true);
+    try {
+      await api.patch(`/cases/${caseId}/remake`, {
+        remake: remakeInput,
+        remakeReason: remakeReasonInput,
+        redo: redoInput,
+        isRedo: isRedoInput,
+      });
+      toast.success('Remake/Redo status updated — same scan number retained');
+      loadCase();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not update remake/redo status');
+    } finally {
+      setSavingRemake(false);
     }
   };
 
@@ -166,8 +193,6 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
               ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),
               ...(data.patientGender ? [['Patient Gender', data.patientGender]] : []),
-              ...(data.remake ? [['Remake', '🔄 Yes' + (data.remakeReason ? ' — ' + data.remakeReason : '')]] : []),
-              ...(data.isRedo ? [['Redo / Replacement', '♻️ Yes — 50% rate']] : []),
             ].map(([label, val]) => (
               <div key={label} style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: 600, marginBottom: '2px' }}>{label}</div>
@@ -287,6 +312,40 @@ export default function CaseDetailModal({ caseId, onClose }) {
                 ✅ Currently set to {format(new Date(data.deliveryDate), 'dd MMM yyyy')}
               </div>
             )}
+          </div>
+
+          {/* Remake / Redo — flags on THIS case only, scan number never changes */}
+          <div className="divider" />
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>
+              Remake / Redo
+              <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>
+                — keeps this case's existing scan number ({data.caseNumber || '—'})
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={remakeInput} onChange={e => setRemakeInput(e.target.checked)} /> 🔄 Remake
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={redoInput} onChange={e => setRedoInput(e.target.checked)} /> Redo
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={isRedoInput} onChange={e => setIsRedoInput(e.target.checked)} /> ♻️ Redo / Replacement (50%)
+              </label>
+            </div>
+            {remakeInput && (
+              <input
+                type="text"
+                placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
+                value={remakeReasonInput}
+                onChange={e => setRemakeReasonInput(e.target.value)}
+                style={{ width: '100%', marginBottom: 10, padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'inherit' }}
+              />
+            )}
+            <button className="btn btn-primary btn-sm" onClick={saveRemake} disabled={savingRemake}>
+              {savingRemake ? '…' : 'Save'}
+            </button>
           </div>
 
           {/* Payment screenshot */}
