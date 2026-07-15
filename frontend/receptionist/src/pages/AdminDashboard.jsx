@@ -210,10 +210,17 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
 function FinancialProjections({ kpi, fromDate, toDate, onDrill }) {
   const projected  = kpi?.totalProjectedRevenue || 0;
   const received   = kpi?.totalRevenue           || 0;
-  const outstanding = projected - received;
-  const collectionRate = projected > 0 ? Math.round((received / projected) * 100) : 0;
-  const receivedPct    = projected > 0 ? (received / projected) * 100 : 0;
-  const outstandingPct = projected > 0 ? (outstanding / projected) * 100 : 0;
+  // Outstanding must match Finance's "Pending" figure exactly — delivered-only,
+  // netted for partial payments (kpi.outstandingAmount, from admin-analytics).
+  // It is NOT projected-minus-received: that would count unbilled value still
+  // sitting on in-progress cases as "outstanding," which it isn't yet.
+  const outstanding = kpi?.outstandingAmount || 0;
+  // Collection rate is scoped to delivered/billable cases (received + outstanding),
+  // not the broader "projected" total, which also includes in-progress cases.
+  const billableTotal  = received + outstanding;
+  const collectionRate = billableTotal > 0 ? Math.round((received / billableTotal) * 100) : 0;
+  const receivedPct    = billableTotal > 0 ? (received / billableTotal) * 100 : 0;
+  const outstandingPct = billableTotal > 0 ? (outstanding / billableTotal) * 100 : 0;
 
   return (
     <div className="card" style={{ marginBottom: 24 }}>
@@ -227,7 +234,7 @@ function FinancialProjections({ kpi, fromDate, toDate, onDrill }) {
           {[
             {
               label: 'Total Case Value', value: fmtBr(projected),
-              sub: `${(kpi?.totalCases || 0)} cases × avg rate`,
+              sub: `${(kpi?.totalCases || 0)} cases, incl. in-progress`,
               color: 'var(--blue)', bg: '#EEF2FF', icon: '📊',
               onClick: () => onDrill('totalCases'),
             },

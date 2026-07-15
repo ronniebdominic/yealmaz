@@ -268,7 +268,8 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       totalRemakes,
       remakeReasonGroups,
       deliveredCasesData,
-      outstandingPayments,
+      outstandingCount,
+      outstandingNetAmount,
       projectedAggregate,
     ] = await Promise.all([
       Promise.all([
@@ -303,16 +304,25 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         where: { ...caseFilter, status: 'DELIVERED', deliveryDate: { not: null } },
         select: { createdAt: true, deliveryDate: true, dueDate: true },
       }),
-      prisma.payment.aggregate({
+      // Outstanding excludes in-progress cases — only unpaid balances on DELIVERED
+      // cases count as outstanding. Must match finance-report's pending calculation
+      // exactly (amount > 0 filter + net of any partial amountReceived) or the two
+      // dashboards show different Outstanding figures for the same underlying data.
+      prisma.payment.count({
         where: {
           status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
-          // Outstanding excludes in-progress cases — only unpaid balances on
-          // DELIVERED cases count as outstanding.
+          amount: { gt: 0 },
           case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}) },
         },
-        _sum: { amount: true },
-        _count: true,
       }),
+      prisma.payment.findMany({
+        where: {
+          status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
+          amount: { gt: 0 },
+          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}) },
+        },
+        select: { amount: true, amountReceived: true },
+      }).then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
       // Total projected revenue = sum of ALL payment amounts (regardless of status) in range
       prisma.payment.aggregate({
         where: {
@@ -401,8 +411,8 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments,
         readyToDispatch, totalRemakes, mostCommonRemakeReason,
         avgTurnaroundDays, onTimeDeliveryPct, totalProjectedRevenue,
-        outstandingCount: outstandingPayments._count,
-        outstandingAmount: outstandingPayments._sum.amount || 0,
+        outstandingCount: outstandingCount,
+        outstandingAmount: outstandingNetAmount,
       },
       monthlyTrend,
       revenueByClinic,
