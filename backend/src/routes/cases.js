@@ -719,7 +719,7 @@ const EDITABLE_FIELDS = [
   'patientName', 'patientAge', 'doctorName', 'doctorPhone', 'patientGender',
   'workType', 'toothNumbers', 'units', 'shade', 'notes',
   'remake', 'redo', 'remakeReason', 'isRedo',
-  'dueDate', 'deliveryDate', 'totalAmount', 'deliveryType',
+  'dueDate', 'deliveryDate', 'totalAmount', 'deliveryType', 'clinicId',
 ];
 const INT_FIELDS   = new Set(['patientAge', 'units']);
 const FLOAT_FIELDS = new Set(['totalAmount']);
@@ -749,6 +749,19 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       return res.status(400).json({ error: 'Work type cannot be empty.' });
     }
 
+    let clinicChangeNote = '';
+    if ('clinicId' in data) {
+      if (!data.clinicId) return res.status(400).json({ error: 'Clinic cannot be empty.' });
+      if (data.clinicId !== existing.clinicId) {
+        const [oldClinic, newClinic] = await Promise.all([
+          prisma.clinic.findUnique({ where: { id: existing.clinicId }, select: { name: true } }),
+          prisma.clinic.findUnique({ where: { id: data.clinicId }, select: { name: true } }),
+        ]);
+        if (!newClinic) return res.status(400).json({ error: 'Selected clinic does not exist.' });
+        clinicChangeNote = ` — clinic changed from ${oldClinic?.name || 'Unknown'} to ${newClinic.name}`;
+      }
+    }
+
     const updated = await prisma.case.update({ where: { id: req.params.id }, data });
 
     await prisma.caseStage.create({
@@ -756,7 +769,7 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
         caseId: req.params.id,
         stageName: existing.status,
         scannedBy: req.user.name,
-        notes: `Case details edited by ${req.user.name} (admin)`,
+        notes: `Case details edited by ${req.user.name} (admin)${clinicChangeNote}`,
       }
     });
 
@@ -764,6 +777,9 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
+    if (clinicChangeNote) {
+      io.to(`clinic_${existing.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
+    }
 
     res.json(updated);
   } catch (err) {

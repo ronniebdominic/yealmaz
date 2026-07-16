@@ -395,9 +395,10 @@ const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid va
 // ── Edit Case Modal ────────────────────────────────────────
 // Admin-only — edits core case details. Status/payment are changed via their
 // own dedicated actions (Override, status changes elsewhere), not here.
-function EditCaseModal({ caseData, onDone, onClose }) {
+function EditCaseModal({ caseData, clinicList, onDone, onClose }) {
   const toDateInput = (d) => d ? new Date(d).toISOString().slice(0, 10) : '';
   const [form, setForm] = useState({
+    clinicId:      caseData.clinicId || caseData.clinic?.id || '',
     patientName:   caseData.patientName || '',
     patientAge:    caseData.patientAge?.toString() || '',
     patientGender: caseData.patientGender || '',
@@ -432,11 +433,13 @@ function EditCaseModal({ caseData, onDone, onClose }) {
   const setBool = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.checked }));
 
   const submit = async () => {
+    if (!form.clinicId)           { toast.error('Clinic is required'); return; }
     if (!form.patientName.trim()) { toast.error('Patient name is required'); return; }
     if (!form.workType.trim())    { toast.error('Work type is required'); return; }
     setSaving(true);
     try {
       await api.patch(`/cases/${caseData.id}`, {
+        clinicId:      form.clinicId,
         patientName:   form.patientName.trim(),
         patientAge:    form.patientAge || null,
         patientGender: form.patientGender || null,
@@ -477,6 +480,16 @@ function EditCaseModal({ caseData, onDone, onClose }) {
         </div>
         <div className="modal-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={fieldLabel}>Clinic <span style={{ color: 'var(--red)' }}>*</span></label>
+              <SearchableSelect
+                value={form.clinicId}
+                onChange={v => setForm(f => ({ ...f, clinicId: v }))}
+                options={clinicList.map(c => ({ value: c.id, label: c.name }))}
+                placeholder="Select clinic…"
+                style={{ width: '100%' }}
+              />
+            </div>
             <div>
               <label style={fieldLabel}>Patient Name <span style={{ color: 'var(--red)' }}>*</span></label>
               <input style={fieldInput} value={form.patientName} onChange={set('patientName')} />
@@ -983,6 +996,7 @@ export default function AdminCases() {
       {editTarget && (
         <EditCaseModal
           caseData={editTarget}
+          clinicList={clinicList}
           onDone={() => { setEditTarget(null); refresh(); }}
           onClose={() => setEditTarget(null)}
         />
