@@ -1096,9 +1096,12 @@ function BillingCycleModal({ clinic, onClose, onSaved }) {
 function CollectModal({ caseData, onDone, onClose }) {
   const [amount, setAmount] = useState(caseData.totalAmount?.toString() || '');
   const [notes,  setNotes]  = useState('');
+  const [withholdTax, setWithholdTax] = useState(false);
+  const [taxWithheld, setTaxWithheld] = useState('');
   const [saving, setSaving] = useState(false);
 
   const isTrusted = caseData.clinic?.isExcluded;
+  const netReceived = (parseFloat(amount) || 0) - (parseFloat(taxWithheld) || 0);
 
   const submit = async () => {
     setSaving(true);
@@ -1106,6 +1109,7 @@ function CollectModal({ caseData, onDone, onClose }) {
       await api.post(`/payments/${caseData.id}/collect`, {
         amount: amount ? parseFloat(amount) : undefined,
         notes:  notes  || undefined,
+        taxWithheld: withholdTax && taxWithheld ? parseFloat(taxWithheld) : undefined,
       });
       toast.success(`✅ Payment collected — ${caseData.caseNumber}`);
       onDone();
@@ -1160,6 +1164,38 @@ function CollectModal({ caseData, onDone, onClose }) {
               autoFocus
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 15, fontWeight: 600, background: 'var(--surface)', color: 'var(--text-1)' }}
             />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={withholdTax} onChange={e => setWithholdTax(e.target.checked)} />
+              🏛️ Clinic withheld tax for government filing
+            </label>
+            {withholdTax && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="number" min="0"
+                    placeholder="Tax withheld (Br)"
+                    value={taxWithheld}
+                    onChange={e => setTaxWithheld(e.target.value)}
+                    style={{ flex: 1, padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, background: 'var(--surface)', color: 'var(--text-1)' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setTaxWithheld(String(Math.round((parseFloat(amount) || 0) * 0.03)))}
+                  >
+                    Auto-fill 3%
+                  </button>
+                </div>
+                {taxWithheld && (
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
+                    Net received: <strong style={{ color: 'var(--text-2)' }}>Br {netReceived.toLocaleString('en-US')}</strong> — invoice stays Br {(parseFloat(amount) || 0).toLocaleString('en-US')}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: 20 }}>
@@ -1968,6 +2004,7 @@ function RevenueOverviewPanel() {
   const r  = data?.revenue  || {};
   const u  = data?.units    || {};
   const pend = data?.pending || {};
+  const tax  = data?.taxWithheld || {};
 
   const fmtBr = (n) => `Br ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -2009,7 +2046,7 @@ function RevenueOverviewPanel() {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
             Revenue
           </div>
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 24 }}>
             <div className="stat-card">
               <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📅</div>
               <div className="stat-label">Today</div>
@@ -2042,6 +2079,14 @@ function RevenueOverviewPanel() {
               <div className="stat-label">Units Delivered Today</div>
               <div className="stat-value">{u.daily || 0}</div>
               <div className="stat-sub">units</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background: '#F5F3FF' }}>🏛️</div>
+              <div className="stat-label">Tax Withheld{applied.from || applied.to ? ' (Range)' : ' (YTD)'}</div>
+              <div className="stat-value" style={{ color: '#6D28D9', fontSize: (tax.amount || 0) >= 100000 ? 17 : 22 }}>
+                {fmtBr(tax.amount)}
+              </div>
+              <div className="stat-sub">{tax.count || 0} payment{tax.count !== 1 ? 's' : ''} · deducted by clinics for tax filing</div>
             </div>
           </div>
 

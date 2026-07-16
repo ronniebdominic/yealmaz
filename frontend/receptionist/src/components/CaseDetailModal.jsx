@@ -199,6 +199,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                     ? format(new Date(data.payment.verifiedAt), 'dd MMM yyyy')
                     : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
+              ...(data.payment?.taxWithheld ? [['🏛️ Tax Withheld', `Br ${data.payment.taxWithheld.toLocaleString('en-US')} · Net received: Br ${((data.payment.amount ?? data.totalAmount ?? 0) - data.payment.taxWithheld).toLocaleString('en-US')}`]] : []),
               ...(data.deliveryDate ? [['Delivered On', format(new Date(data.deliveryDate), 'dd MMM yyyy, h:mm a')]] : []),
               ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
               ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),

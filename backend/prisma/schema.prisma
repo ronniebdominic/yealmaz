@@ -233,6 +233,7 @@ model Payment {
   screenshotUrl   String?       // Cloudinary URL
   amount          Float?        // full amount due for this case
   amountReceived  Float?        // partial amount already collected (status stays PENDING until amount is met in full)
+  taxWithheld     Float?        // withholding tax the clinic deducted & filed to the government directly — NOT owed to us, excluded from Outstanding by virtue of status becoming VERIFIED
   status          PaymentStatus @default(PENDING)
   rejectionReason String?
   uploadedAt      DateTime?

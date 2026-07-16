@@ -129,6 +129,7 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       revenueDaily, revenueMTD, revenueYTD, revenueRange,
       unitsDaily, unitsMTD, unitsYTD,
       paidToday, pendingCount, pendingAmount,
+      taxWithheldAgg,
       recentVerified, recentPending,
     ] = await Promise.all([
       prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfToday }, ...searchWhere }, _sum: { amount: true }, _count: true }),
@@ -149,6 +150,13 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       // expressed as a Prisma aggregate (no cross-field subtraction), so sum in JS.
       prisma.payment.findMany({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 }, case: { status: 'DELIVERED' } }, select: { amount: true, amountReceived: true } })
         .then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
+      // Reconciliation figure for Finance — total withheld by clinics for direct
+      // government tax filing, for the selected period. These payments are
+      // VERIFIED (fully settled), not outstanding — this is purely informational.
+      prisma.payment.aggregate({
+        where: { status: 'VERIFIED', taxWithheld: { not: null }, verifiedAt: { gte: dateFrom, lte: dateTo } },
+        _sum: { taxWithheld: true }, _count: true,
+      }),
       prisma.payment.findMany({
         where: { status: 'VERIFIED', verifiedAt: { gte: dateFrom, lte: dateTo }, ...searchWhere },
         include: { case: { include: { clinic: { select: { name: true } } } } },
@@ -177,6 +185,7 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       },
       paid: { today: paidToday },
       pending: { count: pendingCount, amount: pendingAmount },
+      taxWithheld: { count: taxWithheldAgg._count, amount: taxWithheldAgg._sum.taxWithheld || 0 },
       recentVerified,
       recentPending,
     });

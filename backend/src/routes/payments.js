@@ -436,13 +436,29 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
 // Admin manually marks payment as collected (cash, bank transfer, etc.) — no screenshot needed
 router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
   try {
-    const { amount, notes } = req.body;
+    const { amount, notes, taxWithheld } = req.body;
 
     const caseData = await prisma.case.findUnique({
       where: { id: req.params.caseId },
       include: { clinic: { select: { id: true, name: true } }, payment: true }
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    // Some clinics deduct a withholding tax (they file it to the government
+    // directly) before paying the remainder — that deducted amount is NOT
+    // owed to us, so it must never be conflated with amount/totalAmount (the
+    // true invoice value) or amountReceived (a genuine still-owed shortfall).
+    const resolvedAmount = amount ? parseFloat(amount) : (caseData.payment?.amount ?? caseData.totalAmount);
+    let taxWithheldAmount = null;
+    if (taxWithheld) {
+      taxWithheldAmount = parseFloat(taxWithheld);
+      if (isNaN(taxWithheldAmount) || taxWithheldAmount < 0) {
+        return res.status(400).json({ error: 'Tax withheld must be a non-negative number.' });
+      }
+      if (resolvedAmount != null && taxWithheldAmount > resolvedAmount) {
+        return res.status(400).json({ error: 'Tax withheld cannot exceed the amount collected.' });
+      }
+    }
 
     const paymentData = {
       status: 'VERIFIED',
@@ -451,7 +467,12 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE'), async (re
       rejectionReason: null,
     };
     if (amount) paymentData.amount = parseFloat(amount);
-    if (notes)  paymentData.invoiceNotes = notes;
+    if (taxWithheldAmount != null) paymentData.taxWithheld = taxWithheldAmount;
+    let noteText = notes || '';
+    if (taxWithheldAmount != null) {
+      noteText += `${noteText ? ' | ' : ''}Withholding tax: Br ${taxWithheldAmount} deducted by clinic`;
+    }
+    if (noteText) paymentData.invoiceNotes = noteText;
 
     // Issue a real invoice on collection (if one wasn't already issued).
     // Real invoices only exist after payment — this is what Billing & Invoicing lists.
