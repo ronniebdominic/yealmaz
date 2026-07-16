@@ -379,6 +379,7 @@ const METHOD_META = {
 function ScreenshotsTab({ queryClient }) {
   const [processing, setProcessing] = useState(null);
   const [filter, setFilter] = useState('all'); // all | success | pending | failed
+  const [search, setSearch] = useState('');
   const [collectModal, setCollect] = useState(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -414,10 +415,17 @@ function ScreenshotsTab({ queryClient }) {
   };
 
   const filtered = tx.filter(t => {
-    if (filter === 'all') return true;
-    if (filter === 'success') return t.outcome === 'SUCCESS';
-    if (filter === 'failed')  return t.outcome === 'FAILED';
-    return t.outcome !== 'SUCCESS' && t.outcome !== 'FAILED'; // pending bucket
+    if (filter === 'success' && t.outcome !== 'SUCCESS') return false;
+    if (filter === 'failed'  && t.outcome !== 'FAILED')  return false;
+    if (filter === 'pending' && (t.outcome === 'SUCCESS' || t.outcome === 'FAILED')) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const hit = t.caseNumber?.toLowerCase().includes(q)
+        || t.clinicName?.toLowerCase().includes(q)
+        || t.patientName?.toLowerCase().includes(q);
+      if (!hit) return false;
+    }
+    return true;
   });
 
   if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading transactions…</div>;
@@ -448,16 +456,23 @@ function ScreenshotsTab({ queryClient }) {
       </div>
 
       <div className="card">
-        <div className="card-header">
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
           <div className="card-title">💳 Payment Gateway Transactions</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[['all','All'],['success','Success'],['pending','Pending'],['failed','Failed']].map(([id, label]) => (
-              <button key={id} onClick={() => setFilter(id)}
-                className={`filter-chip${filter === id ? ' active' : ''}`}
-                style={filter === id ? { background: 'var(--blue)', color: '#fff' } : {}}>
-                {label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="search-input" style={{ minWidth: 200 }}>
+              <span className="icon">🔍</span>
+              <input placeholder="Search clinic, case #, patient…" value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            {search && <button className="btn btn-ghost btn-sm" onClick={() => setSearch('')} style={{ color: 'var(--red)' }}>✕</button>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[['all','All'],['success','Success'],['pending','Pending'],['failed','Failed']].map(([id, label]) => (
+                <button key={id} onClick={() => setFilter(id)}
+                  className={`filter-chip${filter === id ? ' active' : ''}`}
+                  style={filter === id ? { background: 'var(--blue)', color: '#fff' } : {}}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="table-wrap">
