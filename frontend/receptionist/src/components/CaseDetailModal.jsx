@@ -46,6 +46,16 @@ const STATUS_LABELS = {
   CANCELLED:                 'Cancelled',
 };
 
+// The delivery exec's "arrived at lab" scan reuses the PICKUP_ASSIGNED status
+// (the driver is just cleared, no dedicated status exists for this step), so
+// its stage row has the same stageName as the dispatcher's original pickup
+// assignment — same label, two different timeline entries. Disambiguate by
+// the note delivery.js writes for that scan.
+const stageTimelineLabel = (s) =>
+  s.stageName === 'PICKUP_ASSIGNED' && s.notes?.startsWith('Impression arrived at lab')
+    ? 'Picked Up'
+    : STATUS_LABELS[s.stageName] || s.stageName;
+
 export default function CaseDetailModal({ caseId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -401,7 +411,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                 <div className="timeline-item" key={s.id}>
                   <div className={`timeline-dot done`}>{STAGE_ICONS[s.stageName] || '●'}</div>
                   <div className="timeline-content">
-                    <div className="timeline-label">{STATUS_LABELS[s.stageName]}</div>
+                    <div className="timeline-label">{stageTimelineLabel(s)}</div>
                     <div className="timeline-time">
                       {format(new Date(s.scannedAt), 'dd MMM yyyy, h:mm a')}
                     </div>
