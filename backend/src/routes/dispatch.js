@@ -52,7 +52,7 @@ router.get('/executives', protect, restrict('DISPATCH', 'ADMIN'), async (req, re
     const executives = await prisma.user.findMany({
       where: { role: 'DELIVERY', isActive: true },
       select: {
-        id: true, name: true, email: true, phone: true,
+        id: true, name: true, email: true, phone: true, station: true,
         assignedDeliveries: {
           where: { status: { in: ['PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
           select: { id: true, caseNumber: true, status: true, patientName: true, clinic: { select: { name: true } } }

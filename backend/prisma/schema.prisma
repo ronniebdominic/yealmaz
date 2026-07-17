@@ -21,6 +21,7 @@ model User {
   role       Role
   departments String[] @default([]) // For LAB_TECH: scopes them to these department(s). Empty = unrestricted (all departments).
   phone      String?
+  station    String?  // for DISPATCH/DELIVERY: which station/area they cover, for routing — matches Clinic.station
   isActive   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

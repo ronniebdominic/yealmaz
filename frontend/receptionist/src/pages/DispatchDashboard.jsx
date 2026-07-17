@@ -29,7 +29,10 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)' }}>
             <div className="case-number" style={{ marginBottom: 2 }}>{caseData.caseNumber}</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{caseData.workType} · 🏥 {caseData.clinic?.name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+              {caseData.workType} · 🏥 {caseData.clinic?.name}
+              {caseData.clinic?.station && <span style={{ color: 'var(--accent)', fontWeight: 600 }}> · 📍 {caseData.clinic.station}</span>}
+            </div>
             {caseData.clinic?.address && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>📍 {caseData.clinic.address}</div>
             )}
@@ -43,20 +46,34 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
             SELECT DRIVER
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-            {executives.map(exec => {
+            {[...executives]
+              .sort((a, b) => {
+                const clinicStation = caseData.clinic?.station?.trim().toLowerCase();
+                const aMatch = clinicStation && a.station?.trim().toLowerCase() === clinicStation;
+                const bMatch = clinicStation && b.station?.trim().toLowerCase() === clinicStation;
+                if (aMatch === bMatch) return 0;
+                return aMatch ? -1 : 1;
+              })
+              .map(exec => {
               const active = exec.assignedDeliveries?.length || 0;
               const sel = selectedExecId === exec.id;
+              const clinicStation = caseData.clinic?.station?.trim().toLowerCase();
+              const sameStation = clinicStation && exec.station?.trim().toLowerCase() === clinicStation;
               return (
                 <button key={exec.id} onClick={() => setSelectedExecId(exec.id)} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                  border: `2px solid ${sel ? 'var(--accent)' : 'var(--border)'}`,
+                  border: `2px solid ${sel ? 'var(--accent)' : sameStation ? 'var(--green)' : 'var(--border)'}`,
                   background: sel ? 'var(--accent-dim)' : 'var(--surface-2)',
                   transition: 'all .15s',
                 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{sel ? '✓ ' : ''}{exec.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{exec.email}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      {exec.email}
+                      {exec.station && <span> · 📍 {exec.station}</span>}
+                      {sameStation && <span style={{ color: 'var(--green)', fontWeight: 700 }}> · ✓ same station</span>}
+                    </div>
                   </div>
                   <div style={{
                     fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
@@ -345,7 +362,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
               <option value="">— Assign later —</option>
               {executives.map(e => (
                 <option key={e.id} value={e.id}>
-                  {e.name} · {e.assignedDeliveries?.length || 0} active jobs
+                  {e.name}{e.station ? ` · 📍${e.station}` : ''} · {e.assignedDeliveries?.length || 0} active jobs
                 </option>
               ))}
             </select>
@@ -667,7 +684,10 @@ export default function DispatchDashboard() {
                       {todayOrders.map(c => (
                         <tr key={c.id}>
                           <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
-                          <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                          <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                           <Td><span className="patient-name">{c.patientName}</span></Td>
                           <Td style={{ fontSize: 12 }}>{c.workType}</Td>
                           <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
@@ -735,7 +755,10 @@ export default function DispatchDashboard() {
                     <tbody>
                       {placeOrder.map(c => (
                         <tr key={c.id}>
-                          <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                          <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
                             {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
                           </Td>
@@ -815,7 +838,10 @@ export default function DispatchDashboard() {
                     <tbody>
                       {pickupInProgress.map(c => (
                         <tr key={c.id}>
-                          <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                          <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
                             {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
                           </Td>
@@ -898,7 +924,10 @@ export default function DispatchDashboard() {
                         const stage = c.stages?.[0];
                         return (
                           <tr key={c.id}>
-                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
                             <Td style={{ fontSize: 12 }}>{c.workType}</Td>
@@ -970,7 +999,10 @@ export default function DispatchDashboard() {
                         const canRequest = !['PAYMENT_REQUESTED','SCREENSHOT_UPLOADED','VERIFIED'].includes(c.paymentStatus);
                         return (
                           <tr key={c.id}>
-                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
                             <Td style={{ fontSize: 12 }}>{c.workType}</Td>
@@ -1054,7 +1086,10 @@ export default function DispatchDashboard() {
                         const overdue = c.dueDate && new Date(c.dueDate) < new Date();
                         return (
                           <tr key={c.id}>
-                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
                               {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
                             </Td>
@@ -1139,7 +1174,10 @@ export default function DispatchDashboard() {
                         const amount = c.payment?.amount ?? c.totalAmount;
                         return (
                           <tr key={c.id}>
-                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}</Td>
                             <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
@@ -1214,7 +1252,10 @@ export default function DispatchDashboard() {
                         const amount = c.payment?.amount ?? c.totalAmount;
                         return (
                           <tr key={c.id}>
-                            <Td style={{ fontWeight: 600 }}>{c.clinic?.name}</Td>
+                            <Td style={{ fontWeight: 600 }}>
+                            {c.clinic?.name}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                          </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
                             <Td style={{ fontSize: 12 }}>{c.workType}</Td>

@@ -389,6 +389,7 @@ function AcceptCasesSection({ queryClient }) {
               {c.workType && c.workType !== 'TBD' ? c.workType : <span style={{ color: 'var(--amber)' }}>Work type TBD</span>}
               {c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}{' · '}🏥 {c.clinic?.name}
             </div>
+            {c.clinic?.station && <div style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 700 }}>📍 Station: {c.clinic.station}</div>}
             {c.clinic?.phone && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📞 {c.clinic.phone}</div>}
             {c.clinic?.address && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📍 {c.clinic.address}</div>}
             {c.doctorName && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>👨‍⚕️ {c.doctorName}{c.doctorPhone ? ` · ${c.doctorPhone}` : ''}</div>}

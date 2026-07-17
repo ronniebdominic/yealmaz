@@ -98,7 +98,7 @@ router.get('/', protect, async (req, res) => {
       prisma.case.findMany({
         where,
         include: {
-          clinic:           { select: { id: true, name: true, phone: true, isExcluded: true } },
+          clinic:           { select: { id: true, name: true, phone: true, isExcluded: true, station: true } },
           stages:           stagesRelation,
           payment:          true,
           assignedDelivery: { select: { id: true, name: true } },

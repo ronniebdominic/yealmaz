@@ -53,11 +53,12 @@ function UserFormModal({ initial, onSaved, onClose }) {
     name:        initial.name        || '',
     email:       initial.email       || '',
     phone:       initial.phone       || '',
+    station:     initial.station     || '',
     role:        initial.role        || 'RECEPTIONIST',
     departments: initial.departments || [],
     password:    '',
   } : {
-    name: '', email: '', phone: '',
+    name: '', email: '', phone: '', station: '',
     role: 'RECEPTIONIST', departments: [], password: generatePassword(),
   });
   const [showPass,           setShowPass]           = useState(!isEdit);
@@ -83,6 +84,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
         name:  form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim() || undefined,
+        station: form.station.trim() || undefined,
         role:  form.role,
         departments: form.role === 'LAB_TECH' ? form.departments : [],
       };
@@ -185,6 +187,14 @@ function UserFormModal({ initial, onSaved, onClose }) {
               <Field label="Phone" hint="optional">
                 <input style={inputStyle} placeholder="+251 9…"
                   value={form.phone} onChange={e => set('phone', e.target.value)} />
+              </Field>
+            </div>
+
+            {/* Station — mainly for Dispatch/Delivery routing, matches Clinic's Station field */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <Field label="Station / Area" hint="optional — for routing, matches a clinic's station">
+                <input style={inputStyle} placeholder="e.g. Bole, Piassa, CMC"
+                  value={form.station} onChange={e => set('station', e.target.value)} />
               </Field>
             </div>
 
@@ -333,6 +343,7 @@ export default function AdminUsers() {
     const matchSearch = !search.trim() ||
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.station || '').toLowerCase().includes(search.toLowerCase()) ||
       (u.departments || []).join(' ').toLowerCase().includes(search.toLowerCase());
     return matchRole && matchSearch;
   });
@@ -395,6 +406,7 @@ export default function AdminUsers() {
                   <col style={{ width: 120 }} />
                   <col style={{ width: 160 }} />
                   <col style={{ width: 110 }} />
+                  <col style={{ width: 110 }} />
                   <col style={{ width: 80 }} />
                   <col style={{ width: 90 }} />
                   <col style={{ width: 230 }} />
@@ -406,6 +418,7 @@ export default function AdminUsers() {
                     <th>Role</th>
                     <th>Department</th>
                     <th>Phone</th>
+                    <th>Station</th>
                     <th>Status</th>
                     <th>Added</th>
                     <th>Actions</th>
@@ -442,6 +455,7 @@ export default function AdminUsers() {
                             : <span style={{ color: 'var(--text-3)' }}>—</span>}
                         </td>
                         <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
+                        <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.station || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
                         <td style={{ padding: '8px 16px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: u.isActive ? 'rgba(22,163,74,0.1)' : 'rgba(229,62,62,0.1)', color: u.isActive ? 'var(--green)' : 'var(--red)', whiteSpace: 'nowrap' }}>
                             {u.isActive ? 'Active' : 'Inactive'}

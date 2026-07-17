@@ -29,7 +29,10 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
         </div>
         <div style={{ padding: 18 }}>
           <div style={{ background: '#F9FAFB', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid #E5E7EB' }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: '#1F2937', marginBottom: 3 }}>🏥 {caseData.clinic?.name}</div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: '#1F2937', marginBottom: 3 }}>
+              🏥 {caseData.clinic?.name}
+              {caseData.clinic?.station && <span style={{ color: '#1A56A0', fontWeight: 700 }}> · 📍 {caseData.clinic.station}</span>}
+            </div>
             {caseData.clinic?.address && <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 2 }}>📍 {caseData.clinic.address}</div>}
             {caseData.clinic?.phone  && <div style={{ fontSize: 13 }}>📞 <a href={`tel:${caseData.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700 }}>{caseData.clinic.phone}</a></div>}
             {(caseData.caseNumber || caseData.workType) && (
@@ -168,6 +171,7 @@ export default function DeliveryDashboard() {
     <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
       <td style={{ padding: '10px 14px', minWidth: 180 }}>
         <div style={{ fontWeight: 700, color: '#111827', fontSize: 14 }}>{c.clinic?.name || '—'}</div>
+        {c.clinic?.station && <div style={{ fontSize: 11, color: '#1A56A0', fontWeight: 700 }}>📍 {c.clinic.station}</div>}
         {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{c.caseNumber}</div>}
         {c.workType && <div style={{ fontSize: 11, color: '#6B7280' }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</div>}
       </td>
