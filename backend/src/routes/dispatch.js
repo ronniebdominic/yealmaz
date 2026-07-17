@@ -266,6 +266,51 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
   }
 });
 
+// ── POST /api/dispatch/:caseId/self-dropoff ──────────────
+// Clinic brings the impression to the lab themselves — no delivery partner
+// needed. Moves the case straight to the same "arrived at lab, awaiting
+// receptionist acceptance" state a driver-delivered pickup reaches after
+// delivery.js's /collect-impression (PICKUP_ASSIGNED + no assigned driver),
+// so it shows up in Reception's existing "Arrived at Lab" queue unchanged.
+router.post('/:caseId/self-dropoff', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.caseId }, include: { clinic: { select: { name: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+    if (existing.status !== 'PENDING_PICKUP') {
+      return res.status(400).json({ error: 'Case is not awaiting pickup.' });
+    }
+
+    const updated = await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { status: 'PICKUP_ASSIGNED', assignedDeliveryId: null },
+      include: { clinic: { select: { name: true } } },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'PICKUP_ASSIGNED',
+        scannedBy: req.user.name,
+        notes: `Self drop-off by ${existing.clinic?.name || 'clinic'} — no delivery partner assigned`,
+      }
+    });
+
+    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'dashboard:summary');
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('case_arrived', {
+      caseId: updated.id, caseNumber: updated.caseNumber,
+      patientName: updated.patientName, workType: updated.workType,
+      message: `${existing.clinic?.name || 'Clinic'} dropped off the impression directly — awaiting receptionist acceptance`
+    });
+
+    res.json({ success: true, case: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not record self drop-off.' });
+  }
+});
+
 // ── POST /api/dispatch/phone-order ──────────────────────────
 // Dispatcher creates a new case from a telephonic call.
 // clinicId OR (clinicName + clinicPhone) must be provided.
@@ -276,7 +321,7 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
     const {
       clinicId, clinicName, clinicPhone, clinicAddress,
       patientName, workType, doctorName, doctorPhone, notes,
-      assignToExecutiveId, deliveryType,
+      assignToExecutiveId, deliveryType, selfDropOff,
     } = req.body;
 
     const resolvedDeliveryType = deliveryType === 'EXPRESS' ? 'EXPRESS' : 'NORMAL';
@@ -307,7 +352,10 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
     const dueDate  = new Date();
     dueDate.setDate(dueDate.getDate() + autoDays);
 
-    const status = assignToExecutiveId ? 'PICKUP_ASSIGNED' : 'PENDING_PICKUP';
+    // Self drop-off skips a delivery partner entirely — lands straight in the
+    // same "arrived at lab, no driver" state Reception's Accept queue already
+    // watches for, same as assign-pickup + collect-impression combined.
+    const status = (selfDropOff || assignToExecutiveId) ? 'PICKUP_ASSIGNED' : 'PENDING_PICKUP';
 
     const newCase = await prisma.case.create({
       data: {
@@ -321,7 +369,7 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
         deliveryType: resolvedDeliveryType,
         clinicId:    resolvedClinicId,
         status,
-        ...(assignToExecutiveId ? { assignedDeliveryId: assignToExecutiveId } : {}),
+        ...(!selfDropOff && assignToExecutiveId ? { assignedDeliveryId: assignToExecutiveId } : {}),
       },
       include: { clinic: { select: { name: true, phone: true, address: true } } },
     });
@@ -331,7 +379,7 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
         caseId:    newCase.id,
         stageName: status,
         scannedBy: req.user.name,
-        notes:     `Phone order placed by dispatcher${resolvedDeliveryType === 'EXPRESS' ? ' — ⚡ Express' : ''}${assignToExecutiveId ? ' — pickup assigned' : ''}`,
+        notes:     `Phone order placed by dispatcher${resolvedDeliveryType === 'EXPRESS' ? ' — ⚡ Express' : ''}${selfDropOff ? ' — self drop-off by clinic' : assignToExecutiveId ? ' — pickup assigned' : ''}`,
       },
     });
 

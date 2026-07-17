@@ -225,7 +225,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
   const [form, setForm] = useState({
     existingClinicId: '', clinicName: '', clinicPhone: '', clinicAddress: '',
     doctorName: '', doctorPhone: '', notes: '',
-    assignToExecutiveId: '', deliveryType: 'NORMAL',
+    assignToExecutiveId: '', deliveryType: 'NORMAL', selfDropOff: false,
   });
   const [clinics, setClinics] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -254,8 +254,9 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
         doctorName:    form.doctorName || undefined,
         doctorPhone:   form.doctorPhone || undefined,
         notes:         form.notes || undefined,
-        assignToExecutiveId: form.assignToExecutiveId || undefined,
+        assignToExecutiveId: !form.selfDropOff ? (form.assignToExecutiveId || undefined) : undefined,
         deliveryType:  form.deliveryType,
+        selfDropOff:   form.selfDropOff || undefined,
       });
       toast.success('📞 Phone order placed!');
       onSuccess();
@@ -355,10 +356,22 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Assign driver immediately */}
+          {/* Self drop-off — clinic brings the impression in themselves, no driver needed */}
           <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '9px 10px', borderRadius: 8, border: `1.5px solid ${form.selfDropOff ? 'var(--accent)' : 'var(--border)'}`, background: form.selfDropOff ? 'var(--accent-dim)' : 'var(--surface-2)' }}>
+              <input type="checkbox" checked={form.selfDropOff}
+                onChange={e => setForm(prev => ({ ...prev, selfDropOff: e.target.checked, assignToExecutiveId: e.target.checked ? '' : prev.assignToExecutiveId }))} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: form.selfDropOff ? 'var(--accent)' : 'var(--text-1)' }}>📦 Self Drop-off by Clinic</div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Clinic is bringing the impression to the lab themselves — no delivery partner needed</div>
+              </div>
+            </label>
+          </div>
+
+          {/* Assign driver immediately */}
+          <div style={{ opacity: form.selfDropOff ? 0.4 : 1, pointerEvents: form.selfDropOff ? 'none' : 'auto' }}>
             <label style={lbl}>ASSIGN PICKUP DRIVER (optional)</label>
-            <select value={form.assignToExecutiveId} onChange={set('assignToExecutiveId')} style={inp}>
+            <select value={form.assignToExecutiveId} onChange={set('assignToExecutiveId')} style={inp} disabled={form.selfDropOff}>
               <option value="">— Assign later —</option>
               {executives.map(e => (
                 <option key={e.id} value={e.id}>
@@ -514,6 +527,21 @@ export default function DispatchDashboard() {
       toast.error(err.response?.data?.error || 'Assignment failed');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const [selfDropOffId, setSelfDropOffId] = useState(null);
+  const handleSelfDropOff = async (c) => {
+    if (!window.confirm(`Confirm ${c.clinic?.name || 'the clinic'} is dropping off this case themselves — no delivery partner will be assigned.`)) return;
+    setSelfDropOffId(c.id);
+    try {
+      await api.post(`/dispatch/${c.id}/self-dropoff`);
+      toast.success('📦 Marked as self drop-off — now awaiting receptionist acceptance');
+      refetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not record self drop-off');
+    } finally {
+      setSelfDropOffId(null);
     }
   };
 
@@ -769,13 +797,24 @@ export default function DispatchDashboard() {
                             {format(new Date(c.createdAt), 'dd MMM yyyy')}
                           </Td>
                           <Td>
-                            <button
-                              className="btn btn-sm"
-                              style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74', whiteSpace: 'nowrap' }}
-                              onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
-                            >
-                              🛵 Assign Pickup
-                            </button>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <button
+                                className="btn btn-sm"
+                                style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74', whiteSpace: 'nowrap' }}
+                                onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
+                              >
+                                🛵 Assign Pickup
+                              </button>
+                              <button
+                                className="btn btn-sm"
+                                style={{ background: '#EFF6FF', color: 'var(--accent)', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
+                                onClick={() => handleSelfDropOff(c)}
+                                disabled={selfDropOffId === c.id}
+                                title="Clinic is bringing the case in themselves"
+                              >
+                                {selfDropOffId === c.id ? '…' : '📦 Self Drop-off'}
+                              </button>
+                            </div>
                           </Td>
                         </tr>
                       ))}
