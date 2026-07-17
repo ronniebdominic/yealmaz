@@ -42,6 +42,33 @@ const STATUS_FILTERS = [
   { label: 'Ready to Dispatch',value: 'READY_TO_DISPATCH',           icon: '📦' },
 ];
 
+// ── Clickable department card ─────────────────────────────
+function DeptCard({ icon, label, count, active, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
+        background: active ? 'var(--blue)' : 'var(--surface)',
+        border: `1.5px solid ${active ? 'var(--blue)' : 'var(--border)'}`,
+        boxShadow: active ? '0 4px 14px rgba(26,86,160,0.25)' : 'var(--shadow, none)',
+        transition: 'transform .1s, box-shadow .15s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 20 }}>{icon}</span>
+        <span style={{ fontSize: 22, fontWeight: 800, color: active ? '#fff' : 'var(--text-1)' }}>{count}</span>
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: active ? 'rgba(255,255,255,0.9)' : 'var(--text-2)' }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
 const PAYMENT_FILTERS = [
   { label: 'All Payments', value: '' },
   { label: 'Unpaid',       value: 'PENDING' },
@@ -77,6 +104,12 @@ export default function AdminCaseStatusBoard() {
   const countMap = useMemo(
     () => Object.fromEntries(statusCounts.map(s => [s.status, s.count])),
     [statusCounts]
+  );
+  // "All" card = sum of just the pipeline departments listed below (not every
+  // status in the system — e.g. excludes DELIVERED/CANCELLED/pickup stages).
+  const allDeptCount = useMemo(
+    () => STATUS_FILTERS.filter(f => f.value).reduce((sum, f) => sum + (countMap[f.value] ?? 0), 0),
+    [countMap]
   );
 
   const changeFilter = (setter) => (val) => { setter(val); setPage(1); };
@@ -163,14 +196,17 @@ export default function AdminCaseStatusBoard() {
           )}
         </div>
 
-        {/* Per-department status filters, each with a live count */}
-        <div className="filters" style={{ marginBottom: 10 }}>
+        {/* Per-department status cards, each with a live count */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, marginBottom: 20 }}>
           {STATUS_FILTERS.map(f => (
-            <button key={f.value} className={`filter-chip ${statusFilter === f.value ? 'active' : ''}`}
-              onClick={() => changeFilter(setStatusFilter)(f.value)}>
-              {f.icon} {f.label}
-              {f.value && <span style={{ marginLeft: 6, opacity: 0.75 }}>({countMap[f.value] ?? 0})</span>}
-            </button>
+            <DeptCard
+              key={f.value}
+              icon={f.icon}
+              label={f.label}
+              count={f.value ? (countMap[f.value] ?? 0) : allDeptCount}
+              active={statusFilter === f.value}
+              onClick={() => changeFilter(setStatusFilter)(f.value)}
+            />
           ))}
         </div>
 
