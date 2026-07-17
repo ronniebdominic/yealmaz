@@ -231,10 +231,19 @@ router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async
 // ── GET /api/dashboard/admin-analytics ──────────────────
 router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { from, to, clinicId } = req.query;
-    const cacheKey = `dashboard:analytics:${from || ''}:${to || ''}:${clinicId || ''}`;
+    const { from, to, clinicId, search } = req.query;
+    const cacheKey = `dashboard:analytics:${from || ''}:${to || ''}:${clinicId || ''}:${search || ''}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
+
+    // Free-text filter across clinic name / patient name / case number —
+    // applied everywhere caseFilter is used, plus mirrored into the Payment
+    // queries below via their nested `case: {...}` clause.
+    const searchOR = search ? [
+      { clinic: { name: { contains: search, mode: 'insensitive' } } },
+      { patientName: { contains: search, mode: 'insensitive' } },
+      { caseNumber: { contains: search, mode: 'insensitive' } },
+    ] : null;
 
     const dateTo = to ? new Date(to) : new Date();
     dateTo.setHours(23, 59, 59, 999);
@@ -260,10 +269,11 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     }
     const trendStart = trendBuckets[0].start;
 
-    // All case KPIs are filtered by the selected date range (createdAt) and clinic
+    // All case KPIs are filtered by the selected date range (createdAt), clinic, and search
     const caseFilter = {
       createdAt: { gte: dateFrom, lte: dateTo },
       ...(clinicId ? { clinicId } : {}),
+      ...(searchOR ? { OR: searchOR } : {}),
     };
 
     const [
@@ -280,6 +290,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       outstandingCount,
       outstandingNetAmount,
       projectedAggregate,
+      unitsDeliveredAgg,
     ] = await Promise.all([
       Promise.all([
         prisma.case.count({ where: caseFilter }),
@@ -291,7 +302,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         where: {
           status: 'VERIFIED',
           verifiedAt: { gte: trendStart, lte: dateTo },
-          ...(clinicId ? { case: { clinicId } } : {}),
+          ...((clinicId || searchOR) ? { case: { ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) } } : {}),
         },
         select: { amount: true, verifiedAt: true, case: { select: { clinicId: true } } },
       }),
@@ -321,14 +332,14 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         where: {
           status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
           amount: { gt: 0 },
-          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}) },
+          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
         },
       }),
       prisma.payment.findMany({
         where: {
           status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
           amount: { gt: 0 },
-          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}) },
+          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
         },
         select: { amount: true, amountReceived: true },
       }).then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
@@ -336,10 +347,13 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.payment.aggregate({
         where: {
           amount: { not: null },
-          case: { createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}) },
+          case: { createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
         },
         _sum: { amount: true },
       }),
+      // Units delivered — distinct from totalUnits (all cases in range regardless
+      // of status); this is specifically the "Revenue vs Volume" delivered figure.
+      prisma.case.aggregate({ where: { ...caseFilter, status: 'DELIVERED' }, _sum: { units: true } }),
     ]);
 
     const filteredPayments = trendPayments.filter(
@@ -422,6 +436,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         avgTurnaroundDays, onTimeDeliveryPct, totalProjectedRevenue,
         outstandingCount: outstandingCount,
         outstandingAmount: outstandingNetAmount,
+        unitsDelivered: unitsDeliveredAgg._sum.units || 0,
       },
       monthlyTrend,
       revenueByClinic,

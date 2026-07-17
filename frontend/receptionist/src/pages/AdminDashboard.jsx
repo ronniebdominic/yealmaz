@@ -28,29 +28,6 @@ const PRODUCTION_STATUSES = [
   'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
 ].join(',');
 
-// ── KPI card (clickable) ──────────────────────────────────
-function KpiCard({ icon, label, value, sub, color = 'var(--blue)', bg = '#EEF2FF', onClick, active }) {
-  return (
-    <div
-      className="stat-card"
-      onClick={onClick}
-      style={{
-        cursor: onClick ? 'pointer' : 'default',
-        outline: active ? `2px solid ${color}` : 'none',
-        outlineOffset: 2,
-        transition: 'box-shadow .15s',
-        boxShadow: active ? `0 0 0 3px ${color}22` : undefined,
-      }}
-    >
-      <div className="stat-icon" style={{ background: bg }}>{icon}</div>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value" style={{ color }}>{value}</div>
-      {sub && <div className="stat-sub">{sub}</div>}
-      {onClick && <div style={{ fontSize: 10, color, marginTop: 4, fontWeight: 600 }}>Click to view cases ↓</div>}
-    </div>
-  );
-}
-
 // ── Custom chart tooltip ──────────────────────────────────
 const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
   if (!active || !payload?.length) return null;
@@ -206,97 +183,30 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
   );
 }
 
-// ── Financial Projections Card ────────────────────────────
-function FinancialProjections({ kpi, fromDate, toDate, onDrill }) {
-  const projected  = kpi?.totalProjectedRevenue || 0;
-  const received   = kpi?.totalRevenue           || 0;
-  // Outstanding must match Finance's "Pending" figure exactly — delivered-only,
-  // netted for partial payments (kpi.outstandingAmount, from admin-analytics).
-  // It is NOT projected-minus-received: that would count unbilled value still
-  // sitting on in-progress cases as "outstanding," which it isn't yet.
-  const outstanding = kpi?.outstandingAmount || 0;
-  // Collection rate is scoped to delivered/billable cases (received + outstanding),
-  // not the broader "projected" total, which also includes in-progress cases.
-  const billableTotal  = received + outstanding;
-  const collectionRate = billableTotal > 0 ? Math.round((received / billableTotal) * 100) : 0;
-  const receivedPct    = billableTotal > 0 ? (received / billableTotal) * 100 : 0;
-  const outstandingPct = billableTotal > 0 ? (outstanding / billableTotal) * 100 : 0;
+// ── Section header (matches the 3-block mockup: Financial Projection /
+// Revenue Vs Volume / Operation) ──────────────────────────
+function SectionHeader({ children }) {
+  return <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '4px 0 12px' }}>{children}</div>;
+}
 
+// ── Colored KPI tile (mockup uses flat green/red/yellow/blue blocks) ─────
+function ColorTile({ icon, label, value, sub, color, bg, onClick, active }) {
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
-      <div className="card-header">
-        <div className="card-title">💹 Financial Projections</div>
-        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{fromDate} — {toDate}</span>
+    <div
+      onClick={onClick}
+      style={{
+        background: bg, borderRadius: 10, padding: '14px 16px', cursor: onClick ? 'pointer' : 'default',
+        border: `1px solid ${color}33`, outline: active ? `2px solid ${color}` : 'none', outlineOffset: 2,
+        transition: 'box-shadow .15s',
+      }}
+      onMouseEnter={e => onClick && (e.currentTarget.style.boxShadow = `0 0 0 2px ${color}44`)}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+        <span style={{ fontSize: 15 }}>{icon}</span>{label}
       </div>
-      <div style={{ padding: '20px 24px' }}>
-        {/* Big numbers row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, marginBottom: 24 }}>
-          {[
-            {
-              label: 'Total Case Value', value: fmtBr(projected),
-              sub: `${(kpi?.totalCases || 0)} cases, incl. in-progress`,
-              color: 'var(--blue)', bg: '#EEF2FF', icon: '📊',
-              onClick: () => onDrill('totalCases'),
-            },
-            {
-              label: 'Payments Received', value: fmtBr(received),
-              sub: `${kpi?.deliveredCases || 0} verified payments`,
-              color: 'var(--green)', bg: 'var(--green-dim)', icon: '✅',
-              onClick: () => onDrill('paymentsReceived'),
-            },
-            {
-              label: 'Outstanding / Not Received', value: fmtBr(Math.max(0, outstanding)),
-              sub: `${kpi?.outstandingCount || 0} cases pending payment`,
-              color: outstanding > 0 ? 'var(--red)' : 'var(--green)',
-              bg: outstanding > 0 ? '#FFF1F2' : 'var(--green-dim)', icon: outstanding > 0 ? '⏳' : '✅',
-              onClick: () => onDrill('outstanding'),
-            },
-          ].map(item => (
-            <div key={item.label}
-              onClick={item.onClick}
-              style={{
-                background: item.bg, borderRadius: 12, padding: '16px 18px', cursor: 'pointer',
-                border: `1px solid ${item.color}22`, transition: 'box-shadow .15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = `0 0 0 2px ${item.color}44`}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-            >
-              <div style={{ fontSize: 22, marginBottom: 6 }}>{item.icon}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: item.color, lineHeight: 1.2 }}>{item.value}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{item.sub}</div>
-              <div style={{ fontSize: 10, color: item.color, marginTop: 6, fontWeight: 600 }}>Click to view cases →</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Collection rate bar */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Collection Rate</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: collectionRate >= 80 ? 'var(--green)' : collectionRate >= 50 ? 'var(--amber)' : 'var(--red)' }}>
-              {collectionRate}%
-            </div>
-          </div>
-          <div style={{ height: 14, borderRadius: 7, background: '#FFF1F2', overflow: 'hidden', position: 'relative' }}>
-            <div style={{
-              height: '100%', width: `${receivedPct}%`,
-              background: 'linear-gradient(90deg, #16A34A, #22C55E)',
-              borderRadius: 7, transition: 'width .6s ease',
-            }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'var(--text-3)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />
-              Received {receivedPct.toFixed(1)}%
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--red)', display: 'inline-block' }} />
-              Outstanding {outstandingPct.toFixed(1)}%
-            </div>
-          </div>
-        </div>
-      </div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.2 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
@@ -316,6 +226,8 @@ const DRILL_MAP = {
 // ── Main component ────────────────────────────────────────
 export default function AdminDashboard() {
   const [selectedClinic, setSelectedClinic] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState(''); // committed on Enter/blur — avoids a request per keystroke
   const thisYear = new Date().getFullYear();
   const [fromDate, setFromDate] = useState(`${thisYear}-01-01`);
   const [toDate, setToDate]     = useState(new Date().toISOString().slice(0, 10));
@@ -338,10 +250,11 @@ export default function AdminDashboard() {
   };
 
   const { data, isLoading: loading, error: queryError } = useQuery({
-    queryKey: ['dashboard', 'analytics', fromDate, toDate, selectedClinic],
+    queryKey: ['dashboard', 'analytics', fromDate, toDate, selectedClinic, search],
     queryFn: () => {
       const params = { from: fromDate, to: toDate };
       if (selectedClinic) params.clinicId = selectedClinic;
+      if (search) params.search = search;
       return api.get('/dashboard/admin-analytics', { params }).then(r => r.data);
     },
     staleTime: 5 * 60_000,
@@ -367,11 +280,12 @@ export default function AdminDashboard() {
       [],
       ['Total Projected Revenue (Br)', kpi?.totalProjectedRevenue ?? 0],
       ['Total Revenue Received (Br)',  kpi?.totalRevenue ?? 0],
-      ['Outstanding (Br)', (kpi?.totalProjectedRevenue || 0) - (kpi?.totalRevenue || 0)],
+      ['Outstanding (Br)', kpi?.outstandingAmount ?? 0],
       ['Total Cases',      kpi?.totalCases ?? 0],
       ['Total Units',      kpi?.totalUnits ?? 0],
       ['Active Cases',     kpi?.activeCases ?? 0],
       ['Delivered Cases',  kpi?.deliveredCases ?? 0],
+      ['Units Delivered',  kpi?.unitsDelivered ?? 0],
       ['Pending Payments', kpi?.pendingPayments ?? 0],
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
@@ -424,6 +338,20 @@ export default function AdminDashboard() {
         <div className="card" style={{ marginBottom: 20, padding: '14px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Filters</span>
+            <div className="search-input" style={{ minWidth: 200, margin: 0 }}>
+              <span className="icon">🔍</span>
+              <input
+                placeholder="Search clinic, patient, case no…"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && setSearch(searchInput)}
+                onBlur={() => setSearch(searchInput)}
+              />
+            </div>
+            {search && (
+              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }}
+                onClick={() => { setSearchInput(''); setSearch(''); }}>✕</button>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>From</label>
               <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setDrillKey(null); }} style={inputStyle} />
@@ -487,52 +415,81 @@ export default function AdminDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-3)', fontSize: 14 }}>Loading analytics…</div>
         ) : (
           <>
-            {/* ── Financial Projections ── */}
-            <FinancialProjections kpi={kpi} fromDate={fromDate} toDate={toDate} onDrill={handleDrill} />
-
-            {/* ── KPI Row 1 — Revenue & Volume ── */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Revenue & Volume</div>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 8 }}>
-              <KpiCard icon="💰" label="Total Revenue" value={ETB(kpi?.totalRevenue)}
-                bg="var(--green-dim)" color="var(--green)" sub="Verified payments"
-                active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')} />
-              <KpiCard icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'}
-                bg="#EEF2FF" color="var(--blue)" sub="In selected range"
+            {/* ── Section 1: Financial Projection ── */}
+            <SectionHeader>Financial Projection</SectionHeader>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+              <ColorTile icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'}
+                sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
-              <KpiCard icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'}
-                bg="var(--accent-dim)" color="var(--accent)" sub="In selected range"
+              <ColorTile icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'}
+                sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
-              <KpiCard icon="⚙️" label="Active Cases" value={kpi?.activeCases ?? '—'}
-                bg="var(--amber-dim)" color="var(--amber)" sub="In production"
-                active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')} />
-              <KpiCard icon="✅" label="Delivered" value={kpi?.deliveredCases ?? '—'}
-                bg="var(--green-dim)" color="var(--green)" sub="Completed"
-                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+              <ColorTile icon="📊" label="Total Case Value" value={fmtBr(kpi?.totalProjectedRevenue)}
+                sub="Incl. in-progress cases" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
             </div>
 
-            {/* ── KPI Row 2 — Operations ── */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 1, margin: '18px 0 10px' }}>Operations</div>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)', marginBottom: 24 }}>
-              <KpiCard icon="🚚" label="Ready Orders" value={kpi?.readyToDispatch ?? '—'}
-                bg="var(--accent-dim)" color="var(--accent)" sub="Ready to Dispatch"
-                active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')} />
-              <KpiCard icon="⏳" label="Outstanding" value={ETB(kpi?.outstandingAmount)}
-                bg="#FFF1F2" color="var(--red)" sub={`${kpi?.outstandingCount ?? 0} unpaid cases`}
+            {/* ── Section 2: Revenue Vs Volume ── */}
+            <SectionHeader>Revenue Vs Volume</SectionHeader>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
+              <ColorTile icon="✅" label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
+                sub="Completed" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+              <ColorTile icon="🦷" label="Total Units Delivered" value={kpi?.unitsDelivered ?? '—'}
+                sub="Completed" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+              <ColorTile icon="💰" label="Verified Payments" value={ETB(kpi?.totalRevenue)}
+                sub="Received" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')} />
+              <ColorTile icon="⏳" label="Outstanding Payment" value={ETB(kpi?.outstandingAmount)}
+                sub={`${kpi?.outstandingCount ?? 0} unpaid cases`} color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')} />
-              <KpiCard icon="🔄" label="Total Remakes" value={kpi?.totalRemakes ?? '—'}
-                bg="var(--amber-dim)" color="var(--amber)" sub="In selected range"
+            </div>
+
+            {/* Collection rate bar */}
+            {(() => {
+              const received    = kpi?.totalRevenue      || 0;
+              const outstanding = kpi?.outstandingAmount  || 0;
+              const billableTotal  = received + outstanding;
+              const collectionRate = billableTotal > 0 ? Math.round((received / billableTotal) * 100) : 0;
+              const receivedPct    = billableTotal > 0 ? (received / billableTotal) * 100 : 0;
+              const outstandingPct = billableTotal > 0 ? (outstanding / billableTotal) * 100 : 0;
+              return (
+                <div className="card" style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(90deg, #F0A500, #F59E0B)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Collection Rate</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{collectionRate}%</div>
+                  </div>
+                  <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.35)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${receivedPct}%`, background: '#fff', borderRadius: 6, transition: 'width .6s ease' }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                    <span>Received {receivedPct.toFixed(1)}%</span>
+                    <span>Outstanding {outstandingPct.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── Section 3: Operation ── */}
+            <SectionHeader>Operation</SectionHeader>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 24 }}>
+              <ColorTile icon="⚙️" label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
+                sub="In production" color="var(--amber)" bg="var(--amber-dim)"
+                active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')} />
+              <ColorTile icon="🚚" label="Ready for Delivery & Dispatch" value={kpi?.readyToDispatch ?? '—'}
+                sub="Ready to dispatch" color="var(--amber)" bg="var(--amber-dim)"
+                active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')} />
+              <ColorTile icon="🔄" label="Total Remake" value={kpi?.totalRemakes ?? '—'}
+                sub={kpi?.mostCommonRemakeReason ? `Top reason: ${kpi.mostCommonRemakeReason}` : 'In selected range'}
+                color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')} />
-              <KpiCard icon="🏷️" label="Top Remake Reason"
-                value={kpi?.mostCommonRemakeReason ?? '—'}
-                bg="#F5F3FF" color="#6D28D9" sub="Most common" />
-              <KpiCard icon="⏱️" label="Avg Turnaround"
+              <ColorTile icon="⏱️" label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
-                bg="#EFF6FF" color="var(--blue)" sub="Days to delivery" />
-              <KpiCard icon="🎯" label="On-Time Delivery"
+                sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF" />
+              <ColorTile icon="🎯" label="% On Time Delivery"
                 value={kpi?.onTimeDeliveryPct != null ? `${kpi.onTimeDeliveryPct}%` : '—'}
-                bg={kpi?.onTimeDeliveryPct >= 80 ? 'var(--green-dim)' : 'var(--amber-dim)'}
-                color={kpi?.onTimeDeliveryPct >= 80 ? 'var(--green)' : 'var(--amber)'}
-                sub="Within due date" />
+                sub="Within due date" color="var(--blue)" bg="#EEF2FF" />
             </div>
 
             {/* ── Drill-down panel ── */}
