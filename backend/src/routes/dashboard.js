@@ -343,11 +343,12 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         },
         select: { amount: true, amountReceived: true },
       }).then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
-      // Total projected revenue = sum of ALL payment amounts (regardless of status) in range
+      // Total Case Value — delivered cases only. Excludes in-progress cases, whose
+      // pricing/units can still change before delivery and aren't final revenue yet.
       prisma.payment.aggregate({
         where: {
           amount: { not: null },
-          case: { createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+          case: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
         },
         _sum: { amount: true },
       }),
