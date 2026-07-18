@@ -13,6 +13,11 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
+import {
+  MdLocalHospital, MdWarning, MdDelete, MdPaid, MdAccountBalance, MdEdit,
+  MdBolt, MdFileDownload, MdSearch, MdAssignment, MdVisibility, MdCheckCircle,
+  MdPendingActions, MdClose,
+} from 'react-icons/md';
 
 const PAGE_SIZE = 20;
 
@@ -56,7 +61,7 @@ function CaseInfoCard({ caseData, accent }) {
         {caseData.caseNumber}
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <span>🏥 {caseData.clinic?.name}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdLocalHospital size={13} /> {caseData.clinic?.name}</span>
         <span>{caseData.workType}{caseData.units != null ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}</span>
         {caseData.totalAmount && (
           <span style={{ fontWeight: 600 }}>Br {caseData.totalAmount.toLocaleString('en-US')}</span>
@@ -76,7 +81,7 @@ function DeleteConfirmModal({ caseData, onConfirm, onClose, deleting }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-header">
-          <div className="modal-title" style={{ color: 'var(--red)' }}>⚠️ Delete Case</div>
+          <div className="modal-title" style={{ color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}><MdWarning className="mi" size={16} /> Delete Case</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
@@ -99,7 +104,7 @@ function DeleteConfirmModal({ caseData, onConfirm, onClose, deleting }) {
                 cursor: deleting ? 'not-allowed' : 'pointer',
               }}
             >
-              {deleting ? 'Deleting…' : '🗑️ Delete Permanently'}
+              {deleting ? 'Deleting…' : <><MdDelete size={15} /> Delete Permanently</>}
             </button>
           </div>
         </div>
@@ -126,7 +131,7 @@ function CollectPaymentModal({ caseData, onDone, onClose }) {
         notes:  notes  || undefined,
         taxWithheld: withholdTax && taxWithheld ? parseFloat(taxWithheld) : undefined,
       });
-      toast.success(`✅ Payment collected for ${caseData.caseNumber}`);
+      toast.success(`Payment collected for ${caseData.caseNumber}`);
       onDone();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record payment');
@@ -140,7 +145,7 @@ function CollectPaymentModal({ caseData, onDone, onClose }) {
       <div className="modal" style={{ maxWidth: 460 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">💰 Collect Payment</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdPaid className="mi" size={16} /> Collect Payment</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
               Mark as manually collected — no screenshot required
             </div>
@@ -172,7 +177,7 @@ function CollectPaymentModal({ caseData, onDone, onClose }) {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
               <input type="checkbox" checked={withholdTax} onChange={e => setWithholdTax(e.target.checked)} />
-              🏛️ Clinic withheld tax for government filing
+              <MdAccountBalance className="mi" size={14} /> Clinic withheld tax for government filing
             </label>
             {withholdTax && (
               <div style={{ marginTop: 8 }}>
@@ -240,7 +245,7 @@ const OVERRIDE_OPTIONS = [
     desc:  'Force-mark as paid regardless of screenshot status',
     color: '#16A34A',
     bg:    'rgba(22,163,74,0.08)',
-    icon:  '✅',
+    icon:  MdCheckCircle,
   },
   {
     value: 'PENDING',
@@ -248,7 +253,7 @@ const OVERRIDE_OPTIONS = [
     desc:  'Clear any screenshot / approval and reset to awaiting payment',
     color: '#D97706',
     bg:    'rgba(217,119,6,0.08)',
-    icon:  '⏳',
+    icon:  MdPendingActions,
   },
   {
     value: 'REJECTED',
@@ -256,7 +261,7 @@ const OVERRIDE_OPTIONS = [
     desc:  'Mark payment as rejected (clinic must re-submit)',
     color: '#E53E3E',
     bg:    'rgba(229,62,62,0.08)',
-    icon:  '✗',
+    icon:  MdClose,
   },
 ];
 
@@ -335,7 +340,7 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       background: active ? opt.color : 'var(--border)',
                       color: '#fff', fontSize: 13, fontWeight: 700,
-                    }}>{opt.icon}</span>
+                    }}><opt.icon size={14} /></span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: active ? opt.color : 'var(--text-1)' }}>
                         {opt.label}
@@ -411,7 +416,7 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
                 transition: 'background .15s',
               }}
             >
-              {saving ? 'Applying…' : `${selected.icon} Apply Override`}
+              {saving ? 'Applying…' : <><selected.icon size={15} /> Apply Override</>}
             </button>
           </div>
         </div>
@@ -511,7 +516,7 @@ function EditCaseModal({ caseData, clinicList, onDone, onClose }) {
       <div className="modal" style={{ maxWidth: 640 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">✏️ Edit Case Details</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdEdit className="mi" size={16} /> Edit Case Details</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{caseData.caseNumber} · {caseData.clinic?.name}</div>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -797,7 +802,7 @@ export default function AdminCases() {
               transition: 'background .15s',
             }}
           >
-            {exporting ? '⏳ Exporting…' : '⬇️ Export Excel'}
+            {exporting ? <><MdPendingActions size={14} /> Exporting…</> : <><MdFileDownload size={14} /> Export Excel</>}
           </button>
         </div>
       </div>
@@ -806,7 +811,7 @@ export default function AdminCases() {
         {/* Search + clinic selector */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
-            <span className="icon">🔍</span>
+            <span className="icon mi"><MdSearch size={16} /></span>
             <input
               placeholder="Search by clinic, patient name or case number…"
               value={search}
@@ -858,7 +863,7 @@ export default function AdminCases() {
               <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading cases…</div>
             ) : cases.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
+                <div className="empty-icon mi"><MdAssignment size={32} /></div>
                 <div className="empty-title">No cases match your filters</div>
                 <p>Try adjusting the search or filter criteria</p>
               </div>
@@ -942,7 +947,7 @@ export default function AdminCases() {
 
                           {/* View */}
                           <button className="btn btn-ghost btn-sm" onClick={() => setViewCase(c)}>
-                            👁 View
+                            <MdVisibility className="mi" size={14} /> View
                           </button>
 
                           {/* Edit — admin-only detail editor */}
@@ -956,7 +961,7 @@ export default function AdminCases() {
                               fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                             }}
                           >
-                            ✏️ Edit
+                            <MdEdit size={13} /> Edit
                           </button>
 
                           {/* Collect — dispatched/delivered & unpaid */}
@@ -971,7 +976,7 @@ export default function AdminCases() {
                                 fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                               }}
                             >
-                              💰 Collect
+                              <MdPaid size={13} /> Collect
                             </button>
                           )}
 
@@ -986,7 +991,7 @@ export default function AdminCases() {
                               fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                             }}
                           >
-                            ⚡ Override
+                            <MdBolt size={13} /> Override
                           </button>
 
                           {/* Delete */}
@@ -1000,7 +1005,7 @@ export default function AdminCases() {
                               fontSize: 12, fontWeight: 700, cursor: 'pointer',
                             }}
                           >
-                            🗑️ Delete
+                            <MdDelete size={13} /> Delete
                           </button>
 
                         </div>

@@ -14,6 +14,12 @@ import { printCaseLabel } from '../utils/printLabel';
 import api from '../api';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
+import {
+  MdAssignment, MdMoveToInbox, MdScience, MdContentCut, MdBiotech,
+  MdComputer, MdSettings, MdPrint, MdBuild, MdPalette, MdAccountBalance,
+  MdDiamond, MdAutoAwesome, MdLocalFireDepartment, MdSearch, MdInventory2,
+  MdPrecisionManufacturing, MdVisibility,
+} from 'react-icons/md';
 
 const PAGE_SIZE = 25;
 
@@ -22,28 +28,28 @@ const PAGE_SIZE = 25;
 // scan screen (scan.js DEPARTMENTS) so the label here means the same thing
 // there.
 const STATUS_FILTERS = [
-  { label: 'All',              value: '',                            icon: '📋' },
-  { label: 'Accepted',         value: 'CASE_ACCEPTED',               icon: '📥' },
-  { label: 'Plaster',          value: 'PLASTER_DEPARTMENT',          icon: '🏺' },
-  { label: 'Margin',           value: 'MARGIN_DEPARTMENT',           icon: '✂️' },
-  { label: 'Scanning',         value: 'SCANNING',                    icon: '🔬' },
-  { label: 'Designing',        value: 'DESIGNING',                   icon: '🖥️' },
-  { label: 'Milling/Sintering',value: 'MILLING_SINTERING',           icon: '⚙️' },
-  { label: 'Resin 3D Print',   value: 'RESIN_3D_PRINTING',           icon: '🖨️' },
-  { label: 'Metal 3D Print',   value: 'METAL_3D_PRINTING',           icon: '🔩' },
-  { label: 'Metal Finishing',  value: 'METAL_FINISHING',             icon: '🔨' },
-  { label: 'Opaque',           value: 'OPAQUE_APPLICATION',          icon: '🎨' },
-  { label: 'Ceramic',          value: 'CERAMIC_LAYERING',            icon: '🏛️' },
-  { label: 'Zirconia Fitting', value: 'ZIRCONIA_FITTING_FINISHING',  icon: '💎' },
-  { label: 'Glazing',          value: 'GLAZING',                     icon: '✨' },
-  { label: 'Thermo Press',     value: 'THERMO_PRESS',                icon: '🔥' },
-  { label: 'Trimming',         value: 'TRIMMING',                    icon: '✂️' },
-  { label: 'Quality Check',    value: 'QUALITY_CHECK',               icon: '🔍' },
-  { label: 'Ready to Dispatch',value: 'READY_TO_DISPATCH',           icon: '📦' },
+  { label: 'All',              value: '',                            icon: MdAssignment },
+  { label: 'Accepted',         value: 'CASE_ACCEPTED',               icon: MdMoveToInbox },
+  { label: 'Plaster',          value: 'PLASTER_DEPARTMENT',          icon: MdScience },
+  { label: 'Margin',           value: 'MARGIN_DEPARTMENT',           icon: MdContentCut },
+  { label: 'Scanning',         value: 'SCANNING',                    icon: MdBiotech },
+  { label: 'Designing',        value: 'DESIGNING',                   icon: MdComputer },
+  { label: 'Milling/Sintering',value: 'MILLING_SINTERING',           icon: MdSettings },
+  { label: 'Resin 3D Print',   value: 'RESIN_3D_PRINTING',           icon: MdPrint },
+  { label: 'Metal 3D Print',   value: 'METAL_3D_PRINTING',           icon: MdBuild },
+  { label: 'Metal Finishing',  value: 'METAL_FINISHING',             icon: MdBuild },
+  { label: 'Opaque',           value: 'OPAQUE_APPLICATION',          icon: MdPalette },
+  { label: 'Ceramic',          value: 'CERAMIC_LAYERING',            icon: MdAccountBalance },
+  { label: 'Zirconia Fitting', value: 'ZIRCONIA_FITTING_FINISHING',  icon: MdDiamond },
+  { label: 'Glazing',          value: 'GLAZING',                     icon: MdAutoAwesome },
+  { label: 'Thermo Press',     value: 'THERMO_PRESS',                icon: MdLocalFireDepartment },
+  { label: 'Trimming',         value: 'TRIMMING',                    icon: MdContentCut },
+  { label: 'Quality Check',    value: 'QUALITY_CHECK',               icon: MdSearch },
+  { label: 'Ready to Dispatch',value: 'READY_TO_DISPATCH',           icon: MdInventory2 },
 ];
 
 // ── Clickable department card ─────────────────────────────
-function DeptCard({ icon, label, count, active, onClick }) {
+function DeptCard({ icon: Icon, label, count, active, onClick }) {
   return (
     <div
       onClick={onClick}
@@ -59,7 +65,7 @@ function DeptCard({ icon, label, count, active, onClick }) {
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 20 }}>{icon}</span>
+        <span style={{ fontSize: 20, display: 'flex' }}>{Icon && <Icon size={20} />}</span>
         <span style={{ fontSize: 22, fontWeight: 800, color: active ? '#fff' : 'var(--text-1)' }}>{count}</span>
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: active ? 'rgba(255,255,255,0.9)' : 'var(--text-2)' }}>
@@ -137,7 +143,7 @@ export default function AdminCaseStatusBoard() {
   return (
     <AdminLayout>
       <div className="topbar">
-        <div className="topbar-title">🏭 Case Status Board</div>
+        <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}><MdPrecisionManufacturing className="mi" size={18} /> Case Status Board</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{pagination.total ?? 0} matching cases</div>
           <ExportMenu
@@ -163,7 +169,7 @@ export default function AdminCaseStatusBoard() {
         {/* Search + date range + clinic */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
-            <span className="icon">🔍</span>
+            <span className="icon mi"><MdSearch size={16} /></span>
             <input
               placeholder="Search by clinic, patient name or case number…"
               value={search}
@@ -227,7 +233,7 @@ export default function AdminCaseStatusBoard() {
               <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading cases…</div>
             ) : cases.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
+                <div className="empty-icon mi"><MdAssignment size={32} /></div>
                 <div className="empty-title">No cases match your filters</div>
                 <p>Try adjusting the search, date range, or department filter</p>
               </div>
@@ -272,14 +278,14 @@ export default function AdminCaseStatusBoard() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setViewCase(c)}>👁 View</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setViewCase(c)}><MdVisibility className="mi" size={14} /> View</button>
                           <button
                             className="btn btn-ghost btn-sm"
                             disabled={!c.qrCodeUrl}
                             title={c.qrCodeUrl ? 'Print production label' : 'No QR code on this case yet'}
                             onClick={() => printCaseLabel(c)}
                           >
-                            🖨️
+                            <MdPrint className="mi" size={14} />
                           </button>
                         </div>
                       </td>
