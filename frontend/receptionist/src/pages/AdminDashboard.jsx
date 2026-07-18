@@ -11,6 +11,13 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from 'recharts';
+import {
+  MdAssignment, MdSettings, MdCheckCircle, MdCreditCard, MdLocalShipping,
+  MdPaid, MdPendingActions, MdAutorenew, MdInventory2, MdBarChart,
+  MdSchedule, MdTrackChanges, MdSearch, MdFileDownload, MdCancel,
+  MdErrorOutline, MdScience, MdHandshake, MdClose, MdCheck, MdChevronLeft,
+  MdChevronRight,
+} from 'react-icons/md';
 
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
 const fmtBr = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -82,11 +89,13 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
   const cases = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
 
+  const DrillIcon = drill.icon;
+
   return (
-    <div className="card" style={{ marginBottom: 24, border: '2px solid var(--blue)', borderRadius: 12 }}>
+    <div className="glass-card" style={{ marginBottom: 24, border: '2px solid var(--blue)', borderRadius: 12 }}>
       <div className="card-header" style={{ background: 'var(--blue)', color: '#fff', borderRadius: '10px 10px 0 0', padding: '14px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 20 }}>{drill.icon}</span>
+          <DrillIcon className="mi" size={22} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{drill.label}</div>
             {pagination.total != null && (
@@ -96,12 +105,12 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="btn btn-ghost btn-sm" onClick={exportAll} disabled={exporting}
-            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
-            {exporting ? 'Exporting…' : '⬇ Export All (Excel)'}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none' }}>
+            <MdFileDownload className="mi" size={16} /> {exporting ? 'Exporting…' : 'Export All (Excel)'}
           </button>
           <button onClick={onClose}
             style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            ×
+            <MdClose className="mi" size={18} />
           </button>
         </div>
       </div>
@@ -109,7 +118,7 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
       {/* Search */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
         <div className="search-input" style={{ maxWidth: 340, margin: 0 }}>
-          <span className="icon">🔍</span>
+          <span className="icon mi"><MdSearch size={16} /></span>
           <input
             placeholder="Search clinic, patient, case no…"
             value={search}
@@ -123,7 +132,7 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading cases…</div>
         ) : cases.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🔍</div>
+            <div className="empty-icon mi" style={{ margin: '0 auto 12px' }}><MdSearch size={32} /></div>
             <div className="empty-title">No cases found</div>
           </div>
         ) : (
@@ -174,8 +183,8 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid var(--border)', fontSize: 13 }}>
           <span style={{ color: 'var(--text-3)' }}>Page {page} of {pagination.totalPages}</span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1}>← Prev</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next →</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1} style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MdChevronLeft className="mi" size={16} /> Prev</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>Next <MdChevronRight className="mi" size={16} /></button>
           </div>
         </div>
       )}
@@ -190,20 +199,24 @@ function SectionHeader({ children }) {
 }
 
 // ── Colored KPI tile (mockup uses flat green/red/yellow/blue blocks) ─────
-function ColorTile({ icon, label, value, sub, color, bg, onClick, active }) {
+// Glassmorphic: keeps the semantic tint (bg) but frosts it with a blur +
+// soft inset highlight, rather than flattening every card to neutral white.
+function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active }) {
   return (
     <div
       onClick={onClick}
       style={{
-        background: bg, borderRadius: 10, padding: '14px 16px', cursor: onClick ? 'pointer' : 'default',
+        background: bg, borderRadius: 12, padding: '14px 16px', cursor: onClick ? 'pointer' : 'default',
         border: `1px solid ${color}33`, outline: active ? `2px solid ${color}` : 'none', outlineOffset: 2,
-        transition: 'box-shadow .15s',
+        WebkitBackdropFilter: 'blur(12px) saturate(160%)', backdropFilter: 'blur(12px) saturate(160%)',
+        boxShadow: active ? `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)` : 'inset 0 1px 0 rgba(255,255,255,.5)',
+        transition: 'box-shadow .15s, transform .15s',
       }}
-      onMouseEnter={e => onClick && (e.currentTarget.style.boxShadow = `0 0 0 2px ${color}44`)}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+      onMouseEnter={e => { if (onClick) { e.currentTarget.style.boxShadow = `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)`; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = active ? `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)` : 'inset 0 1px 0 rgba(255,255,255,.5)'; e.currentTarget.style.transform = 'translateY(0)'; }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-        <span style={{ fontSize: 15 }}>{icon}</span>{label}
+        <Icon className="mi" size={16} />{label}
       </div>
       <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{sub}</div>}
@@ -213,14 +226,14 @@ function ColorTile({ icon, label, value, sub, color, bg, onClick, active }) {
 
 // ── Drill-down definitions ────────────────────────────────
 const DRILL_MAP = {
-  totalCases:       { key: 'totalCases',       icon: '📋', label: 'All Cases',                   params: {} },
-  activeCases:      { key: 'activeCases',       icon: '⚙️', label: 'Active Cases (In Production)', params: { status: PRODUCTION_STATUSES } },
-  deliveredCases:   { key: 'deliveredCases',    icon: '✅', label: 'Delivered Cases',              params: { status: 'DELIVERED' } },
-  pendingPayments:  { key: 'pendingPayments',   icon: '💳', label: 'Pending Payment Approvals',   params: { paymentStatus: 'SCREENSHOT_UPLOADED' } },
-  readyToDispatch:  { key: 'readyToDispatch',   icon: '🚚', label: 'Ready to Dispatch',           params: { status: 'READY_TO_DISPATCH' } },
-  paymentsReceived: { key: 'paymentsReceived',  icon: '💰', label: 'Payments Received (Verified)', params: { paymentStatus: 'VERIFIED' } },
-  outstanding:      { key: 'outstanding',       icon: '⏳', label: 'Outstanding — Not Received',  params: { paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED' } },
-  totalRemakes:     { key: 'totalRemakes',      icon: '🔄', label: 'Remake Cases',               params: { remake: 'true' } },
+  totalCases:       { key: 'totalCases',       icon: MdAssignment,     label: 'All Cases',                   params: {} },
+  activeCases:      { key: 'activeCases',       icon: MdSettings,       label: 'Active Cases (In Production)', params: { status: PRODUCTION_STATUSES } },
+  deliveredCases:   { key: 'deliveredCases',    icon: MdCheckCircle,    label: 'Delivered Cases',              params: { status: 'DELIVERED' } },
+  pendingPayments:  { key: 'pendingPayments',   icon: MdCreditCard,     label: 'Pending Payment Approvals',   params: { paymentStatus: 'SCREENSHOT_UPLOADED' } },
+  readyToDispatch:  { key: 'readyToDispatch',   icon: MdLocalShipping,  label: 'Ready to Dispatch',           params: { status: 'READY_TO_DISPATCH' } },
+  paymentsReceived: { key: 'paymentsReceived',  icon: MdPaid,           label: 'Payments Received (Verified)', params: { paymentStatus: 'VERIFIED' } },
+  outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED' } },
+  totalRemakes:     { key: 'totalRemakes',      icon: MdAutorenew,      label: 'Remake Cases',               params: { remake: 'true' } },
 };
 
 // ── Main component ────────────────────────────────────────
@@ -303,17 +316,17 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout>
-      <div className="topbar">
+      <div className="topbar glass-topbar">
         <div className="topbar-title">Analytics Dashboard</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={exportToExcel} disabled={loading || !data}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: loading || !data ? 'var(--border)' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: loading || !data ? 'not-allowed' : 'pointer' }}>
-            <span>📊</span> Export Excel
+            <MdBarChart className="mi" size={16} /> Export Excel
           </button>
           <button onClick={runWorkflowTest} disabled={testRunning}
             title="Run end-to-end workflow test through all lab stages"
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: testRunning ? 'var(--border)' : '#0F2044', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: testRunning ? 'not-allowed' : 'pointer' }}>
-            {testRunning ? '⏳ Testing…' : '🧪 Run Test'}
+            {testRunning ? <><MdPendingActions className="mi" size={16} /> Testing…</> : <><MdScience className="mi" size={16} /> Run Test</>}
           </button>
           <ExportMenu
             data={revenueByClinic || []}
@@ -335,11 +348,11 @@ export default function AdminDashboard() {
 
       <div className="content">
         {/* Filters */}
-        <div className="card" style={{ marginBottom: 20, padding: '14px 20px' }}>
+        <div className="glass-card" style={{ marginBottom: 20, padding: '14px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Filters</span>
             <div className="search-input" style={{ minWidth: 200, margin: 0 }}>
-              <span className="icon">🔍</span>
+              <span className="icon mi"><MdSearch size={16} /></span>
               <input
                 placeholder="Search clinic, patient, case no…"
                 value={searchInput}
@@ -349,8 +362,8 @@ export default function AdminDashboard() {
               />
             </div>
             {search && (
-              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }}
-                onClick={() => { setSearchInput(''); setSearch(''); }}>✕</button>
+              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', display: 'flex', alignItems: 'center' }}
+                onClick={() => { setSearchInput(''); setSearch(''); }}><MdClose className="mi" size={14} /></button>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>From</label>
@@ -382,34 +395,45 @@ export default function AdminDashboard() {
         </div>
 
         {error && (
-          <div style={{ background: '#3d1a1a', borderRadius: 10, padding: '12px 16px', marginBottom: 20, border: '1px solid rgba(229,62,62,.3)', color: '#ef9a9a', fontSize: 13 }}>⚠️ {error}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#3d1a1a', borderRadius: 10, padding: '12px 16px', marginBottom: 20, border: '1px solid rgba(229,62,62,.3)', color: '#ef9a9a', fontSize: 13 }}>
+            <MdErrorOutline className="mi" size={16} /> {error}
+          </div>
         )}
 
         {/* ── Workflow Test Results ── */}
-        {testResult && (
-          <div style={{ marginBottom: 20, borderRadius: 12, overflow: 'hidden', border: `2px solid ${testResult.result?.startsWith('✅') ? '#16A34A' : '#DC2626'}` }}>
-            <div style={{ background: testResult.result?.startsWith('✅') ? '#16A34A' : '#DC2626', color: '#fff', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 15 }}>{testResult.result}</div>
-                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{testResult.summary}</div>
-              </div>
-              <button onClick={() => setTestResult(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', fontSize: 15 }}>×</button>
-            </div>
-            <div style={{ background: '#F9FAFB', padding: '12px 18px' }}>
-              {testResult.steps?.map((s, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '5px 0', borderBottom: '1px solid #E5E7EB' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: s.status === 'PASS' ? '#16A34A' : '#DC2626', minWidth: 14 }}>
-                    {s.status === 'PASS' ? '✓' : '✕'}
-                  </span>
+        {testResult && (() => {
+          const passed = testResult.result?.startsWith('✅');
+          const resultText = testResult.result?.replace(/^[✅❌]\s*/, '');
+          return (
+            <div style={{ marginBottom: 20, borderRadius: 12, overflow: 'hidden', border: `2px solid ${passed ? '#16A34A' : '#DC2626'}` }}>
+              <div style={{ background: passed ? '#16A34A' : '#DC2626', color: '#fff', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {passed ? <MdCheckCircle className="mi" size={22} /> : <MdCancel className="mi" size={22} />}
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2937' }}>{s.step}</div>
-                    {s.detail && <div style={{ fontSize: 12, color: s.status === 'PASS' ? '#6B7280' : '#DC2626', marginTop: 2 }}>{s.detail}</div>}
+                    <div style={{ fontWeight: 800, fontSize: 15 }}>{resultText}</div>
+                    <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{testResult.summary}</div>
                   </div>
                 </div>
-              ))}
+                <button onClick={() => setTestResult(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <MdClose className="mi" size={16} />
+                </button>
+              </div>
+              <div style={{ background: '#F9FAFB', padding: '12px 18px' }}>
+                {testResult.steps?.map((s, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '5px 0', borderBottom: '1px solid #E5E7EB' }}>
+                    <span className="mi" style={{ color: s.status === 'PASS' ? '#16A34A' : '#DC2626', minWidth: 16 }}>
+                      {s.status === 'PASS' ? <MdCheck size={16} /> : <MdClose size={16} />}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2937' }}>{s.step}</div>
+                      {s.detail && <div style={{ fontSize: 12, color: s.status === 'PASS' ? '#6B7280' : '#DC2626', marginTop: 2 }}>{s.detail}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: 'var(--text-3)', fontSize: 14 }}>Loading analytics…</div>
@@ -418,13 +442,13 @@ export default function AdminDashboard() {
             {/* ── Section 1: Financial Projection ── */}
             <SectionHeader>Financial Projection</SectionHeader>
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
-              <ColorTile icon="📋" label="Total Cases" value={kpi?.totalCases ?? '—'}
+              <ColorTile icon={MdAssignment} label="Total Cases" value={kpi?.totalCases ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
-              <ColorTile icon="🦷" label="Total Units" value={kpi?.totalUnits ?? '—'}
+              <ColorTile icon={MdInventory2} label="Total Units" value={kpi?.totalUnits ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
-              <ColorTile icon="📊" label="Total Case Value" value={fmtBr(kpi?.totalProjectedRevenue)}
+              <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.totalProjectedRevenue)}
                 sub="Delivered cases only" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
             </div>
@@ -432,16 +456,16 @@ export default function AdminDashboard() {
             {/* ── Section 2: Revenue Vs Volume ── */}
             <SectionHeader>Revenue Vs Volume</SectionHeader>
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
-              <ColorTile icon="✅" label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
+              <ColorTile icon={MdCheckCircle} label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
-              <ColorTile icon="🦷" label="Total Units Delivered" value={kpi?.unitsDelivered ?? '—'}
+              <ColorTile icon={MdInventory2} label="Total Units Delivered" value={kpi?.unitsDelivered ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
-              <ColorTile icon="💰" label="Verified Payments" value={ETB(kpi?.totalRevenue)}
+              <ColorTile icon={MdPaid} label="Verified Payments" value={ETB(kpi?.totalRevenue)}
                 sub="Received" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')} />
-              <ColorTile icon="⏳" label="Outstanding Payment" value={ETB(kpi?.outstandingAmount)}
+              <ColorTile icon={MdPendingActions} label="Outstanding Payment" value={ETB(kpi?.outstandingAmount)}
                 sub={`${kpi?.outstandingCount ?? 0} unpaid cases`} color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')} />
             </div>
@@ -455,7 +479,7 @@ export default function AdminDashboard() {
               const receivedPct    = billableTotal > 0 ? (received / billableTotal) * 100 : 0;
               const outstandingPct = billableTotal > 0 ? (outstanding / billableTotal) * 100 : 0;
               return (
-                <div className="card" style={{ marginBottom: 24, padding: '16px 20px', background: 'linear-gradient(90deg, #F0A500, #F59E0B)' }}>
+                <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: 'var(--radius-lg)', background: 'linear-gradient(90deg, #F0A500, #F59E0B)', border: '1px solid rgba(255,255,255,.35)', boxShadow: '0 8px 28px rgba(217,119,6,.25), inset 0 1px 0 rgba(255,255,255,.4)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Collection Rate</div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{collectionRate}%</div>
@@ -474,20 +498,20 @@ export default function AdminDashboard() {
             {/* ── Section 3: Operation ── */}
             <SectionHeader>Operation</SectionHeader>
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 24 }}>
-              <ColorTile icon="⚙️" label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
+              <ColorTile icon={MdSettings} label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
                 sub="In production" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')} />
-              <ColorTile icon="🚚" label="Ready for Delivery & Dispatch" value={kpi?.readyToDispatch ?? '—'}
+              <ColorTile icon={MdLocalShipping} label="Ready for Delivery & Dispatch" value={kpi?.readyToDispatch ?? '—'}
                 sub="Ready to dispatch" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')} />
-              <ColorTile icon="🔄" label="Total Remake" value={kpi?.totalRemakes ?? '—'}
+              <ColorTile icon={MdAutorenew} label="Total Remake" value={kpi?.totalRemakes ?? '—'}
                 sub={kpi?.mostCommonRemakeReason ? `Top reason: ${kpi.mostCommonRemakeReason}` : 'In selected range'}
                 color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')} />
-              <ColorTile icon="⏱️" label="Turn Around Time"
+              <ColorTile icon={MdSchedule} label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
                 sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF" />
-              <ColorTile icon="🎯" label="% On Time Delivery"
+              <ColorTile icon={MdTrackChanges} label="% On Time Delivery"
                 value={kpi?.onTimeDeliveryPct != null ? `${kpi.onTimeDeliveryPct}%` : '—'}
                 sub="Within due date" color="var(--blue)" bg="#EEF2FF" />
             </div>
@@ -506,7 +530,7 @@ export default function AdminDashboard() {
             )}
 
             {/* ── Charts ── */}
-            <div className="card" style={{ marginBottom: 20 }}>
+            <div className="glass-card" style={{ marginBottom: 20 }}>
               <div className="card-header">
                 <div className="card-title">Monthly Revenue Trend{monthlyTrend?.length ? ` (${monthlyTrend.length} month${monthlyTrend.length > 1 ? 's' : ''})` : ''}</div>
               </div>
@@ -523,7 +547,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="card" style={{ marginBottom: 20 }}>
+            <div className="glass-card" style={{ marginBottom: 20 }}>
               <div className="card-header"><div className="card-title">Cases Processed per Month</div></div>
               <div style={{ padding: '20px 20px 12px' }}>
                 <ResponsiveContainer width="100%" height={200}>
@@ -540,7 +564,7 @@ export default function AdminDashboard() {
 
             {/* Revenue by Work Type */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-              <div className="card">
+              <div className="glass-card">
                 <div className="card-header"><div className="card-title">Revenue by Product Category</div></div>
                 <div style={{ padding: '20px 20px 12px' }}>
                   {revenueByWorkType?.length === 0 ? (
@@ -560,7 +584,7 @@ export default function AdminDashboard() {
                   )}
                 </div>
               </div>
-              <div className="card">
+              <div className="glass-card">
                 <div className="card-header"><div className="card-title">Cases by Product Category</div></div>
                 <div style={{ padding: '12px 20px 20px' }}>
                   {revenueByWorkType?.length === 0 ? (
@@ -582,7 +606,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Product Category Table */}
-            <div className="card" style={{ marginBottom: 20 }}>
+            <div className="glass-card" style={{ marginBottom: 20 }}>
               <div className="card-header"><div className="card-title">Product Category Breakdown</div></div>
               <div className="table-wrap">
                 <table>
@@ -630,7 +654,7 @@ export default function AdminDashboard() {
             {!selectedClinic && (() => {
               const maxRevenue = Math.max(...(revenueByClinic || []).map(c => c.revenue || 0), 1);
               return (
-                <div className="card">
+                <div className="glass-card">
                   <div className="card-header"><div className="card-title">Clinic Performance</div></div>
                   <div className="table-wrap">
                     <table>
@@ -723,9 +747,9 @@ function TrustedPartnersSummary() {
   if (!summary.length) return null;
 
   return (
-    <div className="card" style={{ marginTop: 20 }}>
+    <div className="glass-card" style={{ marginTop: 20 }}>
       <div className="card-header">
-        <div className="card-title">🤝 Trusted Partners Summary</div>
+        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdHandshake className="mi" size={16} /> Trusted Partners Summary</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{summary.length} partners</span>
           <ExportMenu
@@ -772,7 +796,7 @@ function TrustedPartnersSummary() {
                         <div style={{ fontWeight: 700 }}>{c.name}</div>
                         {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
                       </div>
-                      <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}>🤝 Trusted</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}><MdHandshake size={11} /> Trusted</span>
                     </div>
                   </td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{n(c.totalOrders)}</td>
