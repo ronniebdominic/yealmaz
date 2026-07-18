@@ -18,9 +18,26 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#root{height:100%}
-body{background:var(--bg);color:var(--text-1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text-1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
+/* Soft gradient-blob backdrop, fixed behind everything, so the glass blur
+   throughout the app has something to reveal. CSS-only (body::before) so
+   every page gets it automatically — no per-page markup needed. */
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(26,86,160,.16), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(0,196,180,.14), transparent 40%),
+    radial-gradient(circle at 30% 92%, rgba(240,165,0,.10), transparent 42%),
+    radial-gradient(circle at 82% 85%, rgba(124,58,237,.10), transparent 42%),
+    var(--bg);
+}
 .app{display:flex;height:100vh;overflow:hidden}
-.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--navy);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);display:flex;flex-direction:column;overflow-y:auto;
+  background:var(--glass-sidebar-bg);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  border-right:1px solid var(--glass-sidebar-border);
+}
 .sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 .sidebar-logo .tooth{font-size:24px;margin-bottom:4px}
 .sidebar-logo .lab-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:.02em}
@@ -39,16 +56,29 @@ body{background:var(--bg);color:var(--text-1);font-size:14px;line-height:1.5;-we
 .logout-btn{margin-left:auto;background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;padding:4px;border-radius:4px}
 .logout-btn:hover{color:#fff}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.topbar{height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0}
+.topbar{
+  height:var(--header-h);border-bottom:1px solid var(--glass-border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;
+  background:var(--glass-topbar-bg);
+  -webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);
+}
 .topbar-title{font-size:16px;font-weight:600;color:var(--text-1);flex:1}
 .content{flex:1;overflow-y:auto;padding:24px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.card{
+  border-radius:var(--radius-lg);
+  background:var(--glass-bg);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);backdrop-filter:blur(var(--glass-blur)) saturate(180%);
+}
 .card-header{padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .card-title{font-size:14px;font-weight:600;color:var(--text-1)}
 .card-body{padding:20px}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px;transition:transform .15s}
-.stat-card:hover{transform:translateY(-1px)}
+.stat-card{
+  border-radius:var(--radius-lg);padding:18px 20px;display:flex;flex-direction:column;gap:4px;transition:transform .15s, box-shadow .15s;
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+  box-shadow:0 4px 20px rgba(15,32,68,.08), inset 0 1px 0 rgba(255,255,255,.5);
+  -webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(15,32,68,.14), inset 0 1px 0 rgba(255,255,255,.6)}
 .stat-label{font-size:12px;color:var(--text-3);font-weight:500;letter-spacing:.02em}
 .stat-value{font-size:28px;font-weight:700;color:var(--text-1);line-height:1}
 .stat-sub{font-size:12px;color:var(--text-3);margin-top:2px}
@@ -97,7 +127,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .search-input input{padding-left:36px}
 .search-input .icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-3)}
 .modal-overlay{position:fixed;inset:0;background:rgba(15,32,68,.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
-.modal{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp .2s ease}
+.modal{
+  border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:slideUp .2s ease;
+  background:var(--glass-bg-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.6);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+}
 @keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
 .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .modal-title{font-size:16px;font-weight:700}
@@ -132,15 +166,30 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:10px}
-.login-page{min-height:100vh;background:var(--navy);display:flex;align-items:center;justify-content:center}
-.login-card{background:var(--surface);border-radius:20px;padding:40px;width:380px;box-shadow:var(--shadow-lg)}
+.login-page{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(0,196,180,.20), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(26,86,160,.35), transparent 45%),
+    linear-gradient(160deg, var(--navy), var(--navy-mid));
+}
+.login-card{
+  border-radius:20px;padding:40px;width:380px;
+  background:var(--glass-bg-strong);border:1px solid var(--glass-border);
+  box-shadow:var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.6);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+}
 .login-logo{text-align:center;margin-bottom:28px}
 .login-logo .tooth{font-size:40px}
 .login-logo h1{font-size:20px;font-weight:700;color:var(--navy);margin-top:8px}
 .login-logo p{font-size:13px;color:var(--text-3);margin-top:4px}
 
 /* ── Mobile drawer nav ──────────────────────────────────────────────────── */
-.mobile-topbar{display:none;height:52px;background:var(--navy);align-items:center;padding:0 14px;gap:10px;flex-shrink:0}
+.mobile-topbar{
+  display:none;height:52px;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;
+  background:var(--glass-sidebar-bg);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+}
 .mobile-topbar-title{flex:1;font-size:15px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-topbar .live-dot{flex-shrink:0}
 .hamburger{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:6px 8px;border-radius:6px;display:flex;align-items:center;justify-content:center;line-height:1;font-size:22px}
@@ -149,14 +198,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .hamburger-topbar:hover{background:var(--surface-2);color:var(--text-1)}
 .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
 .drawer-overlay.open{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;left:0;height:100%;width:260px;max-width:82vw;background:var(--navy);z-index:201;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto}
+.drawer{
+  position:fixed;top:0;left:0;height:100%;width:260px;max-width:82vw;z-index:201;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto;
+  background:var(--glass-sidebar-bg);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  border-right:1px solid var(--glass-sidebar-border);
+}
 .drawer.open{transform:translateX(0)}
 .drawer-logo{padding:18px 18px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
 .drawer-footer{padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);margin-top:auto}
 
-/* ── Glassmorphism (opt-in — new `.glass-*` classes, doesn't touch the
-   existing .card/.sidebar/.topbar/.stat-card rules above so unconverted
-   pages are unaffected) ───────────────────────────────────────────────── */
+/* ── Glassmorphism ──────────────────────────────────────────────────────
+   Base .card/.stat-card/.sidebar/.topbar/.mobile-topbar/.drawer/.modal
+   rules above already use these vars, so every page is glass by default.
+   The .glass-* classes below stay defined for any spot that opts in
+   explicitly (equivalent, just named) — no page-specific overrides. ──── */
 :root {
   --glass-bg: rgba(255,255,255,.55);
   --glass-bg-strong: rgba(255,255,255,.7);
@@ -166,18 +222,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
   --glass-sidebar-bg: linear-gradient(165deg, rgba(26,86,160,.58), rgba(15,32,68,.68) 55%, rgba(10,22,48,.72));
   --glass-sidebar-border: rgba(255,255,255,.09);
   --glass-topbar-bg: rgba(255,255,255,.6);
-}
-
-/* Soft gradient-blob backdrop so the blur has something to reveal — sits
-   behind the whole app, fixed so it doesn't scroll with content. */
-.glass-backdrop{
-  position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(26,86,160,.16), transparent 42%),
-    radial-gradient(circle at 88% 12%, rgba(0,196,180,.14), transparent 40%),
-    radial-gradient(circle at 30% 92%, rgba(240,165,0,.10), transparent 42%),
-    radial-gradient(circle at 82% 85%, rgba(124,58,237,.10), transparent 42%),
-    var(--bg);
 }
 
 .glass-card{

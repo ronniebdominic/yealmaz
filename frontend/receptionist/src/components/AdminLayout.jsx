@@ -49,10 +49,8 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="app">
-      <div className="glass-backdrop" />
-
       {/* ── Mobile topbar ───────────────────────────────── */}
-      <div className="mobile-topbar glass-sidebar">
+      <div className="mobile-topbar">
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
         <span className="mobile-topbar-title">Ye-Almaz Dental Lab</span>
         <div className="user-avatar" style={{ width: 30, height: 30, fontSize: 12, background: '#F0A500', color: '#0F2044', flexShrink: 0 }}>{initials}</div>
