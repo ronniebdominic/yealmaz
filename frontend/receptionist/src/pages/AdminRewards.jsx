@@ -3,6 +3,7 @@ import AdminLayout from '../components/AdminLayout';
 import api from '../api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { MdCardGiftcard, MdEdit, MdPause, MdPlayArrow, MdDelete } from 'react-icons/md';
 
 const TABS = ['Settings', 'Reward Catalog', 'Clinic Points', 'Redemptions'];
 
@@ -101,7 +102,7 @@ export default function AdminRewards() {
   return (
     <AdminLayout>
       <div className="topbar">
-        <div className="topbar-title">🎁 Rewards Management</div>
+        <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 7 }}><MdCardGiftcard className="mi" size={18} /> Rewards Management</div>
       </div>
       <div className="content">
 
@@ -214,11 +215,11 @@ export default function AdminRewards() {
                           }}>{item.isActive ? 'Active' : 'Inactive'}</span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="btn btn-ghost btn-sm" onClick={() => setEditItem({ ...item })}>✏️</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditItem({ ...item })}><MdEdit size={14} /></button>
                           <button className="btn btn-ghost btn-sm" style={{ marginLeft: 4 }} onClick={() => toggleActive(item)}>
-                            {item.isActive ? '⏸' : '▶'}
+                            {item.isActive ? <MdPause size={14} /> : <MdPlayArrow size={14} />}
                           </button>
-                          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 4, color: 'var(--red)' }} onClick={() => deleteItem(item.id)}>🗑️</button>
+                          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 4, color: 'var(--red)' }} onClick={() => deleteItem(item.id)}><MdDelete size={14} /></button>
                         </td>
                       </tr>
                     ))}

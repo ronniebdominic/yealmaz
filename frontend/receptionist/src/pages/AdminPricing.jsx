@@ -4,6 +4,7 @@ import api from '../api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import Pagination from '../components/Pagination';
+import { MdSave, MdBolt, MdEdit, MdDelete } from 'react-icons/md';
 
 const PAGE_SIZE = 15;
 
@@ -223,7 +224,7 @@ export default function AdminPricing() {
               transition: 'background 0.15s',
             }}
           >
-            {saving ? 'Saving…' : '💾 Save Changes'}
+            {saving ? 'Saving…' : <><MdSave size={14} /> Save Changes</>}
           </button>
         </div>
       </div>
@@ -268,8 +269,8 @@ export default function AdminPricing() {
                 />
               </div>
               <div style={{ flex: 1, minWidth: 130 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
-                  ⚡ EXPRESS PRICE (Br)
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                  <MdBolt size={12} /> EXPRESS PRICE (Br)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Br</span>
@@ -286,8 +287,8 @@ export default function AdminPricing() {
                 </div>
               </div>
               <div style={{ flex: 0, minWidth: 100 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
-                  ⚡ EXPRESS DAYS
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                  <MdBolt size={12} /> EXPRESS DAYS
                 </label>
                 <input
                   type="number"
@@ -359,8 +360,8 @@ export default function AdminPricing() {
                 <tr>
                   <th style={{ width: 48 }}>#</th>
                   <th>Work Type</th>
-                  <th style={{ width: 160 }}>⚡ Express Price</th>
-                  <th style={{ width: 130 }}>⚡ Express Days</th>
+                  <th style={{ width: 160 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdBolt size={12} /> Express Price</span></th>
+                  <th style={{ width: 130 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdBolt size={12} /> Express Days</span></th>
                   <th style={{ width: 160 }}>Price (Br)</th>
                   <th style={{ width: 130 }}>Duration (days)</th>
                   <th style={{ width: 140, textAlign: 'right' }}>Actions</th>
@@ -535,7 +536,7 @@ export default function AdminPricing() {
                             title="Edit work type name"
                             style={{ ...actionBtn }}
                           >
-                            ✏️ Edit
+                            <MdEdit size={13} /> Edit
                           </button>
                           <button
                             onClick={() => handleDelete(p)}
@@ -543,7 +544,7 @@ export default function AdminPricing() {
                             title="Remove work type"
                             style={{ ...actionBtn, color: 'var(--red)', borderColor: 'rgba(198,40,40,0.25)' }}
                           >
-                            🗑️
+                            <MdDelete size={13} />
                           </button>
                         </div>
                       </td>
