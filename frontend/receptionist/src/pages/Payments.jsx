@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import CaseDetailModal from '../components/CaseDetailModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Pagination from '../components/Pagination';
+import { MdCelebration, MdCheck, MdClose } from 'react-icons/md';
 
 const PAGE_SIZE = 10;
 
@@ -35,7 +36,7 @@ export default function Payments() {
     mutationFn: ({ caseId, action, rejectionReason }) =>
       api.post(`/payments/${caseId}/verify`, { action, rejectionReason }),
     onSuccess: (_, { action }) => {
-      toast.success(action === 'APPROVE' ? '✅ Payment approved! Case ready to dispatch.' : '❌ Payment rejected.');
+      toast.success(action === 'APPROVE' ? 'Payment approved! Case ready to dispatch.' : 'Payment rejected.');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
@@ -68,7 +69,7 @@ export default function Payments() {
           <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '60px' }}>Loading…</div>
         ) : payments.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🎉</div>
+            <div className="empty-icon mi"><MdCelebration size={32} /></div>
             <div className="empty-title">All payments verified</div>
             <p>No screenshots waiting for review right now</p>
           </div>
@@ -122,14 +123,14 @@ export default function Payments() {
                         onClick={() => verify(p.caseId, 'APPROVE')}
                         disabled={processing === p.caseId + 'APPROVE'}
                       >
-                        ✓ Approve & Unlock Delivery
+                        <MdCheck className="mi" size={15} /> Approve & Unlock Delivery
                       </button>
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => verify(p.caseId, 'REJECT')}
                         disabled={processing === p.caseId + 'REJECT'}
                       >
-                        ✗ Reject
+                        <MdClose className="mi" size={15} /> Reject
                       </button>
                       <button
                         className="btn btn-ghost btn-sm"

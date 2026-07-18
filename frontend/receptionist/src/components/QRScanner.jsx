@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { MdPhotoCamera, MdVideocamOff } from 'react-icons/md';
 
 const JSQR_CDN = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
 
@@ -114,7 +115,7 @@ export default function QRScanner({ onScan, onClose }) {
         padding: '16px 20px', display: 'flex', justifyContent: 'space-between',
         alignItems: 'center', background: 'rgba(0,0,0,0.85)', flexShrink: 0
       }}>
-        <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>📷 Scan Case QR Code</span>
+        <span style={{ color: '#fff', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 7 }}><MdPhotoCamera size={17} /> Scan Case QR Code</span>
         <button onClick={onClose} style={{
           background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff',
           borderRadius: 8, padding: '7px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 600
@@ -132,7 +133,7 @@ export default function QRScanner({ onScan, onClose }) {
           alignItems: 'center', justifyContent: 'center',
           color: '#fff', padding: 32, textAlign: 'center', gap: 14
         }}>
-          <div style={{ fontSize: 52 }}>📵</div>
+          <MdVideocamOff size={52} />
           <div style={{ fontWeight: 700, fontSize: 18 }}>Camera Unavailable</div>
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, maxWidth: 280, lineHeight: 1.6 }}>{error}</div>
           <button onClick={onClose} style={{

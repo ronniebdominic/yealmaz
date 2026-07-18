@@ -1,5 +1,7 @@
 // Shared search + date-range filter bar.
 // All props are controlled — parent owns the state.
+import { MdSearch } from 'react-icons/md';
+
 export default function FilterBar({
   search = '', onSearch,
   dateFrom = '', onDateFrom,
@@ -18,7 +20,7 @@ export default function FilterBar({
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', ...style }}>
       {/* Search */}
       <div className="search-input" style={{ flex: 2, minWidth: 200, margin: 0 }}>
-        <span className="icon">🔍</span>
+        <span className="icon mi"><MdSearch size={16} /></span>
         <input
           placeholder={placeholder}
           value={search}

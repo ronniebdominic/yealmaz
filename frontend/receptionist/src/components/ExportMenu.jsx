@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { MdPendingActions, MdFileDownload, MdBarChart, MdDescription } from 'react-icons/md';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -126,7 +127,7 @@ export default function ExportMenu({ data, fetchData, columns = [], filename = '
         style={{ display: 'flex', alignItems: 'center', gap: 5, opacity: !hasData ? 0.5 : 1 }}
         title={!hasData ? 'No data to export' : 'Export report'}
       >
-        {loading ? '⏳' : '⬇'} Export
+        {loading ? <MdPendingActions size={14} /> : <MdFileDownload size={14} />} Export
         {!loading && <span style={{ fontSize: 10, opacity: 0.6 }}>▾</span>}
       </button>
 
@@ -142,7 +143,7 @@ export default function ExportMenu({ data, fetchData, columns = [], filename = '
             onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
-            <span style={{ fontSize: 16 }}>📊</span>
+            <MdBarChart size={16} />
             <div>
               <div style={{ fontWeight: 600 }}>Export Excel</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>.xlsx file</div>
@@ -155,7 +156,7 @@ export default function ExportMenu({ data, fetchData, columns = [], filename = '
             onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
-            <span style={{ fontSize: 16 }}>📄</span>
+            <MdDescription size={16} />
             <div>
               <div style={{ fontWeight: 600 }}>Export PDF</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>.pdf file</div>

@@ -1,30 +1,34 @@
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  MdDashboard, MdMoveToInbox, MdLocalShipping, MdSearch, MdAdd,
+  MdAssignment, MdLogout,
+} from 'react-icons/md';
 
 function NavItems({ active, onNav }) {
   return (
     <>
       <div className="nav-section-label">Reception</div>
       <button className={active('/')} onClick={() => onNav('/')}>
-        <span>📊</span> Dashboard
+        <MdDashboard className="mi" size={17} /> Dashboard
       </button>
       <button className={active('/?section=accept')} onClick={() => onNav('/?section=accept')}>
-        <span>📥</span> Accept Case
+        <MdMoveToInbox className="mi" size={17} /> Accept Case
       </button>
       <button className={active('/?section=ready')} onClick={() => onNav('/?section=ready')}>
-        <span>🚚</span> Ready Orders
+        <MdLocalShipping className="mi" size={17} /> Ready Orders
       </button>
       <button className={active('/?section=track')} onClick={() => onNav('/?section=track')}>
-        <span>🔍</span> Track Order
+        <MdSearch className="mi" size={17} /> Track Order
       </button>
 
       <div className="nav-section-label">Cases</div>
       <button className={active('/cases/new')} onClick={() => onNav('/cases/new')}>
-        <span>➕</span> New Case
+        <MdAdd className="mi" size={17} /> New Case
       </button>
       <button className={active('/cases')} onClick={() => onNav('/cases')}>
-        <span>📋</span> All Cases
+        <MdAssignment className="mi" size={17} /> All Cases
       </button>
     </>
   );
@@ -73,7 +77,7 @@ export default function Layout({ children }) {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Receptionist</div>
             </div>
-            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+            <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
       </div>
@@ -95,7 +99,7 @@ export default function Layout({ children }) {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Receptionist</div>
             </div>
-            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+            <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
       </aside>

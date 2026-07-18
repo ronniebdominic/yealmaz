@@ -4,6 +4,7 @@ import { StatusBadge, PaymentBadge, STAGE_ICONS } from './StatusBadge';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { printCaseLabel } from '../utils/printLabel';
+import { MdAccountBalance, MdChat, MdPrint, MdCheckCircle, MdAutorenew } from 'react-icons/md';
 
 const STATUSES = [
   'PENDING_PICKUP', 'PICKUP_ASSIGNED',
@@ -199,13 +200,13 @@ export default function CaseDetailModal({ caseId, onClose }) {
                     ? format(new Date(data.payment.verifiedAt), 'dd MMM yyyy')
                     : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
-              ...(data.payment?.taxWithheld ? [['🏛️ Tax Withheld', `Br ${data.payment.taxWithheld.toLocaleString('en-US')} · Net received: Br ${((data.payment.amount ?? data.totalAmount ?? 0) - data.payment.taxWithheld).toLocaleString('en-US')}`]] : []),
+              ...(data.payment?.taxWithheld ? [[<span key="tax-withheld" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdAccountBalance size={11} /> Tax Withheld</span>, `Br ${data.payment.taxWithheld.toLocaleString('en-US')} · Net received: Br ${((data.payment.amount ?? data.totalAmount ?? 0) - data.payment.taxWithheld).toLocaleString('en-US')}`]] : []),
               ...(data.deliveryDate ? [['Delivered On', format(new Date(data.deliveryDate), 'dd MMM yyyy, h:mm a')]] : []),
               ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
               ...(data.doctorPhone ? [['Doctor Phone', data.doctorPhone]] : []),
               ...(data.patientGender ? [['Patient Gender', data.patientGender]] : []),
-            ].map(([label, val]) => (
-              <div key={label} style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
+            ].map(([label, val], i) => (
+              <div key={i} style={{ background: 'var(--surface-2)', borderRadius: '8px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-3)', fontWeight: 600, marginBottom: '2px' }}>{label}</div>
                 <div style={{ fontSize: '13px', fontWeight: 500 }}>{val}</div>
               </div>
@@ -222,7 +223,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
           <div className="divider" />
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>
-              💬 Comments <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>· additional info needed from the dentist</span>
+              <MdChat size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />Comments <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>· additional info needed from the dentist</span>
             </div>
             {comments.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
@@ -282,7 +283,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
             {data.qrCodeUrl && (
               <div style={{ textAlign: 'center', cursor: 'pointer' }} onClick={printQR} title="Click to print QR">
                 <img src={data.qrCodeUrl} alt="QR Code" style={{ width: '80px', height: '80px', border: '1px solid var(--border)', borderRadius: '8px' }} />
-                <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '4px' }}>🖨️ Print</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: 3 }}><MdPrint size={11} /> Print</div>
               </div>
             )}
           </div>
@@ -319,8 +320,8 @@ export default function CaseDetailModal({ caseId, onClose }) {
               )}
             </div>
             {data.deliveryDate && (
-              <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 5 }}>
-                ✅ Currently set to {format(new Date(data.deliveryDate), 'dd MMM yyyy')}
+              <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <MdCheckCircle size={12} /> Currently set to {format(new Date(data.deliveryDate), 'dd MMM yyyy')}
               </div>
             )}
           </div>
@@ -336,13 +337,13 @@ export default function CaseDetailModal({ caseId, onClose }) {
             </div>
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={remakeInput} onChange={e => setRemakeInput(e.target.checked)} /> 🔄 Remake
+                <input type="checkbox" checked={remakeInput} onChange={e => setRemakeInput(e.target.checked)} /> <MdAutorenew size={13} style={{ verticalAlign: 'middle' }} /> Remake
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
                 <input type="checkbox" checked={redoInput} onChange={e => setRedoInput(e.target.checked)} /> Redo
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={isRedoInput} onChange={e => setIsRedoInput(e.target.checked)} /> ♻️ Redo / Replacement (50%)
+                <input type="checkbox" checked={isRedoInput} onChange={e => setIsRedoInput(e.target.checked)} /> <MdAutorenew size={13} style={{ verticalAlign: 'middle' }} /> Redo / Replacement (50%)
               </label>
             </div>
             {remakeInput && (
@@ -410,7 +411,9 @@ export default function CaseDetailModal({ caseId, onClose }) {
             <div className="timeline">
               {data.stages.map((s, i) => (
                 <div className="timeline-item" key={s.id}>
-                  <div className={`timeline-dot done`}>{STAGE_ICONS[s.stageName] || '●'}</div>
+                  <div className={`timeline-dot done`}>
+                    {STAGE_ICONS[s.stageName] ? (() => { const Icon = STAGE_ICONS[s.stageName]; return <Icon size={12} />; })() : '●'}
+                  </div>
                   <div className="timeline-content">
                     <div className="timeline-label">{stageTimelineLabel(s)}</div>
                     <div className="timeline-time">

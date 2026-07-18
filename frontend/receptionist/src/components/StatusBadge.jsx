@@ -1,3 +1,11 @@
+import {
+  MdTwoWheeler, MdDirectionsBike, MdMoveToInbox, MdScience, MdContentCut,
+  MdBiotech, MdComputer, MdSettings, MdPrint, MdBuild, MdPalette,
+  MdAccountBalance, MdDiamond, MdAutoAwesome, MdLocalFireDepartment,
+  MdSearch, MdPaid, MdInventory2, MdLocalShipping, MdCheckCircle, MdPause,
+  MdAutorenew, MdCancel, MdHandshake,
+} from 'react-icons/md';
+
 const STATUS_MAP = {
   PENDING_PICKUP:            { label: 'Awaiting Pickup',          cls: 'badge-pickup' },
   PICKUP_ASSIGNED:           { label: 'Pickup Assigned',          cls: 'badge-pickup-assigned' },
@@ -43,21 +51,21 @@ export function StatusBadge({ status }) {
 
 export function PaymentBadge({ status, isExcluded }) {
   if (isExcluded && status === 'PENDING') {
-    return <span className="badge badge-trusted">🤝 Trusted Partner</span>;
+    return <span className="badge badge-trusted" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdHandshake size={11} /> Trusted Partner</span>;
   }
   const s = PAY_MAP[status] || { label: status, cls: '' };
   return <span className={`badge ${s.cls}`}>{s.label}</span>;
 }
 
 export const STAGE_ICONS = {
-  PENDING_PICKUP: '🛵', PICKUP_ASSIGNED: '🏍️',
-  CASE_ACCEPTED: '📥', PLASTER_DEPARTMENT: '🏺', MARGIN_DEPARTMENT: '✂️',
-  SCANNING: '🔬', DESIGNING: '🖥️',
-  MILLING_SINTERING: '⚙️', RESIN_3D_PRINTING: '🖨️', METAL_3D_PRINTING: '🔩',
-  METAL_FINISHING: '🔨', OPAQUE_APPLICATION: '🎨', CERAMIC_LAYERING: '🏛️',
-  ZIRCONIA_FITTING_FINISHING: '💎', GLAZING: '✨', THERMO_PRESS: '🔥', TRIMMING: '✂️',
-  QUALITY_CHECK: '🔍', PAYMENT_INVOICING: '💰',
-  READY_TO_DISPATCH: '📦', OUT_FOR_DELIVERY: '🚚', DELIVERED: '✅',
-  ON_HOLD: '⏸️', REMAKE: '🔄', CANCELLED: '❌',
-  UNDER_REVIEW: '🔎', REJECTED: '🚫',
+  PENDING_PICKUP: MdTwoWheeler, PICKUP_ASSIGNED: MdDirectionsBike,
+  CASE_ACCEPTED: MdMoveToInbox, PLASTER_DEPARTMENT: MdScience, MARGIN_DEPARTMENT: MdContentCut,
+  SCANNING: MdBiotech, DESIGNING: MdComputer,
+  MILLING_SINTERING: MdSettings, RESIN_3D_PRINTING: MdPrint, METAL_3D_PRINTING: MdBuild,
+  METAL_FINISHING: MdBuild, OPAQUE_APPLICATION: MdPalette, CERAMIC_LAYERING: MdAccountBalance,
+  ZIRCONIA_FITTING_FINISHING: MdDiamond, GLAZING: MdAutoAwesome, THERMO_PRESS: MdLocalFireDepartment, TRIMMING: MdContentCut,
+  QUALITY_CHECK: MdSearch, PAYMENT_INVOICING: MdPaid,
+  READY_TO_DISPATCH: MdInventory2, OUT_FOR_DELIVERY: MdLocalShipping, DELIVERED: MdCheckCircle,
+  ON_HOLD: MdPause, REMAKE: MdAutorenew, CANCELLED: MdCancel,
+  UNDER_REVIEW: MdSearch, REJECTED: MdCancel,
 };
