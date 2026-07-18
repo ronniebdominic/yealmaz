@@ -11,6 +11,13 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import {
+  MdLocalShipping, MdBolt, MdSearch, MdBlock, MdAutorenew, MdLocalHospital,
+  MdLocationOn, MdCall, MdPalette, MdInventory2, MdAssignment, MdTwoWheeler,
+  MdPrecisionManufacturing, MdCelebration, MdCheckCircle, MdAutoAwesome,
+  MdVisibility, MdPrint, MdDashboard, MdMoveToInbox, MdAdd,
+  MdMedicalServices, MdLogout, MdPendingActions,
+} from 'react-icons/md';
 
 // Common dental shade options
 const SHADE_OPTIONS = [
@@ -151,13 +158,14 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         <div>
           <label style={lbl}>ORDER TYPE</label>
           <div style={{ display: 'flex', gap: 8 }}>
-            {[{ val: 'NORMAL', label: '🚚 Normal' }, { val: 'EXPRESS', label: '⚡ Express' }].map(opt => (
+            {[{ val: 'NORMAL', label: 'Normal', icon: MdLocalShipping }, { val: 'EXPRESS', label: 'Express', icon: MdBolt }].map(opt => (
               <button key={opt.val} type="button" onClick={() => handleOT(opt.val)} style={{
                 flex: 1, padding: '7px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                 border: `2px solid ${orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
                 background: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'rgba(240,165,0,0.1)' : 'var(--blue-dim,#EEF2FF)') : 'var(--surface)',
                 color: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-2)',
-              }}>{opt.label}</button>
+              }}><opt.icon size={14} /> {opt.label}</button>
             ))}
           </div>
         </div>
@@ -325,7 +333,7 @@ function AcceptCasesSection({ queryClient }) {
     setSubmitting(true);
     try {
       await api.patch(`/cases/${c.id}/status`, { status: 'UNDER_REVIEW', notes: note || 'Needs clarification from dentist' });
-      toast.success('🔎 Case marked Under Review');
+      toast.success('Case marked Under Review');
       setOpenId(null);
       invalidate();
     } catch (err) {
@@ -340,7 +348,7 @@ function AcceptCasesSection({ queryClient }) {
     setSubmitting(true);
     try {
       await api.patch(`/cases/${c.id}/status`, { status: 'REJECTED', notes: note });
-      toast.success('🚫 Case rejected');
+      toast.success('Case rejected');
       setOpenId(null);
       invalidate();
     } catch (err) {
@@ -376,27 +384,27 @@ function AcceptCasesSection({ queryClient }) {
                 : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--amber-dim)', color: 'var(--amber)', fontFamily: 'DM Mono, monospace' }}>No Scan # Yet</span>
               }
               <StatusBadge status={c.status} />
-              {c.deliveryType === 'EXPRESS' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(240,165,0,0.12)', color: 'var(--amber)' }}>⚡ Express</span>}
-              {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)' }}>🔄 Remake</span>}
-              {c.redo   && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)' }}>♻️ Redo</span>}
+              {c.deliveryType === 'EXPRESS' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(240,165,0,0.12)', color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdBolt size={12} /> Express</span>}
+              {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdAutorenew size={12} /> Remake</span>}
+              {c.redo   && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdAutorenew size={12} /> Redo</span>}
             </div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>
               {isPlaceholderName(c.patientName)
                 ? <span style={{ color: 'var(--amber)', fontStyle: 'italic' }}>Patient name not provided</span>
                 : c.patientName}
             </div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
               {c.workType && c.workType !== 'TBD' ? c.workType : <span style={{ color: 'var(--amber)' }}>Work type TBD</span>}
-              {c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}{' · '}🏥 {c.clinic?.name}
+              {c.units != null ? ` · ${c.units} unit${c.units !== 1 ? 's' : ''}` : ''}{' · '}<MdLocalHospital size={12} /> {c.clinic?.name}
             </div>
-            {c.clinic?.station && <div style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 700 }}>📍 Station: {c.clinic.station}</div>}
-            {c.clinic?.phone && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📞 {c.clinic.phone}</div>}
-            {c.clinic?.address && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>📍 {c.clinic.address}</div>}
-            {c.doctorName && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>👨‍⚕️ {c.doctorName}{c.doctorPhone ? ` · ${c.doctorPhone}` : ''}</div>}
-            {c.shade && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🎨 Shade: <strong>{c.shade}</strong></div>}
-            {c.toothNumbers && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🦷 Teeth: <strong>{c.toothNumbers}</strong></div>}
-            {c.notes && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>📋 {c.notes}</div>}
-            {c.assignedDelivery && <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2 }}>🛵 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}</div>}
+            {c.clinic?.station && <div style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> Station: {c.clinic.station}</div>}
+            {c.clinic?.phone && <div style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3 }}><MdCall size={12} /> {c.clinic.phone}</div>}
+            {c.clinic?.address && <div style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</div>}
+            {c.doctorName && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><MdMedicalServices size={12} /> {c.doctorName}{c.doctorPhone ? ` · ${c.doctorPhone}` : ''}</div>}
+            {c.shade && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><MdPalette size={12} /> Shade: <strong>{c.shade}</strong></div>}
+            {c.toothNumbers && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><MdInventory2 size={12} /> Teeth: <strong>{c.toothNumbers}</strong></div>}
+            {c.notes && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><MdAssignment size={12} /> {c.notes}</div>}
+            {c.assignedDelivery && <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><MdTwoWheeler size={12} /> {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}</div>}
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
               Registered {format(new Date(c.createdAt), 'dd MMM yyyy, h:mm a')}
             </div>
@@ -410,21 +418,21 @@ function AcceptCasesSection({ queryClient }) {
                 onClick={() => open(c.id, 'accept')}
                 style={{ whiteSpace: 'nowrap' }}
               >
-                ✓ Accept
+                <MdCheckCircle className="mi" size={14} /> Accept
               </button>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => open(c.id, 'review')}
                 style={{ color: '#1D4ED8', whiteSpace: 'nowrap' }}
               >
-                🔎 Under Review
+                <MdSearch className="mi" size={14} /> Under Review
               </button>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => open(c.id, 'reject')}
                 style={{ color: 'var(--red)', whiteSpace: 'nowrap' }}
               >
-                🚫 Reject
+                <MdBlock className="mi" size={14} /> Reject
               </button>
             </div>
           )}
@@ -458,9 +466,9 @@ function AcceptCasesSection({ queryClient }) {
         {isOpen && action === 'review' && (
           <SimpleNoteForm
             color="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
-            title="🔎 Under Review — What information is needed from the dentist?"
+            title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><MdSearch size={14} /> Under Review — What information is needed from the dentist?</span>}
             placeholder="e.g. Shade not specified. Need confirmation of tooth 14 preparation type."
-            confirmLabel="🔎 Mark Under Review"
+            confirmLabel="Mark Under Review"
             submitting={submitting}
             onConfirm={(note) => handleReview(c, note)}
             onCancel={() => setOpenId(null)}
@@ -471,9 +479,9 @@ function AcceptCasesSection({ queryClient }) {
         {isOpen && action === 'reject' && (
           <SimpleNoteForm
             color="var(--red)" bg="#FFF1F2" border="#FECACA"
-            title="🚫 Reject Case — Please enter the reason"
+            title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><MdBlock size={14} /> Reject Case — Please enter the reason</span>}
             placeholder="e.g. Impression quality too poor to work with. Please retake."
-            confirmLabel="🚫 Confirm Rejection"
+            confirmLabel="Confirm Rejection"
             submitting={submitting}
             onConfirm={(note) => handleReject(c, note)}
             onCancel={() => setOpenId(null)}
@@ -491,7 +499,7 @@ function AcceptCasesSection({ queryClient }) {
       {underReview.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
-            <div className="card-title">🔎 Under Review</div>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdSearch className="mi" size={15} /> Under Review</div>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{underReview.length} awaiting dentist info</span>
           </div>
           <div>{underReview.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
@@ -502,13 +510,13 @@ function AcceptCasesSection({ queryClient }) {
       {arrivedAtLab.length > 0 && (
         <div className="card" style={{ marginBottom: 16, border: '2px solid var(--blue)' }}>
           <div className="card-header" style={{ background: 'var(--blue)', borderRadius: '10px 10px 0 0' }}>
-            <div className="card-title" style={{ color: '#fff' }}>🏭 Arrived at Lab — Needs Acceptance</div>
+            <div className="card-title" style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}><MdPrecisionManufacturing className="mi" size={15} /> Arrived at Lab — Needs Acceptance</div>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>
               {arrivedAtLab.length} case{arrivedAtLab.length !== 1 ? 's' : ''} awaiting review
             </span>
           </div>
-          <div style={{ background: '#EFF6FF', padding: '8px 16px', fontSize: 12, color: '#1D4ED8', fontWeight: 600 }}>
-            📦 The delivery driver has brought these impressions to the lab. Please review and Accept, reject, or put Under Review.
+          <div style={{ background: '#EFF6FF', padding: '8px 16px', fontSize: 12, color: '#1D4ED8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MdInventory2 size={14} /> The delivery driver has brought these impressions to the lab. Please review and Accept, reject, or put Under Review.
           </div>
           <div>{arrivedAtLab.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
         </div>
@@ -517,12 +525,12 @@ function AcceptCasesSection({ queryClient }) {
       {/* In Transit — driver is still going to the clinic */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <div className="card-title">🛵 In Transit</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdTwoWheeler className="mi" size={15} /> In Transit</div>
           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{inTransit.length} case{inTransit.length !== 1 ? 's' : ''}</span>
         </div>
         {inTransit.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🎉</div>
+            <div className="empty-icon mi"><MdCelebration size={32} /></div>
             <div className="empty-title">No cases in transit</div>
             <p>Cases where a driver is on the way to collect the impression will appear here.</p>
           </div>
@@ -534,12 +542,12 @@ function AcceptCasesSection({ queryClient }) {
       {/* Awaiting Pickup — no driver assigned yet */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">📋 Awaiting Pickup</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdAssignment className="mi" size={15} /> Awaiting Pickup</div>
           <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pending.length} case{pending.length !== 1 ? 's' : ''}</span>
         </div>
         {pending.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">✅</div>
+            <div className="empty-icon mi"><MdCheckCircle size={32} /></div>
             <div className="empty-title">No cases waiting for pickup</div>
           </div>
         ) : (
@@ -591,11 +599,12 @@ function OrdersTab({ status, paymentVerified, title, icon, emptyText, emptyNote,
   const fetchAll = () => api.get('/cases', { params: params({ limit: 1000 }) }).then(r => r.data.cases ?? []);
   const cases      = data?.cases ?? [];
   const pagination = data?.pagination ?? {};
+  const Icon = icon;
 
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title" style={{ color: accentColor }}>{icon} {title}</div>
+        <div className="card-title" style={{ color: accentColor, display: 'flex', alignItems: 'center', gap: 6 }}>{Icon && <Icon className="mi" size={15} />} {title}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {pagination.total != null && (
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} case{pagination.total !== 1 ? 's' : ''}</span>
@@ -608,7 +617,7 @@ function OrdersTab({ status, paymentVerified, title, icon, emptyText, emptyNote,
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
         ) : cases.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🎉</div>
+            <div className="empty-icon mi"><MdCelebration size={32} /></div>
             <div className="empty-title">{emptyText}</div>
             <p>{emptyNote}</p>
           </div>
@@ -696,7 +705,7 @@ function ReadyOrdersSection() {
           onClick={() => setActiveTab('dispatch')}
           style={activeTab === 'dispatch' ? { background: 'var(--amber)', color: '#fff' } : {}}
         >
-          📦 Ready for Delivery
+          <MdInventory2 className="mi" size={14} /> Ready for Delivery
           <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>QC done · awaiting payment</span>
         </button>
         <button
@@ -704,7 +713,7 @@ function ReadyOrdersSection() {
           onClick={() => setActiveTab('delivery')}
           style={activeTab === 'delivery' ? { background: 'var(--green)', color: '#fff' } : {}}
         >
-          🚚 Ready for Dispatch
+          <MdLocalShipping className="mi" size={14} /> Ready for Dispatch
           <span style={{ fontSize: 10, marginLeft: 6, opacity: 0.8 }}>Payment verified · assign driver</span>
         </button>
       </div>
@@ -715,7 +724,7 @@ function ReadyOrdersSection() {
           status="READY_TO_DISPATCH"
           paymentVerified={false}
           title="Ready for Delivery"
-          icon="📦"
+          icon={MdInventory2}
           accentColor="var(--amber)"
           emptyText="No cases awaiting payment"
           emptyNote="Cases that passed QC will appear here. Finance needs to request and verify payment before dispatch."
@@ -731,7 +740,7 @@ function ReadyOrdersSection() {
           status="READY_TO_DISPATCH"
           paymentVerified={true}
           title="Ready for Dispatch"
-          icon="🚚"
+          icon={MdLocalShipping}
           accentColor="var(--green)"
           emptyText="No cases cleared for dispatch"
           emptyNote="Cases appear here once payment is verified by Finance. Dispatch will assign a driver."
@@ -794,13 +803,13 @@ function FinishingSection() {
         </div>
       </div>
 
-      <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600 }}>
-        ✨ These cases have <strong>reached a finishing stage</strong> (Metal Finishing or Zirconia Fitting & Finishing) in the last 3 days — informational only. They stay listed here even after moving on to Ceramic/Glazing/QC, so you don't miss one that moved through quickly.
+      <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <MdAutoAwesome size={14} /> These cases have <strong>reached a finishing stage</strong> (Metal Finishing or Zirconia Fitting & Finishing) in the last 3 days — informational only. They stay listed here even after moving on to Ceramic/Glazing/QC, so you don't miss one that moved through quickly.
       </div>
 
       <div className="card">
         <div className="card-header">
-          <div className="card-title" style={{ color: '#7C3AED' }}>✨ In Finishing</div>
+          <div className="card-title" style={{ color: '#7C3AED', display: 'flex', alignItems: 'center', gap: 6 }}><MdAutoAwesome className="mi" size={15} /> In Finishing</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{filtered.length} case{filtered.length !== 1 ? 's' : ''}</span>
             <ExportMenu
@@ -826,7 +835,7 @@ function FinishingSection() {
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
           ) : filtered.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">✨</div>
+              <div className="empty-icon mi"><MdAutoAwesome size={32} /></div>
               <div className="empty-title">No cases in finishing right now</div>
               <p>Cases will show up here as soon as the lab scans them into Metal Finishing or Zirconia Fitting & Finishing, and stay listed for 3 days.</p>
             </div>
@@ -853,14 +862,14 @@ function FinishingSection() {
                     <td><StatusBadge status={c.status} /></td>
                     <td>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setViewCase(c)}>👁 View</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setViewCase(c)}><MdVisibility className="mi" size={14} /> View</button>
                         <button
                           className="btn btn-ghost btn-sm"
                           disabled={!c.qrCodeUrl}
                           title={c.qrCodeUrl ? 'Print production label' : 'No QR code on this case yet'}
                           onClick={() => printCaseLabel(c)}
                         >
-                          🖨️ Print Label
+                          <MdPrint className="mi" size={14} /> Print Label
                         </button>
                       </div>
                     </td>
@@ -898,10 +907,10 @@ function TrackOrderSection() {
   return (
     <>
       <div className="card" style={{ marginBottom: 16, padding: '18px 20px' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12 }}>🔍 Search / Track Order Status</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><MdSearch size={16} /> Search / Track Order Status</div>
         <div style={{ display: 'flex', gap: 10 }}>
           <div className="search-input" style={{ flex: 1, margin: 0 }}>
-            <span className="icon">🔍</span>
+            <span className="icon mi"><MdSearch size={16} /></span>
             <input
               placeholder="Case number, patient name, or clinic…"
               value={search}
@@ -947,7 +956,7 @@ function TrackOrderSection() {
               <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Searching…</div>
             ) : cases.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">🔍</div>
+                <div className="empty-icon mi"><MdSearch size={32} /></div>
                 <div className="empty-title">No cases found</div>
                 <p>Try a different case number, patient name, or clinic.</p>
               </div>
@@ -1008,11 +1017,11 @@ function TrackOrderSection() {
 
 // ─── Main Reception Dashboard ─────────────────────────────
 const SECTIONS = [
-  { id: 'dashboard',  label: 'Dashboard',      icon: '📊' },
-  { id: 'accept',     label: 'Accept Case',    icon: '📥' },
-  { id: 'finishing',  label: 'In Finishing',   icon: '✨' },
-  { id: 'ready',      label: 'Ready Orders',   icon: '🚚' },
-  { id: 'track',      label: 'Track Order',    icon: '🔍' },
+  { id: 'dashboard',  label: 'Dashboard',      icon: MdDashboard },
+  { id: 'accept',     label: 'Accept Case',    icon: MdMoveToInbox },
+  { id: 'finishing',  label: 'In Finishing',   icon: MdAutoAwesome },
+  { id: 'ready',      label: 'Ready Orders',   icon: MdLocalShipping },
+  { id: 'track',      label: 'Track Order',    icon: MdSearch },
 ];
 
 export default function Dashboard() {
@@ -1081,17 +1090,17 @@ export default function Dashboard() {
           className={`nav-item${section === s.id ? ' active' : ''}`}
           onClick={() => { setSection(s.id); if (close) close(); }}
         >
-          <span>{s.icon}</span> {s.label}
+          <s.icon className="mi" size={17} /> {s.label}
           {badges[s.id] > 0 && <span className="badge-count">{badges[s.id]}</span>}
         </button>
       ))}
 
       <div className="nav-section-label">Cases</div>
       <button className="nav-item" onClick={() => navigate('/cases/new')}>
-        <span>➕</span> New Case
+        <MdAdd className="mi" size={17} /> New Case
       </button>
       <button className="nav-item" onClick={() => navigate('/cases')}>
-        <span>📋</span> All Cases
+        <MdAssignment className="mi" size={17} /> All Cases
       </button>
     </nav>
   );
@@ -1101,8 +1110,8 @@ export default function Dashboard() {
       {/* Mobile topbar */}
       <div className="mobile-topbar">
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
-        <span className="mobile-topbar-title">
-          {SECTIONS.find(s => s.id === section)?.icon}{' '}
+        <span className="mobile-topbar-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {(() => { const Icon = SECTIONS.find(s => s.id === section)?.icon; return Icon ? <Icon className="mi" size={16} /> : null; })()}
           {SECTIONS.find(s => s.id === section)?.label ?? 'Reception'}
         </span>
         <div className="live-dot" />
@@ -1123,7 +1132,7 @@ export default function Dashboard() {
           <div className="user-info">
             <div className="user-avatar">{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Receptionist</div></div>
-            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+            <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
       </div>
@@ -1140,7 +1149,7 @@ export default function Dashboard() {
           <div className="user-info">
             <div className="user-avatar">{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Receptionist</div></div>
-            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+            <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
       </aside>
@@ -1148,8 +1157,8 @@ export default function Dashboard() {
       {/* Main content */}
       <main className="main">
         <div className="topbar">
-          <div className="topbar-title">
-            {SECTIONS.find(s => s.id === section)?.icon}{' '}
+          <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {(() => { const Icon = SECTIONS.find(s => s.id === section)?.icon; return Icon ? <Icon className="mi" size={17} /> : null; })()}
             {SECTIONS.find(s => s.id === section)?.label ?? 'Dashboard'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1173,7 +1182,7 @@ export default function Dashboard() {
                   const today = new Date().toISOString().slice(0, 10);
                   navigate(`/cases?dateFrom=${today}&dateTo=${today}&label=Orders+Today`);
                 }}>
-                  <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
+                  <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdAssignment size={18} /></div>
                   <div className="stat-label">Orders Today</div>
                   <div className="stat-value">{stats?.todayCases ?? '—'}</div>
                   <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View today's orders ↗</div>
@@ -1182,7 +1191,7 @@ export default function Dashboard() {
                   const today = new Date().toISOString().slice(0, 10);
                   navigate(`/cases?remake=true&dateFrom=${today}&dateTo=${today}&label=Remakes+Today`);
                 }}>
-                  <div className="stat-icon" style={{ background: '#FFF1F2' }}>🔄</div>
+                  <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdAutorenew size={18} /></div>
                   <div className="stat-label">Remake Today</div>
                   <div className="stat-value" style={{ color: stats?.remakeCount > 0 ? 'var(--red)' : 'var(--text-1)' }}>
                     {stats?.remakeCount ?? '—'}
@@ -1193,7 +1202,7 @@ export default function Dashboard() {
                   const today = new Date().toISOString().slice(0, 10);
                   navigate(`/cases?redo=true&dateFrom=${today}&dateTo=${today}&label=Redo+Today`);
                 }}>
-                  <div className="stat-icon" style={{ background: '#FFF7ED' }}>♻️</div>
+                  <div className="stat-icon" style={{ background: '#FFF7ED' }}><MdAutorenew size={18} /></div>
                   <div className="stat-label">Redo Today</div>
                   <div className="stat-value" style={{ color: stats?.redoCases > 0 ? 'var(--amber)' : 'var(--text-1)' }}>
                     {stats?.redoCases ?? '—'}
@@ -1204,7 +1213,7 @@ export default function Dashboard() {
                   const today = new Date().toISOString().slice(0, 10);
                   navigate(`/cases?status=DELIVERED&dateFrom=${today}&dateTo=${today}&label=Delivered+Today`);
                 }}>
-                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdCheckCircle size={18} /></div>
                   <div className="stat-label">Delivered Today</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{stats?.deliveredToday ?? '—'}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View delivered ↗</div>
@@ -1216,19 +1225,19 @@ export default function Dashboard() {
               </div>
               <div className="stats-grid" style={{ marginBottom: 24 }}>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setSection('accept')}>
-                  <div className="stat-icon" style={{ background: '#FFF7ED' }}>🛵</div>
+                  <div className="stat-icon" style={{ background: '#FFF7ED' }}><MdTwoWheeler size={18} /></div>
                   <div className="stat-label">Awaiting Pickup</div>
                   <div className="stat-value" style={{ color: '#EA580C' }}>{stats?.pendingPickups ?? '—'}</div>
                   <div className="stat-sub" style={{ color: '#EA580C', fontWeight: 600 }}>View Accept Cases ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/cases?multiStatus=${encodeURIComponent(PRODUCTION_STATUSES)}&label=In+Production`)}>
-                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
+                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}><MdPendingActions size={18} /></div>
                   <div className="stat-label">In Production</div>
                   <div className="stat-value" style={{ color: 'var(--amber)' }}>{stats?.pendingCases ?? '—'}</div>
                   <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View in-production ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setSection('ready')}>
-                  <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>🚚</div>
+                  <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}><MdLocalShipping size={18} /></div>
                   <div className="stat-label">Ready to Dispatch</div>
                   <div className="stat-value" style={{ color: stats?.readyToDispatch > 0 ? 'var(--accent)' : 'var(--text-1)' }}>
                     {stats?.readyToDispatch ?? '—'}

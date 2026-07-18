@@ -6,6 +6,10 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import {
+  MdEmail, MdBolt, MdWarning, MdAutorenew, MdTwoWheeler, MdMoveToInbox,
+  MdLocalShipping,
+} from 'react-icons/md';
 
 // ── Visual group ordering for the work-type dropdown ─────
 // Types present in the pricing DB will be slotted into these groups.
@@ -97,7 +101,7 @@ const FLAT_PRICE_TYPES = new Set([
   'Sports Guard', 'Bite Splint', 'Bleaching Tray', 'Clear Aligner Setup', 'Gingival Mask',
 ]);
 
-const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 500 };
+const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 3 };
 
 // ── Page ──────────────────────────────────────────────────
 export default function NewCase() {
@@ -264,7 +268,7 @@ export default function NewCase() {
       const isEmailFile = form.intakeMethod === 'EMAIL_3D_FILE';
       const archLabel = [form.archUpper && 'Upper', form.archLower && 'Lower'].filter(Boolean).join(' & ');
       const scanNote = isEmailFile
-        ? `📧 3D file intake — Arches scanned: ${archLabel || 'none selected'}${archFee > 0 ? ` (Br ${archFee.toLocaleString('en-US')} scan fee)` : ''}`
+        ? `3D file intake — Arches scanned: ${archLabel || 'none selected'}${archFee > 0 ? ` (Br ${archFee.toLocaleString('en-US')} scan fee)` : ''}`
         : null;
       const res = await api.post('/cases', {
         ...form,
@@ -305,11 +309,11 @@ export default function NewCase() {
     }
     return FLAT_PRICE_TYPES.has(form.workType) ? (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? '⚡ ' : ''}flat — Br {unitPrice.toLocaleString('en-US')}{archNote} = <strong style={{ color: 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}flat — Br {unitPrice.toLocaleString('en-US')}{archNote} = <strong style={{ color: 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
       </span>
     ) : (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? '⚡ ' : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
       </span>
     );
   })();
@@ -364,7 +368,7 @@ export default function NewCase() {
                     onChange={e => { set('doctorName')(e); setErrors(prev => ({ ...prev, doctorName: '' })); }}
                     style={errors.doctorName ? { borderColor: 'var(--red)' } : {}}
                   />
-                  {errors.doctorName && <div style={errStyle}>⚠ {errors.doctorName}</div>}
+                  {errors.doctorName && <div style={errStyle}><MdWarning className="mi" size={12} /> {errors.doctorName}</div>}
                 </div>
                 <div className="form-group">
                   <label>Contact / Phone *</label>
@@ -375,7 +379,7 @@ export default function NewCase() {
                     onChange={e => { set('doctorPhone')(e); setErrors(prev => ({ ...prev, doctorPhone: '' })); }}
                     style={errors.doctorPhone ? { borderColor: 'var(--red)' } : {}}
                   />
-                  {errors.doctorPhone && <div style={errStyle}>⚠ {errors.doctorPhone}</div>}
+                  {errors.doctorPhone && <div style={errStyle}><MdWarning className="mi" size={12} /> {errors.doctorPhone}</div>}
                 </div>
               </div>
 
@@ -396,7 +400,7 @@ export default function NewCase() {
                     onChange={e => { set('shade')(e); setErrors(prev => ({ ...prev, shade: '' })); }}
                     style={errors.shade ? { borderColor: 'var(--red)' } : {}}
                   />
-                  {errors.shade && <div style={errStyle}>⚠ {errors.shade}</div>}
+                  {errors.shade && <div style={errStyle}><MdWarning className="mi" size={12} /> {errors.shade}</div>}
                 </div>
               </div>
 
@@ -456,12 +460,12 @@ export default function NewCase() {
                   {[
                     {
                       field: 'remake', checked: form.remake,
-                      label: '🔄 Remake', desc: 'Free — no charge to clinic',
+                      label: 'Remake', icon: MdAutorenew, desc: 'Free — no charge to clinic',
                       color: 'var(--red)', bg: '#FFF1F2', border: '#FECACA',
                     },
                     {
                       field: 'redo', checked: form.redo,
-                      label: '♻️ Redo', desc: '50% of work-type price',
+                      label: 'Redo', icon: MdAutorenew, desc: '50% of work-type price',
                       color: 'var(--amber)', bg: 'var(--amber-dim)', border: '#FCD34D',
                     },
                   ].map(opt => (
@@ -483,8 +487,8 @@ export default function NewCase() {
                         style={{ width: 16, height: 16, accentColor: opt.color, cursor: 'pointer' }}
                       />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? opt.color : 'var(--text-1)' }}>
-                          {opt.label}
+                        <div style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? opt.color : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <opt.icon size={13} /> {opt.label}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
                       </div>
@@ -508,9 +512,9 @@ export default function NewCase() {
                 <label>Intake Method</label>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {[
-                    { value: 'PICKUP',        label: 'To Be Picked Up',  icon: '🛵', desc: 'Delivery exec will collect from clinic' },
-                    { value: 'DROP_OFF',      label: 'Dropped at Lab',   icon: '📥', desc: 'Impression already received at lab' },
-                    { value: 'EMAIL_3D_FILE', label: '3D File (Emailed)', icon: '📧', desc: 'Digital scan file sent by dentist via email' },
+                    { value: 'PICKUP',        label: 'To Be Picked Up',  icon: MdTwoWheeler, desc: 'Delivery exec will collect from clinic' },
+                    { value: 'DROP_OFF',      label: 'Dropped at Lab',   icon: MdMoveToInbox, desc: 'Impression already received at lab' },
+                    { value: 'EMAIL_3D_FILE', label: '3D File (Emailed)', icon: MdEmail, desc: 'Digital scan file sent by dentist via email' },
                   ].map(opt => (
                     <button
                       key={opt.value}
@@ -524,7 +528,7 @@ export default function NewCase() {
                         transition: 'border-color .15s, background .15s',
                       }}
                     >
-                      <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                      <opt.icon size={20} className="mi" />
                       <div style={{ textAlign: 'left' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: form.intakeMethod === opt.value ? 'var(--blue)' : 'var(--text-1)' }}>
                           {opt.label}
@@ -575,8 +579,8 @@ export default function NewCase() {
                 <label>Delivery Type</label>
                 <div style={{ display: 'flex', gap: 10 }}>
                   {[
-                    { value: 'NORMAL',  label: 'Normal Delivery',  icon: '🚚', desc: 'Standard turnaround' },
-                    { value: 'EXPRESS', label: 'Express Delivery', icon: '⚡', desc: 'Priority / urgent' },
+                    { value: 'NORMAL',  label: 'Normal Delivery',  icon: MdLocalShipping, desc: 'Standard turnaround' },
+                    { value: 'EXPRESS', label: 'Express Delivery', icon: MdBolt, desc: 'Priority / urgent' },
                   ].map(opt => (
                     <button
                       key={opt.value}
@@ -590,7 +594,7 @@ export default function NewCase() {
                         transition: 'border-color .15s, background .15s',
                       }}
                     >
-                      <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                      <opt.icon size={20} className="mi" />
                       <div style={{ textAlign: 'left' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-1)' }}>
                           {opt.label}

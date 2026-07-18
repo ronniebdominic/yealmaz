@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import CaseDetailModal from '../components/CaseDetailModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { MdFileDownload, MdSearch, MdAutorenew, MdAssignment } from 'react-icons/md';
 
 const STATUS_FILTERS = [
   { label: 'All',             value: '' },
@@ -110,7 +111,7 @@ export default function Cases() {
         <div className="topbar-title">All Cases</div>
         <div className="topbar-right" style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={exportExcel} disabled={exporting}>
-            {exporting ? 'Exporting…' : '⬇ Export Excel'}
+            {exporting ? 'Exporting…' : <><MdFileDownload className="mi" size={14} /> Export Excel</>}
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/cases/new')}>
             + New Case
@@ -126,8 +127,8 @@ export default function Cases() {
             background: 'var(--accent-dim)', border: '1px solid var(--accent)', borderRadius: 10,
             padding: '10px 16px', marginBottom: 14, fontSize: 13,
           }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-              🔍 Filtered: <strong>{filterLabel}</strong>
+            <span style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <MdSearch size={14} /> Filtered: <strong>{filterLabel}</strong>
             </span>
             <button className="btn btn-ghost btn-sm" onClick={reset} style={{ color: 'var(--red)' }}>
               ✕ Clear filter
@@ -138,7 +139,7 @@ export default function Cases() {
         {/* Search + date + clinic row */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="search-input" style={{ flex: 2, minWidth: 200 }}>
-            <span className="icon">🔍</span>
+            <span className="icon mi"><MdSearch size={16} /></span>
             <input
               placeholder="Search by clinic, patient name or case number…"
               value={search}
@@ -186,13 +187,13 @@ export default function Cases() {
           {remake && (
             <button className="filter-chip active" style={{ background: 'var(--red)', color: '#fff' }}
               onClick={() => { setRemake(false); setPage(1); }}>
-              🔄 Remake ✕
+              <MdAutorenew className="mi" size={13} /> Remake ✕
             </button>
           )}
           {redo && (
             <button className="filter-chip active" style={{ background: 'var(--amber)', color: '#fff' }}
               onClick={() => { setRedo(false); setPage(1); }}>
-              ♻️ Redo ✕
+              <MdAutorenew className="mi" size={13} /> Redo ✕
             </button>
           )}
           {multiStatus && (
@@ -212,7 +213,7 @@ export default function Cases() {
               <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading cases…</div>
             ) : cases.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
+                <div className="empty-icon mi"><MdAssignment size={32} /></div>
                 <div className="empty-title">No cases found</div>
                 <p>Try a different clinic, filter or search term</p>
               </div>
