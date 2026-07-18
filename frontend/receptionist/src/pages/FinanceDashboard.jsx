@@ -12,6 +12,15 @@ import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import {
+  MdInventory2, MdLocalHospital, MdLightbulb, MdBolt, MdSend, MdPrint,
+  MdWarning, MdCheckCircle, MdCancel, MdSearch, MdSchedule, MdPendingActions,
+  MdCreditCard, MdCameraAlt, MdEdit, MdPaid, MdImage, MdDescription,
+  MdReceipt, MdInbox, MdEventNote, MdHandshake, MdAccountBalance,
+  MdAssignment, MdTrendingUp, MdAccountBalanceWallet, MdMoneyOff,
+  MdCalendarToday, MdDashboard, MdCelebration, MdCheck, MdClose, MdFileDownload,
+  MdLogout,
+} from 'react-icons/md';
 
 const PAGE_SIZE = 15;
 const HIST_SIZE = 20;
@@ -191,7 +200,7 @@ function SendPaymentRequestModal({ caseData, onDone, onClose }) {
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
               {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}{caseData.toothNumbers ? ` · Teeth ${caseData.toothNumbers}` : ''}{caseData.shade ? ` · Shade ${caseData.shade}` : ''}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>🏥 {caseData.clinic?.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocalHospital size={12} /> {caseData.clinic?.name}</div>
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Amount Due (Br) *</label>
@@ -204,11 +213,11 @@ function SendPaymentRequestModal({ caseData, onDone, onClose }) {
             />
             {calcHint && (
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                <span>💡</span>
+                <MdLightbulb size={13} />
                 <span>
                   Br {calcHint.unitPrice.toLocaleString('en-US')}
                   {!calcHint.isFlat && calcHint.count > 1 && ` × ${calcHint.count} units`}
-                  {calcHint.isExpress && ' · ⚡ express'}
+                  {calcHint.isExpress && <> · <MdBolt size={11} style={{ verticalAlign: 'middle' }} /> express</>}
                   {calcHint.isRedo && ' · 50% redo'}
                   {' = '}
                   <strong style={{ color: 'var(--text-1)' }}>Br {calcHint.total.toLocaleString('en-US')}</strong>
@@ -232,7 +241,7 @@ function SendPaymentRequestModal({ caseData, onDone, onClose }) {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={loading}>
-              {loading ? 'Sending…' : '📨 Send Payment Request'}
+              {loading ? 'Sending…' : <><MdSend className="mi" size={14} /> Send Payment Request</>}
             </button>
           </div>
         </div>
@@ -263,7 +272,7 @@ function InvoiceViewModal({ caseData, onClose }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn btn-primary btn-sm" onClick={printInvoice}>🖨️ Print / Save PDF</button>
+            <button className="btn btn-primary btn-sm" onClick={printInvoice}><MdPrint className="mi" size={14} /> Print / Save PDF</button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
         </div>
@@ -271,7 +280,7 @@ function InvoiceViewModal({ caseData, onClose }) {
           <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ background: 'var(--navy)', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>🦷 {LAB.name}</div>
+                <div style={{ fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6 }}><MdInventory2 size={16} /> {LAB.name}</div>
                 <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{LAB.address} · {LAB.phone}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -347,7 +356,7 @@ function InvoiceViewModal({ caseData, onClose }) {
 function ErrorState({ message, onRetry }) {
   return (
     <div style={{ textAlign: 'center', padding: 60 }}>
-      <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
+      <div style={{ fontSize: 36, marginBottom: 12, display: 'flex', justifyContent: 'center' }}><MdWarning size={36} /></div>
       <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)', marginBottom: 8 }}>
         Failed to load data
       </div>
@@ -362,18 +371,18 @@ function ErrorState({ message, onRetry }) {
 // with their outcome — success / pending / failed — and lets finance verify or
 // reject the ones still awaiting review.
 const OUTCOME_META = {
-  SUCCESS:          { label: '✅ Success',  color: 'var(--green)', bg: 'var(--green-dim)' },
-  FAILED:           { label: '❌ Failed',   color: 'var(--red)',   bg: '#FFF1F2' },
-  PENDING_REVIEW:   { label: '🔎 Awaiting Review', color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  AWAITING_PAYMENT: { label: '🕒 Request Sent',    color: 'var(--blue)',  bg: '#EFF6FF' },
-  PENDING_GATEWAY:  { label: '⏳ In Progress',     color: 'var(--blue)',  bg: '#EFF6FF' },
-  PENDING:          { label: '⏳ Pending',  color: 'var(--text-3)', bg: 'var(--surface-2)' },
+  SUCCESS:          { label: 'Success',  icon: MdCheckCircle, color: 'var(--green)', bg: 'var(--green-dim)' },
+  FAILED:           { label: 'Failed',   icon: MdCancel, color: 'var(--red)',   bg: '#FFF1F2' },
+  PENDING_REVIEW:   { label: 'Awaiting Review', icon: MdSearch, color: 'var(--amber)', bg: 'var(--amber-dim)' },
+  AWAITING_PAYMENT: { label: 'Request Sent',    icon: MdSchedule, color: 'var(--blue)',  bg: '#EFF6FF' },
+  PENDING_GATEWAY:  { label: 'In Progress',     icon: MdPendingActions, color: 'var(--blue)',  bg: '#EFF6FF' },
+  PENDING:          { label: 'Pending',  icon: MdPendingActions, color: 'var(--text-3)', bg: 'var(--surface-2)' },
 };
 const METHOD_META = {
-  GATEWAY:    { label: '💳 Online', color: 'var(--blue)' },
-  SCREENSHOT: { label: '📸 Screenshot', color: '#6D28D9' },
-  REQUESTED:  { label: '🕒 Requested', color: 'var(--text-3)' },
-  MANUAL:     { label: '✍️ Manual', color: 'var(--text-3)' },
+  GATEWAY:    { label: 'Online', icon: MdCreditCard, color: 'var(--blue)' },
+  SCREENSHOT: { label: 'Screenshot', icon: MdCameraAlt, color: '#6D28D9' },
+  REQUESTED:  { label: 'Requested', icon: MdSchedule, color: 'var(--text-3)' },
+  MANUAL:     { label: 'Manual', icon: MdEdit, color: 'var(--text-3)' },
 };
 
 function ScreenshotsTab({ queryClient }) {
@@ -396,7 +405,7 @@ function ScreenshotsTab({ queryClient }) {
     mutationFn: ({ caseId, action, rejectionReason }) =>
       api.post(`/payments/${caseId}/verify`, { action, rejectionReason }),
     onSuccess: (_, { action }) => {
-      toast.success(action === 'APPROVE' ? '✅ Payment approved — case ready for dispatch.' : '❌ Payment rejected.');
+      toast.success(action === 'APPROVE' ? 'Payment approved — case ready for dispatch.' : 'Payment rejected.');
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
@@ -436,19 +445,19 @@ function ScreenshotsTab({ queryClient }) {
       {/* Outcome summary */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 16 }}>
         <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('success')}>
-          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdCheckCircle size={18} /></div>
           <div className="stat-label">Successful</div>
           <div className="stat-value" style={{ color: 'var(--green)' }}>{counts.success}</div>
           <div className="stat-sub">Paid via clinic app</div>
         </div>
         <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('pending')}>
-          <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>⏳</div>
+          <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}><MdPendingActions size={18} /></div>
           <div className="stat-label">Pending</div>
           <div className="stat-value" style={{ color: 'var(--amber)' }}>{counts.pending}</div>
           <div className="stat-sub">Request sent · awaiting payment / review</div>
         </div>
         <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('failed')}>
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}>❌</div>
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdCancel size={18} /></div>
           <div className="stat-label">Failed</div>
           <div className="stat-value" style={{ color: 'var(--red)' }}>{counts.failed}</div>
           <div className="stat-sub">Rejected / unsuccessful</div>
@@ -457,10 +466,10 @@ function ScreenshotsTab({ queryClient }) {
 
       <div className="card">
         <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
-          <div className="card-title">💳 Payment Gateway Transactions</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdCreditCard className="mi" size={15} /> Payment Gateway Transactions</div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div className="search-input" style={{ minWidth: 200 }}>
-              <span className="icon">🔍</span>
+              <span className="icon mi"><MdSearch size={16} /></span>
               <input placeholder="Search clinic, case #, patient…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             {search && <button className="btn btn-ghost btn-sm" onClick={() => setSearch('')} style={{ color: 'var(--red)' }}>✕</button>}
@@ -478,7 +487,7 @@ function ScreenshotsTab({ queryClient }) {
         <div className="table-wrap">
           {filtered.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">💳</div>
+              <div className="empty-icon mi"><MdCreditCard size={32} /></div>
               <div className="empty-title">No transactions</div>
               <p>Payments made by clinics through the app appear here with their success / failure status.</p>
             </div>
@@ -500,11 +509,11 @@ function ScreenshotsTab({ queryClient }) {
                       <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{t.caseNumber}</td>
                       <td style={{ fontWeight: 600 }}>{t.clinicName}</td>
                       <td>{t.patientName}</td>
-                      <td><span style={{ fontSize: 12, fontWeight: 700, color: mm.color }}>{mm.label}</span></td>
+                      <td><span style={{ fontSize: 12, fontWeight: 700, color: mm.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}><mm.icon size={13} /> {mm.label}</span></td>
                       <td style={{ textAlign: 'right', fontWeight: 700 }}>{t.amount ? `Br ${t.amount.toLocaleString('en-US')}` : '—'}</td>
                       <td>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: om.bg, color: om.color, whiteSpace: 'nowrap' }}>
-                          {om.label}
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: om.bg, color: om.color, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <om.icon size={12} /> {om.label}
                         </span>
                         {t.outcome === 'FAILED' && t.rejectionReason && (
                           <div style={{ fontSize: 10, color: 'var(--red)', marginTop: 2 }}>{t.rejectionReason}</div>
@@ -519,8 +528,8 @@ function ScreenshotsTab({ queryClient }) {
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {t.outcome === 'PENDING_REVIEW' && (
                             <>
-                              <button className="btn btn-success btn-sm" onClick={() => verify(t.caseId, 'APPROVE')} disabled={!!processing}>✓ Approve</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => verify(t.caseId, 'REJECT')} disabled={!!processing}>✗</button>
+                              <button className="btn btn-success btn-sm" onClick={() => verify(t.caseId, 'APPROVE')} disabled={!!processing}><MdCheck className="mi" size={14} /> Approve</button>
+                              <button className="btn btn-danger btn-sm" onClick={() => verify(t.caseId, 'REJECT')} disabled={!!processing}><MdClose className="mi" size={14} /></button>
                             </>
                           )}
                           {/* Manual cash / bank collection — for any payment still outstanding */}
@@ -530,10 +539,10 @@ function ScreenshotsTab({ queryClient }) {
                                 id: t.caseId, caseNumber: t.caseNumber, patientName: t.patientName,
                                 workType: t.workType, totalAmount: t.amount, clinic: { name: t.clinicName },
                               })}
-                              style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                            >💰 Collect</button>
+                              style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            ><MdPaid size={13} /> Collect</button>
                           )}
-                          {t.screenshotUrl && <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}>🖼️</button>}
+                          {t.screenshotUrl && <button className="btn btn-ghost btn-sm" onClick={() => window.open(t.screenshotUrl, '_blank')}><MdImage className="mi" size={14} /></button>}
                           {t.outcome === 'SUCCESS' && !t.screenshotUrl && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>—</span>}
                         </div>
                       </td>
@@ -586,7 +595,10 @@ function InvoicesPanel() {
   const doSearch = (v) => { setSearch(v); };
   const applySearch = () => { setSubmitted(search); setPage(1); };
 
-  const methodLabel = (inv) => inv.chapaTxRef ? '💳 Online' : inv.screenshotUrl ? '📸 Screenshot' : '✍️ Manual';
+  const methodLabel = (inv) => {
+    const [Icon, text] = inv.chapaTxRef ? [MdCreditCard, 'Online'] : inv.screenshotUrl ? [MdCameraAlt, 'Screenshot'] : [MdEdit, 'Manual'];
+    return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon size={13} /> {text}</span>;
+  };
 
   if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading invoices…</div>;
   if (isError)   return <ErrorState message="Could not load invoices." onRetry={refetch} />;
@@ -596,13 +608,13 @@ function InvoicesPanel() {
       {/* Summary */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: 16 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
+          <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdDescription size={18} /></div>
           <div className="stat-label">Invoices Issued</div>
           <div className="stat-value" style={{ color: 'var(--blue)' }}>{pagination.total ?? invoices.length}</div>
           <div className="stat-sub">Generated after payment</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdPaid size={18} /></div>
           <div className="stat-label">Total Invoiced</div>
           <div className="stat-value" style={{ color: 'var(--green)', fontSize: totalAmount >= 1000000 ? 16 : 22 }}>{ETB(totalAmount)}</div>
           <div className="stat-sub">{submitted ? 'Matching search' : 'All issued invoices'}</div>
@@ -611,10 +623,10 @@ function InvoicesPanel() {
 
       <div className="card">
         <div className="card-header">
-          <div className="card-title">📄 Issued Invoices</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdDescription className="mi" size={15} /> Issued Invoices</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div className="search-input" style={{ minWidth: 220 }}>
-              <span className="icon">🔍</span>
+              <span className="icon mi"><MdSearch size={16} /></span>
               <input placeholder="Search invoice #, clinic, case…" value={search}
                 onChange={e => doSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && applySearch()} />
             </div>
@@ -639,7 +651,7 @@ function InvoicesPanel() {
         <div className="table-wrap">
           {invoices.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">🧾</div>
+              <div className="empty-icon mi"><MdReceipt size={32} /></div>
               <div className="empty-title">No invoices yet</div>
               <p>Real invoices are generated automatically once a payment is verified. They will appear here, ready to view and print.</p>
             </div>
@@ -666,7 +678,7 @@ function InvoicesPanel() {
                     <td style={{ fontSize: 12 }}>{methodLabel(inv)}</td>
                     <td>
                       <button className="btn btn-primary btn-sm" onClick={() => setViewInvoice({ ...inv.case, payment: inv })}>
-                        🧾 View / Print
+                        <MdReceipt className="mi" size={14} /> View / Print
                       </button>
                     </td>
                   </tr>
@@ -696,8 +708,8 @@ function InvoicesPanel() {
 // Two views: issued Invoices, and Verify Payments (gateway success/failed +
 // approve/reject screenshot uploads — folded in from the old Payment Gateway tab).
 const BILLING_VIEWS = [
-  { id: 'invoices', label: '📄 Invoices' },
-  { id: 'verify',   label: '💳 Verify Payments' },
+  { id: 'invoices', label: 'Invoices', icon: MdDescription },
+  { id: 'verify',   label: 'Verify Payments', icon: MdCreditCard },
 ];
 function BillingTab({ view = 'invoices', onView }) {
   const queryClient = useQueryClient();
@@ -705,8 +717,8 @@ function BillingTab({ view = 'invoices', onView }) {
     <>
       <div className="filters" style={{ margin: '0 0 18px', flexWrap: 'wrap' }}>
         {BILLING_VIEWS.map(v => (
-          <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)}>
-            {v.label}
+          <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <v.icon size={14} /> {v.label}
           </button>
         ))}
       </div>
@@ -899,14 +911,14 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
       <div className="modal" style={{ maxWidth: 640, width: '100%' }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">🧾 Generate Bill</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-              🏥 {clinic.name}{clinic.billingCycle && clinic.billingCycle !== 'NONE' ? ` · ${clinic.billingCycle.toLowerCase()} cycle` : ''}
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdReceipt className="mi" size={16} /> Generate Bill</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <MdLocalHospital size={12} /> {clinic.name}{clinic.billingCycle && clinic.billingCycle !== 'NONE' ? ` · ${clinic.billingCycle.toLowerCase()} cycle` : ''}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="btn btn-primary btn-sm" onClick={print} disabled={loading || cases.length === 0}>
-              🖨️ Print / Save PDF
+              <MdPrint className="mi" size={14} /> Print / Save PDF
             </button>
             <button className="modal-close" onClick={onClose}>×</button>
           </div>
@@ -969,7 +981,7 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)' }}>Loading cases…</div>
           ) : cases.length === 0 ? (
             <div className="empty-state" style={{ padding: 32 }}>
-              <div className="empty-icon">📭</div>
+              <div className="empty-icon mi"><MdInbox size={32} /></div>
               <div className="empty-title">No outstanding cases</div>
               <p>No pending cases found for this period.</p>
             </div>
@@ -1054,8 +1066,8 @@ function BillingCycleModal({ clinic, onClose, onSaved }) {
       <div className="modal" style={{ maxWidth: 460, width: '100%' }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">🗓 Billing Schedule</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>🏥 {clinic.name}</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdEventNote className="mi" size={16} /> Billing Schedule</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocalHospital size={12} /> {clinic.name}</div>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
@@ -1126,7 +1138,7 @@ function CollectModal({ caseData, onDone, onClose }) {
         notes:  notes  || undefined,
         taxWithheld: withholdTax && taxWithheld ? parseFloat(taxWithheld) : undefined,
       });
-      toast.success(`✅ Payment collected — ${caseData.caseNumber}`);
+      toast.success(`Payment collected — ${caseData.caseNumber}`);
       onDone();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record payment');
@@ -1138,7 +1150,7 @@ function CollectModal({ caseData, onDone, onClose }) {
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">💰 Manual Payment Collection</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdPaid className="mi" size={16} /> Manual Payment Collection</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
               {isTrusted ? 'Trusted partner — cash / bank collection' : 'Record cash or bank transfer received directly'}
             </div>
@@ -1156,9 +1168,9 @@ function CollectModal({ caseData, onDone, onClose }) {
             <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
               {caseData.workType}{caseData.toothNumbers ? ` · Teeth ${caseData.toothNumbers}` : ''}
             </div>
-            <div style={{ fontSize: 12, marginTop: 2 }}>🏥 {caseData.clinic?.name}</div>
+            <div style={{ fontSize: 12, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocalHospital size={12} /> {caseData.clinic?.name}</div>
             {isTrusted && (
-              <span style={{ display: 'inline-block', marginTop: 6, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9' }}>🤝 Trusted Partner</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9' }}><MdHandshake size={11} /> Trusted Partner</span>
             )}
           </div>
 
@@ -1184,7 +1196,7 @@ function CollectModal({ caseData, onDone, onClose }) {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
               <input type="checkbox" checked={withholdTax} onChange={e => setWithholdTax(e.target.checked)} />
-              🏛️ Clinic withheld tax for government filing
+              <MdAccountBalance className="mi" size={14} /> Clinic withheld tax for government filing
             </label>
             {withholdTax && (
               <div style={{ marginTop: 8 }}>
@@ -1301,7 +1313,7 @@ function TrustedPartnersTab({ queryClient }) {
   if (isError)   return <div style={{ textAlign: 'center', color: 'var(--red)', padding: 60 }}>Could not load trusted partners. <button className="btn btn-ghost btn-sm" onClick={refetch}>Retry</button></div>;
   if (summary.length === 0) return (
     <div className="empty-state">
-      <div className="empty-icon">🤝</div>
+      <div className="empty-icon mi"><MdHandshake size={32} /></div>
       <div className="empty-title">No trusted partners found</div>
       <p>Clinics marked as Trusted Partners will appear here.</p>
     </div>
@@ -1316,31 +1328,31 @@ function TrustedPartnersTab({ queryClient }) {
       {/* Summary KPIs */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
+          <div className="stat-icon" style={{ background: '#F5F3FF' }}><MdHandshake size={18} /></div>
           <div className="stat-label">Trusted Partners</div>
           <div className="stat-value" style={{ color: '#6D28D9' }}>{summary.length}</div>
           <div className="stat-sub">{scheduled} on a billing schedule</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#EEF2FF' }}>📋</div>
+          <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdAssignment size={18} /></div>
           <div className="stat-label">Total Orders</div>
           <div className="stat-value" style={{ color: 'var(--blue)' }}>{numFmt(totals.totalOrders)}</div>
           <div className="stat-sub">{numFmt(totals.deliveredOrders)} delivered · {numFmt(totals.inProgress)} in progress</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdPaid size={18} /></div>
           <div className="stat-label">Payments Received</div>
           <div className="stat-value" style={{ color: 'var(--green)', fontSize: totals.paymentsReceived >= 1000000 ? 16 : 22 }}>{ETB(totals.paymentsReceived)}</div>
           <div className="stat-sub">Verified</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
           <div className="stat-label">Outstanding</div>
           <div className="stat-value" style={{ color: 'var(--red)', fontSize: totals.outstanding >= 1000000 ? 16 : 22 }}>{ETB(totals.outstanding)}</div>
           <div className="stat-sub">Pending collection</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: billsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}>🗓</div>
+          <div className="stat-icon" style={{ background: billsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}><MdEventNote size={18} /></div>
           <div className="stat-label">Bills Due</div>
           <div className="stat-value" style={{ color: billsDue > 0 ? 'var(--red)' : 'var(--green)' }}>{billsDue}</div>
           <div className="stat-sub">{billsDue > 0 ? 'Scheduled bills overdue' : 'All schedules up to date'}</div>
@@ -1350,7 +1362,7 @@ function TrustedPartnersTab({ queryClient }) {
       {/* Partner table */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">🤝 Trusted Partner Clinics</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdHandshake className="mi" size={15} /> Trusted Partner Clinics</div>
           <ExportMenu
             data={summary}
             columns={[
@@ -1395,7 +1407,7 @@ function TrustedPartnersTab({ queryClient }) {
                           <div style={{ fontWeight: 700, color: 'var(--text-1)' }}>{c.name}</div>
                           {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
                         </div>
-                        <span className="badge badge-trusted" style={{ fontSize: 10 }}>🤝 Trusted</span>
+                        <span className="badge badge-trusted" style={{ fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdHandshake size={10} /> Trusted</span>
                       </div>
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{numFmt(c.totalOrders)}</td>
@@ -1416,16 +1428,16 @@ function TrustedPartnersTab({ queryClient }) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                           {cycleBadge(c.billingCycle)}
-                          {c.billOverdue && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)' }}>⚠ due</span>}
+                          {c.billOverdue && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 2 }}><MdWarning size={10} /> due</span>}
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button onClick={() => setStatement({ clinicId: c.id, clinic: c })}
-                            style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                            🧾 Bill
+                            style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            <MdReceipt size={11} /> Bill
                           </button>
                           <button onClick={() => setCycleClinic(c)}
-                            style={{ background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
-                            🗓
+                            style={{ background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                            <MdEventNote size={11} />
                           </button>
                           <button onClick={() => toggleClinic(c.id)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)' }}>
@@ -1471,12 +1483,12 @@ function TrustedPartnersTab({ queryClient }) {
                                   <td style={{ padding: '8px 12px' }}>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                       <button onClick={() => setCollect(cas)}
-                                        style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                        💰 Collected
+                                        style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <MdPaid size={12} /> Collected
                                       </button>
                                       <button onClick={() => setStatement({ clinicId: cas.clinicId, clinic: cas.clinic })}
-                                        style={{ background: '#EFF6FF', color: 'var(--blue)', border: '1px solid rgba(37,99,235,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                                        📄 Statement
+                                        style={{ background: '#EFF6FF', color: 'var(--blue)', border: '1px solid rgba(37,99,235,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <MdDescription size={12} /> Statement
                                       </button>
                                     </div>
                                   </td>
@@ -1582,7 +1594,7 @@ function HistoryTab() {
 
   if (payments.length === 0 && page === 1) return (
     <div className="empty-state">
-      <div className="empty-icon">✅</div>
+      <div className="empty-icon mi"><MdCheckCircle size={32} /></div>
       <div className="empty-title">No verified payments yet</div>
       <p>Approved payment history will appear here.</p>
     </div>
@@ -1592,7 +1604,7 @@ function HistoryTab() {
     <>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
         <div className="search-input" style={{ flex: 1 }}>
-          <span className="icon">🔍</span>
+          <span className="icon mi"><MdSearch size={16} /></span>
           <input
             placeholder="Search clinic, case, patient or invoice…"
             value={search}
@@ -1603,7 +1615,7 @@ function HistoryTab() {
           <button className="btn btn-ghost btn-sm" onClick={() => handleSearch('')} style={{ color: 'var(--red)' }}>✕</button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={exportExcel} disabled={exporting} style={{ whiteSpace: 'nowrap' }}>
-          {exporting ? 'Exporting…' : '⬇ Export Excel'}
+          {exporting ? 'Exporting…' : <><MdFileDownload className="mi" size={14} /> Export Excel</>}
         </button>
       </div>
     <div className="card">
@@ -1741,7 +1753,7 @@ function CasesTab() {
               <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pagination.total} total</span>
             )}
             <button className="btn btn-ghost btn-sm" onClick={exportAll} disabled={exporting}>
-              {exporting ? 'Exporting…' : '⬇ Export All (Excel)'}
+              {exporting ? 'Exporting…' : <><MdFileDownload className="mi" size={14} /> Export All (Excel)</>}
             </button>
           </div>
         </div>
@@ -1750,7 +1762,7 @@ function CasesTab() {
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
           ) : cases.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📋</div>
+              <div className="empty-icon mi"><MdAssignment size={32} /></div>
               <div className="empty-title">No cases found</div>
             </div>
           ) : (
@@ -1831,7 +1843,7 @@ function ClinicBalancesTab() {
       {/* Summary KPI */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
           <div className="stat-label">Total Outstanding</div>
           <div className="stat-value" style={{ color: 'var(--red)', fontSize: totalOutstanding >= 100000 ? 17 : 22 }}>
             Br {totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1839,13 +1851,13 @@ function ClinicBalancesTab() {
           <div className="stat-sub">Across all clinics</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>🏥</div>
+          <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}><MdLocalHospital size={18} /></div>
           <div className="stat-label">Clinics with Balance</div>
           <div className="stat-value" style={{ color: 'var(--amber)' }}>{balances.length}</div>
           <div className="stat-sub">Have unpaid cases</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#EFF6FF' }}>📋</div>
+          <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdAssignment size={18} /></div>
           <div className="stat-label">Total Unpaid Cases</div>
           <div className="stat-value" style={{ color: 'var(--blue)' }}>
             {balances.reduce((s, b) => s + b.pendingCount, 0)}
@@ -1856,7 +1868,7 @@ function ClinicBalancesTab() {
 
       <div className="card">
         <div className="card-header">
-          <div className="card-title">⏳ Outstanding Balance by Clinic</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdPendingActions className="mi" size={15} /> Outstanding Balance by Clinic</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button className="btn btn-ghost btn-sm" onClick={refetch}>↺ Refresh</button>
             <ExportMenu
@@ -1879,7 +1891,7 @@ function ClinicBalancesTab() {
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--red)' }}>Failed to load balances.</div>
           ) : balances.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">🎉</div>
+              <div className="empty-icon mi"><MdCelebration size={32} /></div>
               <div className="empty-title">No outstanding balances</div>
               <p>All clinics are up to date.</p>
             </div>
@@ -2063,7 +2075,7 @@ function RevenueOverviewPanel() {
           </div>
           <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 24 }}>
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📅</div>
+              <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdCalendarToday size={18} /></div>
               <div className="stat-label">Today</div>
               <div className="stat-value" style={{ color: 'var(--green)', fontSize: (r.daily?.amount || 0) >= 100000 ? 17 : 22 }}>
                 {fmtBr(r.daily?.amount)}
@@ -2072,7 +2084,7 @@ function RevenueOverviewPanel() {
             </div>
             {(applied.from || applied.to) ? (
               <div className="stat-card">
-                <div className="stat-icon" style={{ background: '#EFF6FF' }}>🔍</div>
+                <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdSearch size={18} /></div>
                 <div className="stat-label">Selected Range</div>
                 <div className="stat-value" style={{ color: 'var(--blue)', fontSize: (r.range?.amount || 0) >= 100000 ? 17 : 22 }}>
                   {fmtBr(r.range?.amount)}
@@ -2081,7 +2093,7 @@ function RevenueOverviewPanel() {
               </div>
             ) : (
               <div className="stat-card">
-                <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+                <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
                 <div className="stat-label">Pending</div>
                 <div className="stat-value" style={{ color: 'var(--red)', fontSize: (pend.amount || 0) >= 100000 ? 17 : 22 }}>
                   {fmtBr(pend.amount)}
@@ -2090,13 +2102,13 @@ function RevenueOverviewPanel() {
               </div>
             )}
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#EEF2FF' }}>📦</div>
+              <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdInventory2 size={18} /></div>
               <div className="stat-label">Units Delivered Today</div>
               <div className="stat-value">{u.daily || 0}</div>
               <div className="stat-sub">units</div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#F5F3FF' }}>🏛️</div>
+              <div className="stat-icon" style={{ background: '#F5F3FF' }}><MdAccountBalance size={18} /></div>
               <div className="stat-label">Tax Withheld{applied.from || applied.to ? ' (Range)' : ' (YTD)'}</div>
               <div className="stat-value" style={{ color: '#6D28D9', fontSize: (tax.amount || 0) >= 100000 ? 17 : 22 }}>
                 {fmtBr(tax.amount)}
@@ -2108,7 +2120,7 @@ function RevenueOverviewPanel() {
           {/* Verified payments table */}
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <div className="card-title">✅ Verified Payments {applied.from || applied.to ? '(filtered)' : ''}</div>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle className="mi" size={15} /> Verified Payments {applied.from || applied.to ? '(filtered)' : ''}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentVerified?.length || 0} records</span>
                 <ExportMenu
@@ -2130,7 +2142,7 @@ function RevenueOverviewPanel() {
             <div className="table-wrap">
               {!data.recentVerified?.length ? (
                 <div className="empty-state">
-                  <div className="empty-icon">💸</div>
+                  <div className="empty-icon mi"><MdMoneyOff size={32} /></div>
                   <div className="empty-title">No verified payments</div>
                   <p>No payments match the selected filters.</p>
                 </div>
@@ -2172,7 +2184,7 @@ function RevenueOverviewPanel() {
           {/* Pending payments table */}
           <div className="card">
             <div className="card-header">
-              <div className="card-title">⏳ Pending Payments</div>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdPendingActions className="mi" size={15} /> Pending Payments</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{data.recentPending?.length || 0} records</span>
                 <ExportMenu
@@ -2194,7 +2206,7 @@ function RevenueOverviewPanel() {
             <div className="table-wrap">
               {!data.recentPending?.length ? (
                 <div className="empty-state">
-                  <div className="empty-icon">🎉</div>
+                  <div className="empty-icon mi"><MdCelebration size={32} /></div>
                   <div className="empty-title">No pending payments</div>
                   <p>All payments are up to date.</p>
                 </div>
@@ -2265,19 +2277,19 @@ function ReadyForDeliveryTab() {
     <>
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 16 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}>📦</div>
+          <div className="stat-icon" style={{ background: 'var(--accent-dim)' }}><MdInventory2 size={18} /></div>
           <div className="stat-label">Ready for Delivery</div>
           <div className="stat-value" style={{ color: 'var(--accent)' }}>{cases.length}</div>
           <div className="stat-sub">Passed QC</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+          <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdCheckCircle size={18} /></div>
           <div className="stat-label">Payment Verified</div>
           <div className="stat-value" style={{ color: 'var(--green)' }}>{verified}</div>
           <div className="stat-sub">Cleared to dispatch</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}>💰</div>
+          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPaid size={18} /></div>
           <div className="stat-label">Total Value</div>
           <div className="stat-value" style={{ color: 'var(--text-1)', fontSize: total >= 1000000 ? 16 : 22 }}>{ETB(total)}</div>
           <div className="stat-sub">Across {cases.length} cases</div>
@@ -2286,10 +2298,10 @@ function ReadyForDeliveryTab() {
 
       <div className="card">
         <div className="card-header">
-          <div className="card-title">📦 Ready for Delivery</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdInventory2 className="mi" size={15} /> Ready for Delivery</div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div className="search-input" style={{ maxWidth: 240 }}>
-              <span className="icon">🔍</span>
+              <span className="icon mi"><MdSearch size={16} /></span>
               <input placeholder="Search clinic, case, patient…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <ExportMenu
@@ -2311,7 +2323,7 @@ function ReadyForDeliveryTab() {
           {isLoading ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>
           ) : cases.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon">🎉</div><div className="empty-title">Nothing ready for delivery</div></div>
+            <div className="empty-state"><div className="empty-icon mi"><MdCelebration size={32} /></div><div className="empty-title">Nothing ready for delivery</div></div>
           ) : (
             <table>
               <thead>
@@ -2348,18 +2360,18 @@ function ReadyForDeliveryTab() {
 // Four views: revenue Overview, plus Verified History, Clinic Balances and Cases
 // (folded in from the old standalone Analytics nav items).
 const REPORT_VIEWS = [
-  { id: 'overview', label: '📈 Overview' },
-  { id: 'history',  label: '✅ Verified History' },
-  { id: 'balances', label: '🏦 Clinic Balances' },
-  { id: 'cases',    label: '📋 Cases' },
+  { id: 'overview', label: 'Overview', icon: MdTrendingUp },
+  { id: 'history',  label: 'Verified History', icon: MdCheckCircle },
+  { id: 'balances', label: 'Clinic Balances', icon: MdAccountBalanceWallet },
+  { id: 'cases',    label: 'Cases', icon: MdAssignment },
 ];
 function ReportTab({ view = 'overview', onView }) {
   return (
     <>
       <div className="filters" style={{ margin: '0 0 18px', flexWrap: 'wrap' }}>
         {REPORT_VIEWS.map(v => (
-          <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)}>
-            {v.label}
+          <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <v.icon size={14} /> {v.label}
           </button>
         ))}
       </div>
@@ -2374,15 +2386,15 @@ function ReportTab({ view = 'overview', onView }) {
 // Nav model — single source of truth, rendered in both drawer + sidebar.
 const NAV_GROUPS = [
   { group: 'Overview', items: [
-    { id: 'dashboard',  label: 'Dashboard',          icon: '📊' },
+    { id: 'dashboard',  label: 'Dashboard',          icon: MdDashboard },
   ]},
   { group: 'Operations', items: [
-    { id: 'ready',      label: 'Ready for Delivery', icon: '📦' },
-    { id: 'billing',    label: 'Billing & Invoicing',icon: '📄', badge: 'payments' },
-    { id: 'trusted',    label: 'Trusted Partners',   icon: '🤝', badge: 'trusted' },
+    { id: 'ready',      label: 'Ready for Delivery', icon: MdInventory2 },
+    { id: 'billing',    label: 'Billing & Invoicing',icon: MdDescription, badge: 'payments' },
+    { id: 'trusted',    label: 'Trusted Partners',   icon: MdHandshake, badge: 'trusted' },
   ]},
   { group: 'Analytics', items: [
-    { id: 'report',     label: 'Report',             icon: '📈' },
+    { id: 'report',     label: 'Report',             icon: MdTrendingUp },
   ]},
 ];
 const MAIN_TABS = NAV_GROUPS.flatMap(g => g.items);
@@ -2461,7 +2473,7 @@ export default function FinanceDashboard() {
               <button key={item.id}
                 className={`nav-item${tab === item.id ? ' active' : ''}`}
                 onClick={() => onNav(item.id)}>
-                <span>{item.icon}</span> {item.label}
+                <item.icon className="mi" size={17} /> {item.label}
                 {count > 0 && <span className="badge-count">{count}</span>}
               </button>
             );
@@ -2476,7 +2488,9 @@ export default function FinanceDashboard() {
       {/* ── Mobile topbar ───────────────────────────────── */}
       <div className="mobile-topbar">
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
-        <span className="mobile-topbar-title">{currentTab?.icon} {currentTab?.label}</span>
+        <span className="mobile-topbar-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {currentTab?.icon && <currentTab.icon className="mi" size={16} />} {currentTab?.label}
+        </span>
         <div className="live-dot" />
       </div>
 
@@ -2498,7 +2512,7 @@ export default function FinanceDashboard() {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Finance</div>
             </div>
-            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+            <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
       </div>
@@ -2523,7 +2537,7 @@ export default function FinanceDashboard() {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Finance</div>
             </div>
-            <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
+            <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
       </aside>
@@ -2532,8 +2546,8 @@ export default function FinanceDashboard() {
       <main className="main">
         {/* Topbar */}
         <div className="topbar">
-          <div className="topbar-title">
-            {MAIN_TABS.find(t => t.id === tab)?.icon}{' '}
+          <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {(() => { const Icon = MAIN_TABS.find(t => t.id === tab)?.icon; return Icon ? <Icon className="mi" size={17} /> : null; })()}
             {MAIN_TABS.find(t => t.id === tab)?.label}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
@@ -2551,19 +2565,19 @@ export default function FinanceDashboard() {
               </div>
               <div className="stats-grid" style={{ marginBottom: 18, gridTemplateColumns: 'repeat(5,1fr)' }}>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('ready')}>
-                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>📦</div>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdInventory2 size={18} /></div>
                   <div className="stat-label">Delivered / Day</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{stats.deliveredToday ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View deliveries ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('overview'); setTab('report'); }}>
-                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>🦷</div>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdInventory2 size={18} /></div>
                   <div className="stat-label">Total Units</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.units?.daily ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Units today ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('overview'); setTab('report'); }}>
-                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>💰</div>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdPaid size={18} /></div>
                   <div className="stat-label">Revenue</div>
                   <div className="stat-value" style={{ color: 'var(--green)', fontSize: (quickReport?.revenue?.daily?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.revenue?.daily?.amount || 0).toLocaleString('en-US')}
@@ -2571,13 +2585,13 @@ export default function FinanceDashboard() {
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>Verified today ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('history'); setTab('report'); }}>
-                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}>✅</div>
+                  <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdCheckCircle size={18} /></div>
                   <div className="stat-label">Paid</div>
                   <div className="stat-value" style={{ color: 'var(--green)' }}>{quickReport?.paid?.today ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View history ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('balances'); setTab('report'); }}>
-                  <div className="stat-icon" style={{ background: '#FFF1F2' }}>⏳</div>
+                  <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
                   <div className="stat-label">Pending</div>
                   <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
@@ -2591,25 +2605,25 @@ export default function FinanceDashboard() {
               </div>
               <div className="stats-grid" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(4,1fr)' }}>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setBillingView('verify'); setTab('billing'); }}>
-                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}>💳</div>
+                  <div className="stat-icon" style={{ background: 'var(--amber-dim)' }}><MdCreditCard size={18} /></div>
                   <div className="stat-label">Payments to Verify</div>
                   <div className="stat-value" style={{ color: 'var(--amber)' }}>{paymentsToVerify}</div>
                   <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Gateway payments ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setBillingView('invoices'); setTab('billing'); }}>
-                  <div className="stat-icon" style={{ background: '#EFF6FF' }}>📄</div>
+                  <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdDescription size={18} /></div>
                   <div className="stat-label">Invoices Today</div>
                   <div className="stat-value" style={{ color: 'var(--blue)' }}>{quickReport?.paid?.today ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View invoices ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
-                  <div className="stat-icon" style={{ background: '#F5F3FF' }}>🤝</div>
+                  <div className="stat-icon" style={{ background: '#F5F3FF' }}><MdHandshake size={18} /></div>
                   <div className="stat-label">Trusted — Outstanding</div>
                   <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedOutstanding}</div>
                   <div className="stat-sub" style={{ color: '#6D28D9', fontWeight: 600 }}>Clinics to bill ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
-                  <div className="stat-icon" style={{ background: trustedBillsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}>🗓</div>
+                  <div className="stat-icon" style={{ background: trustedBillsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}><MdEventNote size={18} /></div>
                   <div className="stat-label">Bills Due</div>
                   <div className="stat-value" style={{ color: trustedBillsDue > 0 ? 'var(--red)' : 'var(--green)' }}>{trustedBillsDue}</div>
                   <div className="stat-sub" style={{ color: trustedBillsDue > 0 ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>
