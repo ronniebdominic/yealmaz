@@ -9,37 +9,44 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  MdTwoWheeler, MdLocalShipping, MdDirectionsBike, MdInventory2, MdCheckCircle,
+  MdCelebration, MdSettings, MdCreditCard, MdBolt, MdLightbulb, MdCall,
+  MdLocationOn, MdWarning, MdAutorenew, MdPerson, MdHandshake, MdAssignment,
+  MdClose, MdLocalHospital,
+} from 'react-icons/md';
 
 const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—';
 
 // ── Executive assign modal ────────────────────────────────
 function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }) {
   const [selectedExecId, setSelectedExecId] = useState('');
-  const title = mode === 'pickup' ? '🛵 Assign Pickup Driver' : '🚚 Assign Delivery Driver';
+  const TitleIcon = mode === 'pickup' ? MdTwoWheeler : MdLocalShipping;
+  const title = mode === 'pickup' ? 'Assign Pickup Driver' : 'Assign Delivery Driver';
   const current = caseData.assignedDelivery;
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">{title}</div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><TitleIcon className="mi" size={18} /> {title}</div>
+          <button className="modal-close" onClick={onClose}><MdClose className="mi" size={18} /></button>
         </div>
         <div className="modal-body">
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)' }}>
             <div className="case-number" style={{ marginBottom: 2 }}>{caseData.caseNumber}</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-              {caseData.workType} · 🏥 {caseData.clinic?.name}
-              {caseData.clinic?.station && <span style={{ color: 'var(--accent)', fontWeight: 600 }}> · 📍 {caseData.clinic.station}</span>}
+            <div style={{ fontSize: 13, color: 'var(--text-2)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+              {caseData.workType} · <MdLocalHospital className="mi" size={13} /> {caseData.clinic?.name}
+              {caseData.clinic?.station && <span style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}> · <MdLocationOn size={13} /> {caseData.clinic.station}</span>}
             </div>
             {caseData.clinic?.address && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>📍 {caseData.clinic.address}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn className="mi" size={13} /> {caseData.clinic.address}</div>
             )}
           </div>
           {current && (
-            <div style={{ background: 'var(--amber-dim)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--amber)' }}>
-              ⚠ Currently: <strong>{current.name}</strong>
+            <div style={{ background: 'var(--amber-dim)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <MdWarning className="mi" size={15} /> Currently: <strong>{current.name}</strong>
             </div>
           )}
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 8, letterSpacing: 0.5 }}>
@@ -71,7 +78,7 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{sel ? '✓ ' : ''}{exec.name}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                       {exec.email}
-                      {exec.station && <span> · 📍 {exec.station}</span>}
+                      {exec.station && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}> · <MdLocationOn size={12} /> {exec.station}</span>}
                       {sameStation && <span style={{ color: 'var(--green)', fontWeight: 700 }}> · ✓ same station</span>}
                     </div>
                   </div>
@@ -136,7 +143,7 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
     setSaving(true);
     try {
       await api.post(`/payments/${caseData.id}/request`, { amount, notes });
-      toast.success('💳 Payment request sent!');
+      toast.success('Payment request sent!');
       onSuccess();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed');
@@ -149,16 +156,17 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <div className="modal-title">💳 Request Payment</div>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MdCreditCard className="mi" size={18} /> Request Payment</div>
+          <button className="modal-close" onClick={onClose}><MdClose className="mi" size={18} /></button>
         </div>
         <div className="modal-body">
           {/* Case summary */}
           <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)', fontSize: 13 }}>
             <div className="case-number">{caseData.caseNumber}</div>
             <div style={{ fontWeight: 700, color: 'var(--text-1)', marginTop: 4 }}>{caseData.patientName} · {caseData.clinic?.name}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-              {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}{caseData.deliveryType === 'EXPRESS' ? ' · ⚡ Express' : ''}
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
+              {caseData.workType}{caseData.units ? ` · ${caseData.units} unit${caseData.units !== 1 ? 's' : ''}` : ''}
+              {caseData.deliveryType === 'EXPRESS' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}> · <MdBolt size={13} /> Express</span>}
             </div>
           </div>
 
@@ -173,7 +181,7 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
             />
             {calcHint && (
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                <span>💡</span>
+                <MdLightbulb size={14} />
                 <span>
                   Br {calcHint.unitPrice.toLocaleString('en-US')}
                   {!calcHint.isFlat && calcHint.count > 1 && ` × ${calcHint.count} units`}
@@ -199,7 +207,7 @@ function PaymentModal({ caseData, onClose, onSuccess }) {
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
             <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
-              {saving ? 'Sending…' : '💳 Send Request'}
+              {saving ? 'Sending…' : <><MdCreditCard className="mi" size={15} /> Send Request</>}
             </button>
           </div>
         </div>
@@ -258,7 +266,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
         deliveryType:  form.deliveryType,
         selfDropOff:   form.selfDropOff || undefined,
       });
-      toast.success('📞 Phone order placed!');
+      toast.success('Phone order placed!');
       onSuccess();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to place order');
@@ -271,7 +279,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <div className="modal-header">
-          <div className="modal-title">📞 New Phone Order</div>
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MdCall className="mi" size={18} /> New Phone Order</div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -336,8 +344,8 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
             <label style={lbl}>DELIVERY TYPE</label>
             <div style={{ display: 'flex', gap: 10 }}>
               {[
-                { value: 'NORMAL',  label: 'Normal',  icon: '🚚' },
-                { value: 'EXPRESS', label: 'Express', icon: '⚡' },
+                { value: 'NORMAL',  label: 'Normal',  icon: MdLocalShipping },
+                { value: 'EXPRESS', label: 'Express', icon: MdBolt },
               ].map(opt => (
                 <button key={opt.value} type="button"
                   onClick={() => setForm(prev => ({ ...prev, deliveryType: opt.value }))}
@@ -347,7 +355,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
                     border: `2px solid ${form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
                     background: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'rgba(240,165,0,0.08)' : 'var(--blue-dim, #EEF2FF)') : 'var(--surface)',
                   }}>
-                  <span style={{ fontSize: 16 }}>{opt.icon}</span>
+                  <opt.icon size={16} color={form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-2)'} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-1)' }}>
                     {opt.label}
                   </span>
@@ -362,7 +370,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
               <input type="checkbox" checked={form.selfDropOff}
                 onChange={e => setForm(prev => ({ ...prev, selfDropOff: e.target.checked, assignToExecutiveId: e.target.checked ? '' : prev.assignToExecutiveId }))} />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: form.selfDropOff ? 'var(--accent)' : 'var(--text-1)' }}>📦 Self Drop-off by Clinic</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: form.selfDropOff ? 'var(--accent)' : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 6 }}><MdInventory2 size={15} /> Self Drop-off by Clinic</div>
                 <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Clinic is bringing the impression to the lab themselves — no delivery partner needed</div>
               </div>
             </label>
@@ -375,7 +383,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
               <option value="">— Assign later —</option>
               {executives.map(e => (
                 <option key={e.id} value={e.id}>
-                  {e.name}{e.station ? ` · 📍${e.station}` : ''} · {e.assignedDeliveries?.length || 0} active jobs
+                  {e.name}{e.station ? ` · ${e.station}` : ''} · {e.assignedDeliveries?.length || 0} active jobs
                 </option>
               ))}
             </select>
@@ -384,7 +392,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
             <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
             <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
-              {saving ? 'Placing…' : '📞 Place Phone Order'}
+              {saving ? 'Placing…' : <><MdCall className="mi" size={15} /> Place Phone Order</>}
             </button>
           </div>
         </div>
@@ -516,10 +524,10 @@ export default function DispatchDashboard() {
     try {
       if (assignModal.mode === 'pickup') {
         await api.post(`/dispatch/${assignModal.case.id}/assign-pickup`, { executiveId });
-        toast.success('🛵 Pickup driver assigned!');
+        toast.success('Pickup driver assigned!');
       } else {
         await api.post(`/dispatch/${assignModal.case.id}/send-out`, { executiveId });
-        toast.success('🚚 Case dispatched for delivery!');
+        toast.success('Case dispatched for delivery!');
       }
       setAssignModal(null);
       refetchAll();
@@ -536,7 +544,7 @@ export default function DispatchDashboard() {
     setSelfDropOffId(c.id);
     try {
       await api.post(`/dispatch/${c.id}/self-dropoff`);
-      toast.success('📦 Marked as self drop-off — now awaiting receptionist acceptance');
+      toast.success('Marked as self drop-off — now awaiting receptionist acceptance');
       refetchAll();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not record self drop-off');
@@ -550,13 +558,13 @@ export default function DispatchDashboard() {
   // Each tab carries a workflow `group` used to section the sidebar nav,
   // matching how Reception/Finance group their nav under section labels.
   const TABS = [
-    { id: 'place-order',      label: 'Place Order',        icon: '📋', group: 'Pickup',     sub: 'Awaiting pickup'        },
-    { id: 'pickup-progress',  label: 'Pickup In Progress', icon: '🛵', group: 'Pickup',     sub: 'Driver collecting'      },
-    { id: 'in-milling',       label: 'In Milling',         icon: '⚙️', group: 'Production', sub: 'At milling stage'       },
-    { id: 'ready-delivery',   label: 'Ready for Delivery', icon: '📦', group: 'Delivery',   sub: 'QC done · awaiting pay' },
-    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: '🚚', group: 'Delivery',   sub: 'Paid/trusted · assign driver' },
-    { id: 'en-route',         label: 'En Route',           icon: '🚴', group: 'Delivery',   sub: 'Out for delivery'       },
-    { id: 'delivered',        label: 'Delivered',          icon: '✅', group: 'Completed',  sub: 'Done'                   },
+    { id: 'place-order',      label: 'Place Order',        icon: MdAssignment,    group: 'Pickup',     sub: 'Awaiting pickup'        },
+    { id: 'pickup-progress',  label: 'Pickup In Progress', icon: MdTwoWheeler,    group: 'Pickup',     sub: 'Driver collecting'      },
+    { id: 'in-milling',       label: 'In Milling',         icon: MdSettings,      group: 'Production', sub: 'At milling stage'       },
+    { id: 'ready-delivery',   label: 'Ready for Delivery', icon: MdInventory2,    group: 'Delivery',   sub: 'QC done · awaiting pay' },
+    { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: MdLocalShipping, group: 'Delivery',   sub: 'Paid/trusted · assign driver' },
+    { id: 'en-route',         label: 'En Route',           icon: MdDirectionsBike,group: 'Delivery',   sub: 'Out for delivery'       },
+    { id: 'delivered',        label: 'Delivered',          icon: MdCheckCircle,   group: 'Completed',  sub: 'Done'                   },
   ];
   const NAV_GROUPS = ['Pickup', 'Production', 'Delivery', 'Completed'];
 
@@ -573,7 +581,7 @@ export default function DispatchDashboard() {
               style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-                <span>{t.icon}</span>
+                <t.icon className="mi" size={16} />
                 <span style={{ flex: 1 }}>{t.label}</span>
                 {tabCount[t.id] > 0 && <span className="badge-count">{tabCount[t.id]}</span>}
               </div>
@@ -587,13 +595,13 @@ export default function DispatchDashboard() {
 
   // ── KPI pipeline — one card per stage, in workflow order, colour-coded ──────
   const PIPELINE = [
-    { tab: 'place-order',     label: 'Pending Pickup',     icon: '📋', count: placeOrder.length,      hint: 'Needs driver',     color: '#DC2626', bg: '#FEF2F2' },
-    { tab: 'pickup-progress', label: 'Pickup In Progress', icon: '🛵', count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: '#EFF6FF' },
-    { tab: 'in-milling',      label: 'In Milling',         icon: '⚙️', count: milling.length,           hint: 'In production',    color: '#0891B2', bg: '#ECFEFF' },
-    { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: '📦', count: readyDelivery.length,    hint: 'Awaiting payment', color: '#D97706', bg: '#FFFBEB' },
-    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: '🚚', count: readyDispatch.length,    hint: 'Payment cleared', color: '#16A34A', bg: '#F0FDF4' },
-    { tab: 'en-route',        label: 'En Route',           icon: '🚴', count: enRoute.length,          hint: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF' },
-    { tab: 'delivered',       label: 'Delivered',          icon: '✅', count: delivered.length,        hint: 'Completed',        color: '#16A34A', bg: '#F0FDF4' },
+    { tab: 'place-order',     label: 'Pending Pickup',     icon: MdAssignment,    count: placeOrder.length,      hint: 'Needs driver',     color: '#DC2626', bg: '#FEF2F2' },
+    { tab: 'pickup-progress', label: 'Pickup In Progress', icon: MdTwoWheeler,    count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: '#EFF6FF' },
+    { tab: 'in-milling',      label: 'In Milling',         icon: MdSettings,      count: milling.length,           hint: 'In production',    color: '#0891B2', bg: '#ECFEFF' },
+    { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: MdInventory2,    count: readyDelivery.length,    hint: 'Awaiting payment', color: '#D97706', bg: '#FFFBEB' },
+    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: MdLocalShipping, count: readyDispatch.length,    hint: 'Payment cleared', color: '#16A34A', bg: '#F0FDF4' },
+    { tab: 'en-route',        label: 'En Route',           icon: MdDirectionsBike,count: enRoute.length,          hint: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF' },
+    { tab: 'delivered',       label: 'Delivered',          icon: MdCheckCircle,   count: delivered.length,        hint: 'Completed',        color: '#16A34A', bg: '#F0FDF4' },
   ];
 
   return (
@@ -601,7 +609,10 @@ export default function DispatchDashboard() {
       {/* Mobile topbar */}
       <div className="mobile-topbar">
         <button className="hamburger-topbar" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
-        <span className="mobile-topbar-title">{TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}</span>
+        <span className="mobile-topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {(() => { const Icon = TABS.find(t => t.id === tab)?.icon; return Icon ? <Icon className="mi" size={16} /> : null; })()}
+          {TABS.find(t => t.id === tab)?.label}
+        </span>
         <div className="live-dot" />
       </div>
 
@@ -642,7 +653,10 @@ export default function DispatchDashboard() {
         {/* Topbar */}
         <div className="topbar">
           <button className="hamburger-topbar" style={{ display: 'none' }} onClick={() => setOpen(true)}>☰</button>
-          <div className="topbar-title">{TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}</div>
+          <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {(() => { const Icon = TABS.find(t => t.id === tab)?.icon; return Icon ? <Icon className="mi" size={18} /> : null; })()}
+            {TABS.find(t => t.id === tab)?.label}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-3)' }}>
               <div className="live-dot" /> Live · {user?.name?.split(' ')[0]}
@@ -661,7 +675,7 @@ export default function DispatchDashboard() {
             </div>
             <button className="btn btn-ghost btn-sm" onClick={openTodayOrders}
               style={{ borderColor: todayOrders !== null ? 'var(--blue)' : 'var(--border)', color: 'var(--blue)' }}>
-              {loadingToday ? 'Loading…' : todayOrders !== null ? '▲ Hide today' : '📋 View all today ↗'}
+              {loadingToday ? 'Loading…' : todayOrders !== null ? '▲ Hide today' : <><MdAssignment className="mi" size={14} /> View all today ↗</>}
             </button>
           </div>
 
@@ -681,7 +695,7 @@ export default function DispatchDashboard() {
               <div key={s.tab} className="stat-card"
                 style={{ cursor: 'pointer', borderTop: `3px solid ${s.color}`, outline: tab === s.tab ? `2px solid ${s.color}` : 'none', outlineOffset: 2 }}
                 onClick={() => { setTab(s.tab); setTodayOrders(null); }}>
-                <div className="stat-icon" style={{ background: s.bg }}>{s.icon}</div>
+                <div className="stat-icon" style={{ background: s.bg, color: s.color }}><s.icon size={18} /></div>
                 <div className="stat-label">{s.label}</div>
                 <div className="stat-value" style={{ color: s.color }}>{s.count}</div>
                 <div className="stat-sub" style={{ color: s.color, fontWeight: 600 }}>{s.hint} ↗</div>
@@ -693,9 +707,9 @@ export default function DispatchDashboard() {
           {todayOrders !== null && (
             <div className="card" style={{ marginBottom: 16, border: '2px solid var(--blue)', borderRadius: 12 }}>
               <div className="card-header" style={{ background: 'var(--blue)', color: '#fff', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ fontWeight: 700 }}>📋 All Orders Today ({todayOrders.length})</div>
+                <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><MdAssignment className="mi" size={16} /> All Orders Today ({todayOrders.length})</div>
                 <button onClick={() => setTodayOrders(null)}
-                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', fontSize: 15 }}>×</button>
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MdClose size={15} /></button>
               </div>
               <div className="table-wrap">
                 {todayOrders.length === 0 ? (
@@ -714,7 +728,7 @@ export default function DispatchDashboard() {
                           <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
                           <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                           <Td><span className="patient-name">{c.patientName}</span></Td>
                           <Td style={{ fontSize: 12 }}>{c.workType}</Td>
@@ -735,14 +749,14 @@ export default function DispatchDashboard() {
           {tab === 'place-order' && (
             <div className="card">
               <div className="card-header">
-                <div className="card-title">📋 Place Order — Client Orders Awaiting Pickup</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdAssignment className="mi" size={15} /> Place Order — Client Orders Awaiting Pickup</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <button
                     className="btn btn-primary btn-sm"
                     onClick={() => setPhoneOrderOpen(true)}
                     style={{ whiteSpace: 'nowrap' }}
                   >
-                    📞 Phone Order
+                    <MdCall className="mi" size={14} /> Phone Order
                   </button>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{placeOrder.length} pending</span>
                   <ExportMenu
@@ -763,7 +777,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {placeOrder.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">🎉</div>
+                    <div className="empty-icon mi"><MdCelebration size={32} /></div>
                     <div className="empty-title">No orders waiting for pickup</div>
                     <p>Orders placed by clinics through the app (and phone orders) appear here. Assign a driver to go collect the impression.</p>
                   </div>
@@ -785,10 +799,10 @@ export default function DispatchDashboard() {
                         <tr key={c.id}>
                           <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                            {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
+                            {c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}
                           </Td>
                           <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
                           <Td><span className="case-number">{c.caseNumber}</span></Td>
@@ -803,7 +817,7 @@ export default function DispatchDashboard() {
                                 style={{ background: '#FFF7ED', color: '#EA580C', border: '1px solid #FDBA74', whiteSpace: 'nowrap' }}
                                 onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
                               >
-                                🛵 Assign Pickup
+                                <MdTwoWheeler className="mi" size={14} /> Assign Pickup
                               </button>
                               <button
                                 className="btn btn-sm"
@@ -812,7 +826,7 @@ export default function DispatchDashboard() {
                                 disabled={selfDropOffId === c.id}
                                 title="Clinic is bringing the case in themselves"
                               >
-                                {selfDropOffId === c.id ? '…' : '📦 Self Drop-off'}
+                                {selfDropOffId === c.id ? '…' : <><MdInventory2 className="mi" size={14} /> Self Drop-off</>}
                               </button>
                             </div>
                           </Td>
@@ -829,12 +843,12 @@ export default function DispatchDashboard() {
           {tab === 'pickup-progress' && (
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: '#F0FDF4', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10 }}>
-                  🛵 A driver has been assigned to collect the impression from the clinic. Once collected, the case will appear on the Receptionist dashboard for acceptance.
+                <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <MdTwoWheeler className="mi" size={14} /> A driver has been assigned to collect the impression from the clinic. Once collected, the case will appear on the Receptionist dashboard for acceptance.
                 </div>
               </div>
               <div className="card-header">
-                <div className="card-title">🛵 Pickup In Progress</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdTwoWheeler className="mi" size={15} /> Pickup In Progress</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{pickupInProgress.length} in transit</span>
                   <ExportMenu
@@ -856,7 +870,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {pickupInProgress.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">✅</div>
+                    <div className="empty-icon mi"><MdCheckCircle size={32} /></div>
                     <div className="empty-title">No pickups in progress</div>
                     <p>Cases where a driver has been assigned to collect the impression will appear here. Assign a driver from the Place Order tab to see them here.</p>
                   </div>
@@ -879,16 +893,16 @@ export default function DispatchDashboard() {
                         <tr key={c.id}>
                           <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                            {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
+                            {c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}
                           </Td>
                           <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
                           <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
                           <Td><span className="patient-name">{c.patientName}</span></Td>
-                          <Td style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
-                            🛵 {c.assignedDelivery?.name?.replace('Yealmaz Delivery Executive ', 'Driver ')}
+                          <Td style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <MdTwoWheeler size={13} /> {c.assignedDelivery?.name?.replace('Yealmaz Delivery Executive ', 'Driver ')}
                           </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>
                             {format(new Date(c.createdAt), 'dd MMM yyyy')}
@@ -899,7 +913,7 @@ export default function DispatchDashboard() {
                               onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
                               title="Reassign to a different driver"
                             >
-                              🔄 Reassign
+                              <MdAutorenew className="mi" size={14} /> Reassign
                             </button>
                           </Td>
                         </tr>
@@ -915,12 +929,12 @@ export default function DispatchDashboard() {
           {tab === 'in-milling' && (
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: '#ECFEFF', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ fontSize: 12, color: '#0E7490', fontWeight: 600, paddingBottom: 10 }}>
-                  ⚙️ These cases have <strong>reached the Milling / Sintering department</strong> — informational only, no dispatch action needed yet. They'll move to Ready for Delivery once QC passes.
+                <div style={{ fontSize: 12, color: '#0E7490', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <MdSettings className="mi" size={14} /> These cases have <strong>reached the Milling / Sintering department</strong> — informational only, no dispatch action needed yet. They'll move to Ready for Delivery once QC passes.
                 </div>
               </div>
               <div className="card-header">
-                <div className="card-title">⚙️ In Milling <span style={{ fontSize: 12, color: '#0891B2', fontWeight: 600, marginLeft: 6 }}>— At Production Stage</span></div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdSettings className="mi" size={15} /> In Milling <span style={{ fontSize: 12, color: '#0891B2', fontWeight: 600, marginLeft: 6 }}>— At Production Stage</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{milling.length} cases</span>
                   <ExportMenu
@@ -941,7 +955,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {milling.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">⚙️</div>
+                    <div className="empty-icon mi"><MdSettings size={32} /></div>
                     <div className="empty-title">No cases in milling right now</div>
                     <p>Cases will show up here as soon as the lab scans them into the Milling / Sintering department.</p>
                   </div>
@@ -965,7 +979,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
@@ -987,12 +1001,12 @@ export default function DispatchDashboard() {
           {tab === 'ready-delivery' && (
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: 'var(--amber-dim)', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ fontSize: 12, color: '#92400E', fontWeight: 600, paddingBottom: 10 }}>
-                  📦 These cases <strong>passed QC and are complete</strong> — payment has not yet been requested or verified. Use "Request Payment" to notify the clinic.
+                <div style={{ fontSize: 12, color: '#92400E', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <MdInventory2 className="mi" size={14} /> These cases <strong>passed QC and are complete</strong> — payment has not yet been requested or verified. Use "Request Payment" to notify the clinic.
                 </div>
               </div>
               <div className="card-header">
-                <div className="card-title">📦 Ready for Delivery <span style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>— Awaiting Payment</span></div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdInventory2 className="mi" size={15} /> Ready for Delivery <span style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600, marginLeft: 6 }}>— Awaiting Payment</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDelivery.length} cases</span>
                   <ExportMenu
@@ -1014,7 +1028,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {readyDelivery.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">🎉</div>
+                    <div className="empty-icon mi"><MdCelebration size={32} /></div>
                     <div className="empty-title">No cases awaiting payment</div>
                     <p>Cases appear here after passing QC. Request payment from the clinic before dispatching.</p>
                   </div>
@@ -1040,7 +1054,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
@@ -1055,7 +1069,7 @@ export default function DispatchDashboard() {
                                   style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
                                   onClick={() => setPayModal(c)}
                                 >
-                                  💳 Request
+                                  <MdCreditCard className="mi" size={14} /> Request
                                 </button>
                               ) : (
                                 <span style={{ fontSize: 12, color: 'var(--text-3)' }}>—</span>
@@ -1075,12 +1089,12 @@ export default function DispatchDashboard() {
           {tab === 'ready-dispatch' && (
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: 'var(--green-dim)', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10 }}>
-                  ✅ Payment is <strong>verified</strong> (or the clinic is a 🤝 trusted partner billed later) for these cases — assign a delivery driver to dispatch them to the clinic at any time.
+                <div style={{ fontSize: 12, color: '#166534', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <MdCheckCircle className="mi" size={14} /> Payment is <strong>verified</strong> (or the clinic is a <MdHandshake size={13} /> trusted partner billed later) for these cases — assign a delivery driver to dispatch them to the clinic at any time.
                 </div>
               </div>
               <div className="card-header">
-                <div className="card-title">🚚 Ready for Dispatch <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, marginLeft: 6 }}>— Payment Verified / Trusted Partner</span></div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdLocalShipping className="mi" size={15} /> Ready for Dispatch <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600, marginLeft: 6 }}>— Payment Verified / Trusted Partner</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{readyDispatch.length} cases</span>
                   <ExportMenu
@@ -1102,7 +1116,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {readyDispatch.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">🎉</div>
+                    <div className="empty-icon mi"><MdCelebration size={32} /></div>
                     <div className="empty-title">No cases cleared for dispatch</div>
                     <p>Cases move here once Finance verifies payment. They can then be assigned a driver and dispatched to the clinic.</p>
                   </div>
@@ -1127,10 +1141,10 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                              {c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}
+                              {c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}
                             </Td>
                             <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
@@ -1146,7 +1160,7 @@ export default function DispatchDashboard() {
                                 style={{ whiteSpace: 'nowrap' }}
                                 onClick={() => setAssignModal({ case: c, mode: 'send-out' })}
                               >
-                                🚚 Dispatch
+                                <MdLocalShipping className="mi" size={14} /> Dispatch
                               </button>
                             </Td>
                           </tr>
@@ -1163,7 +1177,7 @@ export default function DispatchDashboard() {
           {tab === 'en-route' && (
             <div className="card">
               <div className="card-header">
-                <div className="card-title">🚴 En Route — Out for Delivery</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdDirectionsBike className="mi" size={15} /> En Route — Out for Delivery</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{enRoute.length} cases</span>
                   <ExportMenu
@@ -1188,7 +1202,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {enRoute.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">🎉</div>
+                    <div className="empty-icon mi"><MdCelebration size={32} /></div>
                     <div className="empty-title">No cases out for delivery</div>
                     <p>Cases dispatched to a driver will appear here.</p>
                   </div>
@@ -1215,9 +1229,9 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
-                            <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}</Td>
+                            <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}</Td>
                             <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
@@ -1227,8 +1241,8 @@ export default function DispatchDashboard() {
                             <Td><PaymentBadge status={c.paymentStatus} /></Td>
                             <Td>
                               {c.assignedDelivery ? (
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
-                                  👤 {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  <MdPerson size={13} /> {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}
                                 </span>
                               ) : '—'}
                             </Td>
@@ -1246,7 +1260,7 @@ export default function DispatchDashboard() {
           {tab === 'delivered' && (
             <div className="card">
               <div className="card-header">
-                <div className="card-title">✅ Delivered</div>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle className="mi" size={15} /> Delivered</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{delivered.length} cases</span>
                   <ExportMenu
@@ -1269,7 +1283,7 @@ export default function DispatchDashboard() {
               <div className="table-wrap">
                 {delivered.length === 0 ? (
                   <div className="empty-state">
-                    <div className="empty-icon">📦</div>
+                    <div className="empty-icon mi"><MdCelebration size={32} /></div>
                     <div className="empty-title">No deliveries yet today</div>
                   </div>
                 ) : (
@@ -1293,7 +1307,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>📍 {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
                           </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
@@ -1302,8 +1316,8 @@ export default function DispatchDashboard() {
                             <Td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(amount)}</Td>
                             <Td><PaymentBadge status={c.paymentStatus} /></Td>
                             <Td>
-                              <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--green-dim)', color: 'var(--green)' }}>
-                                ✅ Delivered
+                              <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'var(--green-dim)', color: 'var(--green)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <MdCheckCircle size={13} /> Delivered
                               </span>
                             </Td>
                           </tr>
