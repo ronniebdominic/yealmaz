@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
   --navy:#0F2044;--navy-mid:#1A3560;--blue:#1A56A0;--blue-light:#2E75B6;
@@ -12,7 +12,9 @@
   --radius:10px;--radius-lg:16px;
   --shadow:0 1px 3px rgba(15,32,68,.08),0 4px 16px rgba(15,32,68,.04);
   --shadow-lg:0 8px 32px rgba(15,32,68,.12);
-  font-family:'DM Sans',sans-serif;
+  --font-body:'Plus Jakarta Sans','DM Sans',sans-serif;
+  --font-mono:'JetBrains Mono','DM Mono',monospace;
+  font-family:var(--font-body);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#root{height:100%}
@@ -59,7 +61,7 @@ td{padding:13px 16px;font-size:13.5px;color:var(--text-2);border-bottom:1px soli
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface-2)}
 .patient-name{font-weight:600;color:var(--text-1)}
-.case-number{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-3)}
+.case-number{font-family:var(--font-mono);font-size:12px;color:var(--text-3)}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
 .badge::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .badge-pickup{background:#FFF7ED;color:#EA580C}.badge-pickup::before{background:#EA580C}
@@ -80,7 +82,7 @@ tr:hover td{background:var(--surface-2)}
 .badge-pay-verified{background:var(--green-dim);color:var(--green)}.badge-pay-verified::before{background:var(--green)}
 .badge-pay-rejected{background:var(--red-dim);color:var(--red)}.badge-pay-rejected::before{background:var(--red)}
 .badge-trusted{background:#F5F3FF;color:#6D28D9}.badge-trusted::before{background:#7C3AED}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:'DM Sans',sans-serif;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:var(--font-body);white-space:nowrap}
 .btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--navy-mid)}
 .btn-success{background:var(--green);color:#fff}.btn-success:hover{background:#15803d}
 .btn-danger{background:var(--red);color:#fff}.btn-danger:hover{background:#C53030}
@@ -89,7 +91,7 @@ tr:hover td{background:var(--surface-2)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .form-group{margin-bottom:16px}
 label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
-input,select,textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;font-family:'DM Sans',sans-serif;color:var(--text-1);background:var(--surface);transition:border-color .15s;outline:none}
+input,select,textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;font-family:var(--font-body);color:var(--text-1);background:var(--surface);transition:border-color .15s;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .search-input{position:relative}
 .search-input input{padding-left:36px}
@@ -161,7 +163,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
   --glass-border: rgba(255,255,255,.5);
   --glass-shadow: 0 8px 32px rgba(15,32,68,.10), inset 0 1px 0 rgba(255,255,255,.6);
   --glass-blur: 18px;
-  --glass-sidebar-bg: rgba(10,22,48,.62);
+  --glass-sidebar-bg: linear-gradient(165deg, rgba(26,86,160,.58), rgba(15,32,68,.68) 55%, rgba(10,22,48,.72));
   --glass-sidebar-border: rgba(255,255,255,.09);
   --glass-topbar-bg: rgba(255,255,255,.6);
 }
