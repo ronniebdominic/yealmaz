@@ -4,6 +4,7 @@ import api from '../api';
 import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import Pagination from '../components/Pagination';
+import { MdLocalShipping } from 'react-icons/md';
 
 const PAGE_SIZE = 15;
 const fetchAssigned = () => api.get('/delivery/assigned').then(r => r.data.cases ?? r.data);
@@ -37,7 +38,7 @@ export default function Delivery() {
           <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '60px' }}>Loading…</div>
         ) : cases.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🚚</div>
+            <div className="empty-icon mi"><MdLocalShipping size={32} /></div>
             <div className="empty-title">No cases ready for dispatch</div>
             <p>Cases will appear here once payment is verified</p>
           </div>

@@ -3,20 +3,24 @@ import { useAuth } from '../AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import {
+  MdCheckCircle, MdUndo, MdLocalHospital, MdLocationOn, MdCall, MdWarning,
+  MdSearch, MdClose, MdLogout,
+} from 'react-icons/md';
 
 // ── Confirm modal ─────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   const [reason, setReason] = useState('');
 
   const CFG = {
-    picked_up:          { title: 'Mark as Picked Up',         color: '#16A34A', needsReason: false, btn: '✓ Confirm Picked Up' },
-    not_picked_up:      { title: 'Not Picked Up — Return to Dispatch', color: '#DC2626', needsReason: true, btn: '↩ Return to Dispatch Queue', placeholder: 'Reason (e.g. clinic closed, patient absent)…',
+    picked_up:          { title: 'Mark as Picked Up',         color: '#16A34A', needsReason: false, btn: 'Confirm Picked Up', btnIcon: MdCheckCircle },
+    not_picked_up:      { title: 'Not Picked Up — Return to Dispatch', color: '#DC2626', needsReason: true, btn: 'Return to Dispatch Queue', btnIcon: MdUndo, placeholder: 'Reason (e.g. clinic closed, patient absent)…',
       note: 'The driver assignment will be cleared. Dispatch will be notified to assign a new driver.' },
-    lab_pickup:         { title: 'Collected from Lab',         color: '#16A34A', needsReason: false, btn: '✓ Confirm Collected from Lab' },
-    not_picked_lab:     { title: 'Could Not Collect — Return to Dispatch', color: '#DC2626', needsReason: true, btn: '↩ Return to Dispatch Queue', placeholder: 'Reason (e.g. not ready at lab)…',
+    lab_pickup:         { title: 'Collected from Lab',         color: '#16A34A', needsReason: false, btn: 'Confirm Collected from Lab', btnIcon: MdCheckCircle },
+    not_picked_lab:     { title: 'Could Not Collect — Return to Dispatch', color: '#DC2626', needsReason: true, btn: 'Return to Dispatch Queue', btnIcon: MdUndo, placeholder: 'Reason (e.g. not ready at lab)…',
       note: 'This case will return to the Ready for Dispatch queue. Dispatch will assign a new driver.' },
-    delivered:          { title: 'Mark as Delivered',          color: '#16A34A', needsReason: false, btn: '✅ Confirm Delivered' },
-    not_delivered:      { title: 'Could Not Deliver — Return to Dispatch', color: '#DC2626', needsReason: true, btn: '↩ Return to Dispatch Queue', placeholder: 'Reason (e.g. clinic closed)…',
+    delivered:          { title: 'Mark as Delivered',          color: '#16A34A', needsReason: false, btn: 'Confirm Delivered', btnIcon: MdCheckCircle },
+    not_delivered:      { title: 'Could Not Deliver — Return to Dispatch', color: '#DC2626', needsReason: true, btn: 'Return to Dispatch Queue', btnIcon: MdUndo, placeholder: 'Reason (e.g. clinic closed)…',
       note: 'This case will return to the Ready for Dispatch queue. Dispatch will assign a new driver.' },
   };
   const cfg = CFG[action] || {};
@@ -29,12 +33,12 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
         </div>
         <div style={{ padding: 18 }}>
           <div style={{ background: '#F9FAFB', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid #E5E7EB' }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: '#1F2937', marginBottom: 3 }}>
-              🏥 {caseData.clinic?.name}
-              {caseData.clinic?.station && <span style={{ color: '#1A56A0', fontWeight: 700 }}> · 📍 {caseData.clinic.station}</span>}
+            <div style={{ fontWeight: 800, fontSize: 15, color: '#1F2937', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+              <MdLocalHospital size={15} /> {caseData.clinic?.name}
+              {caseData.clinic?.station && <span style={{ color: '#1A56A0', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}> · <MdLocationOn size={13} /> {caseData.clinic.station}</span>}
             </div>
-            {caseData.clinic?.address && <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 2 }}>📍 {caseData.clinic.address}</div>}
-            {caseData.clinic?.phone  && <div style={{ fontSize: 13 }}>📞 <a href={`tel:${caseData.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700 }}>{caseData.clinic.phone}</a></div>}
+            {caseData.clinic?.address && <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={13} /> {caseData.clinic.address}</div>}
+            {caseData.clinic?.phone  && <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> <a href={`tel:${caseData.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700 }}>{caseData.clinic.phone}</a></div>}
             {(caseData.caseNumber || caseData.workType) && (
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #E5E7EB', fontSize: 12, color: '#6B7280' }}>
                 {caseData.caseNumber && <span style={{ fontFamily: 'monospace', marginRight: 8 }}>{caseData.caseNumber}</span>}
@@ -43,8 +47,8 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
             )}
           </div>
           {cfg.note && (
-            <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12, color: '#92400E', fontWeight: 600 }}>
-              ⚠ {cfg.note}
+            <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12, color: '#92400E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <MdWarning size={13} /> {cfg.note}
             </div>
           )}
           {cfg.needsReason && (
@@ -57,8 +61,8 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
               Cancel
             </button>
             <button onClick={() => onConfirm(reason)} disabled={loading || (cfg.needsReason && !reason.trim())}
-              style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: cfg.color, color: '#fff', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer' }}>
-              {loading ? 'Processing…' : cfg.btn}
+              style={{ flex: 2, padding: '10px', borderRadius: 8, border: 'none', background: cfg.color, color: '#fff', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              {loading ? 'Processing…' : <>{cfg.btnIcon && <cfg.btnIcon size={15} />} {cfg.btn}</>}
             </button>
           </div>
         </div>
@@ -110,30 +114,30 @@ export default function DeliveryDashboard() {
       const { case: c, action } = modal;
       if (action === 'picked_up') {
         await api.post(`/delivery/${c.id}/collect-impression`);
-        toast.success('✓ Impression collected — heading to lab');
+        toast.success('Impression collected — heading to lab');
 
       } else if (action === 'not_picked_up') {
         // Impression pickup failed → PENDING_PICKUP + clear driver → dispatch reassigns
         await api.post(`/delivery/${c.id}/return-to-pickup-queue`, { reason });
-        toast.success('↩ Returned to dispatch — driver cleared, case ready for reassignment');
+        toast.success('Returned to dispatch — driver cleared, case ready for reassignment');
 
       } else if (action === 'lab_pickup') {
         await api.post(`/delivery/${c.id}/pickup`);
-        toast.success('✓ Collected from lab — heading to clinic');
+        toast.success('Collected from lab — heading to clinic');
 
       } else if (action === 'not_picked_lab') {
         // Lab pickup failed → READY_TO_DISPATCH + clear driver → dispatch reassigns
         await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason });
-        toast.success('↩ Returned to dispatch queue — driver cleared, case ready for reassignment');
+        toast.success('Returned to dispatch queue — driver cleared, case ready for reassignment');
 
       } else if (action === 'delivered') {
         await api.post(`/delivery/${c.id}/deliver`);
-        toast.success('✅ Delivery confirmed!');
+        toast.success('Delivery confirmed!');
 
       } else if (action === 'not_delivered') {
         // Delivery failed → READY_TO_DISPATCH + clear driver → dispatch reassigns
         await api.post(`/delivery/${c.id}/return-to-dispatch`, { reason });
-        toast.success('↩ Returned to dispatch queue — driver cleared, case ready for reassignment');
+        toast.success('Returned to dispatch queue — driver cleared, case ready for reassignment');
       }
       setModal(null);
       loadCases();
@@ -171,18 +175,18 @@ export default function DeliveryDashboard() {
     <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
       <td style={{ padding: '10px 14px', minWidth: 180 }}>
         <div style={{ fontWeight: 700, color: '#111827', fontSize: 14 }}>{c.clinic?.name || '—'}</div>
-        {c.clinic?.station && <div style={{ fontSize: 11, color: '#1A56A0', fontWeight: 700 }}>📍 {c.clinic.station}</div>}
+        {c.clinic?.station && <div style={{ fontSize: 11, color: '#1A56A0', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
         {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{c.caseNumber}</div>}
         {c.workType && <div style={{ fontSize: 11, color: '#6B7280' }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</div>}
       </td>
       <td style={{ padding: '10px 14px', fontSize: 13, color: '#374151', minWidth: 160 }}>
         {c.clinic?.address
-          ? <><span style={{ color: '#6B7280' }}>📍 </span>{c.clinic.address}</>
+          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={13} color="#6B7280" />{c.clinic.address}</span>
           : <span style={{ color: '#D1D5DB' }}>—</span>}
       </td>
       <td style={{ padding: '10px 14px', fontSize: 13, minWidth: 140 }}>
         {c.clinic?.phone
-          ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none' }}>📞 {c.clinic.phone}</a>
+          ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> {c.clinic.phone}</a>
           : <span style={{ color: '#D1D5DB' }}>—</span>}
       </td>
       <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
@@ -190,8 +194,8 @@ export default function DeliveryDashboard() {
           {/* Green action */}
           <button
             onClick={() => setModal({ case: c, action: section === 'delivery' ? 'delivered' : c.status === 'READY_TO_DISPATCH' ? 'lab_pickup' : 'picked_up' })}
-            style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            {section === 'delivery' ? '✓ Mark as Deliver' : c.status === 'READY_TO_DISPATCH' ? '✓ Picked up from Lab' : '✓ Mark as Pick up'}
+            style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <MdCheckCircle size={13} /> {section === 'delivery' ? 'Mark as Deliver' : c.status === 'READY_TO_DISPATCH' ? 'Picked up from Lab' : 'Mark as Pick up'}
           </button>
           {/* Red action — routes to correct return endpoint based on case type */}
           <button
@@ -203,8 +207,8 @@ export default function DeliveryDashboard() {
                   ? 'not_picked_lab'                                       // Lab pickup failed → READY_TO_DISPATCH + clear driver
                   : 'not_picked_up'                                        // Clinic pickup failed → PENDING_PICKUP + clear driver
             })}
-            style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            {section === 'delivery' ? '↩ Return not delivered' : '✕ Not Picked up'}
+            style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            {section === 'delivery' ? <><MdUndo size={13} /> Return not delivered</> : <><MdClose size={13} /> Not Picked up</>}
           </button>
         </div>
       </td>
@@ -241,8 +245,8 @@ export default function DeliveryDashboard() {
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> Live · {user?.name?.split(' ')[0]}
           </div>
           <button onClick={logout}
-            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
-            ⏻
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+            <MdLogout size={15} />
           </button>
         </div>
       </div>
@@ -254,7 +258,7 @@ export default function DeliveryDashboard() {
           <div style={{ flex: 2, minWidth: 200 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>SEARCH</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #E5E7EB', borderRadius: 8, padding: '7px 10px', background: '#F9FAFB' }}>
-              <span>🔍</span>
+              <MdSearch size={15} color="#9CA3AF" />
               <input placeholder="Clinic name, case no., location…" value={search} onChange={e => setSearch(e.target.value)}
                 style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1, color: '#1F2937' }} />
             </div>
@@ -333,13 +337,13 @@ export default function DeliveryDashboard() {
                           <div style={{ fontWeight: 700, color: '#111827' }}>{c.clinic?.name}</div>
                           {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{c.caseNumber}</div>}
                         </td>
-                        <td style={{ padding: '10px 14px', fontSize: 13, color: '#6B7280' }}>{c.clinic?.address ? `📍 ${c.clinic.address}` : '—'}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: '#6B7280' }}>{c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={13} /> {c.clinic.address}</span> : '—'}</td>
                         <td style={{ padding: '10px 14px', fontSize: 13 }}>
-                          {c.clinic?.phone ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none' }}>📞 {c.clinic.phone}</a> : '—'}
+                          {c.clinic?.phone ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> {c.clinic.phone}</a> : '—'}
                         </td>
                         <td style={{ padding: '10px 14px' }}>
-                          <span style={{ background: '#16A34A', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700 }}>
-                            ✅ Delivered {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM') : ''}
+                          <span style={{ background: '#16A34A', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <MdCheckCircle size={13} /> Delivered {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM') : ''}
                           </span>
                         </td>
                       </tr>
@@ -351,7 +355,7 @@ export default function DeliveryDashboard() {
 
             {totalActive === 0 && completedList.length === 0 && !hasFilter && (
               <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+                <div style={{ fontSize: 36, marginBottom: 10, display: 'flex', justifyContent: 'center' }}><MdCheckCircle size={36} color="#16A34A" /></div>
                 <div style={{ fontWeight: 700, color: '#374151', fontSize: 16 }}>All clear!</div>
                 <div style={{ color: '#9CA3AF', marginTop: 4 }}>No jobs assigned right now. You'll be notified when a new job is ready.</div>
               </div>
