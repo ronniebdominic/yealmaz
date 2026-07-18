@@ -7,14 +7,18 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
+import {
+  MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
+  MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow,
+} from 'react-icons/md';
 
 // ── Constants ─────────────────────────────────────────────
 const ROLES = [
-  { value: 'RECEPTIONIST', label: 'Receptionist',   icon: '🗂️' },
-  { value: 'LAB_TECH',     label: 'Lab Technician', icon: '🔬' },
-  { value: 'DELIVERY',     label: 'Delivery',       icon: '🚚' },
-  { value: 'DISPATCH',     label: 'Dispatch',       icon: '📦' },
-  { value: 'FINANCE',      label: 'Finance',        icon: '💰' },
+  { value: 'RECEPTIONIST', label: 'Receptionist',   icon: MdFolder },
+  { value: 'LAB_TECH',     label: 'Lab Technician', icon: MdBiotech },
+  { value: 'DELIVERY',     label: 'Delivery',       icon: MdLocalShipping },
+  { value: 'DISPATCH',     label: 'Dispatch',       icon: MdInventory2 },
+  { value: 'FINANCE',      label: 'Finance',        icon: MdPaid },
 ];
 
 const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.value, r]));
@@ -113,7 +117,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
       <div className="modal" style={{ maxWidth: 520 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">{isEdit ? '✏️ Edit User' : '👤 New User'}</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{isEdit ? <><MdEdit className="mi" size={16} /> Edit User</> : <><MdPerson className="mi" size={16} /> New User</>}</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
               {isEdit ? 'Update details — leave password blank to keep existing' : 'Fill in details or regenerate the password'}
             </div>
@@ -139,7 +143,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
                 onChange={e => { set('role', e.target.value); set('departments', []); }}
               >
                 {ROLES.map(r => (
-                  <option key={r.value} value={r.value}>{r.icon} {r.label}</option>
+                  <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
             </Field>
@@ -212,7 +216,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
                       color: 'var(--text-2)', cursor: 'pointer', marginBottom: 14,
                     }}
                   >
-                    🔑 Change Password
+                    <MdVpnKey size={14} /> Change Password
                   </button>
                 ) : (
                   <Field label="New Password">
@@ -276,7 +280,7 @@ function CredsCard({ user, password, onClose }) {
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title" style={{ color: 'var(--green)' }}>✅ User Created</div>
+            <div className="modal-title" style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle className="mi" size={16} /> User Created</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
               Save these credentials — password won't be shown again
             </div>
@@ -371,7 +375,7 @@ export default function AdminUsers() {
         {/* Search + role filters */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
-            <span className="icon">🔍</span>
+            <span className="icon mi"><MdSearch size={16} /></span>
             <input
               placeholder="Search by name, email or department…"
               value={search} onChange={e => setSearch(e.target.value)}
@@ -394,7 +398,7 @@ export default function AdminUsers() {
               <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading users…</div>
             ) : filtered.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">👤</div>
+                <div className="empty-icon mi"><MdPerson size={32} /></div>
                 <div className="empty-title">No users found</div>
                 <p>{search || roleFilter ? 'Try adjusting your search or filter' : 'Add the first user with the button above'}</p>
               </div>
@@ -442,8 +446,8 @@ export default function AdminUsers() {
                         </td>
                         <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.email}</td>
                         <td style={{ padding: '8px 16px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap' }}>
-                            {roleInfo.icon} {roleInfo.label || u.role}
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {roleInfo.icon && <roleInfo.icon size={11} />} {roleInfo.label || u.role}
                           </span>
                         </td>
                         <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
@@ -466,7 +470,7 @@ export default function AdminUsers() {
                         </td>
                         <td style={{ padding: '8px 16px' }}>
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
-                            <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(u)}>✏️ Edit</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(u)}><MdEdit className="mi" size={14} /> Edit</button>
                             <button
                               onClick={() => {
                                 api.patch(`/users/${u.id}`, { isActive: !u.isActive })
@@ -475,7 +479,7 @@ export default function AdminUsers() {
                               }}
                               style={{ display: 'flex', alignItems: 'center', gap: 3, background: u.isActive ? 'rgba(229,62,62,0.07)' : 'rgba(22,163,74,0.08)', color: u.isActive ? 'var(--red)' : 'var(--green)', border: `1px solid ${u.isActive ? 'rgba(229,62,62,0.2)' : 'rgba(22,163,74,0.25)'}`, borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                             >
-                              {u.isActive ? '⏸ Deactivate' : '▶ Activate'}
+                              {u.isActive ? <><MdPause size={13} /> Deactivate</> : <><MdPlayArrow size={13} /> Activate</>}
                             </button>
                           </div>
                         </td>

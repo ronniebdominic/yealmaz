@@ -7,6 +7,10 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
+import {
+  MdEdit, MdLocalHospital, MdAutoAwesome, MdVpnKey, MdCheckCircle, MdSearch,
+  MdPause, MdPlayArrow, MdHandshake,
+} from 'react-icons/md';
 
 // ── Clinic-specific Helpers ───────────────────────────────
 function slugify(name) {
@@ -99,7 +103,7 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
       <div className="modal" style={{ maxWidth: 540 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">{isEdit ? '✏️ Edit Clinic' : '🏥 New Clinic'}</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{isEdit ? <><MdEdit className="mi" size={16} /> Edit Clinic</> : <><MdLocalHospital className="mi" size={16} /> New Clinic</>}</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
               {isEdit ? 'Update clinic details — leave password blank to keep existing' : 'Fill in the details or use Auto-fill to generate credentials'}
             </div>
@@ -125,9 +129,10 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
                   whiteSpace: 'nowrap', background: 'var(--blue)', color: '#fff',
                   border: 'none', borderRadius: 7, padding: '7px 14px',
                   fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
                 }}
               >
-                ✨ Auto-fill
+                <MdAutoAwesome size={13} /> Auto-fill
               </button>
             </div>
           )}
@@ -189,7 +194,7 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
                       color: 'var(--text-2)', cursor: 'pointer', marginBottom: 14,
                     }}
                   >
-                    🔑 Change Password
+                    <MdVpnKey size={14} /> Change Password
                   </button>
                 ) : (
                   <Field label="New Password">
@@ -283,7 +288,7 @@ function CredsCard({ clinic, password, onClose }) {
       <div className="modal" style={{ maxWidth: 460 }}>
         <div className="modal-header">
           <div>
-            <div className="modal-title" style={{ color: 'var(--green)' }}>✅ Clinic Created</div>
+            <div className="modal-title" style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle className="mi" size={16} /> Clinic Created</div>
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
               Save these credentials — the password won't be shown again
             </div>
@@ -396,7 +401,7 @@ export default function AdminClinics() {
         {/* Search */}
         <div style={{ marginBottom: 16 }}>
           <div className="search-input">
-            <span className="icon">🔍</span>
+            <span className="icon mi"><MdSearch size={16} /></span>
             <input
               placeholder="Search by name, code, email or station…"
               value={search}
@@ -412,7 +417,7 @@ export default function AdminClinics() {
               <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading clinics…</div>
             ) : filtered.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">🏥</div>
+                <div className="empty-icon mi"><MdLocalHospital size={32} /></div>
                 <div className="empty-title">No clinics found</div>
                 <p>{search ? 'Try a different search term' : 'Create the first clinic using the button above'}</p>
               </div>
@@ -508,7 +513,7 @@ export default function AdminClinics() {
                             className="btn btn-ghost btn-sm"
                             onClick={() => setEditTarget(c)}
                           >
-                            ✏️ Edit
+                            <MdEdit className="mi" size={14} /> Edit
                           </button>
                           <button
                             onClick={() => {
@@ -529,7 +534,7 @@ export default function AdminClinics() {
                               fontSize: 12, fontWeight: 700, cursor: 'pointer',
                             }}
                           >
-                            {c.isActive ? '⏸ Deactivate' : '▶ Activate'}
+                            {c.isActive ? <><MdPause size={13} /> Deactivate</> : <><MdPlayArrow size={13} /> Activate</>}
                           </button>
                           <button
                             onClick={() => {
@@ -549,7 +554,7 @@ export default function AdminClinics() {
                               fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                             }}
                           >
-                            {c.isExcluded ? '✕ Remove Partner' : '🤝 Mark Partner'}
+                            {c.isExcluded ? '✕ Remove Partner' : <><MdHandshake size={13} /> Mark Partner</>}
                           </button>
                         </div>
                       </td>
