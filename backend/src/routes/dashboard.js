@@ -7,6 +7,19 @@ const { appCache, invalidate } = require('../cache');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Active lab-production stages only — excludes intake (PENDING_PICKUP,
+// PICKUP_ASSIGNED), dispatch/terminal (READY_TO_DISPATCH, OUT_FOR_DELIVERY,
+// DELIVERED), and exception states (ON_HOLD, REMAKE, CANCELLED,
+// UNDER_REVIEW, REJECTED). Mirrors AdminDashboard.jsx's PRODUCTION_STATUSES
+// so the "Total Cases In Progress" KPI always matches what its own
+// drill-down (which queries /cases with this same status list) shows.
+const PRODUCTION_STATUSES = [
+  'CASE_ACCEPTED', 'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT', 'SCANNING', 'DESIGNING',
+  'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING', 'METAL_FINISHING',
+  'OPAQUE_APPLICATION', 'CERAMIC_LAYERING', 'ZIRCONIA_FITTING_FINISHING', 'GLAZING',
+  'THERMO_PRESS', 'TRIMMING', 'QUALITY_CHECK', 'PAYMENT_INVOICING',
+];
+
 // ── GET /api/dashboard/summary ───────────────────────────
 router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
   const cacheKey = 'dashboard:summary';
@@ -293,7 +306,15 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     ] = await Promise.all([
       Promise.all([
         prisma.case.count({ where: caseFilter }),
-        prisma.case.count({ where: { ...caseFilter, status: { notIn: ['DELIVERED', 'ON_HOLD', 'CANCELLED'] } } }),
+        // "In Progress" = active lab-production stages only (PRODUCTION_STATUSES).
+        // Previously this counted everything except DELIVERED/ON_HOLD/CANCELLED,
+        // which silently included READY_TO_DISPATCH (already its own tile below —
+        // those cases are DONE with production, just waiting on payment/dispatch)
+        // plus OUT_FOR_DELIVERY/REMAKE/UNDER_REVIEW/REJECTED/intake states. That
+        // made Total Cases In Progress + Ready for Delivery + Delivered overshoot
+        // Total Cases, and made this tile disagree with its own drill-down (which
+        // already only shows PRODUCTION_STATUSES).
+        prisma.case.count({ where: { ...caseFilter, status: { in: PRODUCTION_STATUSES } } }),
         prisma.case.count({ where: { ...caseFilter, status: 'DELIVERED' } }),
       ]),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
@@ -328,7 +349,10 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         where: caseFilter,
         select: { workType: true, units: true, clinicId: true, totalAmount: true, payment: { select: { status: true, amount: true } } },
       }),
-      prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
+      // Scoped to the same date/clinic/search filters as the rest of this
+      // endpoint's KPIs, so it moves with the filters like everything else
+      // (was previously a global, unfiltered snapshot).
+      prisma.case.count({ where: { ...caseFilter, status: 'READY_TO_DISPATCH' } }),
       prisma.case.count({ where: { remake: true, ...caseFilter } }),
       prisma.case.groupBy({
         by: ['remakeReason'],
