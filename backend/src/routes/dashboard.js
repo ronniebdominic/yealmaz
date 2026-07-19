@@ -326,7 +326,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.case.groupBy({ by: ['clinicId'], where: caseFilter, _count: { id: true } }),
       prisma.case.findMany({
         where: caseFilter,
-        select: { workType: true, units: true, clinicId: true, payment: { select: { status: true, amount: true } } },
+        select: { workType: true, units: true, clinicId: true, totalAmount: true, payment: { select: { status: true, amount: true } } },
       }),
       prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
       prisma.case.count({ where: { remake: true, ...caseFilter } }),
@@ -359,17 +359,17 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 
     const totalRevenue = cohortVerifiedPayments.reduce((s, p) => s + (p.amount || 0), 0);
 
-    // Total Case Value = billed amount for every delivered case in the cohort,
-    // paid or not. Outstanding = the subset still unpaid (net of any partial
-    // amountReceived). Both derived from the same deliveredCohortCases list so
-    // they can never drift apart from each other.
+    // Delivered Case Value = billed amount for every DELIVERED case in the
+    // cohort, paid or not. Outstanding = the subset still unpaid (net of any
+    // partial amountReceived). Both derived from the same deliveredCohortCases
+    // list so they can never drift apart from each other.
     const UNPAID_STATUSES = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'];
-    let totalProjectedRevenue = 0;
+    let deliveredCaseValue = 0;
     let outstandingNetAmount = 0;
     let outstandingCount = 0;
     for (const c of deliveredCohortCases) {
       const billed = c.payment?.amount ?? c.totalAmount ?? 0;
-      totalProjectedRevenue += billed;
+      deliveredCaseValue += billed;
       const payStatus = c.payment?.status || 'PENDING';
       if (billed > 0 && UNPAID_STATUSES.includes(payStatus)) {
         outstandingNetAmount += billed - (c.payment?.amountReceived || 0);
@@ -408,6 +408,11 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 
     const workTypeMap = {};
     let totalUnits = 0;
+    // Total Case Value (Financial Projection) — expected/billed value across
+    // EVERY case in the selected range regardless of status, unlike
+    // deliveredCaseValue above which is delivered-only. Same billed-amount
+    // fallback (payment.amount, else case.totalAmount) as everywhere else.
+    let totalCaseValue = 0;
     for (const c of casesByWorkType) {
       const wt = c.workType || 'Other';
       if (!workTypeMap[wt]) workTypeMap[wt] = { count: 0, revenue: 0, units: 0 };
@@ -417,6 +422,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       if (c.payment?.status === 'VERIFIED' && c.payment?.amount) {
         workTypeMap[wt].revenue += c.payment.amount;
       }
+      totalCaseValue += c.payment?.amount ?? c.totalAmount ?? 0;
     }
     const revenueByWorkType = Object.entries(workTypeMap)
       .map(([workType, d]) => ({ workType, count: d.count, revenue: d.revenue, units: d.units }))
@@ -447,7 +453,8 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       kpi: {
         totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments,
         readyToDispatch, totalRemakes, mostCommonRemakeReason,
-        avgTurnaroundDays, onTimeDeliveryPct, totalProjectedRevenue,
+        avgTurnaroundDays, onTimeDeliveryPct,
+        totalCaseValue, deliveredCaseValue,
         outstandingCount: outstandingCount,
         outstandingAmount: outstandingNetAmount,
         unitsDelivered: unitsDeliveredAgg._sum.units || 0,

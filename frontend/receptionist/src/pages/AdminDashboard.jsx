@@ -291,7 +291,8 @@ export default function AdminDashboard() {
       ['Period', `${fromDate} to ${toDate}`],
       ['Clinic Filter', selectedClinic ? (clinicList?.find(c => c.id === selectedClinic)?.name || selectedClinic) : 'All Clinics'],
       [],
-      ['Total Case Value — Delivered Only (Br)', kpi?.totalProjectedRevenue ?? 0],
+      ['Total Case Value (Br)', kpi?.totalCaseValue ?? 0],
+      ['Total Case Value — Delivered Only (Br)', kpi?.deliveredCaseValue ?? 0],
       ['Total Revenue Received (Br)',  kpi?.totalRevenue ?? 0],
       ['Outstanding (Br)', kpi?.outstandingAmount ?? 0],
       ['Total Cases',      kpi?.totalCases ?? 0],
@@ -448,19 +449,22 @@ export default function AdminDashboard() {
               <ColorTile icon={MdInventory2} label="Total Units" value={kpi?.totalUnits ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
-              <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.totalProjectedRevenue)}
-                sub="Delivered cases only" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+              <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.totalCaseValue)}
+                sub="In selected range" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
             </div>
 
             {/* ── Section 2: Revenue Vs Volume ── */}
             <SectionHeader>Revenue Vs Volume</SectionHeader>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 16 }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 16 }}>
               <ColorTile icon={MdCheckCircle} label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
               <ColorTile icon={MdInventory2} label="Total Units Delivered" value={kpi?.unitsDelivered ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+              <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.deliveredCaseValue)}
+                sub="Delivered cases only" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
               <ColorTile icon={MdPaid} label="Verified Payments" value={ETB(kpi?.totalRevenue)}
                 sub="Received" color="var(--green)" bg="var(--green-dim)"
@@ -470,13 +474,14 @@ export default function AdminDashboard() {
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')} />
             </div>
 
-            {/* Collection rate bar — must share the same cohort as "Total Case
-                Value" above (delivered cases created in the selected range), not
-                kpi.totalRevenue (payments verified in-range regardless of when
-                the case was created) or the two numbers describe different case
-                populations and the rate becomes meaningless. */}
+            {/* Collection rate bar — must share the same cohort as the delivered
+                "Total Case Value" tile above it (delivered cases created in the
+                selected range), not kpi.totalCaseValue (ALL cases, paid or not,
+                delivered or not) or kpi.totalRevenue (payments verified in-range
+                regardless of when the case was created) — mixing cohorts makes
+                the rate meaningless. */}
             {(() => {
-              const billableTotal  = kpi?.totalProjectedRevenue || 0;
+              const billableTotal  = kpi?.deliveredCaseValue || 0;
               const outstanding = kpi?.outstandingAmount  || 0;
               const received    = Math.max(billableTotal - outstanding, 0);
               const collectionRate = billableTotal > 0 ? Math.round((received / billableTotal) * 100) : 0;
