@@ -470,11 +470,15 @@ export default function AdminDashboard() {
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')} />
             </div>
 
-            {/* Collection rate bar */}
+            {/* Collection rate bar — must share the same cohort as "Total Case
+                Value" above (delivered cases created in the selected range), not
+                kpi.totalRevenue (payments verified in-range regardless of when
+                the case was created) or the two numbers describe different case
+                populations and the rate becomes meaningless. */}
             {(() => {
-              const received    = kpi?.totalRevenue      || 0;
+              const billableTotal  = kpi?.totalProjectedRevenue || 0;
               const outstanding = kpi?.outstandingAmount  || 0;
-              const billableTotal  = received + outstanding;
+              const received    = Math.max(billableTotal - outstanding, 0);
               const collectionRate = billableTotal > 0 ? Math.round((received / billableTotal) * 100) : 0;
               const receivedPct    = billableTotal > 0 ? (received / billableTotal) * 100 : 0;
               const outstandingPct = billableTotal > 0 ? (outstanding / billableTotal) * 100 : 0;
