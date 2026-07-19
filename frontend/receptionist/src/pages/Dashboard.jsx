@@ -175,6 +175,35 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   };
   const clearTeeth = () => { setSelectedTeeth([]); calcPriceAndDate(workType, orderType, manualUnits); };
 
+  // Picking the original/reference case pulls its patient & clinical details
+  // straight into this form — it's the same patient and (usually) the same
+  // work being redone, so there's no reason to re-type it. Price/due date are
+  // still computed fresh from the current work type + units, not copied from
+  // the old case (a remake is free, a redo is 50% — copying the old price
+  // would be wrong).
+  const handleSelectOriginal = (rc) => {
+    setOriginalCase(rc);
+
+    if (rc.patientName && !isPlaceholderName(rc.patientName)) setPatientName(rc.patientName);
+    if (rc.shade) setShade(rc.shade);
+    if (rc.doctorName) setDoctorName(rc.doctorName);
+    if (rc.doctorPhone) setDoctorPhone(rc.doctorPhone);
+
+    const teeth = rc.toothNumbers
+      ? rc.toothNumbers.split(',').map(t => parseInt(t.trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b)
+      : [];
+    setSelectedTeeth(teeth);
+    if (teeth.length === 0 && rc.units) setManualUnits(String(rc.units));
+
+    const wt = rc.workType && rc.workType !== 'TBD' ? rc.workType : workType;
+    if (wt) setWorkType(wt);
+    const ot = rc.deliveryType || orderType;
+    setOrderType(ot);
+
+    const u = teeth.length > 0 ? String(teeth.length) : (rc.units ? String(rc.units) : units);
+    calcPriceAndDate(wt, ot, u);
+  };
+
   const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
   const lbl     = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
 
@@ -316,7 +345,10 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
               />
             )}
             <label style={lbl}>ORIGINAL / REFERENCE CASE</label>
-            <OriginalCasePicker selected={originalCase} onSelect={setOriginalCase} onClear={() => setOriginalCase(null)} />
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
+              Selecting a case fills in patient name, shade, doctor, and teeth/units from it automatically — review before accepting.
+            </div>
+            <OriginalCasePicker selected={originalCase} onSelect={handleSelectOriginal} onClear={() => setOriginalCase(null)} />
           </div>
         )}
       </div>
