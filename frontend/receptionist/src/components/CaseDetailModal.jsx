@@ -65,6 +65,8 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [statusNotes, setStatusNotes] = useState('');
   const [deliveryDateInput, setDeliveryDateInput] = useState('');
   const [savingDeliveryDate, setSavingDeliveryDate] = useState(false);
+  const [unitsInput, setUnitsInput] = useState('');
+  const [savingUnits, setSavingUnits] = useState(false);
   const [remakeInput, setRemakeInput] = useState(false);
   const [remakeReasonInput, setRemakeReasonInput] = useState('');
   const [redoInput, setRedoInput] = useState(false);
@@ -106,6 +108,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
       setData(res.data);
       setNewStatus(res.data.status);
       setDeliveryDateInput(res.data.deliveryDate ? res.data.deliveryDate.slice(0, 10) : '');
+      setUnitsInput(res.data.units != null ? String(res.data.units) : '');
       setRemakeInput(res.data.remake || false);
       setRemakeReasonInput(res.data.remakeReason || '');
       setRedoInput(res.data.redo || false);
@@ -163,6 +166,24 @@ export default function CaseDetailModal({ caseId, onClose }) {
     }
   };
 
+  const saveUnits = async () => {
+    const units = parseInt(unitsInput, 10);
+    if (!Number.isInteger(units) || units < 1) {
+      toast.error('Enter a whole number of at least 1');
+      return;
+    }
+    setSavingUnits(true);
+    try {
+      await api.patch(`/cases/${caseId}/units`, { units });
+      toast.success('Units updated');
+      loadCase();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not update units');
+    } finally {
+      setSavingUnits(false);
+    }
+  };
+
   const printQR = () => printCaseLabel(data);
 
   if (loading) return (
@@ -191,7 +212,6 @@ export default function CaseDetailModal({ caseId, onClose }) {
               ['Clinic', data.clinic?.name],
               ['Work Type', data.workType],
               ['Tooth Numbers', data.toothNumbers || '—'],
-              ...(data.units != null ? [['Units', data.units]] : []),
               ['Shade', data.shade || '—'],
               [data.dueDate ? 'Due Date' : data.payment?.verifiedAt ? 'Delivered' : 'Due Date',
                 data.dueDate
@@ -322,6 +342,36 @@ export default function CaseDetailModal({ caseId, onClose }) {
             {data.deliveryDate && (
               <div style={{ fontSize: 11, color: 'var(--green)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <MdCheckCircle size={12} /> Currently set to {format(new Date(data.deliveryDate), 'dd MMM yyyy')}
+              </div>
+            )}
+          </div>
+
+          {/* Units — correct the count if it changes at/near delivery */}
+          <div className="divider" />
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px' }}>
+              Units to Deliver
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={unitsInput}
+                onChange={e => setUnitsInput(e.target.value)}
+                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none' }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={saveUnits}
+                disabled={savingUnits || parseInt(unitsInput, 10) === data.units}
+              >
+                {savingUnits ? '…' : 'Save'}
+              </button>
+            </div>
+            {data.units != null && (
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 5 }}>
+                Currently {data.units} unit{data.units !== 1 ? 's' : ''}
               </div>
             )}
           </div>

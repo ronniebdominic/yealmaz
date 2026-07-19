@@ -601,6 +601,46 @@ router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), a
   }
 });
 
+// ── PATCH /api/cases/:id/units ────────────────────────────
+// Reception (not just admin) can correct the unit count — the number of
+// units actually going out sometimes changes right before/at delivery
+// (e.g. a unit was dropped from the case, or the lab count differed from
+// what was ordered), and that shouldn't require an admin to fix.
+router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    const units = parseInt(req.body.units, 10);
+    if (!Number.isInteger(units) || units < 1) {
+      return res.status(400).json({ error: 'Units must be a whole number of at least 1.' });
+    }
+
+    const updated = await prisma.case.update({ where: { id: req.params.id }, data: { units } });
+
+    if (units !== existing.units) {
+      await prisma.caseStage.create({
+        data: {
+          caseId: req.params.id,
+          stageName: existing.status,
+          scannedBy: req.user.name,
+          notes: `Units changed from ${existing.units ?? '—'} to ${units} by ${req.user.name}`,
+        }
+      });
+    }
+
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
+
+    const io = req.app.get('io');
+    io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
+
+    res.json(updated);
+  } catch (err) {
+    console.error('[PATCH /cases/:id/units]', err);
+    res.status(500).json({ error: 'Could not update units.' });
+  }
+});
+
 // ── PATCH /api/cases/:id/remake ──────────────────────────
 // Mark an EXISTING case as remake/redo (or clear it) — reception, not just
 // admin. Only touches these four flag fields; caseNumber is never reassigned,
