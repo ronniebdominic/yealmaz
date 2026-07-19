@@ -16,7 +16,7 @@ import {
   MdPaid, MdPendingActions, MdAutorenew, MdInventory2, MdBarChart,
   MdSchedule, MdTrackChanges, MdSearch, MdFileDownload, MdCancel,
   MdErrorOutline, MdScience, MdHandshake, MdClose, MdCheck, MdChevronLeft,
-  MdChevronRight,
+  MdChevronRight, MdInfoOutline,
 } from 'react-icons/md';
 
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
@@ -201,7 +201,7 @@ function SectionHeader({ children }) {
 // ── Colored KPI tile (mockup uses flat green/red/yellow/blue blocks) ─────
 // Glassmorphic: keeps the semantic tint (bg) but frosts it with a blur +
 // soft inset highlight, rather than flattening every card to neutral white.
-function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active }) {
+function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active, info }) {
   return (
     <div
       onClick={onClick}
@@ -216,7 +216,14 @@ function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active }
       onMouseLeave={e => { e.currentTarget.style.boxShadow = active ? `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)` : 'inset 0 1px 0 rgba(255,255,255,.5)'; e.currentTarget.style.transform = 'translateY(0)'; }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-        <Icon className="mi" size={16} />{label}
+        <Icon className="mi" size={16} />
+        <span style={{ flex: 1 }}>{label}</span>
+        {info && (
+          <span className="info-icon-wrap" tabIndex={0} onClick={e => e.stopPropagation()}>
+            <MdInfoOutline size={13} style={{ opacity: 0.55 }} />
+            <span className="info-tooltip">{info}</span>
+          </span>
+        )}
       </div>
       <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{sub}</div>}
@@ -445,13 +452,16 @@ export default function AdminDashboard() {
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
               <ColorTile icon={MdAssignment} label="Total Cases" value={kpi?.totalCases ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
+                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')}
+                info="Every case created between the From and To dates you picked above, no matter what stage it's at — still in production, ready to ship, or already delivered." />
               <ColorTile icon={MdInventory2} label="Total Units" value={kpi?.totalUnits ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
+                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')}
+                info="Total tooth/unit count added up across all those same cases (e.g. a 3-unit bridge counts as 3)." />
               <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.totalCaseValue)}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')} />
+                active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')}
+                info="What all of those cases are expected to bill for in total — added together whether the clinic has paid yet or not, and whether the case has been delivered yet or not." />
             </div>
 
             {/* ── Section 2: Revenue Vs Volume ── */}
@@ -459,19 +469,24 @@ export default function AdminDashboard() {
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 16 }}>
               <ColorTile icon={MdCheckCircle} label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
+                info="Of the cases created in this range, how many have actually reached the clinic (status = Delivered)." />
               <ColorTile icon={MdInventory2} label="Total Units Delivered" value={kpi?.unitsDelivered ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
+                info="Total units, but only counting the delivered cases above — not the ones still in production." />
               <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.deliveredCaseValue)}
                 sub="Delivered cases only" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')} />
+                active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
+                info="What the delivered cases are billed for in total — this is the money actually earned so far from finished work, whether it's been paid yet or not. (The 'Total Case Value' above in Financial Projection also includes cases that aren't delivered yet — this one doesn't.)" />
               <ColorTile icon={MdPaid} label="Verified Payments" value={ETB(kpi?.totalRevenue)}
                 sub="Received" color="var(--green)" bg="var(--green-dim)"
-                active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')} />
+                active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')}
+                info="Money Finance has checked and confirmed as paid, for cases created in this range — regardless of exactly when that payment was verified." />
               <ColorTile icon={MdPendingActions} label="Outstanding Payment" value={ETB(kpi?.outstandingAmount)}
                 sub={`${kpi?.outstandingCount ?? 0} unpaid cases`} color="var(--red)" bg="#FFF1F2"
-                active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')} />
+                active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')}
+                info="Money still owed on DELIVERED cases from this range that haven't been fully paid. A case still in production isn't counted as 'outstanding' — nothing's owed until it ships." />
             </div>
 
             {/* Collection rate bar — must share the same cohort as the delivered
@@ -490,7 +505,13 @@ export default function AdminDashboard() {
               return (
                 <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: 'var(--radius-lg)', background: 'linear-gradient(90deg, #F0A500, #F59E0B)', border: '1px solid rgba(255,255,255,.35)', boxShadow: '0 8px 28px rgba(217,119,6,.25), inset 0 1px 0 rgba(255,255,255,.4)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Collection Rate</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      Collection Rate
+                      <span className="info-icon-wrap" tabIndex={0}>
+                        <MdInfoOutline size={13} style={{ opacity: 0.75 }} />
+                        <span className="info-tooltip">Of the money billed on delivered cases in this range (Total Case Value, delivered only), what share has actually been collected vs. is still owed. Not paid-for cases still in production — this is purely about delivered work.</span>
+                      </span>
+                    </div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{collectionRate}%</div>
                   </div>
                   <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.35)', overflow: 'hidden' }}>
@@ -509,20 +530,25 @@ export default function AdminDashboard() {
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 24 }}>
               <ColorTile icon={MdSettings} label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
                 sub="In production" color="var(--amber)" bg="var(--amber-dim)"
-                active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')} />
+                active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')}
+                info="Cases actively moving through the lab right now (plaster, scanning, milling, ceramics, QC, etc). Doesn't include cases that are already finished and just waiting to ship — those are counted separately in 'Ready for Delivery & Dispatch' below, so a case is never counted in both." />
               <ColorTile icon={MdLocalShipping} label="Ready for Delivery & Dispatch" value={kpi?.readyToDispatch ?? '—'}
                 sub="Ready to dispatch" color="var(--amber)" bg="var(--amber-dim)"
-                active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')} />
+                active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')}
+                info="Cases where the lab work is fully done and QC'd — just waiting on payment and/or a driver before they go out. These have left 'In Progress' but aren't 'Delivered' yet." />
               <ColorTile icon={MdAutorenew} label="Total Remake" value={kpi?.totalRemakes ?? '—'}
                 sub={kpi?.mostCommonRemakeReason ? `Top reason: ${kpi.mostCommonRemakeReason}` : 'In selected range'}
                 color="var(--red)" bg="#FFF1F2"
-                active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')} />
+                active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')}
+                info="Cases created in this range that were flagged as a remake — redone for the clinic at no extra charge (e.g. shade mismatch, fit issue)." />
               <ColorTile icon={MdSchedule} label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
-                sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF" />
+                sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF"
+                info="On average, how many days pass between a case being created and it actually being delivered — measured only on cases from this range that have already been delivered." />
               <ColorTile icon={MdTrackChanges} label="% On Time Delivery"
                 value={kpi?.onTimeDeliveryPct != null ? `${kpi.onTimeDeliveryPct}%` : '—'}
-                sub="Within due date" color="var(--blue)" bg="#EEF2FF" />
+                sub="Within due date" color="var(--blue)" bg="#EEF2FF"
+                info="Of the delivered cases in this range that had a due date set, what percentage were delivered on or before that due date." />
             </div>
 
             {/* ── Drill-down panel ── */}
