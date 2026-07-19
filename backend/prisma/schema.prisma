@@ -284,6 +284,7 @@ model WorkTypePrice {
   durationDays        Int?
   expressPrice        Float?
   expressDurationDays Int?
+  isFlatRate          Boolean  @default(false) // priced per case/dentition, never multiplied by unit count (e.g. Night Guard, Retainer)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

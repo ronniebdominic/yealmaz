@@ -33,7 +33,7 @@ router.put('/', async (req, res) => {
     }
 
     await Promise.all(
-      updates.map(({ workType, price, durationDays, expressPrice, expressDurationDays }) =>
+      updates.map(({ workType, price, durationDays, expressPrice, expressDurationDays, isFlatRate }) =>
         prisma.workTypePrice.upsert({
           where: { workType },
           update: {
@@ -41,6 +41,7 @@ router.put('/', async (req, res) => {
             ...(durationDays !== undefined ? { durationDays: durationDays ? parseInt(durationDays) : null } : {}),
             ...(expressPrice !== undefined ? { expressPrice: expressPrice ? parseFloat(expressPrice) : null } : {}),
             ...(expressDurationDays !== undefined ? { expressDurationDays: expressDurationDays ? parseInt(expressDurationDays) : null } : {}),
+            ...(isFlatRate !== undefined ? { isFlatRate: Boolean(isFlatRate) } : {}),
           },
           create: {
             workType,
@@ -48,6 +49,7 @@ router.put('/', async (req, res) => {
             durationDays: durationDays ? parseInt(durationDays) : null,
             expressPrice: expressPrice ? parseFloat(expressPrice) : null,
             expressDurationDays: expressDurationDays ? parseInt(expressDurationDays) : null,
+            isFlatRate: Boolean(isFlatRate),
           },
         })
       )
@@ -66,13 +68,14 @@ router.put('/', async (req, res) => {
 // PATCH /api/prices/:id  — rename work type or update individual row
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { workType, price, durationDays, expressPrice, expressDurationDays } = req.body;
+    const { workType, price, durationDays, expressPrice, expressDurationDays, isFlatRate } = req.body;
     const data = {};
     if (workType !== undefined) data.workType = workType.trim();
     if (price !== undefined) data.price = parseFloat(price);
     if (durationDays !== undefined) data.durationDays = durationDays ? parseInt(durationDays) : null;
     if (expressPrice !== undefined) data.expressPrice = expressPrice ? parseFloat(expressPrice) : null;
     if (expressDurationDays !== undefined) data.expressDurationDays = expressDurationDays ? parseInt(expressDurationDays) : null;
+    if (isFlatRate !== undefined) data.isFlatRate = Boolean(isFlatRate);
 
     if (Object.keys(data).length === 0) {
       return res.status(400).json({ error: 'Nothing to update.' });

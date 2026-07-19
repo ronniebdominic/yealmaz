@@ -22,9 +22,10 @@ export default function AdminPricing() {
   const [newDays, setNewDays] = useState('');
   const [newExpressPrice, setNewExpressPrice] = useState('');
   const [newExpressDays, setNewExpressDays] = useState('');
+  const [newIsFlatRate, setNewIsFlatRate] = useState(false);
   // per-row edit mode
   const [editRow, setEditRow] = useState(null); // id of row being inline-edited
-  const [editRowData, setEditRowData] = useState({ workType: '', price: '', durationDays: '', expressPrice: '', expressDurationDays: '' });
+  const [editRowData, setEditRowData] = useState({ workType: '', price: '', durationDays: '', expressPrice: '', expressDurationDays: '', isFlatRate: false });
 
   const { data: prices = [], isLoading } = useQuery({
     queryKey: ['prices'],
@@ -122,6 +123,7 @@ export default function AdminPricing() {
       durationDays: String(p.durationDays ?? ''),
       expressPrice: String(p.expressPrice ?? ''),
       expressDurationDays: String(p.expressDurationDays ?? ''),
+      isFlatRate: p.isFlatRate ?? false,
     });
   };
 
@@ -138,8 +140,12 @@ export default function AdminPricing() {
       durationDays: editRowData.durationDays ? parseInt(editRowData.durationDays) : null,
       expressPrice: editRowData.expressPrice ? parseFloat(editRowData.expressPrice) : null,
       expressDurationDays: editRowData.expressDurationDays ? parseInt(editRowData.expressDurationDays) : null,
+      isFlatRate: editRowData.isFlatRate,
     });
   };
+
+  // Quick toggle — doesn't need edit mode, just flips the flag immediately.
+  const toggleFlatRate = (p) => patchRow({ id: p.id, isFlatRate: !p.isFlatRate });
 
   const handleDelete = (p) => {
     if (!window.confirm(`Remove "${p.workType}" from pricing?\n\nThis cannot be undone.`)) return;
@@ -158,13 +164,14 @@ export default function AdminPricing() {
     const durationDays = newDays ? parseInt(newDays) : null;
     const expressPrice = newExpressPrice ? parseFloat(newExpressPrice) : null;
     const expressDurationDays = newExpressDays ? parseInt(newExpressDays) : null;
-    saveAll([{ workType: trimmed, price, durationDays, expressPrice, expressDurationDays }]);
+    saveAll([{ workType: trimmed, price, durationDays, expressPrice, expressDurationDays, isFlatRate: newIsFlatRate }]);
     setShowAdd(false);
     setNewType('');
     setNewPrice('');
     setNewDays('');
     setNewExpressPrice('');
     setNewExpressDays('');
+    setNewIsFlatRate(false);
   };
 
   const getPrice = (p) =>
@@ -334,6 +341,15 @@ export default function AdminPricing() {
                   style={{ ...inputStyle, maxWidth: '100%', width: '100%' }}
                 />
               </div>
+              <div style={{ flex: 0, minWidth: 150 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', display: 'block', marginBottom: 5 }}>
+                  &nbsp;
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-2)', cursor: 'pointer', padding: '8px 0' }}>
+                  <input type="checkbox" checked={newIsFlatRate} onChange={e => setNewIsFlatRate(e.target.checked)} />
+                  Flat rate (per case)
+                </label>
+              </div>
               <button
                 onClick={handleAddNew}
                 disabled={saving}
@@ -364,19 +380,20 @@ export default function AdminPricing() {
                   <th style={{ width: 130 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdBolt size={12} /> Express Days</span></th>
                   <th style={{ width: 160 }}>Price (Br)</th>
                   <th style={{ width: 130 }}>Duration (days)</th>
+                  <th style={{ width: 100, textAlign: 'center' }}>Flat Rate</th>
                   <th style={{ width: 140, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: 48, color: 'var(--text-3)' }}>
                       Loading prices…
                     </td>
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty-state">No work types match your search</td>
+                    <td colSpan={8} className="empty-state">No work types match your search</td>
                   </tr>
                 ) : paginated.map((p, i) => {
                   const globalIdx = (page - 1) * PAGE_SIZE + i;
@@ -434,6 +451,14 @@ export default function AdminPricing() {
                             onChange={e => setEditRowData(d => ({ ...d, durationDays: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && saveEdit()}
                             style={{ ...inputStyle, width: 90, maxWidth: 90 }}
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={editRowData.isFlatRate}
+                            onChange={e => setEditRowData(d => ({ ...d, isFlatRate: e.target.checked }))}
+                            title="Priced per case, not multiplied by units"
                           />
                         </td>
                         <td style={{ textAlign: 'right' }}>
@@ -518,6 +543,15 @@ export default function AdminPricing() {
                             fontWeight: durDirty ? 700 : 400,
                             borderColor: durDirty ? 'var(--amber)' : 'var(--border)',
                           }}
+                        />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={!!p.isFlatRate}
+                          onChange={() => toggleFlatRate(p)}
+                          disabled={!!editRow || patching}
+                          title="Priced per case, not multiplied by units"
                         />
                       </td>
                       <td style={{ textAlign: 'right' }}>

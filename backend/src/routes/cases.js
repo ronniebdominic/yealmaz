@@ -606,9 +606,23 @@ router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), a
 // units actually going out sometimes changes right before/at delivery
 // (e.g. a unit was dropped from the case, or the lab count differed from
 // what was ordered), and that shouldn't require an admin to fix.
+//
+// Units and pricing are linked: for per-unit work types (isFlatRate=false
+// on WorkTypePrice) the billed amount shifts by (newUnits - oldUnits) *
+// unitPrice, where unitPrice honors the case's delivery type (express vs
+// normal) and remake/redo status (free / 50%). This is a DELTA adjustment,
+// not a from-scratch recompute, so anything else baked into totalAmount at
+// creation (e.g. a digital-intake arch fee) is preserved untouched. Flat-rate
+// work types (dentures, night guards, retainers, etc.) are priced per case
+// regardless of unit count, so units change with no price impact.
+//
+// If payment has already been verified (money collected/confirmed), the
+// amount is deliberately left alone — silently rewriting a verified payment
+// would corrupt the financial record. The response flags this so the UI can
+// tell the receptionist to loop in Finance/Admin for a manual adjustment.
 router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
-    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id }, include: { payment: true } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
 
     const units = parseInt(req.body.units, 10);
@@ -616,25 +630,66 @@ router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       return res.status(400).json({ error: 'Units must be a whole number of at least 1.' });
     }
 
-    const updated = await prisma.case.update({ where: { id: req.params.id }, data: { units } });
+    const oldUnits = existing.units ?? 0;
+    const unitsChanged = units !== oldUnits;
 
-    if (units !== existing.units) {
+    let priceAdjustment = { changed: false, reason: 'unchanged', oldAmount: existing.totalAmount ?? null, newAmount: existing.totalAmount ?? null };
+    const caseData = { units };
+
+    if (unitsChanged) {
+      if (existing.payment?.status === 'VERIFIED') {
+        priceAdjustment = { changed: false, reason: 'payment_verified', oldAmount: existing.totalAmount ?? null, newAmount: existing.totalAmount ?? null };
+      } else {
+        const priceRow = await prisma.workTypePrice.findUnique({ where: { workType: existing.workType } });
+        if (!priceRow || priceRow.isFlatRate) {
+          priceAdjustment = { changed: false, reason: priceRow ? 'flat_rate' : 'no_price_row', oldAmount: existing.totalAmount ?? null, newAmount: existing.totalAmount ?? null };
+        } else {
+          const useExpress = existing.deliveryType === 'EXPRESS' && priceRow.expressPrice != null;
+          const unitPrice = useExpress ? priceRow.expressPrice : priceRow.price;
+          const multiplier = existing.remake ? 0 : (existing.redo || existing.isRedo) ? 0.5 : 1;
+          const delta = unitPrice * multiplier * (units - oldUnits);
+
+          if (delta !== 0) {
+            const oldAmount = existing.totalAmount ?? 0;
+            const newAmount = Math.max(0, oldAmount + delta);
+            caseData.totalAmount = newAmount;
+            priceAdjustment = { changed: true, reason: 'adjusted', oldAmount, newAmount };
+          }
+        }
+      }
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const c = await tx.case.update({ where: { id: req.params.id }, data: caseData, include: { payment: true } });
+      if (priceAdjustment.changed && existing.payment) {
+        await tx.payment.update({ where: { caseId: req.params.id }, data: { amount: priceAdjustment.newAmount } });
+        c.payment.amount = priceAdjustment.newAmount;
+      }
+      return c;
+    });
+
+    if (unitsChanged) {
+      const priceNote = priceAdjustment.changed
+        ? ` — billed amount adjusted from Br ${priceAdjustment.oldAmount?.toLocaleString('en-US')} to Br ${priceAdjustment.newAmount.toLocaleString('en-US')}`
+        : priceAdjustment.reason === 'payment_verified'
+          ? ' — amount left unchanged (payment already verified)'
+          : '';
       await prisma.caseStage.create({
         data: {
           caseId: req.params.id,
           stageName: existing.status,
           scannedBy: req.user.name,
-          notes: `Units changed from ${existing.units ?? '—'} to ${units} by ${req.user.name}`,
+          notes: `Units changed from ${existing.units ?? '—'} to ${units} by ${req.user.name}${priceNote}`,
         }
       });
     }
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
 
-    res.json(updated);
+    res.json({ ...updated, priceAdjustment });
   } catch (err) {
     console.error('[PATCH /cases/:id/units]', err);
     res.status(500).json({ error: 'Could not update units.' });

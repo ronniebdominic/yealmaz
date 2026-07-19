@@ -174,8 +174,16 @@ export default function CaseDetailModal({ caseId, onClose }) {
     }
     setSavingUnits(true);
     try {
-      await api.patch(`/cases/${caseId}/units`, { units });
-      toast.success('Units updated');
+      const res = await api.patch(`/cases/${caseId}/units`, { units });
+      const adj = res.data?.priceAdjustment;
+      if (adj?.changed) {
+        toast.success(`Units updated — billed amount adjusted to Br ${adj.newAmount.toLocaleString('en-US')}`);
+      } else if (adj?.reason === 'payment_verified') {
+        toast.success('Units updated');
+        toast('Amount left unchanged — payment already verified. Use Payment Override to adjust it.', { duration: 6000 });
+      } else {
+        toast.success('Units updated');
+      }
       loadCase();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not update units');

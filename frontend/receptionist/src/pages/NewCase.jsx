@@ -95,12 +95,6 @@ function calcDueDate(workType, days) {
   return d.toISOString().split('T')[0];
 }
 
-// Work types priced per full dentition — never multiplied by tooth count
-const FLAT_PRICE_TYPES = new Set([
-  'Orthodontic Retainer', 'Night Guard Soft', 'Night Guard Hard',
-  'Sports Guard', 'Bite Splint', 'Bleaching Tray', 'Clear Aligner Setup', 'Gingival Mask',
-]);
-
 const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 3 };
 
 // ── Page ──────────────────────────────────────────────────
@@ -152,6 +146,15 @@ export default function NewCase() {
     [pricesData]
   );
 
+  // Work types priced per full dentition — never multiplied by tooth count.
+  // Sourced from WorkTypePrice.isFlatRate (Admin > Work Type Pricing), not a
+  // hardcoded list, so it stays in sync with the same flag the backend uses
+  // to decide whether a units edit should adjust the billed amount.
+  const flatRateMap = useMemo(
+    () => Object.fromEntries(pricesData.map(p => [p.workType, !!p.isFlatRate])),
+    [pricesData]
+  );
+
   // Build grouped work-type list from DB (single source of truth)
   const workTypeGroups = useMemo(() => {
     const dbTypes = new Set(pricesData.map(p => p.workType));
@@ -176,7 +179,7 @@ export default function NewCase() {
     const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
     const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
     if (unitPrice === undefined) return null;
-    const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
+    const count = flatRateMap[form.workType] ? 1 : Math.max(1, selectedTeeth.length);
     return unitPrice * count;
   }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
 
@@ -293,7 +296,7 @@ export default function NewCase() {
     if (!form.workType || priceMap[form.workType] == null) return null;
     const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
     const unitPrice  = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
-    const count = FLAT_PRICE_TYPES.has(form.workType) ? 1 : Math.max(1, selectedTeeth.length);
+    const count = flatRateMap[form.workType] ? 1 : Math.max(1, selectedTeeth.length);
     const workTypeFull = unitPrice * count;
     const full = workTypeFull + archFee;
     const archNote = archFee > 0
@@ -307,7 +310,7 @@ export default function NewCase() {
         Redo 50% — <strong style={{ color: 'var(--amber)' }}>Br {(full * 0.5).toLocaleString('en-US')}</strong>
       </span>;
     }
-    return FLAT_PRICE_TYPES.has(form.workType) ? (
+    return flatRateMap[form.workType] ? (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
         {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}flat — Br {unitPrice.toLocaleString('en-US')}{archNote} = <strong style={{ color: 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
       </span>
