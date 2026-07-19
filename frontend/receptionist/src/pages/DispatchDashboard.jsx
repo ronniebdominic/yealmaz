@@ -15,6 +15,7 @@ import {
   MdLocationOn, MdWarning, MdAutorenew, MdPerson, MdHandshake, MdAssignment,
   MdClose, MdLocalHospital,
 } from 'react-icons/md';
+import { todayLocal } from '../utils/date';
 
 const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—';
 
@@ -452,7 +453,7 @@ export default function DispatchDashboard() {
   const openTodayOrders = async () => {
     if (todayOrders !== null) { setTodayOrders(null); return; } // toggle off
     setLoadingToday(true);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocal();
     try {
       const res = await api.get('/cases', { params: { dateFrom: today, dateTo: today, limit: 200 } });
       setTodayOrders(res.data.cases ?? []);

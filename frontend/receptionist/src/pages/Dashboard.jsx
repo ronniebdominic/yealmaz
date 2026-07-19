@@ -18,6 +18,7 @@ import {
   MdVisibility, MdPrint, MdDashboard, MdMoveToInbox, MdAdd,
   MdMedicalServices, MdLogout, MdPendingActions,
 } from 'react-icons/md';
+import { todayLocal, toLocalDateString } from '../utils/date';
 
 // Common dental shade options
 const SHADE_OPTIONS = [
@@ -159,7 +160,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     }
     const days = isExp && expressDurMap[wt] ? expressDurMap[wt] : (durationMap[wt] ?? 5);
     const d = new Date(); d.setDate(d.getDate() + days);
-    setDueDate(d.toISOString().split('T')[0]);
+    setDueDate(toLocalDateString(d));
   };
 
   const handleWT = (wt)  => { setWorkType(wt);    calcPriceAndDate(wt, orderType, units); };
@@ -1300,7 +1301,7 @@ export default function Dashboard() {
               </div>
               <div className="stats-grid" style={{ marginBottom: 24 }}>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = todayLocal();
                   navigate(`/cases?dateFrom=${today}&dateTo=${today}&label=Orders+Today`);
                 }}>
                   <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdAssignment size={18} /></div>
@@ -1309,7 +1310,7 @@ export default function Dashboard() {
                   <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View today's orders ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = todayLocal();
                   navigate(`/cases?remake=true&dateFrom=${today}&dateTo=${today}&label=Remakes+Today`);
                 }}>
                   <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdAutorenew size={18} /></div>
@@ -1320,7 +1321,7 @@ export default function Dashboard() {
                   <div className="stat-sub" style={{ color: 'var(--red)', fontWeight: 600 }}>View remakes ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = todayLocal();
                   navigate(`/cases?redo=true&dateFrom=${today}&dateTo=${today}&label=Redo+Today`);
                 }}>
                   <div className="stat-icon" style={{ background: '#FFF7ED' }}><MdAutorenew size={18} /></div>
@@ -1331,8 +1332,8 @@ export default function Dashboard() {
                   <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>View redo cases ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => {
-                  const today = new Date().toISOString().slice(0, 10);
-                  navigate(`/cases?status=DELIVERED&dateFrom=${today}&dateTo=${today}&label=Delivered+Today`);
+                  const today = todayLocal();
+                  navigate(`/cases?status=DELIVERED&dateFrom=${today}&dateTo=${today}&dateBy=delivery&label=Delivered+Today`);
                 }}>
                   <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdCheckCircle size={18} /></div>
                   <div className="stat-label">Delivered Today</div>

@@ -7,6 +7,7 @@ import api, { downloadExport } from '../api';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
+import { todayLocal } from '../utils/date';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend,
@@ -80,7 +81,7 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
       const exportParams = { ...params };
       delete exportParams.page;
       delete exportParams.limit;
-      await downloadExport('/cases/export', exportParams, `admin-${drill.key}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await downloadExport('/cases/export', exportParams, `admin-${drill.key}_${todayLocal()}.xlsx`);
     } finally {
       setExporting(false);
     }
@@ -255,7 +256,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState(''); // committed on Enter/blur — avoids a request per keystroke
   const thisYear = new Date().getFullYear();
   const [fromDate, setFromDate] = useState(`${thisYear}-01-01`);
-  const [toDate, setToDate]     = useState(new Date().toISOString().slice(0, 10));
+  const [toDate, setToDate]     = useState(todayLocal());
   const [drillKey, setDrillKey]   = useState(null);
   const [testRunning, setTestRunning] = useState(false);
   const [testResult, setTestResult]   = useState(null);
@@ -398,10 +399,10 @@ export default function AdminDashboard() {
             </div>
             <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
               {[
-                { label: 'Today',      f: () => { const n=new Date().toISOString().slice(0,10); setFromDate(n); setToDate(n); setDrillKey(null); } },
-                { label: 'This Month', f: () => { const n=new Date(); setFromDate(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`); setToDate(n.toISOString().slice(0,10)); setDrillKey(null); } },
-                { label: 'This Year',  f: () => { setFromDate(`${thisYear}-01-01`); setToDate(new Date().toISOString().slice(0,10)); setDrillKey(null); } },
-                { label: 'All Time',   f: () => { setFromDate('2020-01-01'); setToDate(new Date().toISOString().slice(0,10)); setDrillKey(null); } },
+                { label: 'Today',      f: () => { const n=todayLocal(); setFromDate(n); setToDate(n); setDrillKey(null); } },
+                { label: 'This Month', f: () => { const n=new Date(); setFromDate(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`); setToDate(todayLocal()); setDrillKey(null); } },
+                { label: 'This Year',  f: () => { setFromDate(`${thisYear}-01-01`); setToDate(todayLocal()); setDrillKey(null); } },
+                { label: 'All Time',   f: () => { setFromDate('2020-01-01'); setToDate(todayLocal()); setDrillKey(null); } },
               ].map(({ label, f }) => <button key={label} className="btn btn-ghost btn-sm" onClick={f}>{label}</button>)}
             </div>
           </div>

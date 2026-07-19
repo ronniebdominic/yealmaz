@@ -1,4 +1,13 @@
 // Ye-Almaz Dental Lab — Main Server
+// The whole system runs on East Africa Time (EAT, UTC+3) — the lab, every
+// clinic, and every staff member are in Ethiopia. Setting this before
+// anything else runs makes every local-time Date computation in the backend
+// (day/month/year boundaries, .toLocaleDateString() on invoices/statements,
+// due-date math, etc.) resolve in EAT instead of whatever timezone the host
+// machine defaults to (UTC on Railway). Must be set before any other module
+// is required, since some Date/Intl internals cache the timezone on first use.
+process.env.TZ = 'Africa/Addis_Ababa';
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');

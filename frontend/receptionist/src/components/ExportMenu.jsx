@@ -10,8 +10,9 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MdPendingActions, MdFileDownload, MdBarChart, MdDescription } from 'react-icons/md';
+import { todayLocal } from '../utils/date';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayLocal;
 
 export default function ExportMenu({ data, fetchData, columns = [], filename = 'export', title = '' }) {
   const [open, setOpen]       = useState(false);

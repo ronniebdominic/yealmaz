@@ -3,6 +3,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { startOfDay, endOfDay } = require('../utils/dateRange');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -127,8 +128,8 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear  = new Date(now.getFullYear(), 0, 1);
 
-    const dateFrom = from ? new Date(from) : startOfYear;
-    const dateTo   = to   ? (() => { const d = new Date(to); d.setHours(23,59,59,999); return d; })() : now;
+    const dateFrom = from ? startOfDay(from) : startOfYear;
+    const dateTo   = to   ? endOfDay(to) : now;
 
     const searchWhere = search ? {
       OR: [
@@ -258,9 +259,8 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       { caseNumber: { contains: search, mode: 'insensitive' } },
     ] : null;
 
-    const dateTo = to ? new Date(to) : new Date();
-    dateTo.setHours(23, 59, 59, 999);
-    const dateFrom = from ? new Date(from) : new Date(new Date().getFullYear(), 0, 1);
+    const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
+    const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
 
     // Trend spans the selected filter range (capped to 24 buckets so the chart stays readable)
     const monthsInRange = (dateTo.getFullYear() - dateFrom.getFullYear()) * 12

@@ -10,6 +10,7 @@ import {
   MdEmail, MdBolt, MdWarning, MdAutorenew, MdTwoWheeler, MdMoveToInbox,
   MdLocalShipping,
 } from 'react-icons/md';
+import { toLocalDateString } from '../utils/date';
 
 // ── Visual group ordering for the work-type dropdown ─────
 // Types present in the pricing DB will be slotted into these groups.
@@ -92,7 +93,7 @@ function getDueDays(workType) {
 function calcDueDate(workType, days) {
   const d = new Date();
   d.setDate(d.getDate() + (days ?? getDueDays(workType)));
-  return d.toISOString().split('T')[0];
+  return toLocalDateString(d);
 }
 
 const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 3 };

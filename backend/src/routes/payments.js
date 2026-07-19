@@ -7,6 +7,7 @@ const { Chapa } = require('chapa-nodejs');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
+const { startOfDay, endOfDay } = require('../utils/dateRange');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -842,12 +843,8 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async 
 
     if (dateFrom || dateTo) {
       where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) {
-        const end = new Date(dateTo);
-        end.setHours(23, 59, 59, 999);
-        where.createdAt.lte = end;
-      }
+      if (dateFrom) where.createdAt.gte = startOfDay(dateFrom);
+      if (dateTo) where.createdAt.lte = endOfDay(dateTo);
     }
 
     const cases = await prisma.case.findMany({
@@ -885,8 +882,8 @@ router.get('/export', protect, restrict('ADMIN', 'FINANCE', 'RECEPTIONIST'), asy
     }
     if (dateFrom || dateTo) {
       where.verifiedAt = {};
-      if (dateFrom) where.verifiedAt.gte = new Date(dateFrom);
-      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.verifiedAt.lte = end; }
+      if (dateFrom) where.verifiedAt.gte = startOfDay(dateFrom);
+      if (dateTo) where.verifiedAt.lte = endOfDay(dateTo);
     }
 
     const payments = await prisma.payment.findMany({

@@ -6,6 +6,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { awardCasePoints } = require('./rewards');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
+const { startOfDay, endOfDay } = require('../utils/dateRange');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -79,8 +80,8 @@ router.get('/', protect, async (req, res) => {
     if (dateFrom || dateTo) {
       const dateField = dateBy === 'delivery' ? 'deliveryDate' : 'createdAt';
       where[dateField] = {};
-      if (dateFrom) where[dateField].gte = new Date(dateFrom);
-      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where[dateField].lte = end; }
+      if (dateFrom) where[dateField].gte = startOfDay(dateFrom);
+      if (dateTo) where[dateField].lte = endOfDay(dateTo);
     }
     if (remake === 'true')  where.remake = true;
     if (remake === 'false') where.remake = false;
@@ -163,8 +164,8 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
     if (dateFrom || dateTo) {
       const dateField = dateBy === 'delivery' ? 'deliveryDate' : 'createdAt';
       where[dateField] = {};
-      if (dateFrom) where[dateField].gte = new Date(dateFrom);
-      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where[dateField].lte = end; }
+      if (dateFrom) where[dateField].gte = startOfDay(dateFrom);
+      if (dateTo) where[dateField].lte = endOfDay(dateTo);
     }
     if (remake === 'true')  where.remake = true;
     if (remake === 'false') where.remake = false;

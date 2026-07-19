@@ -18,6 +18,7 @@ import {
   MdBolt, MdFileDownload, MdSearch, MdAssignment, MdVisibility, MdCheckCircle,
   MdPendingActions, MdClose,
 } from 'react-icons/md';
+import { toLocalDateString } from '../utils/date';
 
 const PAGE_SIZE = 20;
 
@@ -439,7 +440,7 @@ const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid va
 // Admin-only — edits core case details. Status/payment are changed via their
 // own dedicated actions (Override, status changes elsewhere), not here.
 function EditCaseModal({ caseData, clinicList, onDone, onClose }) {
-  const toDateInput = (d) => d ? new Date(d).toISOString().slice(0, 10) : '';
+  const toDateInput = (d) => d ? toLocalDateString(new Date(d)) : '';
   const [form, setForm] = useState({
     clinicId:      caseData.clinicId || caseData.clinic?.id || '',
     patientName:   caseData.patientName || '',

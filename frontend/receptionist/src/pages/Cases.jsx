@@ -9,6 +9,7 @@ import CaseDetailModal from '../components/CaseDetailModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { MdFileDownload, MdSearch, MdAutorenew, MdAssignment } from 'react-icons/md';
+import { todayLocal } from '../utils/date';
 
 const STATUS_FILTERS = [
   { label: 'All',             value: '' },
@@ -44,6 +45,10 @@ export default function Cases() {
   const [clinicId,  setClinicId]  = useState(searchParams.get('clinicId') || '');
   const [dateFrom,  setDateFrom]  = useState(searchParams.get('dateFrom') || '');
   const [dateTo,    setDateTo]    = useState(searchParams.get('dateTo') || '');
+  // 'delivery' means dateFrom/dateTo filter on deliveryDate instead of
+  // createdAt (set by dashboard cards whose own count is delivery-scoped,
+  // e.g. "Delivered Today") — must match or the list won't match the count.
+  const [dateBy,    setDateBy]    = useState(searchParams.get('dateBy') || '');
   const [remake,    setRemake]    = useState(searchParams.get('remake') === 'true');
   const [redo,      setRedo]      = useState(searchParams.get('redo') === 'true');
   // multi-status override (e.g. all production statuses)
@@ -69,13 +74,14 @@ export default function Cases() {
     if (clinicId)    p.clinicId = clinicId;
     if (dateFrom)    p.dateFrom = dateFrom;
     if (dateTo)      p.dateTo   = dateTo;
+    if (dateBy)      p.dateBy   = dateBy;
     if (remake)      p.remake   = 'true';
     if (redo)        p.redo     = 'true';
     return p;
   };
 
   const { data, isLoading } = useQuery({
-    queryKey: ['cases', filter, multiStatus, search, clinicId, dateFrom, dateTo, remake, redo, page],
+    queryKey: ['cases', filter, multiStatus, search, clinicId, dateFrom, dateTo, dateBy, remake, redo, page],
     queryFn: () => api.get('/cases', { params: queryParams() }).then(r => r.data),
     staleTime: 30_000,
     keepPreviousData: true,
@@ -84,7 +90,7 @@ export default function Cases() {
   const exportExcel = async () => {
     setExporting(true);
     try {
-      await downloadExport('/cases/export', queryParams(), `cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await downloadExport('/cases/export', queryParams(), `cases_${todayLocal()}.xlsx`);
     } catch {
       toast.error('Export failed');
     } finally {
@@ -97,7 +103,7 @@ export default function Cases() {
 
   const reset = () => {
     setFilter(''); setSearch(''); setClinicId('');
-    setDateFrom(''); setDateTo('');
+    setDateFrom(''); setDateTo(''); setDateBy('');
     setRemake(false); setRedo(false); setMultiStatus('');
     setPage(1);
     navigate('/cases', { replace: true });

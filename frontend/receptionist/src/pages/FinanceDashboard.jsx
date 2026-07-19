@@ -21,6 +21,7 @@ import {
   MdCalendarToday, MdDashboard, MdCelebration, MdCheck, MdClose, MdFileDownload,
   MdLogout,
 } from 'react-icons/md';
+import { todayLocal, toLocalDateString } from '../utils/date';
 
 const PAGE_SIZE = 15;
 const HIST_SIZE = 20;
@@ -839,7 +840,7 @@ const BILL_PRESETS = [
 
 function rangeForPreset(preset, customFrom, customTo) {
   const now = new Date();
-  const iso = (d) => d.toISOString().slice(0, 10);
+  const iso = toLocalDateString;
   if (preset === 'all') return {};
   if (preset === 'custom') return { dateFrom: customFrom || undefined, dateTo: customTo || undefined };
   if (preset === 'week') {
@@ -1571,7 +1572,7 @@ function HistoryTab() {
       await downloadExport('/payments/export', {
         status: 'VERIFIED',
         search: search || undefined,
-      }, `verified_payments_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      }, `verified_payments_${todayLocal()}.xlsx`);
     } catch {
       toast.error('Export failed');
     } finally {
@@ -1715,7 +1716,7 @@ function CasesTab() {
   const exportAll = async () => {
     setExporting(true);
     try {
-      await downloadExport('/cases/export', queryParams(), `finance-cases_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await downloadExport('/cases/export', queryParams(), `finance-cases_${todayLocal()}.xlsx`);
     } finally {
       setExporting(false);
     }
