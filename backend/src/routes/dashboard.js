@@ -325,21 +325,21 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         select: { createdAt: true, deliveryDate: true, dueDate: true },
       }),
       // Outstanding excludes in-progress cases — only unpaid balances on DELIVERED
-      // cases count as outstanding. Must match finance-report's pending calculation
-      // exactly (amount > 0 filter + net of any partial amountReceived) or the two
-      // dashboards show different Outstanding figures for the same underlying data.
+      // cases count as outstanding. Scoped to the same date/clinic/search filters as
+      // the rest of this endpoint's KPIs, so it moves when the admin changes filters
+      // (finance-report's Outstanding is intentionally unfiltered — a live snapshot).
       prisma.payment.count({
         where: {
           status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
           amount: { gt: 0 },
-          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+          case: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
         },
       }),
       prisma.payment.findMany({
         where: {
           status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
           amount: { gt: 0 },
-          case: { status: 'DELIVERED', ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+          case: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
         },
         select: { amount: true, amountReceived: true },
       }).then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),

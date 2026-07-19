@@ -232,7 +232,7 @@ const DRILL_MAP = {
   pendingPayments:  { key: 'pendingPayments',   icon: MdCreditCard,     label: 'Pending Payment Approvals',   params: { paymentStatus: 'SCREENSHOT_UPLOADED' } },
   readyToDispatch:  { key: 'readyToDispatch',   icon: MdLocalShipping,  label: 'Ready to Dispatch',           params: { status: 'READY_TO_DISPATCH' } },
   paymentsReceived: { key: 'paymentsReceived',  icon: MdPaid,           label: 'Payments Received (Verified)', params: { paymentStatus: 'VERIFIED' } },
-  outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED' } },
+  outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { status: 'DELIVERED', paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED' } },
   totalRemakes:     { key: 'totalRemakes',      icon: MdAutorenew,      label: 'Remake Cases',               params: { remake: 'true' } },
 };
 
