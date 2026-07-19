@@ -276,7 +276,11 @@ router.get('/:id', protect, async (req, res) => {
         clinic: true,
         stages: { orderBy: { scannedAt: 'asc' } },
         payment: true,
-        deliveryLogs: { include: { deliveredBy: { select: { name: true } } } }
+        deliveryLogs: { include: { deliveredBy: { select: { name: true } } } },
+        // Remake/redo lineage — the case this one branched from, and any
+        // later cases that branched from this one.
+        originalCase: { select: { id: true, caseNumber: true, patientName: true, workType: true } },
+        remakes: { select: { id: true, caseNumber: true, patientName: true, status: true, createdAt: true } },
       }
     });
 
@@ -433,10 +437,28 @@ router.post('/', protect, async (req, res) => {
 // Receptionist formally accepts a case: fills in details + generates scan number + QR
 router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
-    const { shade, patientName, doctorName, doctorPhone, workType, units, toothNumbers, notes, patientAge, patientGender, deliveryType, totalAmount, dueDate } = req.body;
+    const {
+      shade, patientName, doctorName, doctorPhone, workType, units, toothNumbers, notes,
+      patientAge, patientGender, deliveryType, totalAmount, dueDate,
+      remake, redo, isRedo, remakeReason, originalCaseId,
+    } = req.body;
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    // Remake/redo lineage — this case keeps getting its own new scan number
+    // (assigned below, same as any other case); originalCaseId just links it
+    // back to the case it's a remake/redo of, like a branch pointing at its
+    // parent. Validate the reference so a typo/stale ID doesn't silently 404
+    // later when someone tries to follow the link.
+    let originalCase = null;
+    if (originalCaseId) {
+      if (originalCaseId === req.params.id) {
+        return res.status(400).json({ error: 'A case cannot reference itself as the original case.' });
+      }
+      originalCase = await prisma.case.findUnique({ where: { id: originalCaseId }, select: { id: true, caseNumber: true } });
+      if (!originalCase) return res.status(400).json({ error: 'Referenced original case not found.' });
+    }
 
     // Generate scan/case number only if not already assigned
     let caseNumber = existing.caseNumber;
@@ -466,6 +488,11 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ...(deliveryType  != null                  ? { deliveryType }                              : {}),
       ...(totalAmount   != null && totalAmount !== '' ? { totalAmount: parseFloat(totalAmount) } : {}),
       ...(dueDate       != null && dueDate !== ''     ? { dueDate: new Date(dueDate) }           : {}),
+      ...(remake != null ? { remake: Boolean(remake) } : {}),
+      ...(redo   != null ? { redo: Boolean(redo) }     : {}),
+      ...(isRedo != null ? { isRedo: Boolean(isRedo) } : {}),
+      ...(remake ? { remakeReason: remakeReason?.trim() || null } : {}),
+      ...(originalCase ? { originalCaseId: originalCase.id } : {}),
     };
 
     // Generate QR if not already present
@@ -482,12 +509,21 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       include: { clinic: { select: { name: true } } },
     });
 
+    const lineageFlags = [
+      remake ? `Remake${remakeReason?.trim() ? ' — ' + remakeReason.trim() : ''}` : null,
+      redo ? 'Redo' : null,
+      isRedo ? 'Redo/Replacement (50%)' : null,
+    ].filter(Boolean);
+    const lineageNote = originalCase
+      ? ` — ${lineageFlags.length ? lineageFlags.join(', ') : 'linked'} of case ${originalCase.caseNumber || originalCase.id}`
+      : '';
+
     await prisma.caseStage.create({
       data: {
         caseId: req.params.id,
         stageName: 'CASE_ACCEPTED',
         scannedBy: req.user.name,
-        notes: notes || 'Case accepted by receptionist',
+        notes: (notes || 'Case accepted by receptionist') + lineageNote,
       },
     });
 

@@ -32,12 +32,6 @@ const SHADE_OPTIONS = [
   'To Be Advised Later',
 ];
 
-// Work types charged per full dentition (not per unit)
-const FLAT_PRICE_TYPES = new Set([
-  'Orthodontic Retainer','Night Guard Soft','Night Guard Hard',
-  'Sports Guard','Bite Splint','Bleaching Tray','Clear Aligner Setup','Gingival Mask',
-]);
-
 // ─── Stable sub-forms (module-level so React never unmounts on parent re-render) ─
 
 // AcceptForm — owns all its form state locally so typing doesn't re-render parent
@@ -46,6 +40,79 @@ const FLAT_PRICE_TYPES = new Set([
 // and prompts the receptionist to fill in the actual name.
 const PLACEHOLDER_NAME_RE = /^[A-Z]{2,4}-\d{4}-\d+$/;
 const isPlaceholderName = (name) => !name || PLACEHOLDER_NAME_RE.test(name) || name === 'Imported Patient';
+
+// Debounced search-as-you-type picker for linking a remake/redo to the
+// original case it's branching from (by scan number or patient name).
+function OriginalCasePicker({ selected, onSelect, onClear }) {
+  const [query, setQuery]     = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen]       = useState(false);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    setSearching(true);
+    const t = setTimeout(() => {
+      api.get('/cases', { params: { search: query.trim(), limit: 8 } })
+        .then(res => setResults(res.data.cases ?? []))
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  if (selected) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+        <MdAssignment size={14} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span className="case-number">{selected.caseNumber || 'No scan #'}</span>{' '}
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{selected.patientName}{selected.workType ? ` · ${selected.workType}` : ''}</span>
+        </div>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onClear} style={{ color: 'var(--red)' }}>✕</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        style={{ width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' }}
+        placeholder="Search scan number or patient name…"
+        value={query}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && query.trim() && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          marginTop: 4, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        }}>
+          {searching ? (
+            <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>Searching…</div>
+          ) : results.length === 0 ? (
+            <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>No matching cases</div>
+          ) : results.map(rc => (
+            <div key={rc.id}
+              onMouseDown={() => { onSelect(rc); setQuery(''); setOpen(false); }}
+              style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span className="case-number">{rc.caseNumber || 'No scan #'}</span>{' '}
+              <strong>{rc.patientName}</strong>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                {rc.clinic?.name}{rc.workType ? ` · ${rc.workType}` : ''}{rc.units ? ` · ${rc.units}u` : ''}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, expressDurMap, onAccept, onCancel, submitting }) {
   const [patientName, setPatientName] = useState(isPlaceholderName(c.patientName) ? '' : c.patientName);
@@ -63,6 +130,20 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const [totalAmount, setTotalAmount] = useState('');
   const [dueDate,     setDueDate]     = useState('');
   const [notes,       setNotes]       = useState('');
+  // Remake/redo lineage — set when this newly-accepted case is actually a
+  // remake/redo of an earlier (already delivered) case. This case still gets
+  // its own new scan number; originalCase just links back to the earlier one.
+  const [showLineage,   setShowLineage]   = useState(false);
+  const [remake,        setRemake]        = useState(false);
+  const [redo,          setRedo]          = useState(false);
+  const [isRedo,        setIsRedo]        = useState(false);
+  const [remakeReason,  setRemakeReason]  = useState('');
+  const [originalCase,  setOriginalCase]  = useState(null);
+
+  const flatRateMap = useMemo(
+    () => Object.fromEntries(pricesData.map(p => [p.workType, !!p.isFlatRate])),
+    [pricesData]
+  );
 
   // Units follow the odontogram selection once teeth are picked (same rule as
   // New Case's tooth chart) — manual entry only applies when nothing's selected.
@@ -73,7 +154,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     const isExp = ot === 'EXPRESS';
     const unitPrice = isExp && expressPriceMap[wt] != null ? expressPriceMap[wt] : (priceMap[wt] ?? null);
     if (unitPrice != null) {
-      const count = FLAT_PRICE_TYPES.has(wt) ? 1 : Math.max(1, parseInt(u) || 1);
+      const count = flatRateMap[wt] ? 1 : Math.max(1, parseInt(u) || 1);
       setTotalAmount(String(unitPrice * count));
     }
     const days = isExp && expressDurMap[wt] ? expressDurMap[wt] : (durationMap[wt] ?? 5);
@@ -99,13 +180,16 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const selWorkType = workType || c.workType || '';
   const isExpress   = orderType === 'EXPRESS';
   const unitPrice   = isExpress && expressPriceMap[selWorkType] != null ? expressPriceMap[selWorkType] : (priceMap[selWorkType] ?? null);
-  const count       = selWorkType && FLAT_PRICE_TYPES.has(selWorkType) ? 1 : Math.max(1, parseInt(units) || 1);
+  const count       = selWorkType && flatRateMap[selWorkType] ? 1 : Math.max(1, parseInt(units) || 1);
   const calcAmt     = unitPrice != null ? unitPrice * count : null;
 
   const submit = () => onAccept({
     shade, patientName, workType: selWorkType, doctorName, doctorPhone, units,
     toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
     orderType, totalAmount, dueDate, notes,
+    remake: showLineage && remake, redo: showLineage && redo, isRedo: showLineage && isRedo,
+    remakeReason: showLineage ? remakeReason : undefined,
+    originalCaseId: showLineage ? originalCase?.id : undefined,
   });
 
   return (
@@ -202,6 +286,38 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         <textarea rows={3} style={{ ...inputSt, resize: 'vertical' }}
           placeholder="Additional instructions, observations, shade confirmation…"
           value={notes} onChange={e => setNotes(e.target.value)} />
+      </div>
+      {/* Remake/Redo lineage — new scan number, but linked back to the original case */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={showLineage} onChange={e => setShowLineage(e.target.checked)} />
+          <MdAutorenew size={14} /> This is a Remake / Redo of an earlier case
+        </label>
+        {showLineage && (
+          <div style={{ marginTop: 10, padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={remake} onChange={e => setRemake(e.target.checked)} /> Remake (free)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={redo} onChange={e => setRedo(e.target.checked)} /> Redo (50%)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={isRedo} onChange={e => setIsRedo(e.target.checked)} /> Redo / Replacement (50%)
+              </label>
+            </div>
+            {remake && (
+              <input
+                style={{ ...inputSt, marginBottom: 10 }}
+                placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
+                value={remakeReason}
+                onChange={e => setRemakeReason(e.target.value)}
+              />
+            )}
+            <label style={lbl}>ORIGINAL / REFERENCE CASE</label>
+            <OriginalCasePicker selected={originalCase} onSelect={setOriginalCase} onClear={() => setOriginalCase(null)} />
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-primary btn-sm" onClick={submit} disabled={submitting} style={{ flex: 1, justifyContent: 'center' }}>
@@ -317,6 +433,11 @@ function AcceptCasesSection({ queryClient }) {
         totalAmount:  formData.totalAmount != null && formData.totalAmount !== '' ? parseFloat(formData.totalAmount) : undefined,
         dueDate:      formData.dueDate || undefined,
         notes:        formData.notes,
+        remake:         formData.remake || undefined,
+        redo:           formData.redo || undefined,
+        isRedo:         formData.isRedo || undefined,
+        remakeReason:   formData.remakeReason || undefined,
+        originalCaseId: formData.originalCaseId || undefined,
       });
       toast.success('✓ Case accepted — scan number assigned');
       invalidate();

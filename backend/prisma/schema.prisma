@@ -115,6 +115,13 @@ model Case {
   assignedDeliveryId String?
   assignedDelivery   User?    @relation("AssignedDeliveries", fields: [assignedDeliveryId], references: [id])
 
+  // Remake/redo lineage — this case gets its OWN scan number (never reuses the
+  // original's), but references the case it's a remake/redo of, like a branch
+  // pointing back to its parent. Set at acceptance time by the receptionist.
+  originalCaseId  String?
+  originalCase    Case?       @relation("CaseLineage", fields: [originalCaseId], references: [id])
+  remakes         Case[]      @relation("CaseLineage")
+
   stages             CaseStage[]
   payment            Payment?
   deliveryLogs       DeliveryLog[]
@@ -132,6 +139,7 @@ model Case {
   @@index([dueDate])
   @@index([deliveryDate])
   @@index([assignedDeliveryId])
+  @@index([originalCaseId])
   @@map("cases")
 }
 

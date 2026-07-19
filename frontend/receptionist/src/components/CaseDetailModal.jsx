@@ -214,6 +214,32 @@ export default function CaseDetailModal({ caseId, onClose }) {
         </div>
 
         <div className="modal-body">
+          {/* Remake/redo lineage — this case's own scan number, branched from an earlier one */}
+          {(data.originalCase || data.remakes?.length > 0) && (
+            <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
+              {data.originalCase && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#6D28D9', fontWeight: 600 }}>
+                  <MdAutorenew size={13} /> Remake/Redo of <span className="case-number" style={{ marginLeft: 2 }}>{data.originalCase.caseNumber || '—'}</span>
+                  <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>({data.originalCase.patientName} · {data.originalCase.workType})</span>
+                </div>
+              )}
+              {data.remakes?.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, color: '#6D28D9', fontWeight: 600, marginTop: data.originalCase ? 6 : 0 }}>
+                  <MdAutorenew size={13} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <span>
+                    Remade as: {data.remakes.map((r, i) => (
+                      <span key={r.id}>
+                        <span className="case-number">{r.caseNumber || '—'}</span>
+                        <span style={{ fontWeight: 400, color: 'var(--text-3)' }}> ({r.patientName})</span>
+                        {i < data.remakes.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Info grid */}
           <div className="grid-2" style={{ marginBottom: '20px' }}>
             {[
