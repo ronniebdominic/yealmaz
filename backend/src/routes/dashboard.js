@@ -288,9 +288,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       totalRemakes,
       remakeReasonGroups,
       deliveredCasesData,
-      outstandingCount,
-      outstandingNetAmount,
-      projectedAggregate,
+      deliveredCohortCases,
       unitsDeliveredAgg,
     ] = await Promise.all([
       Promise.all([
@@ -342,33 +340,17 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         where: { ...caseFilter, status: 'DELIVERED', deliveryDate: { not: null } },
         select: { createdAt: true, deliveryDate: true, dueDate: true },
       }),
-      // Outstanding excludes in-progress cases — only unpaid balances on DELIVERED
-      // cases count as outstanding. Scoped to the same date/clinic/search filters as
-      // the rest of this endpoint's KPIs, so it moves when the admin changes filters
-      // (finance-report's Outstanding is intentionally unfiltered — a live snapshot).
-      prisma.payment.count({
-        where: {
-          status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
-          amount: { gt: 0 },
-          case: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
-        },
-      }),
-      prisma.payment.findMany({
-        where: {
-          status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
-          amount: { gt: 0 },
-          case: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
-        },
-        select: { amount: true, amountReceived: true },
-      }).then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
-      // Total Case Value — delivered cases only. Excludes in-progress cases, whose
-      // pricing/units can still change before delivery and aren't final revenue yet.
-      prisma.payment.aggregate({
-        where: {
-          amount: { not: null },
-          case: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
-        },
-        _sum: { amount: true },
+      // Delivered cases in this cohort, with their billed amount and payment
+      // status — feeds both Total Case Value and Outstanding below. A case's
+      // billed amount is payment.amount if a request/invoice exists, falling
+      // back to case.totalAmount otherwise (matching the fallback used
+      // everywhere else in the UI) — a delivered case that hasn't had payment
+      // requested yet ("No Request Yet") still has a known billed value and
+      // must count as both billed (Total Case Value) and unpaid (Outstanding),
+      // or those two KPIs silently exclude cases nobody has invoiced yet.
+      prisma.case.findMany({
+        where: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+        select: { totalAmount: true, payment: { select: { status: true, amount: true, amountReceived: true } } },
       }),
       // Units delivered — distinct from totalUnits (all cases in range regardless
       // of status); this is specifically the "Revenue vs Volume" delivered figure.
@@ -376,6 +358,24 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     ]);
 
     const totalRevenue = cohortVerifiedPayments.reduce((s, p) => s + (p.amount || 0), 0);
+
+    // Total Case Value = billed amount for every delivered case in the cohort,
+    // paid or not. Outstanding = the subset still unpaid (net of any partial
+    // amountReceived). Both derived from the same deliveredCohortCases list so
+    // they can never drift apart from each other.
+    const UNPAID_STATUSES = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'];
+    let totalProjectedRevenue = 0;
+    let outstandingNetAmount = 0;
+    let outstandingCount = 0;
+    for (const c of deliveredCohortCases) {
+      const billed = c.payment?.amount ?? c.totalAmount ?? 0;
+      totalProjectedRevenue += billed;
+      const payStatus = c.payment?.status || 'PENDING';
+      if (billed > 0 && UNPAID_STATUSES.includes(payStatus)) {
+        outstandingNetAmount += billed - (c.payment?.amountReceived || 0);
+        outstandingCount += 1;
+      }
+    }
 
     for (const p of trendPayments) {
       const d = new Date(p.verifiedAt);
@@ -442,8 +442,6 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     const mostCommonRemakeReason = remakeReasonGroups.length > 0
       ? remakeReasonGroups[0].remakeReason
       : null;
-
-    const totalProjectedRevenue = projectedAggregate._sum.amount || 0;
 
     const result = {
       kpi: {
