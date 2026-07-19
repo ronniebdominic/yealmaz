@@ -237,7 +237,13 @@ router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (
 
     const cases = await prisma.case.findMany({
       where: { id: { in: latestPerCase.map(s => s.caseId) }, status: { notIn: ['DELIVERED', 'CANCELLED'] } },
-      include: { clinic: { select: { name: true } }, payment: { select: { amount: true, status: true } } },
+      include: {
+        clinic: { select: { name: true } },
+        payment: { select: { amount: true, status: true } },
+        // Remake/redo lineage — so this list's "Print Label" button can also
+        // show the previous scan number on the printed slip (printLabel.js).
+        originalCase: { select: { caseNumber: true } },
+      },
     });
     const caseMap = new Map(cases.map(c => [c.id, c]));
 
