@@ -89,6 +89,23 @@ export function printCaseLabel(data) {
       padding: 1.5mm;
       margin-bottom: 3mm;
     }
+    .lineage-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #F5F3FF;
+      border: 1.5px solid #DDD6FE;
+      border-radius: 5px;
+      padding: 2mm 3mm;
+      margin-bottom: 3mm;
+    }
+    .lineage-banner .info-label { color: #6D28D9; margin-bottom: 0; }
+    .lineage-banner .info-value {
+      font-family: 'Courier New', monospace;
+      color: #6D28D9;
+      font-size: 15px;
+      letter-spacing: 0.8px;
+    }
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -180,6 +197,12 @@ export function printCaseLabel(data) {
   </div>
 
   <div class="case-number">${data.caseNumber}</div>
+
+  ${data.originalCase ? `
+  <div class="lineage-banner">
+    <div class="info-label">${[data.remake && 'Remake', data.redo && 'Redo', data.isRedo && 'Redo/Replacement'].filter(Boolean).join(' / ') || 'Remake/Redo'} — Previous Scan #</div>
+    <div class="info-value">${data.originalCase.caseNumber || '—'}</div>
+  </div>` : ''}
 
   <div class="info-grid">
     <div class="info-cell full">

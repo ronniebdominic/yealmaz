@@ -102,6 +102,9 @@ router.get('/', protect, async (req, res) => {
           stages:           stagesRelation,
           payment:          true,
           assignedDelivery: { select: { id: true, name: true } },
+          // Remake/redo lineage — so the production label (printLabel.js) can
+          // show the previous scan number without a separate fetch.
+          originalCase:     { select: { caseNumber: true } },
         },
         orderBy: { [orderByCol]: dateOrder },
         skip,
