@@ -48,7 +48,7 @@ async function getDueDays(workType, isExpress = false) {
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', sortBy = 'date', dateFrom, dateTo, remake, redo } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', sortBy = 'date', dateFrom, dateTo, dateBy, remake, redo } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const dateOrder  = sortDir === 'asc' ? 'asc' : 'desc';
     const orderByCol  = sortBy === 'caseNumber' ? 'caseNumber' : 'createdAt';
@@ -72,18 +72,22 @@ router.get('/', protect, async (req, res) => {
         { workType: { contains: search, mode: 'insensitive' } }
       ];
     }
-    // Order-date range filter (on createdAt)
+    // Date range filter — on createdAt (order date) by default, or on
+    // deliveryDate when dateBy=delivery (used by the Admin Analytics
+    // drill-downs for delivered-cohort KPIs, so the case list you see
+    // matches the date range the tile itself was computed over).
     if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.createdAt.lte = end; }
+      const dateField = dateBy === 'delivery' ? 'deliveryDate' : 'createdAt';
+      where[dateField] = {};
+      if (dateFrom) where[dateField].gte = new Date(dateFrom);
+      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where[dateField].lte = end; }
     }
     if (remake === 'true')  where.remake = true;
     if (remake === 'false') where.remake = false;
     if (redo   === 'true')  where.redo   = true;
     if (redo   === 'false') where.redo   = false;
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, sortBy, dateFrom, dateTo, remake, redo })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, sortBy, dateFrom, dateTo, dateBy, remake, redo })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -136,7 +140,7 @@ router.get('/', protect, async (req, res) => {
 // Defined before /:id so "export" isn't captured as an :id.
 router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, sortDir = 'desc', dateFrom, dateTo, remake, redo } = req.query;
+    const { status, paymentStatus, search, clinicId, sortDir = 'desc', dateFrom, dateTo, dateBy, remake, redo } = req.query;
 
     const where = {};
     if (clinicId) where.clinicId = clinicId;
@@ -157,9 +161,10 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
       ];
     }
     if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where.createdAt.lte = end; }
+      const dateField = dateBy === 'delivery' ? 'deliveryDate' : 'createdAt';
+      where[dateField] = {};
+      if (dateFrom) where[dateField].gte = new Date(dateFrom);
+      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); where[dateField].lte = end; }
     }
     if (remake === 'true')  where.remake = true;
     if (remake === 'false') where.remake = false;

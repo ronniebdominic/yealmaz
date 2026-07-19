@@ -235,11 +235,16 @@ function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active, 
 const DRILL_MAP = {
   totalCases:       { key: 'totalCases',       icon: MdAssignment,     label: 'All Cases',                   params: {} },
   activeCases:      { key: 'activeCases',       icon: MdSettings,       label: 'Active Cases (In Production)', params: { status: PRODUCTION_STATUSES } },
-  deliveredCases:   { key: 'deliveredCases',    icon: MdCheckCircle,    label: 'Delivered Cases',              params: { status: 'DELIVERED' } },
+  // These three share the Revenue vs Volume section's cohort: cases DELIVERED
+  // within the selected range (dateBy: 'delivery'), not created in it — must
+  // match how the backend computes deliveredCases/deliveredCaseValue/
+  // totalRevenue/outstandingAmount, or the drill-down list won't match the
+  // tile you clicked.
+  deliveredCases:   { key: 'deliveredCases',    icon: MdCheckCircle,    label: 'Delivered Cases',              params: { status: 'DELIVERED', dateBy: 'delivery' } },
   pendingPayments:  { key: 'pendingPayments',   icon: MdCreditCard,     label: 'Pending Payment Approvals',   params: { paymentStatus: 'SCREENSHOT_UPLOADED' } },
   readyToDispatch:  { key: 'readyToDispatch',   icon: MdLocalShipping,  label: 'Ready to Dispatch',           params: { status: 'READY_TO_DISPATCH' } },
-  paymentsReceived: { key: 'paymentsReceived',  icon: MdPaid,           label: 'Payments Received (Verified)', params: { paymentStatus: 'VERIFIED' } },
-  outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { status: 'DELIVERED', paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED' } },
+  paymentsReceived: { key: 'paymentsReceived',  icon: MdPaid,           label: 'Payments Received (Verified)', params: { status: 'DELIVERED', paymentStatus: 'VERIFIED', dateBy: 'delivery' } },
+  outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { status: 'DELIVERED', paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED', dateBy: 'delivery' } },
   totalRemakes:     { key: 'totalRemakes',      icon: MdAutorenew,      label: 'Remake Cases',               params: { remake: 'true' } },
 };
 
@@ -470,23 +475,23 @@ export default function AdminDashboard() {
               <ColorTile icon={MdCheckCircle} label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
-                info="Of the cases created in this range, how many have actually reached the clinic (status = Delivered)." />
+                info="Cases actually delivered to the clinic between the From and To dates you picked — regardless of when they were originally created. A case ordered last week and delivered today counts toward today, not last week." />
               <ColorTile icon={MdInventory2} label="Total Units Delivered" value={kpi?.unitsDelivered ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
-                info="Total units, but only counting the delivered cases above — not the ones still in production." />
+                info="Total units across those same delivered-in-range cases — not the ones still in production." />
               <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.deliveredCaseValue)}
                 sub="Delivered cases only" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
-                info="What the delivered cases are billed for in total — this is the money actually earned so far from finished work, whether it's been paid yet or not. (The 'Total Case Value' above in Financial Projection also includes cases that aren't delivered yet — this one doesn't.)" />
+                info="What those delivered-in-range cases are billed for in total — whether it's been paid yet or not. (The 'Total Case Value' above in Financial Projection is a different cohort — cases ordered in this range, not delivered in it.)" />
               <ColorTile icon={MdPaid} label="Verified Payments" value={ETB(kpi?.totalRevenue)}
                 sub="Received" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')}
-                info="Money Finance has checked and confirmed as paid, for cases created in this range — regardless of exactly when that payment was verified." />
+                info="Money Finance has checked and confirmed as paid, for cases delivered within this range — regardless of exactly when that payment was verified." />
               <ColorTile icon={MdPendingActions} label="Outstanding Payment" value={ETB(kpi?.outstandingAmount)}
                 sub={`${kpi?.outstandingCount ?? 0} unpaid cases`} color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')}
-                info="Money still owed on DELIVERED cases from this range that haven't been fully paid. A case still in production isn't counted as 'outstanding' — nothing's owed until it ships." />
+                info="Money still owed on cases DELIVERED within this range that haven't been fully paid. A case still in production isn't counted as 'outstanding' — nothing's owed until it ships." />
             </div>
 
             {/* Collection rate bar — must share the same cohort as the delivered
@@ -544,7 +549,7 @@ export default function AdminDashboard() {
               <ColorTile icon={MdSchedule} label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
                 sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF"
-                info="On average, how many days pass between a case being created and it actually being delivered — measured only on cases from this range that have already been delivered." />
+                info="On average, how many days passed between order and delivery, measured on cases that were DELIVERED within this range (regardless of when they were originally created)." />
               <ColorTile icon={MdTrackChanges} label="% On Time Delivery"
                 value={kpi?.onTimeDeliveryPct != null ? `${kpi.onTimeDeliveryPct}%` : '—'}
                 sub="Within due date" color="var(--blue)" bg="#EEF2FF"

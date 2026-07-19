@@ -282,9 +282,23 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     }
     const trendStart = trendBuckets[0].start;
 
-    // All case KPIs are filtered by the selected date range (createdAt), clinic, and search
+    // "Financial Projection" KPIs are filtered by case CREATION date — cases
+    // ordered in this range, whatever stage they're at now.
     const caseFilter = {
       createdAt: { gte: dateFrom, lte: dateTo },
+      ...(clinicId ? { clinicId } : {}),
+      ...(searchOR ? { OR: searchOR } : {}),
+    };
+    // "Revenue vs Volume" (and Turn Around Time / On Time %) KPIs are filtered
+    // by DELIVERY date instead — cases that shipped in this range, regardless
+    // of when they were originally created. A case created last week and
+    // delivered today belongs to today's "Delivered" numbers, not last week's;
+    // using caseFilter (createdAt) here made a single-day filter show 0
+    // delivered even on a day with 30+ real deliveries, because almost none of
+    // those cases were ALSO created that same day.
+    const deliveredFilter = {
+      status: 'DELIVERED',
+      deliveryDate: { gte: dateFrom, lte: dateTo },
       ...(clinicId ? { clinicId } : {}),
       ...(searchOR ? { OR: searchOR } : {}),
     };
@@ -315,7 +329,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         // Total Cases, and made this tile disagree with its own drill-down (which
         // already only shows PRODUCTION_STATUSES).
         prisma.case.count({ where: { ...caseFilter, status: { in: PRODUCTION_STATUSES } } }),
-        prisma.case.count({ where: { ...caseFilter, status: 'DELIVERED' } }),
+        prisma.case.count({ where: deliveredFilter }),
       ]),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
       // Feeds the monthly trend chart only — deliberately spans back to trendStart
@@ -329,17 +343,16 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         },
         select: { amount: true, verifiedAt: true, case: { select: { clinicId: true } } },
       }),
-      // "Verified Payments" KPI + Revenue by Clinic — scoped to the same cohort as
-      // every other KPI (cases CREATED within the selected range), so it matches
-      // the "Payments Received" drill-down (which hits /cases with the same
-      // dateFrom/dateTo + paymentStatus=VERIFIED) and the Total Cases/Total Case
-      // Value tiles. Deliberately NOT the same query as trendPayments above —
-      // that one is scoped by payment.verifiedAt for the trend chart, which can
-      // include payments for cases created long before the selected range.
+      // "Verified Payments" KPI + Revenue by Clinic — part of the Revenue vs
+      // Volume section, so scoped like the rest of it: cases DELIVERED within
+      // the selected range (deliveredFilter), not cases created in it.
+      // Deliberately NOT the same query as trendPayments above — that one is
+      // scoped by payment.verifiedAt for the trend chart, which can include
+      // payments for cases delivered long before the selected range.
       prisma.payment.findMany({
         where: {
           status: 'VERIFIED',
-          case: { createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+          case: deliveredFilter,
         },
         select: { amount: true, case: { select: { clinicId: true } } },
       }),
@@ -360,8 +373,10 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
       }),
+      // Turn Around Time / % On Time Delivery — cases DELIVERED in this range
+      // (deliveredFilter), same reasoning as everything else in this section.
       prisma.case.findMany({
-        where: { ...caseFilter, status: 'DELIVERED', deliveryDate: { not: null } },
+        where: deliveredFilter,
         select: { createdAt: true, deliveryDate: true, dueDate: true },
       }),
       // Delivered cases in this cohort, with their billed amount and payment
@@ -373,12 +388,12 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       // must count as both billed (Total Case Value) and unpaid (Outstanding),
       // or those two KPIs silently exclude cases nobody has invoiced yet.
       prisma.case.findMany({
-        where: { status: 'DELIVERED', createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+        where: deliveredFilter,
         select: { totalAmount: true, payment: { select: { status: true, amount: true, amountReceived: true } } },
       }),
       // Units delivered — distinct from totalUnits (all cases in range regardless
       // of status); this is specifically the "Revenue vs Volume" delivered figure.
-      prisma.case.aggregate({ where: { ...caseFilter, status: 'DELIVERED' }, _sum: { units: true } }),
+      prisma.case.aggregate({ where: deliveredFilter, _sum: { units: true } }),
     ]);
 
     const totalRevenue = cohortVerifiedPayments.reduce((s, p) => s + (p.amount || 0), 0);
