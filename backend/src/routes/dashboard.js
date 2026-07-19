@@ -280,6 +280,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       [totalCases, activeCases, deliveredCases],
       pendingPayments,
       trendPayments,
+      cohortVerifiedPayments,
       allClinics,
       casesPerClinic,
       casesByWorkType,
@@ -298,6 +299,9 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         prisma.case.count({ where: { ...caseFilter, status: 'DELIVERED' } }),
       ]),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
+      // Feeds the monthly trend chart only — deliberately spans back to trendStart
+      // (many months) and buckets by verifiedAt, since the chart is "cash collected
+      // per month" over time, not scoped to the selected case-creation cohort.
       prisma.payment.findMany({
         where: {
           status: 'VERIFIED',
@@ -305,6 +309,20 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
           ...((clinicId || searchOR) ? { case: { ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) } } : {}),
         },
         select: { amount: true, verifiedAt: true, case: { select: { clinicId: true } } },
+      }),
+      // "Verified Payments" KPI + Revenue by Clinic — scoped to the same cohort as
+      // every other KPI (cases CREATED within the selected range), so it matches
+      // the "Payments Received" drill-down (which hits /cases with the same
+      // dateFrom/dateTo + paymentStatus=VERIFIED) and the Total Cases/Total Case
+      // Value tiles. Deliberately NOT the same query as trendPayments above —
+      // that one is scoped by payment.verifiedAt for the trend chart, which can
+      // include payments for cases created long before the selected range.
+      prisma.payment.findMany({
+        where: {
+          status: 'VERIFIED',
+          case: { createdAt: { gte: dateFrom, lte: dateTo }, ...(clinicId ? { clinicId } : {}), ...(searchOR ? { OR: searchOR } : {}) },
+        },
+        select: { amount: true, case: { select: { clinicId: true } } },
       }),
       prisma.clinic.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.case.groupBy({ by: ['clinicId'], where: caseFilter, _count: { id: true } }),
@@ -357,10 +375,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
       prisma.case.aggregate({ where: { ...caseFilter, status: 'DELIVERED' }, _sum: { units: true } }),
     ]);
 
-    const filteredPayments = trendPayments.filter(
-      p => new Date(p.verifiedAt) >= dateFrom && new Date(p.verifiedAt) <= dateTo
-    );
-    const totalRevenue = filteredPayments.reduce((s, p) => s + (p.amount || 0), 0);
+    const totalRevenue = cohortVerifiedPayments.reduce((s, p) => s + (p.amount || 0), 0);
 
     for (const p of trendPayments) {
       const d = new Date(p.verifiedAt);
@@ -371,7 +386,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 
     const caseCountMap = Object.fromEntries(casesPerClinic.map(r => [r.clinicId, r._count.id]));
     const clinicRevMap = {};
-    for (const p of filteredPayments) {
+    for (const p of cohortVerifiedPayments) {
       const cid = p.case?.clinicId;
       if (!cid) continue;
       if (!clinicRevMap[cid]) clinicRevMap[cid] = { revenue: 0, paidCases: 0 };
