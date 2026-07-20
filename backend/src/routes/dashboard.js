@@ -304,7 +304,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     };
 
     const [
-      [totalCases, activeCases, deliveredCases],
+      [totalCases, activeCases, deliveredCases, otherCases],
       pendingPayments,
       trendPayments,
       cohortVerifiedPayments,
@@ -330,6 +330,13 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         // already only shows PRODUCTION_STATUSES).
         prisma.case.count({ where: { ...caseFilter, status: { in: PRODUCTION_STATUSES } } }),
         prisma.case.count({ where: deliveredFilter }),
+        // Everything else created in this range — awaiting pickup, out for
+        // delivery, on hold, in remake status, cancelled, under review, or
+        // rejected. Not shown as its own tile anywhere else, so without this,
+        // In Progress + Ready for Dispatch + Delivered silently undershoots
+        // Total Cases and looks like a bug (it's ~40+ real cases sitting in
+        // these states, not a miscount).
+        prisma.case.count({ where: { ...caseFilter, status: { notIn: [...PRODUCTION_STATUSES, 'READY_TO_DISPATCH', 'DELIVERED'] } } }),
       ]),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
       // Feeds the monthly trend chart only — deliberately spans back to trendStart
@@ -490,7 +497,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 
     const result = {
       kpi: {
-        totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, pendingPayments,
+        totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, otherCases, pendingPayments,
         readyToDispatch, totalRemakes, mostCommonRemakeReason,
         avgTurnaroundDays, onTimeDeliveryPct,
         totalCaseValue, deliveredCaseValue,

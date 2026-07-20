@@ -17,7 +17,7 @@ import {
   MdPaid, MdPendingActions, MdAutorenew, MdInventory2, MdBarChart,
   MdSchedule, MdTrackChanges, MdSearch, MdFileDownload, MdCancel,
   MdErrorOutline, MdScience, MdHandshake, MdClose, MdCheck, MdChevronLeft,
-  MdChevronRight, MdInfoOutline,
+  MdChevronRight, MdInfoOutline, MdHelpOutline,
 } from 'react-icons/md';
 
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
@@ -34,6 +34,14 @@ const PRODUCTION_STATUSES = [
   'MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING',
   'OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING',
   'THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING',
+].join(',');
+
+// Everything not in production, not ready to dispatch, and not delivered —
+// awaiting pickup, out for delivery, on hold, flagged REMAKE, cancelled,
+// under review, or rejected. Mirrors the backend's otherCases exclusion.
+const OTHER_STATUSES = [
+  'PENDING_PICKUP', 'PICKUP_ASSIGNED', 'OUT_FOR_DELIVERY', 'ON_HOLD',
+  'REMAKE', 'CANCELLED', 'UNDER_REVIEW', 'REJECTED',
 ].join(',');
 
 // ── Custom chart tooltip ──────────────────────────────────
@@ -247,6 +255,7 @@ const DRILL_MAP = {
   paymentsReceived: { key: 'paymentsReceived',  icon: MdPaid,           label: 'Payments Received (Verified)', params: { status: 'DELIVERED', paymentStatus: 'VERIFIED', dateBy: 'delivery' } },
   outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { status: 'DELIVERED', paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED', dateBy: 'delivery' } },
   totalRemakes:     { key: 'totalRemakes',      icon: MdAutorenew,      label: 'Remake Cases',               params: { remake: 'true' } },
+  otherCases:       { key: 'otherCases',        icon: MdHelpOutline,    label: 'Other / Exception Cases',     params: { status: OTHER_STATUSES } },
 };
 
 // ── Main component ────────────────────────────────────────
@@ -311,7 +320,9 @@ export default function AdminDashboard() {
       ['Total Cases',      kpi?.totalCases ?? 0],
       ['Total Units',      kpi?.totalUnits ?? 0],
       ['Active Cases',     kpi?.activeCases ?? 0],
+      ['Ready for Delivery & Dispatch', kpi?.readyToDispatch ?? 0],
       ['Delivered Cases',  kpi?.deliveredCases ?? 0],
+      ['Other / Exception Cases', kpi?.otherCases ?? 0],
       ['Units Delivered',  kpi?.unitsDelivered ?? 0],
       ['Pending Payments', kpi?.pendingPayments ?? 0],
     ];
@@ -533,7 +544,7 @@ export default function AdminDashboard() {
 
             {/* ── Section 3: Operation ── */}
             <SectionHeader>Operation</SectionHeader>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 24 }}>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)', marginBottom: 24 }}>
               <ColorTile icon={MdSettings} label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
                 sub="In production" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')}
@@ -547,6 +558,10 @@ export default function AdminDashboard() {
                 color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')}
                 info="Cases created in this range that were flagged as a remake — redone for the clinic at no extra charge (e.g. shade mismatch, fit issue)." />
+              <ColorTile icon={MdHelpOutline} label="Other / Exception Cases" value={kpi?.otherCases ?? '—'}
+                sub="Not in the buckets above" color="var(--gray, #6B7280)" bg="rgba(107,114,128,0.12)"
+                active={drillKey === 'otherCases'} onClick={() => handleDrill('otherCases')}
+                info="Cases created in this range that don't fall into any bucket above — still awaiting pickup, out for delivery, on hold, flagged with REMAKE status, cancelled, under review, or rejected. Added so 'Total Cases In Progress' + 'Ready for Delivery & Dispatch' + this tile + cases delivered from this same created-in-range cohort always adds up to the 'Total Cases' tile in Financial Projection above." />
               <ColorTile icon={MdSchedule} label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
                 sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF"
