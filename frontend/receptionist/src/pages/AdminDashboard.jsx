@@ -256,6 +256,11 @@ const DRILL_MAP = {
   outstanding:      { key: 'outstanding',       icon: MdPendingActions, label: 'Outstanding — Not Received',  params: { status: 'DELIVERED', paymentStatus: 'PENDING,PAYMENT_REQUESTED,SCREENSHOT_UPLOADED', dateBy: 'delivery' } },
   totalRemakes:     { key: 'totalRemakes',      icon: MdAutorenew,      label: 'Remake Cases',               params: { remake: 'true' } },
   otherCases:       { key: 'otherCases',        icon: MdHelpOutline,    label: 'Other / Exception Cases',     params: { status: OTHER_STATUSES } },
+  // No dateBy here — deliberately falls back to createdAt (the "order date"
+  // cohort), matching how the backend computes deliveredOfCreated. Do NOT
+  // add dateBy:'delivery', or the list would silently switch to a different
+  // cohort than the tile it's supposed to explain.
+  deliveredOfCreated: { key: 'deliveredOfCreated', icon: MdCheckCircle, label: 'Delivered (Ordered in Range)', params: { status: 'DELIVERED' } },
 };
 
 // ── Main component ────────────────────────────────────────
@@ -321,8 +326,9 @@ export default function AdminDashboard() {
       ['Total Units',      kpi?.totalUnits ?? 0],
       ['Active Cases',     kpi?.activeCases ?? 0],
       ['Ready for Delivery & Dispatch', kpi?.readyToDispatch ?? 0],
-      ['Delivered Cases',  kpi?.deliveredCases ?? 0],
+      ['Delivered (Ordered in Range)', kpi?.deliveredOfCreated ?? 0],
       ['Other / Exception Cases', kpi?.otherCases ?? 0],
+      ['Delivered Cases (by Delivery Date)',  kpi?.deliveredCases ?? 0],
       ['Units Delivered',  kpi?.unitsDelivered ?? 0],
       ['Pending Payments', kpi?.pendingPayments ?? 0],
     ];
@@ -544,24 +550,38 @@ export default function AdminDashboard() {
 
             {/* ── Section 3: Operation ── */}
             <SectionHeader>Operation</SectionHeader>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(6,1fr)', marginBottom: 24 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8, marginTop: -4 }}>
+              Status breakdown of the same cohort as "Total Cases" above (by order date) — these four always add up exactly.
+            </div>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 8 }}>
               <ColorTile icon={MdSettings} label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
                 sub="In production" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')}
-                info="Cases actively moving through the lab right now (plaster, scanning, milling, ceramics, QC, etc). Doesn't include cases that are already finished and just waiting to ship — those are counted separately in 'Ready for Delivery & Dispatch' below, so a case is never counted in both." />
+                info="Cases actively moving through the lab right now (plaster, scanning, milling, ceramics, QC, etc). Doesn't include cases that are already finished and just waiting to ship — those are counted separately in 'Ready for Delivery & Dispatch', so a case is never counted in both." />
               <ColorTile icon={MdLocalShipping} label="Ready for Delivery & Dispatch" value={kpi?.readyToDispatch ?? '—'}
                 sub="Ready to dispatch" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')}
                 info="Cases where the lab work is fully done and QC'd — just waiting on payment and/or a driver before they go out. These have left 'In Progress' but aren't 'Delivered' yet." />
+              <ColorTile icon={MdCheckCircle} label="Delivered (of these Cases)" value={kpi?.deliveredOfCreated ?? '—'}
+                sub="Already shipped" color="var(--green)" bg="var(--green-dim)"
+                active={drillKey === 'deliveredOfCreated'} onClick={() => handleDrill('deliveredOfCreated')}
+                info="Of the cases ORDERED in this date range, how many have since been delivered — no matter when the delivery itself happened. This is NOT the same figure as 'Total Cases Delivered' in Revenue vs Volume above, which counts by delivery date instead of order date — the two are different questions and won't always match." />
+              <ColorTile icon={MdHelpOutline} label="Other / Exception Cases" value={kpi?.otherCases ?? '—'}
+                sub="Not in the buckets above" color="var(--gray, #6B7280)" bg="rgba(107,114,128,0.12)"
+                active={drillKey === 'otherCases'} onClick={() => handleDrill('otherCases')}
+                info="Cases created in this range that don't fall into any bucket above — still awaiting pickup, out for delivery, on hold, flagged with REMAKE status, cancelled, under review, or rejected." />
+            </div>
+            {kpi && (
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 20, fontFamily: 'monospace' }}>
+                {(kpi.activeCases ?? 0).toLocaleString()} + {(kpi.readyToDispatch ?? 0).toLocaleString()} + {(kpi.deliveredOfCreated ?? 0).toLocaleString()} + {(kpi.otherCases ?? 0).toLocaleString()} = {((kpi.activeCases ?? 0) + (kpi.readyToDispatch ?? 0) + (kpi.deliveredOfCreated ?? 0) + (kpi.otherCases ?? 0)).toLocaleString()} — matches Total Cases ({(kpi.totalCases ?? 0).toLocaleString()}) ✓
+              </div>
+            )}
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
               <ColorTile icon={MdAutorenew} label="Total Remake" value={kpi?.totalRemakes ?? '—'}
                 sub={kpi?.mostCommonRemakeReason ? `Top reason: ${kpi.mostCommonRemakeReason}` : 'In selected range'}
                 color="var(--red)" bg="#FFF1F2"
                 active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')}
-                info="Cases created in this range that were flagged as a remake — redone for the clinic at no extra charge (e.g. shade mismatch, fit issue)." />
-              <ColorTile icon={MdHelpOutline} label="Other / Exception Cases" value={kpi?.otherCases ?? '—'}
-                sub="Not in the buckets above" color="var(--gray, #6B7280)" bg="rgba(107,114,128,0.12)"
-                active={drillKey === 'otherCases'} onClick={() => handleDrill('otherCases')}
-                info="Cases created in this range that don't fall into any bucket above — still awaiting pickup, out for delivery, on hold, flagged with REMAKE status, cancelled, under review, or rejected. Added so 'Total Cases In Progress' + 'Ready for Delivery & Dispatch' + this tile + cases delivered from this same created-in-range cohort always adds up to the 'Total Cases' tile in Financial Projection above." />
+                info="Cases created in this range that were flagged as a remake — redone for the clinic at no extra charge (e.g. shade mismatch, fit issue). This is a flag on a case, not a status — a remake-flagged case can be in ANY of the buckets above (in progress, delivered, etc), so don't add this into the breakdown above." />
               <ColorTile icon={MdSchedule} label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
                 sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF"

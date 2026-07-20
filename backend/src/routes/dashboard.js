@@ -304,7 +304,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     };
 
     const [
-      [totalCases, activeCases, deliveredCases, otherCases],
+      [totalCases, activeCases, deliveredCases, otherCases, deliveredOfCreated],
       pendingPayments,
       trendPayments,
       cohortVerifiedPayments,
@@ -337,6 +337,14 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
         // Total Cases and looks like a bug (it's ~40+ real cases sitting in
         // these states, not a miscount).
         prisma.case.count({ where: { ...caseFilter, status: { notIn: [...PRODUCTION_STATUSES, 'READY_TO_DISPATCH', 'DELIVERED'] } } }),
+        // Of the cases ORDERED in this range, how many have since been
+        // delivered (whenever that happened) — the piece needed to make
+        // activeCases + readyToDispatch + deliveredOfCreated + otherCases
+        // sum EXACTLY to totalCases. Deliberately distinct from `deliveredCases`
+        // above, which is scoped by deliveryDate instead (Revenue vs Volume's
+        // "what shipped in this period" cohort) — the two numbers will only
+        // coincidentally be close, never guaranteed equal, so don't conflate them.
+        prisma.case.count({ where: { ...caseFilter, status: 'DELIVERED' } }),
       ]),
       prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
       // Feeds the monthly trend chart only — deliberately spans back to trendStart
@@ -497,7 +505,7 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 
     const result = {
       kpi: {
-        totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, otherCases, pendingPayments,
+        totalRevenue, totalCases, totalUnits, activeCases, deliveredCases, otherCases, deliveredOfCreated, pendingPayments,
         readyToDispatch, totalRemakes, mostCommonRemakeReason,
         avgTurnaroundDays, onTimeDeliveryPct,
         totalCaseValue, deliveredCaseValue,
