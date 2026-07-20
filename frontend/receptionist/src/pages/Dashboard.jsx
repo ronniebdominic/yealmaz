@@ -42,6 +42,11 @@ const SHADE_OPTIONS = [
 const PLACEHOLDER_NAME_RE = /^[A-Z]{2,4}-\d{4}-\d+$/;
 const isPlaceholderName = (name) => !name || PLACEHOLDER_NAME_RE.test(name) || name === 'Imported Patient';
 
+// Aligner cases (Clear Aligner, Clear Aligner Setup, …) are tracked by tray
+// count, not tooth position — the odontogram doesn't apply to them.
+const isAlignerWorkType = (wt) => /aligner/i.test(wt || '');
+const TRAY_COUNT_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
+
 // Debounced search-as-you-type picker for linking a remake/redo to the
 // original case it's branching from (by scan number or patient name).
 function OriginalCasePicker({ selected, onSelect, onClear }) {
@@ -163,7 +168,13 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     setDueDate(toLocalDateString(d));
   };
 
-  const handleWT = (wt)  => { setWorkType(wt);    calcPriceAndDate(wt, orderType, units); };
+  const handleWT = (wt)  => {
+    setWorkType(wt);
+    // Aligner cases are tracked by tray count, not tooth position — clear any
+    // odontogram selection so units falls back to the tray-count dropdown.
+    if (isAlignerWorkType(wt) && selectedTeeth.length > 0) setSelectedTeeth([]);
+    calcPriceAndDate(wt, orderType, units);
+  };
   const handleOT = (ot)  => { setOrderType(ot);   calcPriceAndDate(workType, ot, units); };
   const handleManualUnits = (u) => { setManualUnits(u); calcPriceAndDate(workType, orderType, u); };
   const toggleTooth = (num) => {
@@ -189,14 +200,15 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     if (rc.doctorName) setDoctorName(rc.doctorName);
     if (rc.doctorPhone) setDoctorPhone(rc.doctorPhone);
 
-    const teeth = rc.toothNumbers
+    const wt = rc.workType && rc.workType !== 'TBD' ? rc.workType : workType;
+    if (wt) setWorkType(wt);
+
+    const teeth = (!isAlignerWorkType(wt) && rc.toothNumbers)
       ? rc.toothNumbers.split(',').map(t => parseInt(t.trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b)
       : [];
     setSelectedTeeth(teeth);
     if (teeth.length === 0 && rc.units) setManualUnits(String(rc.units));
 
-    const wt = rc.workType && rc.workType !== 'TBD' ? rc.workType : workType;
-    if (wt) setWorkType(wt);
     const ot = rc.deliveryType || orderType;
     setOrderType(ot);
 
@@ -208,6 +220,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const lbl     = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
 
   const selWorkType = workType || c.workType || '';
+  const isAligner   = isAlignerWorkType(selWorkType);
   const isExpress   = orderType === 'EXPRESS';
   const unitPrice   = isExpress && expressPriceMap[selWorkType] != null ? expressPriceMap[selWorkType] : (priceMap[selWorkType] ?? null);
   const count       = selWorkType && flatRateMap[selWorkType] ? 1 : Math.max(1, parseInt(units) || 1);
@@ -249,25 +262,39 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           </select>
         </div>
       </div>
-      {/* Tooth Numbers — odontogram */}
-      <div style={{ marginBottom: 10 }}>
-        <label style={lbl}>TOOTH NUMBERS (ODONTOGRAM)</label>
-        <div style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
-          <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={clearTeeth} />
-        </div>
-        {c.toothNumbers && selectedTeeth.length === 0 && (
-          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-            Clinic submitted: "{c.toothNumbers}" — couldn't auto-mark on the chart, verify manually
+      {/* Tooth Numbers — odontogram (aligner cases track tray count instead) */}
+      {!isAligner && (
+        <div style={{ marginBottom: 10 }}>
+          <label style={lbl}>TOOTH NUMBERS (ODONTOGRAM)</label>
+          <div style={{ padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={clearTeeth} />
           </div>
-        )}
-      </div>
+          {c.toothNumbers && selectedTeeth.length === 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+              Clinic submitted: "{c.toothNumbers}" — couldn't auto-mark on the chart, verify manually
+            </div>
+          )}
+        </div>
+      )}
       {/* Units + Order Type */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div>
-          <label style={lbl}>UNITS{selectedTeeth.length > 0 && <span style={{ marginLeft: 6, fontWeight: 400 }}>(from chart)</span>}</label>
-          <input type="number" min="1" style={{ ...inputSt, ...(selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
-            placeholder="1" value={units} readOnly={selectedTeeth.length > 0}
-            onChange={e => handleManualUnits(e.target.value)} />
+          {isAligner ? (
+            <>
+              <label style={lbl}>NUMBER OF TRAYS</label>
+              <select style={inputSt} value={units || ''} onChange={e => handleManualUnits(e.target.value)}>
+                <option value="">— Select tray count —</option>
+                {TRAY_COUNT_OPTIONS.map(n => <option key={n} value={n}>{n} tray{n > 1 ? 's' : ''}</option>)}
+              </select>
+            </>
+          ) : (
+            <>
+              <label style={lbl}>UNITS{selectedTeeth.length > 0 && <span style={{ marginLeft: 6, fontWeight: 400 }}>(from chart)</span>}</label>
+              <input type="number" min="1" style={{ ...inputSt, ...(selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                placeholder="1" value={units} readOnly={selectedTeeth.length > 0}
+                onChange={e => handleManualUnits(e.target.value)} />
+            </>
+          )}
         </div>
         <div>
           <label style={lbl}>ORDER TYPE</label>
