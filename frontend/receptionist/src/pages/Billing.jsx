@@ -31,6 +31,8 @@ function buildInvoiceHTML(c) {
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:40px}
   .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:24px;border-bottom:3px solid #1565C0}
+  .lab-brand{display:flex;align-items:center;gap:10px}
+  .lab-logo{width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0}
   .lab-name{font-size:22px;font-weight:800;color:#1565C0;margin-bottom:4px}
   .lab-sub{font-size:12px;color:#666}
   .inv-title{text-align:right}
@@ -56,9 +58,12 @@ function buildInvoiceHTML(c) {
 </style></head>
 <body>
 <div class="header">
-  <div>
-    <div class="lab-name">🦷 ${LAB.name}</div>
-    <div class="lab-sub">${LAB.address}<br>${LAB.phone} · ${LAB.email}</div>
+  <div class="lab-brand">
+    <img class="lab-logo" src="${window.location.origin}/logo.png" alt="Ye-Almaz" />
+    <div>
+      <div class="lab-name">${LAB.name}</div>
+      <div class="lab-sub">${LAB.address}<br>${LAB.phone} · ${LAB.email}</div>
+    </div>
   </div>
   <div class="inv-title">
     <h1>INVOICE</h1>
@@ -251,9 +256,12 @@ function InvoiceViewModal({ caseData, onClose }) {
           <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
             {/* Header */}
             <div style={{ background: 'var(--navy)', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 16 }}>🦷 {LAB.name}</div>
-                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{LAB.address} · {LAB.phone}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <img src="/logo.png" alt="Ye-Almaz" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>{LAB.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{LAB.address} · {LAB.phone}</div>
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: 2 }}>INVOICE</div>
