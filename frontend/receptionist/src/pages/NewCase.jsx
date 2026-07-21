@@ -98,6 +98,11 @@ function calcDueDate(workType, days) {
 
 const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 3 };
 
+// Aligner cases (Clear Aligner, Clear Aligner Setup, …) are tracked by tray
+// count, not tooth position — the odontogram doesn't apply to them.
+const isAlignerWorkType = (wt) => /aligner/i.test(wt || '');
+const TRAY_COUNT_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
+
 // ── Page ──────────────────────────────────────────────────
 export default function NewCase() {
   const navigate = useNavigate();
@@ -222,6 +227,13 @@ export default function NewCase() {
   };
 
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  const handleWorkTypeChange = (e) => {
+    const wt = e.target.value;
+    setForm(prev => ({ ...prev, workType: wt }));
+    // Aligner cases are tracked by tray count, not tooth position — clear any
+    // odontogram selection so units falls back to the tray-count dropdown.
+    if (isAlignerWorkType(wt) && selectedTeeth.length > 0) setSelectedTeeth([]);
+  };
   const setCheck = (field) => (e) => {
     const checked = e.target.checked;
     setForm(prev => {
@@ -322,6 +334,8 @@ export default function NewCase() {
     );
   })();
 
+  const isAligner = isAlignerWorkType(form.workType);
+
   return (
     <Layout>
       <div className="topbar">
@@ -408,40 +422,54 @@ export default function NewCase() {
                 </div>
               </div>
 
-              {/* Odontogram */}
-              <div className="form-group">
-                <label>Tooth Selection <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}>(FDI numbering — click to select)</span></label>
-                <div style={{
-                  background: 'var(--surface-2)', border: '1px solid var(--border)',
-                  borderRadius: 10, padding: '14px 16px', overflowX: 'auto',
-                }}>
-                  <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={() => setSelectedTeeth([])} />
+              {/* Odontogram — aligner cases track tray count instead */}
+              {!isAligner && (
+                <div className="form-group">
+                  <label>Tooth Selection <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}>(FDI numbering — click to select)</span></label>
+                  <div style={{
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    borderRadius: 10, padding: '14px 16px', overflowX: 'auto',
+                  }}>
+                    <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={() => setSelectedTeeth([])} />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Units */}
               <div className="form-group">
-                <label>Units
-                  {selectedTeeth.length > 0 && (
-                    <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                      auto-filled from tooth selection
-                    </span>
-                  )}
-                </label>
-                <input
-                  type="number" min="1"
-                  placeholder="Enter number of units"
-                  value={selectedTeeth.length > 0 ? selectedTeeth.length : manualUnits}
-                  onChange={e => { if (selectedTeeth.length === 0) setManualUnits(e.target.value); }}
-                  readOnly={selectedTeeth.length > 0}
-                  style={selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-                />
+                {isAligner ? (
+                  <>
+                    <label>Number of Trays</label>
+                    <select value={manualUnits} onChange={e => setManualUnits(e.target.value)}>
+                      <option value="">— Select tray count —</option>
+                      {TRAY_COUNT_OPTIONS.map(n => <option key={n} value={n}>{n} tray{n > 1 ? 's' : ''}</option>)}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <label>Units
+                      {selectedTeeth.length > 0 && (
+                        <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                          auto-filled from tooth selection
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number" min="1"
+                      placeholder="Enter number of units"
+                      value={selectedTeeth.length > 0 ? selectedTeeth.length : manualUnits}
+                      onChange={e => { if (selectedTeeth.length === 0) setManualUnits(e.target.value); }}
+                      readOnly={selectedTeeth.length > 0}
+                      style={selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                    />
+                  </>
+                )}
               </div>
 
               {/* Work type — driven by pricing DB */}
               <div className="form-group">
                 <label>Work Type *</label>
-                <select value={form.workType} onChange={set('workType')} required>
+                <select value={form.workType} onChange={handleWorkTypeChange} required>
                   <option value="">— Select work type —</option>
                   {workTypeGroups.length === 0 ? (
                     <option disabled>Loading work types…</option>
