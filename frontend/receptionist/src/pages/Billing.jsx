@@ -14,7 +14,7 @@ const fetchBilling = () => api.get('/payments/billing').then(r => r.data.cases ?
 const LAB = {
   name: 'Ye-Almaz Dental Laboratory',
   address: 'Addis Ababa, Ethiopia',
-  phone: '+251 911 000 000',
+  phone: '+251 945 535 455',
   email: 'info@yealmaz.com',
 };
 

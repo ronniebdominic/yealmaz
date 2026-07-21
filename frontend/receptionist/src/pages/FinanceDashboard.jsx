@@ -46,7 +46,7 @@ const fetchFinanceReport = ({ from, to, search } = {}) => {
 const LAB = {
   name: 'Ye-Almaz Dental Laboratory',
   address: 'Addis Ababa, Ethiopia',
-  phone: '+251 911 000 000',
+  phone: '+251 945 535 455',
   email: 'info@yealmaz.com',
 };
 
@@ -831,7 +831,7 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
     <img class="lab-logo" src="${window.location.origin}/logo.png" alt="Ye-Almaz" />
     <div>
       <div class="lab-name">Ye-Almaz Dental Laboratory</div>
-      <div class="lab-sub">Addis Ababa, Ethiopia<br>+251 911 000 000 · info@yealmaz.com</div>
+      <div class="lab-sub">Addis Ababa, Ethiopia<br>+251 945 535 455 · info@yealmaz.com</div>
     </div>
   </div>
   <div class="doc-title">

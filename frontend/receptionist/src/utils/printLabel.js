@@ -188,7 +188,7 @@ export function printCaseLabel(data) {
     <img class="header-icon" src="${window.location.origin}/logo.png" alt="Ye-Almaz" />
     <div class="header-text">
       <div class="lab-name">Ye-Almaz Dental Laboratory</div>
-      <div class="lab-sub">Addis Ababa, Ethiopia &nbsp;·&nbsp; Production Tracking Label</div>
+      <div class="lab-sub">Addis Ababa, Ethiopia &nbsp;·&nbsp; +251 945 535 455 &nbsp;·&nbsp; Production Tracking Label</div>
     </div>
   </div>
 
