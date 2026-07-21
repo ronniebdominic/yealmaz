@@ -31,7 +31,7 @@ function generateCode(name) {
 }
 
 const EMPTY_FORM = {
-  name: '', code: '', station: '', email: '',
+  name: '', code: '', station: '', zoneId: '', email: '',
   phone: '', address: '', password: '', isExcluded: false,
 };
 
@@ -42,6 +42,7 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
     name:       initial.name       || '',
     code:       initial.code       || '',
     station:    initial.station    || '',
+    zoneId:     initial.zoneId     || '',
     email:      initial.email      || '',
     phone:      initial.phone      || '',
     address:    initial.address    || '',
@@ -51,6 +52,12 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
   const [showPass,           setShowPass]           = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [saving,             setSaving]             = useState(false);
+
+  const { data: zones = [] } = useQuery({
+    queryKey: ['zones'],
+    queryFn: () => api.get('/zones').then(r => r.data),
+    staleTime: 60_000,
+  });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -73,6 +80,7 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
         name:       form.name.trim(),
         code:       form.code.trim()    || undefined,
         station:    form.station.trim() || undefined,
+        zoneId:     form.zoneId || '',
         email:      form.email.trim()   || undefined,
         phone:      form.phone.trim()   || undefined,
         address:    form.address.trim() || undefined,
@@ -153,6 +161,13 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
             <Field label="Station / Area" hint="optional">
               <input style={inputStyle} placeholder="e.g. Bole, Kazanchis"
                 value={form.station} onChange={e => set('station', e.target.value)} />
+            </Field>
+
+            <Field label="Zone" hint="optional — collective of stations">
+              <select style={inputStyle} value={form.zoneId} onChange={e => set('zoneId', e.target.value)}>
+                <option value="">— No zone —</option>
+                {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </select>
             </Field>
 
             <Field label="Phone" hint="optional">
@@ -369,7 +384,8 @@ export default function AdminClinics() {
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     (c.code   || '').toLowerCase().includes(search.toLowerCase()) ||
     (c.email  || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.station|| '').toLowerCase().includes(search.toLowerCase())
+    (c.station|| '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.zone?.name || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const handleSaved = (clinic, plainPassword) => {
@@ -427,6 +443,7 @@ export default function AdminClinics() {
                   <col style={{ width: 200 }} />
                   <col style={{ width: 80 }} />
                   <col style={{ width: 100 }} />
+                  <col style={{ width: 100 }} />
                   <col style={{ width: 200 }} />
                   <col style={{ width: 120 }} />
                   <col style={{ width: 100 }} />
@@ -439,6 +456,7 @@ export default function AdminClinics() {
                     <th>Clinic</th>
                     <th>Code</th>
                     <th>Station</th>
+                    <th>Zone</th>
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Partner</th>
@@ -476,6 +494,11 @@ export default function AdminClinics() {
                           : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
                       <td style={{ padding: '8px 16px', fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.station || '—'}</td>
+                      <td style={{ padding: '8px 16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {c.zone?.name
+                          ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(21,101,192,0.1)', color: 'var(--blue)' }}>{c.zone.name}</span>
+                          : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                      </td>
                       <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.email || ''}>{c.email || '—'}</td>
                       <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{c.phone || '—'}</td>
                       <td style={{ padding: '8px 16px' }}>

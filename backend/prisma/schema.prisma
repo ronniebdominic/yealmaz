@@ -22,6 +22,8 @@ model User {
   departments String[] @default([]) // For LAB_TECH: scopes them to these department(s). Empty = unrestricted (all departments).
   phone      String?
   station    String?  // for DISPATCH/DELIVERY: which station/area they cover, for routing — matches Clinic.station
+  zoneId     String?  // for DELIVERY: the broader zone (a collective of stations) they're assigned to cover
+  zone       Zone?    @relation(fields: [zoneId], references: [id])
   isActive   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -46,12 +48,30 @@ enum Role {
   FINANCE
 }
 
+// ── ZONES ──────────────────────────────────────────────
+// A zone is a collective of stations (e.g. "East Zone" covers the Bole,
+// CMC and Megenagna stations) — a coarser grouping so Dispatch can assign a
+// delivery partner to a whole area rather than one station at a time.
+model Zone {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinics Clinic[]
+  users   User[]
+
+  @@map("zones")
+}
+
 // ── CLINICS ────────────────────────────────────────────
 model Clinic {
   id        String   @id @default(uuid())
   code      String?  @unique
   name      String
   station   String?
+  zoneId    String?  // the zone (collective of stations) this clinic's station falls under
+  zone      Zone?    @relation(fields: [zoneId], references: [id])
   email     String?  @unique
   phone     String?
   address   String?

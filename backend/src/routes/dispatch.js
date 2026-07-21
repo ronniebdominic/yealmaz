@@ -31,7 +31,7 @@ router.get('/stations', protect, restrict('DISPATCH', 'ADMIN', 'DELIVERY'), asyn
     const cases = await prisma.case.findMany({
       where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } },
       include: {
-        clinic: { select: { id: true, code: true, name: true, station: true, address: true, phone: true } },
+        clinic: { select: { id: true, code: true, name: true, station: true, zone: { select: { id: true, name: true } }, address: true, phone: true } },
         assignedDelivery: { select: { id: true, name: true } },
       },
       orderBy: [{ clinic: { name: 'asc' } }, { dueDate: 'asc' }]
@@ -53,6 +53,7 @@ router.get('/executives', protect, restrict('DISPATCH', 'ADMIN'), async (req, re
       where: { role: 'DELIVERY', isActive: true },
       select: {
         id: true, name: true, email: true, phone: true, station: true,
+        zone: { select: { id: true, name: true } },
         assignedDeliveries: {
           where: { status: { in: ['PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
           select: { id: true, caseNumber: true, status: true, patientName: true, clinic: { select: { name: true } } }
@@ -86,7 +87,7 @@ router.get('/queue', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) =>
         ]
       },
       include: {
-        clinic: { select: { id: true, code: true, name: true, station: true, address: true, phone: true, isExcluded: true } },
+        clinic: { select: { id: true, code: true, name: true, station: true, zone: { select: { id: true, name: true } }, address: true, phone: true, isExcluded: true } },
         payment: { select: { status: true, amount: true } },
         assignedDelivery: { select: { id: true, name: true, email: true } },
         deliveryLogs: { orderBy: { deliveredAt: 'desc' }, take: 1 }

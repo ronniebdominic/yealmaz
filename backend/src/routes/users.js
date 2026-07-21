@@ -23,7 +23,9 @@ function parseDepartments(input) {
 
 const SAFE_SELECT = {
   id: true, name: true, email: true, role: true,
-  departments: true, phone: true, station: true, isActive: true, createdAt: true,
+  departments: true, phone: true, station: true,
+  zoneId: true, zone: { select: { id: true, name: true } },
+  isActive: true, createdAt: true,
 };
 
 // ── GET /api/users ───────────────────────────────────────
@@ -44,7 +46,7 @@ router.get('/', protect, restrict('ADMIN'), async (req, res) => {
 // ── POST /api/users ──────────────────────────────────────
 router.post('/', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, email, password, role, departments, phone, station } = req.body;
+    const { name, email, password, role, departments, phone, station, zoneId } = req.body;
 
     if (!name?.trim())     return res.status(400).json({ error: 'Name is required.' });
     if (!email?.trim())    return res.status(400).json({ error: 'Email is required.' });
@@ -69,6 +71,7 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
         departments: role === 'LAB_TECH' ? cleaned : [],
         phone:       phone?.trim() || null,
         station:     station?.trim() || null,
+        zoneId:      zoneId || null,
       },
       select: SAFE_SELECT,
     });
@@ -83,7 +86,7 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
 // ── PATCH /api/users/:id ─────────────────────────────────
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, email, password, role, departments, phone, station, isActive } = req.body;
+    const { name, email, password, role, departments, phone, station, zoneId, isActive } = req.body;
 
     // Prevent modifying other admins
     const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { role: true } });
@@ -96,6 +99,7 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
     if (role     !== undefined && role !== 'ADMIN') data.role = role;
     if (phone    !== undefined) data.phone      = phone?.trim() || null;
     if (station  !== undefined) data.station    = station?.trim() || null;
+    if (zoneId   !== undefined) data.zoneId     = zoneId || null;
     if (isActive !== undefined) data.isActive   = isActive;
     if (departments !== undefined) {
       const { cleaned, invalid } = parseDepartments(departments);

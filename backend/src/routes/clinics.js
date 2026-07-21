@@ -33,6 +33,7 @@ router.get('/all', protect, restrict('ADMIN'), async (req, res) => {
       where: { isActive: true },
       select: {
         id: true, code: true, name: true, station: true,
+        zoneId: true, zone: { select: { id: true, name: true } },
         email: true, phone: true, address: true,
         isActive: true, isExcluded: true, createdAt: true,
       },
@@ -48,7 +49,7 @@ router.get('/all', protect, restrict('ADMIN'), async (req, res) => {
 // ── POST /api/clinics — create clinic (admin only) ───────
 router.post('/', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, code, station, email, phone, address, password, isExcluded } = req.body;
+    const { name, code, station, zoneId, email, phone, address, password, isExcluded } = req.body;
 
     if (!name?.trim())     return res.status(400).json({ error: 'Clinic name is required.' });
     if (!password?.trim()) return res.status(400).json({ error: 'Password is required.' });
@@ -72,6 +73,7 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
         name:       name.trim(),
         code:       code?.trim()    || null,
         station:    station?.trim() || null,
+        zoneId:     zoneId || null,
         email:      email?.trim()   || null,
         phone:      phone?.trim()   || null,
         address:    address?.trim() || null,
@@ -80,6 +82,7 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
       },
       select: {
         id: true, code: true, name: true, station: true,
+        zoneId: true, zone: { select: { id: true, name: true } },
         email: true, phone: true, address: true,
         isActive: true, isExcluded: true, createdAt: true,
       },
@@ -98,12 +101,13 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
 // ── PATCH /api/clinics/:id — update clinic (admin only) ──
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, code, station, email, phone, address, isActive, isExcluded, password } = req.body;
+    const { name, code, station, zoneId, email, phone, address, isActive, isExcluded, password } = req.body;
 
     const updateData = {};
     if (name     !== undefined) updateData.name       = name.trim();
     if (code     !== undefined) updateData.code       = code?.trim()    || null;
     if (station  !== undefined) updateData.station    = station?.trim() || null;
+    if (zoneId   !== undefined) updateData.zoneId     = zoneId || null;
     if (email    !== undefined) updateData.email      = email?.trim()   || null;
     if (phone    !== undefined) updateData.phone      = phone?.trim()   || null;
     if (address  !== undefined) updateData.address    = address?.trim() || null;
@@ -116,6 +120,7 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       data: updateData,
       select: {
         id: true, code: true, name: true, station: true,
+        zoneId: true, zone: { select: { id: true, name: true } },
         email: true, phone: true, address: true,
         isActive: true, isExcluded: true, createdAt: true,
       },

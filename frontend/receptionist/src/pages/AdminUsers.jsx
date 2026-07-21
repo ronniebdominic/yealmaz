@@ -58,16 +58,23 @@ function UserFormModal({ initial, onSaved, onClose }) {
     email:       initial.email       || '',
     phone:       initial.phone       || '',
     station:     initial.station     || '',
+    zoneId:      initial.zoneId      || '',
     role:        initial.role        || 'RECEPTIONIST',
     departments: initial.departments || [],
     password:    '',
   } : {
-    name: '', email: '', phone: '', station: '',
+    name: '', email: '', phone: '', station: '', zoneId: '',
     role: 'RECEPTIONIST', departments: [], password: generatePassword(),
   });
   const [showPass,           setShowPass]           = useState(!isEdit);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [saving,             setSaving]             = useState(false);
+
+  const { data: zones = [] } = useQuery({
+    queryKey: ['zones'],
+    queryFn: () => api.get('/zones').then(r => r.data),
+    staleTime: 60_000,
+  });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const toggleDept = (code) => setForm(f => ({
@@ -89,6 +96,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
         email: form.email.trim(),
         phone: form.phone.trim() || undefined,
         station: form.station.trim() || undefined,
+        zoneId: form.zoneId || '',
         role:  form.role,
         departments: form.role === 'LAB_TECH' ? form.departments : [],
       };
@@ -194,13 +202,17 @@ function UserFormModal({ initial, onSaved, onClose }) {
               </Field>
             </div>
 
-            {/* Station — mainly for Dispatch/Delivery routing, matches Clinic's Station field */}
-            <div style={{ gridColumn: '1 / -1' }}>
-              <Field label="Station / Area" hint="optional — for routing, matches a clinic's station">
-                <input style={inputStyle} placeholder="e.g. Bole, Piassa, CMC"
-                  value={form.station} onChange={e => set('station', e.target.value)} />
-              </Field>
-            </div>
+            {/* Station + Zone — mainly for Dispatch/Delivery routing */}
+            <Field label="Station / Area" hint="optional — for routing, matches a clinic's station">
+              <input style={inputStyle} placeholder="e.g. Bole, Piassa, CMC"
+                value={form.station} onChange={e => set('station', e.target.value)} />
+            </Field>
+            <Field label="Zone" hint="optional — the broader area they cover">
+              <select style={inputStyle} value={form.zoneId} onChange={e => set('zoneId', e.target.value)}>
+                <option value="">— No zone —</option>
+                {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </select>
+            </Field>
 
             {/* Password */}
             <div style={{ gridColumn: '1 / -1' }}>
@@ -348,6 +360,7 @@ export default function AdminUsers() {
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
       (u.station || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.zone?.name || '').toLowerCase().includes(search.toLowerCase()) ||
       (u.departments || []).join(' ').toLowerCase().includes(search.toLowerCase());
     return matchRole && matchSearch;
   });
@@ -411,6 +424,7 @@ export default function AdminUsers() {
                   <col style={{ width: 160 }} />
                   <col style={{ width: 110 }} />
                   <col style={{ width: 110 }} />
+                  <col style={{ width: 110 }} />
                   <col style={{ width: 80 }} />
                   <col style={{ width: 90 }} />
                   <col style={{ width: 230 }} />
@@ -423,6 +437,7 @@ export default function AdminUsers() {
                     <th>Department</th>
                     <th>Phone</th>
                     <th>Station</th>
+                    <th>Zone</th>
                     <th>Status</th>
                     <th>Added</th>
                     <th>Actions</th>
@@ -460,6 +475,11 @@ export default function AdminUsers() {
                         </td>
                         <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
                         <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.station || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
+                        <td style={{ padding: '8px 16px', whiteSpace: 'nowrap' }}>
+                          {u.zone?.name
+                            ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(21,101,192,0.1)', color: 'var(--blue)' }}>{u.zone.name}</span>
+                            : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        </td>
                         <td style={{ padding: '8px 16px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: u.isActive ? 'rgba(22,163,74,0.1)' : 'rgba(229,62,62,0.1)', color: u.isActive ? 'var(--green)' : 'var(--red)', whiteSpace: 'nowrap' }}>
                             {u.isActive ? 'Active' : 'Inactive'}

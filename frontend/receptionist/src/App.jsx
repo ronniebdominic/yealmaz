@@ -11,6 +11,7 @@ import AdminCases from './pages/AdminCases';
 import AdminCaseStatusBoard from './pages/AdminCaseStatusBoard';
 import AdminClinics from './pages/AdminClinics';
 import AdminUsers from './pages/AdminUsers';
+import AdminZones from './pages/AdminZones';
 import AdminRewards from './pages/AdminRewards';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
@@ -65,6 +66,7 @@ function AppRoutes() {
       <Route path="/admin/case-status" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminCaseStatusBoard /></ProtectedRoute>} />
       <Route path="/admin/clinics" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminClinics /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminUsers /></ProtectedRoute>} />
+      <Route path="/admin/zones" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminZones /></ProtectedRoute>} />
       <Route path="/admin/rewards" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminRewards /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

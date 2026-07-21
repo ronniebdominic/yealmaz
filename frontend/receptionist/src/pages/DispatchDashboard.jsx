@@ -13,7 +13,7 @@ import {
   MdTwoWheeler, MdLocalShipping, MdDirectionsBike, MdInventory2, MdCheckCircle,
   MdCelebration, MdSettings, MdCreditCard, MdBolt, MdLightbulb, MdCall,
   MdLocationOn, MdWarning, MdAutorenew, MdPerson, MdHandshake, MdAssignment,
-  MdClose, MdLocalHospital,
+  MdClose, MdLocalHospital, MdMap,
 } from 'react-icons/md';
 import { todayLocal } from '../utils/date';
 
@@ -40,6 +40,7 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
             <div style={{ fontSize: 13, color: 'var(--text-2)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
               {caseData.workType} · <MdLocalHospital className="mi" size={13} /> {caseData.clinic?.name}
               {caseData.clinic?.station && <span style={{ color: 'var(--accent)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}> · <MdLocationOn size={13} /> {caseData.clinic.station}</span>}
+              {caseData.clinic?.zone?.name && <span style={{ color: 'var(--blue)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}> · <MdMap size={13} /> {caseData.clinic.zone.name}</span>}
             </div>
             {caseData.clinic?.address && (
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn className="mi" size={13} /> {caseData.clinic.address}</div>
@@ -57,21 +58,26 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
             {[...executives]
               .sort((a, b) => {
                 const clinicStation = caseData.clinic?.station?.trim().toLowerCase();
-                const aMatch = clinicStation && a.station?.trim().toLowerCase() === clinicStation;
-                const bMatch = clinicStation && b.station?.trim().toLowerCase() === clinicStation;
-                if (aMatch === bMatch) return 0;
-                return aMatch ? -1 : 1;
+                const clinicZoneId  = caseData.clinic?.zone?.id;
+                const rank = (e) => {
+                  if (clinicStation && e.station?.trim().toLowerCase() === clinicStation) return 0;
+                  if (clinicZoneId && e.zone?.id === clinicZoneId) return 1;
+                  return 2;
+                };
+                return rank(a) - rank(b);
               })
               .map(exec => {
               const active = exec.assignedDeliveries?.length || 0;
               const sel = selectedExecId === exec.id;
               const clinicStation = caseData.clinic?.station?.trim().toLowerCase();
+              const clinicZoneId  = caseData.clinic?.zone?.id;
               const sameStation = clinicStation && exec.station?.trim().toLowerCase() === clinicStation;
+              const sameZone    = !sameStation && clinicZoneId && exec.zone?.id === clinicZoneId;
               return (
                 <button key={exec.id} onClick={() => setSelectedExecId(exec.id)} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                  border: `2px solid ${sel ? 'var(--accent)' : sameStation ? 'var(--green)' : 'var(--border)'}`,
+                  border: `2px solid ${sel ? 'var(--accent)' : sameStation ? 'var(--green)' : sameZone ? 'var(--blue)' : 'var(--border)'}`,
                   background: sel ? 'var(--accent-dim)' : 'var(--surface-2)',
                   transition: 'all .15s',
                 }}>
@@ -80,7 +86,9 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
                     <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                       {exec.email}
                       {exec.station && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}> · <MdLocationOn size={12} /> {exec.station}</span>}
+                      {exec.zone?.name && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}> · <MdMap size={12} /> {exec.zone.name}</span>}
                       {sameStation && <span style={{ color: 'var(--green)', fontWeight: 700 }}> · ✓ same station</span>}
+                      {sameZone && <span style={{ color: 'var(--blue)', fontWeight: 700 }}> · ✓ same zone</span>}
                     </div>
                   </div>
                   <div style={{
@@ -384,7 +392,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
               <option value="">— Assign later —</option>
               {executives.map(e => (
                 <option key={e.id} value={e.id}>
-                  {e.name}{e.station ? ` · ${e.station}` : ''} · {e.assignedDeliveries?.length || 0} active jobs
+                  {e.name}{e.station ? ` · ${e.station}` : ''}{e.zone?.name ? ` · ${e.zone.name} zone` : ''} · {e.assignedDeliveries?.length || 0} active jobs
                 </option>
               ))}
             </select>
@@ -729,7 +737,7 @@ export default function DispatchDashboard() {
                           <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
                           <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                           <Td><span className="patient-name">{c.patientName}</span></Td>
                           <Td style={{ fontSize: 12 }}>{c.workType}</Td>
@@ -800,7 +808,7 @@ export default function DispatchDashboard() {
                         <tr key={c.id}>
                           <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
                             {c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}
@@ -894,7 +902,7 @@ export default function DispatchDashboard() {
                         <tr key={c.id}>
                           <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                           <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
                             {c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}
@@ -980,7 +988,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
@@ -1055,7 +1063,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
@@ -1142,7 +1150,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>
                               {c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}
@@ -1230,7 +1238,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-2)' }}>{c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={12} /> {c.clinic.address}</span> : '—'}</Td>
                             <Td style={{ fontSize: 12 }}>{c.clinic?.phone || '—'}</Td>
@@ -1308,7 +1316,7 @@ export default function DispatchDashboard() {
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
                             {c.clinic?.name}
-                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+                            {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 2 }}><MdLocationOn size={11} /> {c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
                           </Td>
                             <Td><span className="patient-name">{c.patientName}</span></Td>
                             <Td><span className="case-number">{c.caseNumber}</span></Td>
