@@ -25,8 +25,8 @@ const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—'
 // ── Executive assign modal ────────────────────────────────
 function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }) {
   const [selectedExecId, setSelectedExecId] = useState('');
-  const TitleIcon = mode === 'pickup' ? MdTwoWheeler : MdLocalShipping;
-  const title = mode === 'pickup' ? 'Assign Pickup Driver' : 'Assign Delivery Driver';
+  const TitleIcon = mode === 'pickup' ? MdTwoWheeler : mode === 'reassign' ? MdAutorenew : MdLocalShipping;
+  const title = mode === 'pickup' ? 'Assign Pickup Driver' : mode === 'reassign' ? 'Reassign Delivery Driver' : 'Assign Delivery Driver';
   const current = caseData.assignedDelivery;
 
   return (
@@ -708,6 +708,10 @@ export default function DispatchDashboard() {
       if (assignModal.mode === 'pickup') {
         await api.post(`/dispatch/${assignModal.case.id}/assign-pickup`, { executiveId });
         toast.success('Pickup driver assigned!');
+      } else if (assignModal.mode === 'reassign') {
+        // Case is already OUT_FOR_DELIVERY — just swap the driver, no status change.
+        await api.post(`/dispatch/${assignModal.case.id}/assign`, { executiveId });
+        toast.success('Driver reassigned!');
       } else {
         await api.post(`/dispatch/${assignModal.case.id}/send-out`, { executiveId });
         toast.success('Case dispatched for delivery!');
@@ -1431,11 +1435,21 @@ export default function DispatchDashboard() {
                             <Td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>{ETB(amount)}</Td>
                             <Td><PaymentBadge status={c.paymentStatus} /></Td>
                             <Td>
-                              {c.assignedDelivery ? (
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                  <MdPerson size={13} /> {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}
-                                </span>
-                              ) : '—'}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                {c.assignedDelivery ? (
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <MdPerson size={13} /> {c.assignedDelivery.name.replace('Yealmaz Delivery Executive ', 'Driver ')}
+                                  </span>
+                                ) : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ whiteSpace: 'nowrap' }}
+                                  title="Reassign to a different driver"
+                                  onClick={() => setAssignModal({ case: c, mode: 'reassign' })}
+                                >
+                                  <MdAutorenew className="mi" size={13} /> Reassign
+                                </button>
+                              </div>
                             </Td>
                           </tr>
                         );
