@@ -170,9 +170,13 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
 
   const handleWT = (wt)  => {
     setWorkType(wt);
-    // Aligner cases are tracked by tray count, not tooth position — clear any
-    // odontogram selection so units falls back to the tray-count dropdown.
-    if (isAlignerWorkType(wt) && selectedTeeth.length > 0) setSelectedTeeth([]);
+    if (isAlignerWorkType(wt)) {
+      // Aligner cases are tracked by tray count, not tooth position or
+      // shade — clear any odontogram selection so units falls back to the
+      // tray-count dropdown, and clear shade since it isn't shown/required.
+      if (selectedTeeth.length > 0) setSelectedTeeth([]);
+      if (shade) setShade('');
+    }
     calcPriceAndDate(wt, orderType, units);
   };
   const handleOT = (ot)  => { setOrderType(ot);   calcPriceAndDate(workType, ot, units); };
@@ -196,12 +200,12 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     setOriginalCase(rc);
 
     if (rc.patientName && !isPlaceholderName(rc.patientName)) setPatientName(rc.patientName);
-    if (rc.shade) setShade(rc.shade);
     if (rc.doctorName) setDoctorName(rc.doctorName);
     if (rc.doctorPhone) setDoctorPhone(rc.doctorPhone);
 
     const wt = rc.workType && rc.workType !== 'TBD' ? rc.workType : workType;
     if (wt) setWorkType(wt);
+    if (!isAlignerWorkType(wt) && rc.shade) setShade(rc.shade); else if (isAlignerWorkType(wt)) setShade('');
 
     const teeth = (!isAlignerWorkType(wt) && rc.toothNumbers)
       ? rc.toothNumbers.split(',').map(t => parseInt(t.trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b)
@@ -246,14 +250,16 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         <input style={inputSt} placeholder="Patient's full name" value={patientName} onChange={e => setPatientName(e.target.value)} />
       </div>
       {/* Shade + Work Type */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-        <div>
-          <label style={lbl}>SHADE *</label>
-          <select style={inputSt} value={shade} onChange={e => setShade(e.target.value)}>
-            <option value="">— Select shade —</option>
-            {SHADE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isAligner ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        {!isAligner && (
+          <div>
+            <label style={lbl}>SHADE *</label>
+            <select style={inputSt} value={shade} onChange={e => setShade(e.target.value)}>
+              <option value="">— Select shade —</option>
+              {SHADE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label style={lbl}>WORK TYPE *</label>
           <select style={inputSt} value={selWorkType} onChange={e => handleWT(e.target.value)}>
@@ -471,7 +477,8 @@ function AcceptCasesSection({ queryClient }) {
     const effectiveDoctorPhone = formData.doctorPhone?.trim() || c.doctorPhone?.trim();
 
     if (!effectivePatientName)                     return toast.error('Patient name is required');
-    if (!formData.shade)                           return toast.error('Shade is required');
+    if (!isAlignerWorkType(formData.workType || c.workType) && !formData.shade)
+                                                    return toast.error('Shade is required');
     if (!formData.workType && !c.workType)         return toast.error('Work type is required');
     if (!effectiveDoctorName)                      return toast.error("Doctor's name is required");
     if (!effectiveDoctorPhone)                     return toast.error("Doctor's contact is required");

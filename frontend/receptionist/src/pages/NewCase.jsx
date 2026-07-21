@@ -229,10 +229,12 @@ export default function NewCase() {
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
   const handleWorkTypeChange = (e) => {
     const wt = e.target.value;
-    setForm(prev => ({ ...prev, workType: wt }));
-    // Aligner cases are tracked by tray count, not tooth position — clear any
-    // odontogram selection so units falls back to the tray-count dropdown.
-    if (isAlignerWorkType(wt) && selectedTeeth.length > 0) setSelectedTeeth([]);
+    const aligner = isAlignerWorkType(wt);
+    setForm(prev => ({ ...prev, workType: wt, ...(aligner ? { shade: '' } : {}) }));
+    // Aligner cases are tracked by tray count, not tooth position or shade —
+    // clear any odontogram selection so units falls back to the tray-count
+    // dropdown, and clear shade since it isn't shown/required.
+    if (aligner && selectedTeeth.length > 0) setSelectedTeeth([]);
   };
   const setCheck = (field) => (e) => {
     const checked = e.target.checked;
@@ -253,7 +255,8 @@ export default function NewCase() {
 
   const validate = () => {
     const e = {};
-    if (!form.shade.trim())       e.shade      = 'Shade is required';
+    if (!isAlignerWorkType(form.workType) && !form.shade.trim())
+                                   e.shade      = 'Shade is required';
     if (!form.doctorName.trim())  e.doctorName  = "Doctor's name is required";
     if (!form.doctorPhone.trim()) e.doctorPhone = 'Contact / phone is required';
     return e;
@@ -401,7 +404,7 @@ export default function NewCase() {
                 </div>
               </div>
 
-              <div className="grid-2">
+              <div className={isAligner ? '' : 'grid-2'}>
                 <div className="form-group">
                   <label>Patient Gender</label>
                   <select value={form.patientGender} onChange={set('patientGender')}>
@@ -410,16 +413,18 @@ export default function NewCase() {
                     <option value="Female">Female</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Shade *</label>
-                  <input
-                    placeholder="e.g. A2, B1"
-                    value={form.shade}
-                    onChange={e => { set('shade')(e); setErrors(prev => ({ ...prev, shade: '' })); }}
-                    style={errors.shade ? { borderColor: 'var(--red)' } : {}}
-                  />
-                  {errors.shade && <div style={errStyle}><MdWarning className="mi" size={12} /> {errors.shade}</div>}
-                </div>
+                {!isAligner && (
+                  <div className="form-group">
+                    <label>Shade *</label>
+                    <input
+                      placeholder="e.g. A2, B1"
+                      value={form.shade}
+                      onChange={e => { set('shade')(e); setErrors(prev => ({ ...prev, shade: '' })); }}
+                      style={errors.shade ? { borderColor: 'var(--red)' } : {}}
+                    />
+                    {errors.shade && <div style={errStyle}><MdWarning className="mi" size={12} /> {errors.shade}</div>}
+                  </div>
+                )}
               </div>
 
               {/* Odontogram — aligner cases track tray count instead */}
