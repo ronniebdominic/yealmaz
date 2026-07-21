@@ -1270,6 +1270,7 @@ function TrustedPartnersTab({ queryClient }) {
   const [cycleClinic, setCycleClinic] = useState(null); // clinic → Billing Cycle modal
   const [clinicCases, setClinicCases] = useState({}); // { [clinicId]: cases[] }
   const [loadingClinic, setLoadingClinic] = useState(null);
+  const [search, setSearch] = useState('');
 
   const cycleBadge = (cyc) => {
     if (!cyc || cyc === 'NONE') return null;
@@ -1296,17 +1297,6 @@ function TrustedPartnersTab({ queryClient }) {
     finally { setLoadingClinic(null); }
   };
 
-  // Totals
-  const totals = summary.reduce((acc, c) => ({
-    totalOrders:      acc.totalOrders      + c.totalOrders,
-    totalUnits:       acc.totalUnits       + c.totalUnits,
-    deliveredOrders:  acc.deliveredOrders  + c.deliveredOrders,
-    inProgress:       acc.inProgress       + c.inProgress,
-    totalRevenue:     acc.totalRevenue     + c.totalRevenue,
-    paymentsReceived: acc.paymentsReceived + c.paymentsReceived,
-    outstanding:      acc.outstanding      + c.outstanding,
-  }), { totalOrders: 0, totalUnits: 0, deliveredOrders: 0, inProgress: 0, totalRevenue: 0, paymentsReceived: 0, outstanding: 0 });
-
   const cases      = [];
   const pagination = {};
 
@@ -1320,9 +1310,29 @@ function TrustedPartnersTab({ queryClient }) {
     </div>
   );
 
+  // Client-side filter — the summary endpoint returns every trusted clinic
+  // in one shot (no server pagination), so there's no need for a backend
+  // round-trip to search this small, already-loaded list.
+  const q = search.trim().toLowerCase();
+  const filteredSummary = q
+    ? summary.filter(c => c.name?.toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q))
+    : summary;
+
+  // Totals — scoped to the filtered/searched set, so the KPI cards match
+  // what's actually shown in the table below them.
+  const totals = filteredSummary.reduce((acc, c) => ({
+    totalOrders:      acc.totalOrders      + c.totalOrders,
+    totalUnits:       acc.totalUnits       + c.totalUnits,
+    deliveredOrders:  acc.deliveredOrders  + c.deliveredOrders,
+    inProgress:       acc.inProgress       + c.inProgress,
+    totalRevenue:     acc.totalRevenue     + c.totalRevenue,
+    paymentsReceived: acc.paymentsReceived + c.paymentsReceived,
+    outstanding:      acc.outstanding      + c.outstanding,
+  }), { totalOrders: 0, totalUnits: 0, deliveredOrders: 0, inProgress: 0, totalRevenue: 0, paymentsReceived: 0, outstanding: 0 });
+
   const numFmt = (v) => Number(v || 0).toLocaleString('en-US');
-  const billsDue = summary.filter(c => c.billOverdue).length;
-  const scheduled = summary.filter(c => c.billingCycle && c.billingCycle !== 'NONE').length;
+  const billsDue = filteredSummary.filter(c => c.billOverdue).length;
+  const scheduled = filteredSummary.filter(c => c.billingCycle && c.billingCycle !== 'NONE').length;
 
   return (
     <>
@@ -1360,12 +1370,27 @@ function TrustedPartnersTab({ queryClient }) {
         </div>
       </div>
 
+      {/* Search */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+        <div className="search-input" style={{ flex: 1 }}>
+          <span className="icon mi"><MdSearch size={16} /></span>
+          <input
+            placeholder="Search clinic name or phone…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        {search && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setSearch('')} style={{ color: 'var(--red)' }}>✕</button>
+        )}
+      </div>
+
       {/* Partner table */}
       <div className="card">
         <div className="card-header">
           <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdHandshake className="mi" size={15} /> Trusted Partner Clinics</div>
           <ExportMenu
-            data={summary}
+            data={filteredSummary}
             columns={[
               { header: 'Clinic Name',         value: c => c.name },
               { header: 'Total Orders',         value: c => c.totalOrders },
@@ -1380,6 +1405,13 @@ function TrustedPartnersTab({ queryClient }) {
             title="Trusted Partners Summary"
           />
         </div>
+        {filteredSummary.length === 0 ? (
+          <div className="empty-state" style={{ padding: '40px 20px' }}>
+            <div className="empty-icon mi"><MdSearch size={28} /></div>
+            <div className="empty-title">No clinics match "{search}"</div>
+            <p>Try a different name or phone number.</p>
+          </div>
+        ) : (
         <div className="table-wrap">
           <table>
             <thead>
@@ -1396,7 +1428,7 @@ function TrustedPartnersTab({ queryClient }) {
               </tr>
             </thead>
             <tbody>
-              {summary.map(c => (
+              {filteredSummary.map(c => (
                 <React.Fragment key={c.id}>
                   <tr style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
                     <td>
@@ -1506,7 +1538,7 @@ function TrustedPartnersTab({ queryClient }) {
 
               {/* Totals row */}
               <tr style={{ background: 'var(--surface-2)', fontWeight: 700, borderTop: '2px solid var(--border)' }}>
-                <td style={{ padding: '12px 16px', color: 'var(--text-1)' }}>TOTAL — {summary.length} partners</td>
+                <td style={{ padding: '12px 16px', color: 'var(--text-1)' }}>TOTAL — {filteredSummary.length} partner{filteredSummary.length !== 1 ? 's' : ''}{search ? ` (of ${summary.length})` : ''}</td>
                 <td style={{ textAlign: 'center', color: 'var(--blue)' }}>{numFmt(totals.totalOrders)}</td>
                 <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{numFmt(totals.totalUnits)}</td>
                 <td style={{ textAlign: 'center', color: 'var(--green)' }}>{numFmt(totals.deliveredOrders)}</td>
@@ -1519,6 +1551,7 @@ function TrustedPartnersTab({ queryClient }) {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {collectCase && (
