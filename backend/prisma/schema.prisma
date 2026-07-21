@@ -253,6 +253,7 @@ model Payment {
   invoiceNumber   String?       @unique
   invoiceIssuedAt DateTime?
   invoiceNotes    String?
+  fsNumber        String?       // manually entered FS number from the clinic's paper sales-invoice/fiscal receipt
 
   // Chapa online payment
   chapaTxRef       String? @unique

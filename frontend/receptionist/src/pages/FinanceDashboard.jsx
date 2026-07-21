@@ -736,13 +736,18 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const period = periodLabel || (allOutstanding ? 'All Outstanding' : `${MONTHS[month]} ${year}`);
 
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
   const rows = cases.map((c, i) => `
     <tr>
       <td>${i + 1}</td>
       <td style="font-family:monospace;font-size:12px">${c.caseNumber}</td>
       <td>${c.patientName}</td>
       <td>${c.workType}</td>
+      <td style="text-align:center">${c.units ?? '—'}</td>
+      <td>${fmtDate(c.deliveryDate)}</td>
       <td style="font-family:monospace">${c.payment?.invoiceNumber || '—'}</td>
+      <td style="font-family:monospace;font-weight:700">${c.payment?.fsNumber || '—'}</td>
       <td style="text-align:right;font-weight:700">Br ${(c.totalAmount || 0).toLocaleString('en-US')}</td>
     </tr>`).join('');
 
@@ -807,12 +812,12 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
 
 <table>
   <thead>
-    <tr><th>#</th><th>Case Number</th><th>Patient</th><th>Work Type</th><th>Invoice #</th><th style="text-align:right">Amount (Br)</th></tr>
+    <tr><th>#</th><th>Case Number</th><th>Patient</th><th>Work Type</th><th style="text-align:center">Units</th><th>Delivered</th><th>Invoice #</th><th>FS #</th><th style="text-align:right">Amount (Br)</th></tr>
   </thead>
   <tbody>
-    ${rows || '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">No outstanding cases for this period</td></tr>'}
+    ${rows || '<tr><td colspan="9" style="text-align:center;color:#999;padding:20px">No outstanding cases for this period</td></tr>'}
     <tr class="total-row">
-      <td colspan="5" style="text-align:right">Total Outstanding</td>
+      <td colspan="8" style="text-align:right">Total Outstanding</td>
       <td class="total-amount">Br ${total.toLocaleString('en-US')}</td>
     </tr>
   </tbody>
@@ -865,6 +870,8 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
   const [cases, setCases]           = useState([]);
   const [loading, setLoading]       = useState(false);
   const [marking, setMarking]       = useState(false);
+  const [fsEdits, setFsEdits]       = useState({}); // { [caseId]: in-progress value }
+  const [fsSaving, setFsSaving]     = useState({}); // { [caseId]: true }
 
   const range = rangeForPreset(preset, customFrom, customTo);
   const periodLabel = preset === 'all' ? 'All Outstanding'
@@ -883,6 +890,27 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [preset, customFrom, customTo]);
+
+  // FS # (the clinic's paper sales-invoice/fiscal receipt number) — Finance
+  // types it in here while reconciling the bill; saved per-case on blur.
+  const fsValue = (c) => fsEdits[c.id] !== undefined ? fsEdits[c.id] : (c.payment?.fsNumber || '');
+  const saveFsNumber = async (c) => {
+    const value = fsValue(c).trim();
+    if (value === (c.payment?.fsNumber || '')) {
+      setFsEdits(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+      return;
+    }
+    setFsSaving(prev => ({ ...prev, [c.id]: true }));
+    try {
+      await api.post(`/payments/${c.id}/fs-number`, { fsNumber: value });
+      setCases(prev => prev.map(x => x.id === c.id ? { ...x, payment: { ...x.payment, fsNumber: value || null } } : x));
+      setFsEdits(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+    } catch {
+      toast.error('Could not save FS number');
+    } finally {
+      setFsSaving(prev => { const n = { ...prev }; delete n[c.id]; return n; });
+    }
+  };
 
   const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
 
@@ -909,7 +937,7 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 640, width: '100%' }}>
+      <div className="modal" style={{ maxWidth: 920, width: '100%' }}>
         <div className="modal-header">
           <div>
             <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdReceipt className="mi" size={16} /> Generate Bill</div>
@@ -987,12 +1015,12 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
               <p>No pending cases found for this period.</p>
             </div>
           ) : (
-            <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ maxHeight: 320, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
-                    {['Case #', 'Patient', 'Work Type', 'Invoice #', 'Amount'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', fontWeight: 700, fontSize: 11, color: 'var(--text-3)', textAlign: h === 'Amount' ? 'right' : 'left', borderBottom: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</th>
+                    {['Case #', 'Patient', 'Work Type', 'Units', 'Delivered', 'Invoice #', 'FS #', 'Amount'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', fontWeight: 700, fontSize: 11, color: 'var(--text-3)', textAlign: h === 'Amount' ? 'right' : h === 'Units' ? 'center' : 'left', borderBottom: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1002,8 +1030,22 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
                       <td style={{ padding: '9px 12px', fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{c.caseNumber}</td>
                       <td style={{ padding: '9px 12px', fontWeight: 600 }}>{c.patientName}</td>
                       <td style={{ padding: '9px 12px', color: 'var(--text-2)' }}>{c.workType}</td>
+                      <td style={{ padding: '9px 12px', textAlign: 'center', color: 'var(--text-2)' }}>{c.units ?? '—'}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                        {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
+                      </td>
                       <td style={{ padding: '9px 12px', fontFamily: 'DM Mono, monospace', color: 'var(--blue)', fontSize: 11 }}>{c.payment?.invoiceNumber || '—'}</td>
-                      <td style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'right' }}>
+                      <td style={{ padding: '6px 8px' }}>
+                        <input
+                          value={fsValue(c)}
+                          onChange={e => setFsEdits(prev => ({ ...prev, [c.id]: e.target.value }))}
+                          onBlur={() => saveFsNumber(c)}
+                          placeholder="FS #"
+                          style={{ width: 84, padding: '4px 6px', fontSize: 11, borderRadius: 5, border: '1px solid var(--border)', fontFamily: 'DM Mono, monospace', background: 'var(--surface)' }}
+                        />
+                        {fsSaving[c.id] && <span style={{ fontSize: 9, color: 'var(--text-3)', marginLeft: 4 }}>saving…</span>}
+                      </td>
+                      <td style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
                     </tr>
@@ -1011,7 +1053,7 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
-                    <td colSpan={4} style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', fontSize: 13 }}>Total</td>
+                    <td colSpan={7} style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', fontSize: 13 }}>Total</td>
                     <td style={{ padding: '10px 12px', fontWeight: 800, fontSize: 15, color: 'var(--blue)', textAlign: 'right' }}>
                       Br {total.toLocaleString('en-US')}
                     </td>

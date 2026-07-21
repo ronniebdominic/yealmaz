@@ -851,7 +851,7 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async 
       where,
       include: {
         clinic: { select: { name: true, phone: true, address: true } },
-        payment: { select: { invoiceNumber: true, amount: true } },
+        payment: { select: { invoiceNumber: true, amount: true, fsNumber: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -860,6 +860,27 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch statement.' });
+  }
+});
+
+// ── POST /api/payments/:caseId/fs-number ─────────────────
+// Manually recorded FS number (the clinic's paper sales-invoice/fiscal
+// receipt number) — Finance types this in while reconciling a Trusted
+// Partner bill, since the lab has no fiscal-device integration.
+router.post('/:caseId/fs-number', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  const { caseId } = req.params;
+  const { fsNumber } = req.body;
+
+  try {
+    const payment = await prisma.payment.update({
+      where: { caseId },
+      data: { fsNumber: fsNumber ? String(fsNumber).trim() || null : null },
+    });
+    res.json({ fsNumber: payment.fsNumber });
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Case has no payment record.' });
+    console.error(err);
+    res.status(500).json({ error: 'Could not save FS number.' });
   }
 });
 
