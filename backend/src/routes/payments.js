@@ -746,6 +746,7 @@ router.get('/invoices', protect, restrict('ADMIN', 'FINANCE'), async (req, res) 
       ...(search ? {
         OR: [
           { invoiceNumber: { contains: search, mode: 'insensitive' } },
+          { fsNumber: { contains: search, mode: 'insensitive' } },
           { case: { clinic: { name: { contains: search, mode: 'insensitive' } } } },
           { case: { patientName: { contains: search, mode: 'insensitive' } } },
           { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
@@ -899,6 +900,7 @@ router.get('/export', protect, restrict('ADMIN', 'FINANCE', 'RECEPTIONIST'), asy
         { case: { patientName: { contains: search, mode: 'insensitive' } } },
         { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { fsNumber: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (dateFrom || dateTo) {
@@ -916,6 +918,7 @@ router.get('/export', protect, restrict('ADMIN', 'FINANCE', 'RECEPTIONIST'), asy
     const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
     const columns = [
       { header: 'Invoice #',   value: p => p.invoiceNumber || '' },
+      { header: 'FS #',        value: p => p.fsNumber || '' },
       { header: 'Case #',      value: p => p.case?.caseNumber || '' },
       { header: 'Clinic',      value: p => p.case?.clinic?.name || '' },
       { header: 'Patient',     value: p => p.case?.patientName || '' },

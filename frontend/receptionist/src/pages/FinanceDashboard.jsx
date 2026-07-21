@@ -122,6 +122,7 @@ function buildInvoiceHTML(c) {
       <div><div class="section-title">Due Date</div><div class="date-item">${due}</div></div>
       <div><div class="section-title">Case Number</div><div class="date-item" style="font-family:monospace">${c.caseNumber}</div></div>
       <div><div class="section-title">Patient</div><div class="date-item">${c.patientName}</div></div>
+      <div><div class="section-title">FS #</div><div class="date-item" style="font-family:monospace">${inv?.fsNumber || '—'}</div></div>
     </div>
   </div>
 </div>
@@ -307,6 +308,7 @@ function InvoiceViewModal({ caseData, onClose }) {
                   ['Case #',       caseData.caseNumber],
                   ['Patient',      caseData.patientName],
                   ['Due Date',     caseData.dueDate ? format(new Date(caseData.dueDate), 'dd MMM yyyy') : '—'],
+                  ['FS #',         inv?.fsNumber || '—'],
                 ].map(([lbl, val]) => (
                   <div key={lbl}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 }}>{lbl}</div>
@@ -585,6 +587,9 @@ function InvoicesPanel() {
   const [search, setSearch] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [viewInvoice, setViewInvoice] = useState(null);
+  const [fsEdits, setFsEdits]     = useState({}); // { [paymentId]: in-progress value }
+  const [fsSaving, setFsSaving]   = useState({}); // { [paymentId]: true }
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['payments', 'invoices', page, submitted],
@@ -604,6 +609,28 @@ function InvoicesPanel() {
   const methodLabel = (inv) => {
     const [Icon, text] = inv.chapaTxRef ? [MdCreditCard, 'Online'] : inv.screenshotUrl ? [MdCameraAlt, 'Screenshot'] : [MdEdit, 'Manual'];
     return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon size={13} /> {text}</span>;
+  };
+
+  // FS # (the clinic's paper sales-invoice/fiscal receipt number) — Finance
+  // types it in here; saved per-invoice on blur, keyed by case (the payment
+  // record's caseId, same endpoint used by the Trusted Partner statement).
+  const fsValue = (inv) => fsEdits[inv.id] !== undefined ? fsEdits[inv.id] : (inv.fsNumber || '');
+  const saveFsNumber = async (inv) => {
+    const value = fsValue(inv).trim();
+    if (value === (inv.fsNumber || '')) {
+      setFsEdits(prev => { const n = { ...prev }; delete n[inv.id]; return n; });
+      return;
+    }
+    setFsSaving(prev => ({ ...prev, [inv.id]: true }));
+    try {
+      await api.post(`/payments/${inv.caseId}/fs-number`, { fsNumber: value });
+      queryClient.invalidateQueries({ queryKey: ['payments', 'invoices'] });
+      setFsEdits(prev => { const n = { ...prev }; delete n[inv.id]; return n; });
+    } catch {
+      toast.error('Could not save FS number');
+    } finally {
+      setFsSaving(prev => { const n = { ...prev }; delete n[inv.id]; return n; });
+    }
   };
 
   if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading invoices…</div>;
@@ -633,7 +660,7 @@ function InvoicesPanel() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div className="search-input" style={{ minWidth: 220 }}>
               <span className="icon mi"><MdSearch size={16} /></span>
-              <input placeholder="Search invoice #, clinic, case…" value={search}
+              <input placeholder="Search invoice #, FS #, clinic, case…" value={search}
                 onChange={e => doSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && applySearch()} />
             </div>
             <button className="btn btn-primary btn-sm" onClick={applySearch}>Search</button>
@@ -642,6 +669,7 @@ function InvoicesPanel() {
               data={invoices}
               columns={[
                 { header: 'Invoice #',  value: i => i.invoiceNumber },
+                { header: 'FS #',       value: i => i.fsNumber || '' },
                 { header: 'Issued',     value: i => i.invoiceIssuedAt ? format(new Date(i.invoiceIssuedAt), 'dd MMM yyyy') : '' },
                 { header: 'Case #',     value: i => i.case?.caseNumber },
                 { header: 'Clinic',     value: i => i.case?.clinic?.name },
@@ -665,7 +693,7 @@ function InvoicesPanel() {
             <table>
               <thead>
                 <tr>
-                  <th>Invoice #</th><th>Issued</th><th>Case #</th><th>Clinic</th><th>Patient</th>
+                  <th>Invoice #</th><th>FS #</th><th>Issued</th><th>Case #</th><th>Clinic</th><th>Patient</th>
                   <th>Work Type</th>
                   <th style={{ textAlign: 'right' }}>Amount</th>
                   <th>Method</th><th>Action</th>
@@ -675,6 +703,16 @@ function InvoicesPanel() {
                 {invoices.map(inv => (
                   <tr key={inv.id}>
                     <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12, color: 'var(--blue)', fontWeight: 700 }}>{inv.invoiceNumber}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <input
+                        value={fsValue(inv)}
+                        onChange={e => setFsEdits(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                        onBlur={() => saveFsNumber(inv)}
+                        placeholder="FS #"
+                        style={{ width: 84, padding: '4px 6px', fontSize: 11, borderRadius: 5, border: '1px solid var(--border)', fontFamily: 'DM Mono, monospace', background: 'var(--surface)' }}
+                      />
+                      {fsSaving[inv.id] && <span style={{ fontSize: 9, color: 'var(--text-3)', marginLeft: 4 }}>saving…</span>}
+                    </td>
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{inv.invoiceIssuedAt ? format(new Date(inv.invoiceIssuedAt), 'dd MMM yyyy') : '—'}</td>
                     <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{inv.case?.caseNumber}</td>
                     <td style={{ fontWeight: 600 }}>{inv.case?.clinic?.name}</td>
