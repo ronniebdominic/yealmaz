@@ -16,7 +16,7 @@ import {
   MdTwoWheeler, MdLocalShipping, MdDirectionsBike, MdInventory2, MdCheckCircle,
   MdCelebration, MdSettings, MdCreditCard, MdBolt, MdLightbulb, MdCall,
   MdLocationOn, MdWarning, MdAutorenew, MdPerson, MdHandshake, MdAssignment,
-  MdClose, MdLocalHospital, MdMap, MdSearch,
+  MdClose, MdLocalHospital, MdMap, MdSearch, MdDelete, MdBlock,
 } from 'react-icons/md';
 import { todayLocal } from '../utils/date';
 
@@ -110,6 +110,94 @@ function AssignModal({ caseData, executives, mode, onConfirm, onClose, loading }
             <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
               onClick={() => onConfirm(selectedExecId)} disabled={loading || !selectedExecId}>
               {loading ? 'Assigning…' : title}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Cancel Pickup modal ───────────────────────────────────
+// Records that a driver went to the clinic but the clinic decided to cancel
+// the order on the spot — it was never picked up. Requires a reason so
+// there's an audit trail (visible on the case's stage history) even though
+// the case disappears from the active pipeline right away.
+function CancelPickupModal({ caseData, onConfirm, onClose, loading }) {
+  const [reason, setReason] = useState('');
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdBlock className="mi" size={16} /> Cancel — Not Picked Up</div>
+          <button className="modal-close" onClick={onClose}><MdClose className="mi" size={18} /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{caseData.patientName}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              {caseData.workType} · <MdLocalHospital className="mi" size={13} /> {caseData.clinic?.name}
+            </div>
+          </div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 6, letterSpacing: 0.5 }}>
+            REASON *
+          </label>
+          <textarea
+            rows={3}
+            placeholder="e.g. Clinic decided not to send the case…"
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', resize: 'vertical', fontFamily: 'inherit', marginBottom: 16 }}
+          />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Back</button>
+            <button className="btn btn-danger" style={{ flex: 1, justifyContent: 'center' }}
+              onClick={() => onConfirm(reason)} disabled={loading || !reason.trim()}>
+              {loading ? 'Cancelling…' : 'Confirm Cancellation'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete Order confirm modal ────────────────────────────
+// Mirrors AdminCases.jsx's DeleteConfirmModal — same warning copy/styling —
+// scoped here to orders Dispatch is allowed to delete (never accepted yet).
+function DeleteOrderConfirmModal({ caseData, onConfirm, onClose, deleting }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div className="modal-title" style={{ color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 6 }}><MdWarning className="mi" size={16} /> Delete Order</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ background: 'rgba(229,62,62,0.05)', border: '1px solid rgba(229,62,62,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{caseData.patientName}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              {caseData.workType} · <MdLocalHospital size={13} /> {caseData.clinic?.name}
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20 }}>
+            This will permanently delete the order and <strong style={{ color: 'var(--text-1)' }}>all associated records</strong>.
+            This <strong style={{ color: 'var(--red)' }}>cannot be undone</strong>.
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+            <button
+              onClick={onConfirm}
+              disabled={deleting}
+              style={{
+                flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: deleting ? 'var(--border)' : '#E53E3E',
+                color: '#fff', border: 'none', borderRadius: 8,
+                padding: '9px 18px', fontSize: 13, fontWeight: 700,
+                cursor: deleting ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {deleting ? 'Deleting…' : <><MdDelete size={15} /> Delete Permanently</>}
             </button>
           </div>
         </div>
@@ -439,6 +527,11 @@ const ALL_CASES_STATUS_FILTERS = [
   { label: 'Rejected',        value: 'REJECTED' },
 ];
 
+// A case Dispatch is allowed to delete — mirrors the server-side guard in
+// DELETE /cases/:id exactly, so this button never shows where it would 403.
+const isDeletableByDispatch = (c) =>
+  !c.caseNumber && ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'CANCELLED'].includes(c.status);
+
 function AllCasesTab() {
   const [search,   setSearch]   = useState('');
   const [status,   setStatus]   = useState('');
@@ -448,6 +541,9 @@ function AllCasesTab() {
   const [page,     setPage]     = useState(1);
   const [viewCaseId, setViewCaseId] = useState(null);
   const [exporting, setExporting]   = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting]         = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: clinicList = [] } = useQuery({
     queryKey: ['clinics'],
@@ -489,6 +585,21 @@ function AllCasesTab() {
       toast.error('Export failed');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/cases/${deleteTarget.id}`);
+      toast.success('Order deleted');
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ['dispatch', 'all-cases'] });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not delete order');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -561,6 +672,13 @@ function AllCasesTab() {
                           onClick={() => printCaseLabel(c)}>
                           <MdAssignment className="mi" size={13} /> Label
                         </button>
+                        {isDeletableByDispatch(c) && (
+                          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }}
+                            title="Delete this order permanently"
+                            onClick={() => setDeleteTarget(c)}>
+                            <MdDelete className="mi" size={13} /> Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -580,6 +698,14 @@ function AllCasesTab() {
       </div>
 
       {viewCaseId && <CaseDetailModal caseId={viewCaseId} onClose={() => setViewCaseId(null)} />}
+      {deleteTarget && (
+        <DeleteOrderConfirmModal
+          caseData={deleteTarget}
+          deleting={deleting}
+          onConfirm={handleDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
     </>
   );
 }
@@ -597,6 +723,10 @@ export default function DispatchDashboard() {
   const [dateTo, setDateTo]     = useState('');
   const [assignModal, setAssignModal]     = useState(null);
   const [payModal, setPayModal]           = useState(null);
+  const [cancelModal, setCancelModal]     = useState(null); // case being cancelled (not picked up)
+  const [deleteModal, setDeleteModal]     = useState(null); // case being deleted
+  const [cancelling, setCancelling]       = useState(false);
+  const [deleting, setDeleting]           = useState(false);
   const [phoneOrderOpen, setPhoneOrderOpen] = useState(false);
   const [processing, setProcessing]       = useState(false);
   const [todayOrders, setTodayOrders]     = useState(null);  // drill-down for Orders Today
@@ -737,6 +867,38 @@ export default function DispatchDashboard() {
       toast.error(err.response?.data?.error || 'Could not record self drop-off');
     } finally {
       setSelfDropOffId(null);
+    }
+  };
+
+  const handleCancelPickup = async (reason) => {
+    if (!cancelModal || !reason?.trim()) return;
+    setCancelling(true);
+    try {
+      await api.post(`/dispatch/${cancelModal.id}/cancel-pickup`, { reason });
+      toast.success('Marked as cancelled — not picked up');
+      setCancelModal(null);
+      refetchAll();
+      queryClient.invalidateQueries({ queryKey: ['dispatch', 'all-cases'] });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not cancel pickup');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/cases/${deleteModal.id}`);
+      toast.success('Order deleted');
+      setDeleteModal(null);
+      refetchAll();
+      queryClient.invalidateQueries({ queryKey: ['dispatch', 'all-cases'] });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not delete order');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1023,6 +1185,22 @@ export default function DispatchDashboard() {
                               >
                                 {selfDropOffId === c.id ? '…' : <><MdInventory2 className="mi" size={14} /> Self Drop-off</>}
                               </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ whiteSpace: 'nowrap' }}
+                                onClick={() => setCancelModal(c)}
+                                title="Clinic cancelled — not picked up"
+                              >
+                                <MdBlock className="mi" size={14} /> Cancel
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ whiteSpace: 'nowrap', color: 'var(--red)' }}
+                                onClick={() => setDeleteModal(c)}
+                                title="Delete this order permanently"
+                              >
+                                <MdDelete className="mi" size={14} /> Delete
+                              </button>
                             </div>
                           </Td>
                         </tr>
@@ -1103,13 +1281,30 @@ export default function DispatchDashboard() {
                             {format(new Date(c.createdAt), 'dd MMM yyyy')}
                           </Td>
                           <Td>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
-                              title="Reassign to a different driver"
-                            >
-                              <MdAutorenew className="mi" size={14} /> Reassign
-                            </button>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setAssignModal({ case: c, mode: 'pickup' })}
+                                title="Reassign to a different driver"
+                              >
+                                <MdAutorenew className="mi" size={14} /> Reassign
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setCancelModal(c)}
+                                title="Clinic cancelled — not picked up"
+                              >
+                                <MdBlock className="mi" size={14} /> Cancel
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ color: 'var(--red)' }}
+                                onClick={() => setDeleteModal(c)}
+                                title="Delete this order permanently"
+                              >
+                                <MdDelete className="mi" size={14} /> Delete
+                              </button>
+                            </div>
                           </Td>
                         </tr>
                       ))}
@@ -1564,6 +1759,26 @@ export default function DispatchDashboard() {
           executives={executives}
           onClose={() => setPhoneOrderOpen(false)}
           onSuccess={() => { setPhoneOrderOpen(false); refetchAll(); setTab('place-order'); }}
+        />
+      )}
+
+      {/* Cancel pickup modal — clinic cancelled, never picked up */}
+      {cancelModal && (
+        <CancelPickupModal
+          caseData={cancelModal}
+          loading={cancelling}
+          onConfirm={handleCancelPickup}
+          onClose={() => setCancelModal(null)}
+        />
+      )}
+
+      {/* Delete order modal */}
+      {deleteModal && (
+        <DeleteOrderConfirmModal
+          caseData={deleteModal}
+          deleting={deleting}
+          onConfirm={handleDeleteOrder}
+          onClose={() => setDeleteModal(null)}
         />
       )}
     </div>

@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { awardCasePoints } = require('./rewards');
+const { clawBackCasePoints } = require('../utils/rewards');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 
@@ -556,10 +557,24 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
 });
 
 // ── DELETE /api/cases/:id ────────────────────────────────
-router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
+// ADMIN can delete any case. DISPATCH can only delete orders that haven't
+// been accepted yet (no caseNumber, still PENDING_PICKUP/PICKUP_ASSIGNED/
+// CANCELLED) — e.g. an order the clinic cancelled before it was ever picked
+// up, so it doesn't pile up as a dead row after cancel-pickup already
+// removed it from the active pipeline.
+router.delete('/:id', protect, restrict('ADMIN', 'DISPATCH'), async (req, res) => {
   try {
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    if (req.user.role === 'DISPATCH' &&
+        (existing.caseNumber || !['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'CANCELLED'].includes(existing.status))) {
+      return res.status(403).json({ error: 'Dispatch can only delete orders that have not been accepted yet.' });
+    }
+
+    // A case that never got picked up shouldn't leave the clinic holding
+    // reward points for an order that never actually happened.
+    await clawBackCasePoints(prisma, existing.id, existing.clinicId);
 
     // Cascade delete in dependency order
     await prisma.$transaction([
@@ -568,6 +583,7 @@ router.delete('/:id', protect, restrict('ADMIN'), async (req, res) => {
       prisma.deliveryLog.deleteMany({ where: { caseId: req.params.id } }),
       prisma.notification.deleteMany({ where: { caseId: req.params.id } }),
       prisma.payment.deleteMany({ where: { caseId: req.params.id } }),
+      prisma.sheetSyncRow.deleteMany({ where: { caseId: req.params.id } }),
       prisma.case.delete({ where: { id: req.params.id } }),
     ]);
 

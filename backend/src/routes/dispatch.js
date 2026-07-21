@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
+const { clawBackCasePoints } = require('../utils/rewards');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -309,6 +310,65 @@ router.post('/:caseId/self-dropoff', protect, restrict('DISPATCH', 'ADMIN'), asy
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not record self drop-off.' });
+  }
+});
+
+// ── POST /api/dispatch/:caseId/cancel-pickup ─────────────
+// The driver went to the clinic to collect the impression, but the clinic
+// cancelled the order on the spot — it was never picked up. Marks the case
+// CANCELLED (a status that already exists and is already excluded from
+// Reception's Accept Cases queue and every other active-case view) so it
+// stops cluttering the pipeline, instead of sitting stuck in PICKUP_ASSIGNED
+// forever with no exit path. Deliberately does NOT reuse the generic
+// PATCH /cases/:id/status — that endpoint auto-assigns a fresh scan number
+// to any case that doesn't have one whenever the target status isn't
+// PENDING_PICKUP, which would burn a real production scan number just to
+// cancel a dead order.
+router.post('/:caseId/cancel-pickup', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  const { reason } = req.body;
+  if (!reason?.trim()) return res.status(400).json({ error: 'A reason is required.' });
+
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.caseId } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    // A case should never have both a caseNumber and a pre-acceptance status,
+    // but the generic /status endpoint lets DELIVERY/ADMIN revert a case's
+    // status without clearing caseNumber — guard against cancelling
+    // something that's actually already an in-production case.
+    if (existing.caseNumber || !['PENDING_PICKUP', 'PICKUP_ASSIGNED'].includes(existing.status)) {
+      return res.status(400).json({ error: 'Only pending/assigned pickups that have not been accepted yet can be cancelled this way.' });
+    }
+
+    await clawBackCasePoints(prisma, existing.id, existing.clinicId);
+
+    const updated = await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { status: 'CANCELLED', assignedDeliveryId: null },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'CANCELLED',
+        scannedBy: req.user.name,
+        notes: `Cancelled by clinic (not picked up) — ${reason.trim()}`,
+      }
+    });
+
+    await invalidate(
+      `case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary',
+      'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations'
+    );
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
+    io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
+
+    res.json({ success: true, case: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not cancel pickup.' });
   }
 });
 
