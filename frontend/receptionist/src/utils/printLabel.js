@@ -209,6 +209,11 @@ export function printCaseLabel(data) {
       <div class="info-label">Clinic</div>
       <div class="info-value">${data.clinic?.name || '—'}</div>
     </div>
+    ${data.clinic?.zone?.name ? `
+    <div class="info-cell full">
+      <div class="info-label">Zone</div>
+      <div class="info-value">${data.clinic.zone.name}</div>
+    </div>` : ''}
     <div class="info-cell full">
       <div class="info-label">Patient</div>
       <div class="info-value">${data.patientName}${data.patientAge ? ' · Age ' + data.patientAge : ''}</div>

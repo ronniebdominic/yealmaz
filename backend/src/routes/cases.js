@@ -103,7 +103,7 @@ router.get('/', protect, async (req, res) => {
       prisma.case.findMany({
         where,
         include: {
-          clinic:           { select: { id: true, name: true, phone: true, isExcluded: true, station: true } },
+          clinic:           { select: { id: true, name: true, phone: true, isExcluded: true, station: true, zone: { select: { id: true, name: true } } } },
           stages:           stagesRelation,
           payment:          true,
           assignedDelivery: { select: { id: true, name: true } },
@@ -238,7 +238,7 @@ router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (
     const cases = await prisma.case.findMany({
       where: { id: { in: latestPerCase.map(s => s.caseId) }, status: { notIn: ['DELIVERED', 'CANCELLED'] } },
       include: {
-        clinic: { select: { name: true } },
+        clinic: { select: { name: true, zone: { select: { id: true, name: true } } } },
         payment: { select: { amount: true, status: true } },
         // Remake/redo lineage — so this list's "Print Label" button can also
         // show the previous scan number on the printed slip (printLabel.js).
@@ -288,7 +288,7 @@ router.get('/:id', protect, async (req, res) => {
     const caseData = await prisma.case.findUnique({
       where: { id: req.params.id },
       include: {
-        clinic: true,
+        clinic: { include: { zone: true } },
         stages: { orderBy: { scannedAt: 'asc' } },
         payment: true,
         deliveryLogs: { include: { deliveredBy: { select: { name: true } } } },
