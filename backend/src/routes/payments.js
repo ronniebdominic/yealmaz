@@ -737,7 +737,7 @@ router.get('/history', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 // Real invoices — only exist once payment is done (VERIFIED + invoice issued).
 // This is what the Billing & Invoicing tab lists.
 router.get('/invoices', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
-  const { page = 1, limit = 50, search = '' } = req.query;
+  const { page = 1, limit = 50, search = '', clinicId, dateFrom, dateTo, method } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   try {
     const where = {
@@ -751,8 +751,19 @@ router.get('/invoices', protect, restrict('ADMIN', 'FINANCE'), async (req, res) 
           { case: { patientName: { contains: search, mode: 'insensitive' } } },
           { case: { caseNumber: { contains: search, mode: 'insensitive' } } },
         ]
-      } : {})
+      } : {}),
+      ...(clinicId ? { case: { clinicId } } : {}),
+      // Method isn't a stored field — it's inferred from which channel
+      // recorded the payment (same logic the frontend uses to label it).
+      ...(method === 'ONLINE'     ? { chapaTxRef: { not: null } } : {}),
+      ...(method === 'SCREENSHOT' ? { chapaTxRef: null, screenshotUrl: { not: null } } : {}),
+      ...(method === 'MANUAL'     ? { chapaTxRef: null, screenshotUrl: null } : {}),
     };
+    if (dateFrom || dateTo) {
+      where.invoiceIssuedAt = {};
+      if (dateFrom) where.invoiceIssuedAt.gte = startOfDay(dateFrom);
+      if (dateTo) where.invoiceIssuedAt.lte = endOfDay(dateTo);
+    }
     const [payments, total, totalAgg] = await Promise.all([
       prisma.payment.findMany({
         where,

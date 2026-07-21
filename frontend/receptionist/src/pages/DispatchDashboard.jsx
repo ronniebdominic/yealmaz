@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { PaymentBadge } from '../components/StatusBadge';
+import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import SearchableSelect from '../components/SearchableSelect';
 import FilterBar from '../components/FilterBar';
 import ExportMenu from '../components/ExportMenu';
-import api from '../api';
+import Pagination from '../components/Pagination';
+import CaseDetailModal from '../components/CaseDetailModal';
+import { printCaseLabel } from '../utils/printLabel';
+import api, { downloadExport } from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +16,7 @@ import {
   MdTwoWheeler, MdLocalShipping, MdDirectionsBike, MdInventory2, MdCheckCircle,
   MdCelebration, MdSettings, MdCreditCard, MdBolt, MdLightbulb, MdCall,
   MdLocationOn, MdWarning, MdAutorenew, MdPerson, MdHandshake, MdAssignment,
-  MdClose, MdLocalHospital, MdMap,
+  MdClose, MdLocalHospital, MdMap, MdSearch,
 } from 'react-icons/md';
 import { todayLocal } from '../utils/date';
 
@@ -410,6 +413,177 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
   );
 }
 
+// ── All Cases tab ─────────────────────────────────────────
+// Unlike the workflow tabs above (driven by /dispatch/queue, which only
+// covers active cases + cases delivered today), this hits the general
+// /cases endpoint directly — full history, any status, own pagination —
+// so Dispatch can look up an older delivered/cancelled/on-hold case that
+// has already dropped out of the live queue.
+const ALL_CASES_PAGE_SIZE = 20;
+const ALL_CASES_STATUS_FILTERS = [
+  { label: 'All Statuses',    value: '' },
+  { label: 'Awaiting Pickup', value: 'PENDING_PICKUP' },
+  { label: 'Pickup Assigned', value: 'PICKUP_ASSIGNED' },
+  { label: 'Accepted',        value: 'CASE_ACCEPTED' },
+  { label: 'CAD/CAM',         value: 'DESIGNING' },
+  { label: 'Manufacturing',   value: 'MILLING_SINTERING' },
+  { label: 'Ceramic',         value: 'CERAMIC_LAYERING' },
+  { label: 'Quality Check',   value: 'QUALITY_CHECK' },
+  { label: 'Ready to Ship',   value: 'READY_TO_DISPATCH' },
+  { label: 'Out for Delivery',value: 'OUT_FOR_DELIVERY' },
+  { label: 'Delivered',       value: 'DELIVERED' },
+  { label: 'On Hold',         value: 'ON_HOLD' },
+  { label: 'Remake',          value: 'REMAKE' },
+  { label: 'Cancelled',       value: 'CANCELLED' },
+  { label: 'Under Review',    value: 'UNDER_REVIEW' },
+  { label: 'Rejected',        value: 'REJECTED' },
+];
+
+function AllCasesTab() {
+  const [search,   setSearch]   = useState('');
+  const [status,   setStatus]   = useState('');
+  const [clinicId, setClinicId] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo,   setDateTo]   = useState('');
+  const [page,     setPage]     = useState(1);
+  const [viewCaseId, setViewCaseId] = useState(null);
+  const [exporting, setExporting]   = useState(false);
+
+  const { data: clinicList = [] } = useQuery({
+    queryKey: ['clinics'],
+    queryFn: () => api.get('/clinics').then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
+  const clinicOptions = [{ value: '', label: 'All Clinics' }, ...clinicList.map(c => ({ value: c.id, label: c.name }))];
+
+  const queryParams = () => {
+    const p = { limit: ALL_CASES_PAGE_SIZE, page };
+    if (search)   p.search   = search;
+    if (status)   p.status   = status;
+    if (clinicId) p.clinicId = clinicId;
+    if (dateFrom) p.dateFrom = dateFrom;
+    if (dateTo)   p.dateTo   = dateTo;
+    return p;
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dispatch', 'all-cases', search, status, clinicId, dateFrom, dateTo, page],
+    queryFn: () => api.get('/cases', { params: queryParams() }).then(r => r.data),
+    staleTime: 20_000,
+    keepPreviousData: true,
+  });
+
+  const cases      = data?.cases || [];
+  const pagination = data?.pagination || {};
+
+  const resetFilters = () => {
+    setSearch(''); setStatus(''); setClinicId(''); setDateFrom(''); setDateTo(''); setPage(1);
+  };
+  const hasFilters = search || status || clinicId || dateFrom || dateTo;
+
+  const exportExcel = async () => {
+    setExporting(true);
+    try {
+      await downloadExport('/cases/export', queryParams(), `all-cases_${todayLocal()}.xlsx`);
+    } catch {
+      toast.error('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end', marginBottom: 16 }}>
+        <FilterBar
+          search={search} onSearch={v => { setSearch(v); setPage(1); }}
+          dateFrom={dateFrom} onDateFrom={v => { setDateFrom(v); setPage(1); }}
+          dateTo={dateTo} onDateTo={v => { setDateTo(v); setPage(1); }}
+          placeholder="Clinic, case no., patient…"
+          style={{ flex: '1 1 auto', marginBottom: 0 }}
+        />
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3, letterSpacing: 0.4 }}>STATUS</div>
+          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
+            style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', minWidth: 150 }}>
+            {ALL_CASES_STATUS_FILTERS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3, letterSpacing: 0.4 }}>CLINIC</div>
+          <SearchableSelect value={clinicId} onChange={v => { setClinicId(v); setPage(1); }} options={clinicOptions} placeholder="All Clinics" />
+        </div>
+        {hasFilters && (
+          <button className="btn btn-ghost btn-sm" onClick={resetFilters} style={{ color: 'var(--red)' }}>✕ Clear</button>
+        )}
+        <button className="btn btn-ghost btn-sm" onClick={exportExcel} disabled={exporting} style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+          {exporting ? 'Exporting…' : <><MdAssignment className="mi" size={14} /> Export Excel</>}
+        </button>
+      </div>
+
+      <div className="card">
+        <div className="table-wrap">
+          {isLoading ? (
+            <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading cases…</div>
+          ) : cases.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon mi"><MdAssignment size={32} /></div>
+              <div className="empty-title">No cases found</div>
+              <p>Try adjusting the search or filters.</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Case #</th><th>Clinic</th><th>Patient</th><th>Work Type</th>
+                  <th>Status</th><th>Payment</th><th>Order Date</th><th>Delivered</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cases.map(c => (
+                  <tr key={c.id}>
+                    <td style={{ fontFamily: 'DM Mono, monospace', fontSize: 12 }}>{c.caseNumber || '—'}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {c.clinic?.name}
+                      {c.clinic?.station && <div style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)' }}>{c.clinic.station}{c.clinic?.zone?.name && ` · ${c.clinic.zone.name}`}</div>}
+                    </td>
+                    <td>{c.patientName}</td>
+                    <td style={{ fontSize: 13 }}>{c.workType}</td>
+                    <td><StatusBadge status={c.status} /></td>
+                    <td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></td>
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : '—'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setViewCaseId(c.id)}>View</button>
+                        <button className="btn btn-ghost btn-sm" disabled={!c.qrCodeUrl}
+                          title={c.qrCodeUrl ? 'Print production label' : 'No QR code on this case yet'}
+                          onClick={() => printCaseLabel(c)}>
+                          <MdAssignment className="mi" size={13} /> Label
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {pagination.totalPages > 1 && (
+          <Pagination
+            page={page} totalPages={pagination.totalPages}
+            total={pagination.total} pageSize={ALL_CASES_PAGE_SIZE}
+            onPrev={() => setPage(p => p - 1)}
+            onNext={() => setPage(p => p + 1)}
+          />
+        )}
+      </div>
+
+      {viewCaseId && <CaseDetailModal caseId={viewCaseId} onClose={() => setViewCaseId(null)} />}
+    </>
+  );
+}
+
 // ── Main Dispatch Dashboard ───────────────────────────────
 export default function DispatchDashboard() {
   const navigate     = useNavigate();
@@ -574,8 +748,9 @@ export default function DispatchDashboard() {
     { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: MdLocalShipping, group: 'Delivery',   sub: 'Paid/trusted · assign driver' },
     { id: 'en-route',         label: 'En Route',           icon: MdDirectionsBike,group: 'Delivery',   sub: 'Out for delivery'       },
     { id: 'delivered',        label: 'Delivered',          icon: MdCheckCircle,   group: 'Completed',  sub: 'Done'                   },
+    { id: 'all-cases',        label: 'All Cases',          icon: MdSearch,        group: 'Overview',   sub: 'Full history · any status' },
   ];
-  const NAV_GROUPS = ['Pickup', 'Production', 'Delivery', 'Completed'];
+  const NAV_GROUPS = ['Overview', 'Pickup', 'Production', 'Delivery', 'Completed'];
 
   // ── Sidebar nav (grouped by workflow stage, matching the rest of the app) ──
   const SidebarNav = ({ close }) => (
@@ -688,6 +863,8 @@ export default function DispatchDashboard() {
             </button>
           </div>
 
+          {tab !== 'all-cases' && (
+          <>
            {/* ── Search / filter bar ── */}
           <div style={{ marginBottom: 16 }}>
             <FilterBar
@@ -753,6 +930,11 @@ export default function DispatchDashboard() {
               </div>
             </div>
           )}
+          </>
+          )}
+
+          {/* ── TAB: All Cases (full history, any status) ── */}
+          {tab === 'all-cases' && <AllCasesTab />}
 
           {/* ── TAB: Place Order (PENDING_PICKUP) ── */}
           {tab === 'place-order' && (

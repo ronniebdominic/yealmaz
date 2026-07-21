@@ -8,6 +8,7 @@ import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
 import Pagination from '../components/Pagination';
 import FilterBar from '../components/FilterBar';
 import ExportMenu from '../components/ExportMenu';
+import SearchableSelect from '../components/SearchableSelect';
 import api, { downloadExport } from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -582,18 +583,38 @@ function ScreenshotsTab({ queryClient }) {
 // Real invoices ONLY — generated after payment is done. (Quotes/payment
 // requests are auto-sent by Dispatch via 'Request Payment'; they are not
 // invoices and do not appear here.)
+const INVOICE_METHODS = [
+  { value: '',            label: 'All Methods' },
+  { value: 'ONLINE',      label: 'Online' },
+  { value: 'SCREENSHOT',  label: 'Screenshot' },
+  { value: 'MANUAL',      label: 'Manual' },
+];
+
 function InvoicesPanel() {
   const [page, setPage]     = useState(1);
   const [search, setSearch] = useState('');
   const [submitted, setSubmitted] = useState('');
+  const [clinicId, setClinicId] = useState('');
+  const [method, setMethod]     = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [viewInvoice, setViewInvoice] = useState(null);
   const [fsEdits, setFsEdits]     = useState({}); // { [paymentId]: in-progress value }
   const [fsSaving, setFsSaving]   = useState({}); // { [paymentId]: true }
   const queryClient = useQueryClient();
 
+  const { data: clinicList = [] } = useQuery({
+    queryKey: ['clinics'],
+    queryFn: () => api.get('/clinics').then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
+  const clinicOptions = [{ value: '', label: 'All Clinics' }, ...clinicList.map(c => ({ value: c.id, label: c.name }))];
+
+  const invoiceParams = { page, limit: PAGE_SIZE, search: submitted, clinicId, method, dateFrom, dateTo };
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['payments', 'invoices', page, submitted],
-    queryFn: () => api.get('/payments/invoices', { params: { page, limit: PAGE_SIZE, search: submitted } }).then(r => r.data),
+    queryKey: ['payments', 'invoices', page, submitted, clinicId, method, dateFrom, dateTo],
+    queryFn: () => api.get('/payments/invoices', { params: invoiceParams }).then(r => r.data),
     staleTime: 30_000,
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
@@ -605,6 +626,8 @@ function InvoicesPanel() {
 
   const doSearch = (v) => { setSearch(v); };
   const applySearch = () => { setSubmitted(search); setPage(1); };
+  const hasExtraFilters = clinicId || method || dateFrom || dateTo;
+  const clearExtraFilters = () => { setClinicId(''); setMethod(''); setDateFrom(''); setDateTo(''); setPage(1); };
 
   const methodLabel = (inv) => {
     const [Icon, text] = inv.chapaTxRef ? [MdCreditCard, 'Online'] : inv.screenshotUrl ? [MdCameraAlt, 'Screenshot'] : [MdEdit, 'Manual'];
@@ -655,9 +678,9 @@ function InvoicesPanel() {
       </div>
 
       <div className="card">
-        <div className="card-header">
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
           <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdDescription className="mi" size={15} /> Issued Invoices</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div className="search-input" style={{ minWidth: 220 }}>
               <span className="icon mi"><MdSearch size={16} /></span>
               <input placeholder="Search invoice #, FS #, clinic, case…" value={search}
@@ -665,22 +688,50 @@ function InvoicesPanel() {
             </div>
             <button className="btn btn-primary btn-sm" onClick={applySearch}>Search</button>
             {submitted && <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setSubmitted(''); setPage(1); }} style={{ color: 'var(--red)' }}>✕</button>}
-            <ExportMenu
-              data={invoices}
-              columns={[
-                { header: 'Invoice #',  value: i => i.invoiceNumber },
-                { header: 'FS #',       value: i => i.fsNumber || '' },
-                { header: 'Issued',     value: i => i.invoiceIssuedAt ? format(new Date(i.invoiceIssuedAt), 'dd MMM yyyy') : '' },
-                { header: 'Case #',     value: i => i.case?.caseNumber },
-                { header: 'Clinic',     value: i => i.case?.clinic?.name },
-                { header: 'Patient',    value: i => i.case?.patientName },
-                { header: 'Work Type',  value: i => i.case?.workType },
-                { header: 'Amount (Br)',value: i => i.amount ?? '' },
-                { header: 'Method',     value: i => i.chapaTxRef ? 'Online' : i.screenshotUrl ? 'Screenshot' : 'Manual' },
-              ]}
-              filename="invoices" title="Issued Invoices"
-            />
           </div>
+        </div>
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3, letterSpacing: 0.4 }}>CLINIC</div>
+              <SearchableSelect value={clinicId} onChange={v => { setClinicId(v); setPage(1); }} options={clinicOptions} placeholder="All Clinics" />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3, letterSpacing: 0.4 }}>METHOD</div>
+              <select value={method} onChange={e => { setMethod(e.target.value); setPage(1); }}
+                style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', minWidth: 130 }}>
+                {INVOICE_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3, letterSpacing: 0.4 }}>ISSUED FROM</div>
+              <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3, letterSpacing: 0.4 }}>ISSUED TO</div>
+              <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }} />
+            </div>
+            {hasExtraFilters && (
+              <button className="btn btn-ghost btn-sm" onClick={clearExtraFilters} style={{ color: 'var(--red)' }}>✕ Clear</button>
+            )}
+          </div>
+          <ExportMenu
+            fetchData={() => api.get('/payments/invoices', { params: { ...invoiceParams, limit: 9999, page: 1 } }).then(r => r.data.invoices ?? [])}
+            columns={[
+              { header: 'Invoice #',  value: i => i.invoiceNumber },
+              { header: 'FS #',       value: i => i.fsNumber || '' },
+              { header: 'Issued',     value: i => i.invoiceIssuedAt ? format(new Date(i.invoiceIssuedAt), 'dd MMM yyyy') : '' },
+              { header: 'Case #',     value: i => i.case?.caseNumber },
+              { header: 'Clinic',     value: i => i.case?.clinic?.name },
+              { header: 'Patient',    value: i => i.case?.patientName },
+              { header: 'Work Type',  value: i => i.case?.workType },
+              { header: 'Amount (Br)',value: i => i.amount ?? '' },
+              { header: 'Method',     value: i => i.chapaTxRef ? 'Online' : i.screenshotUrl ? 'Screenshot' : 'Manual' },
+            ]}
+            filename="invoices" title="Issued Invoices"
+          />
         </div>
         <div className="table-wrap">
           {invoices.length === 0 ? (
