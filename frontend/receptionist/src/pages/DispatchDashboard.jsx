@@ -661,7 +661,7 @@ function AllCasesTab() {
                     <td>{c.patientName}</td>
                     <td style={{ fontSize: 13 }}>{c.workType}</td>
                     <td><StatusBadge status={c.status} /></td>
-                    <td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></td>
+                    <td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} isRemake={c.remake} /></td>
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : '—'}</td>
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}</td>
                     <td>
@@ -799,7 +799,12 @@ export default function DispatchDashboard() {
   // consolidated cycle, not per case — their cases never get an individual
   // paymentStatus of VERIFIED, so they must skip the payment gate entirely
   // or they'd sit in "Ready for Delivery" forever with no way to dispatch.
-  const isPaymentClear = (c) => c.paymentStatus === 'VERIFIED' || c.clinic?.isExcluded;
+  // Remake cases (c.remake — free, no charge to the clinic) skip it for the
+  // same reason: nothing is owed, so there's nothing to request/verify —
+  // they should land straight in "Ready for Dispatch" once production/QC
+  // finishes. Redo/isRedo cases (50% charge) are NOT included here — they
+  // still owe money and go through the normal payment flow.
+  const isPaymentClear = (c) => c.paymentStatus === 'VERIFIED' || c.clinic?.isExcluded || c.remake === true;
 
   // Ready for Delivery  = QC passed → READY_TO_DISPATCH, payment NOT yet verified
   //   These orders just left QC. Finance still needs to request/confirm payment.
@@ -1543,7 +1548,7 @@ export default function DispatchDashboard() {
                               {c.dueDate ? format(new Date(c.dueDate), 'dd MMM') : '—'}
                               {overdue ? ' ⚠' : ''}
                             </Td>
-                            <Td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></Td>
+                            <Td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} isRemake={c.remake} /></Td>
                             <Td>
                               <button
                                 className="btn btn-primary btn-sm"

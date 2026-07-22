@@ -49,7 +49,10 @@ export function StatusBadge({ status }) {
   return <span className={`badge ${s.cls}`}>{s.label}</span>;
 }
 
-export function PaymentBadge({ status, isExcluded }) {
+export function PaymentBadge({ status, isExcluded, isRemake }) {
+  if (isRemake && status !== 'VERIFIED') {
+    return <span className="badge badge-trusted" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdAutorenew size={11} /> Remake — Free</span>;
+  }
   if (isExcluded && status === 'PENDING') {
     return <span className="badge badge-trusted" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdHandshake size={11} /> Trusted Partner</span>;
   }
