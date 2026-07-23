@@ -527,6 +527,124 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
   }
 });
 
+// Mirrors scan.js's DEPARTMENTS short-codes → labels. Duplicated rather
+// than exported/imported since scan.js only exports its router (same
+// pattern as PRODUCTION_STATUSES being duplicated across files elsewhere
+// in this codebase) — this is the label lookup for the short-code embedded
+// in every CaseStage.scannedBy string (e.g. "Ahmed (PLS)" → "Plaster Department").
+const DEPT_SHORT_LABELS = {
+  REC: 'Reception', PLS: 'Plaster Department', MRG: 'Margin Department',
+  SCN: 'Scanning', DES: 'Designing', MIL: 'Milling / Sintering',
+  R3D: 'Resin 3D Printing', M3D: 'Metal 3D Printing', MFN: 'Metal Finishing',
+  OPQ: 'Opaque Application', CER: 'Ceramic Layering', ZRC: 'Zirconia Fitting',
+  GLZ: 'Glazing', THP: 'Thermo Press', TRM: 'Trimming', QC: 'Quality Control',
+  PAY: 'Payment / Invoicing', DSP: 'Dispatch',
+};
+
+// ── GET /api/dashboard/lab-performance ────────────────────
+// Individual scan-activity metrics per lab technician. A department scan
+// always writes CaseStage.scannedBy as `${techName} (${SHORT})` — see
+// scan.js and LabDashboard.jsx (techName is the logged-in user's own name,
+// not free-typed) — so that trailing "(SHORT)" both identifies a real
+// department scan (as opposed to any other way a CaseStage row gets
+// written — Reception's status endpoint, Dispatch's assign/cancel
+// endpoints, the "System" auto-advance to READY_TO_DISPATCH) and lets us
+// recover which department it was. There's no scannedById FK yet, so
+// attribution is by exact name match against current LAB_TECH accounts;
+// scans that don't match anyone (e.g. a renamed/removed employee) are
+// counted separately rather than silently dropped.
+const SCAN_PATTERN = /^(.*)\s\(([A-Z0-9_]+)\)$/;
+
+// Local (EAT, per process.env.TZ) calendar-day key — NOT toISOString(),
+// which is always UTC and would silently shift late-night/early-morning
+// scans onto the wrong day (the same class of bug fixed elsewhere in this
+// codebase for date-range filtering).
+const localDayKey = (d) => {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const cacheKey = `dashboard:lab-performance:${from || ''}:${to || ''}`;
+    const cached = await appCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
+    const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
+
+    const [techs, stages] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'LAB_TECH' },
+        select: { id: true, name: true, isActive: true, departments: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.caseStage.findMany({
+        where: { scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
+        select: { scannedBy: true, scannedAt: true, caseId: true },
+      }),
+    ]);
+
+    // Exact-name lookup — case-insensitive-trim, since a tech's display
+    // name is what's embedded in the string and typed once at account setup.
+    const byName = new Map(techs.map(t => [t.name.trim().toLowerCase(), t]));
+
+    const perTech = new Map(techs.map(t => [t.id, {
+      id: t.id, name: t.name, isActive: t.isActive, departments: t.departments,
+      totalScans: 0, cases: new Set(), deptCounts: {}, dailyCounts: {}, lastActiveAt: null,
+    }]));
+    let unattributedScans = 0;
+
+    for (const s of stages) {
+      const m = SCAN_PATTERN.exec(s.scannedBy || '');
+      if (!m) continue; // not a department scan (status change, dispatch action, "System", etc.)
+      const [, rawName, short] = m;
+      const tech = byName.get(rawName.trim().toLowerCase());
+      if (!tech) { unattributedScans++; continue; }
+
+      const agg = perTech.get(tech.id);
+      agg.totalScans++;
+      agg.cases.add(s.caseId);
+      agg.deptCounts[short] = (agg.deptCounts[short] || 0) + 1;
+      const day = localDayKey(s.scannedAt);
+      agg.dailyCounts[day] = (agg.dailyCounts[day] || 0) + 1;
+      if (!agg.lastActiveAt || s.scannedAt > agg.lastActiveAt) agg.lastActiveAt = s.scannedAt;
+    }
+
+    const result = {
+      range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      unattributedScans,
+      techs: [...perTech.values()].map(t => {
+        const departmentBreakdown = Object.entries(t.deptCounts)
+          .map(([code, count]) => ({ code, label: DEPT_SHORT_LABELS[code] || code, count }))
+          .sort((a, b) => b.count - a.count);
+        const activeDays = Object.keys(t.dailyCounts).length;
+        return {
+          id: t.id,
+          name: t.name,
+          isActive: t.isActive,
+          departments: t.departments,
+          totalScans: t.totalScans,
+          uniqueCases: t.cases.size,
+          departmentBreakdown,
+          busiestDept: departmentBreakdown[0]?.label || null,
+          activeDays,
+          avgPerActiveDay: activeDays > 0 ? Math.round((t.totalScans / activeDays) * 10) / 10 : 0,
+          dailyCounts: t.dailyCounts,
+          lastActiveAt: t.lastActiveAt,
+        };
+      }).sort((a, b) => b.totalScans - a.totalScans),
+    };
+
+    await appCache.set(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    console.error('[lab-performance]', err);
+    res.status(500).json({ error: 'Could not load lab performance.' });
+  }
+});
+
 // ── GET /api/dashboard/clinic-balances ──────────────────
 // Per-clinic outstanding payment totals for Finance dashboard
 router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {

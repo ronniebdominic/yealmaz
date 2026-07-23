@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminPricing from './pages/AdminPricing';
 import AdminCases from './pages/AdminCases';
 import AdminCaseStatusBoard from './pages/AdminCaseStatusBoard';
+import AdminLabPerformance from './pages/AdminLabPerformance';
 import AdminClinics from './pages/AdminClinics';
 import AdminUsers from './pages/AdminUsers';
 import AdminZones from './pages/AdminZones';
@@ -64,6 +65,7 @@ function AppRoutes() {
       <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminPricing /></ProtectedRoute>} />
       <Route path="/admin/cases" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminCases /></ProtectedRoute>} />
       <Route path="/admin/case-status" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminCaseStatusBoard /></ProtectedRoute>} />
+      <Route path="/admin/lab-performance" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminLabPerformance /></ProtectedRoute>} />
       <Route path="/admin/clinics" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminClinics /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminUsers /></ProtectedRoute>} />
       <Route path="/admin/zones" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminZones /></ProtectedRoute>} />

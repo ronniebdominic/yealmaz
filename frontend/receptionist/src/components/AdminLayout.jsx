@@ -3,7 +3,7 @@ import { useAuth } from '../AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
-  MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap,
+  MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge,
 } from 'react-icons/md';
 
 function NavItems({ active, onNav }) {
@@ -15,6 +15,9 @@ function NavItems({ active, onNav }) {
       </button>
       <button className={active('/admin/case-status')} onClick={() => onNav('/admin/case-status')}>
         <MdPrecisionManufacturing className="mi" size={17} /> Case Status Board
+      </button>
+      <button className={active('/admin/lab-performance')} onClick={() => onNav('/admin/lab-performance')}>
+        <MdBadge className="mi" size={17} /> Lab Performance
       </button>
 
       <div className="nav-section-label">Management</div>

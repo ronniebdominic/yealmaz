@@ -208,7 +208,7 @@ router.post('/:caseId', protect, async (req, res) => {
       scannedBy
     };
 
-    invalidate(`case:${caseId}`, `case:lab:${caseId}`, 'lab:active:*', 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dispatch:queue', 'dispatch:milling');
+    invalidate(`case:${caseId}`, `case:lab:${caseId}`, 'lab:active:*', 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dispatch:queue', 'dispatch:milling', 'dashboard:lab-performance:*');
 
     io.to('lab_staff').emit('stage_scanned', payload);
     io.to(`clinic_${caseData.clinic.id}`).emit('case_updated', payload);
