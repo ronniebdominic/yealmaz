@@ -33,17 +33,17 @@ const LAB_PURPLE = '#7C3AED';
 const LAB_PURPLE_DIM = 'rgba(124,58,237,0.1)';
 
 const Stat = ({ label, value, info }) => (
-  <div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>
-      {label}
+  <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 3, fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.5em', marginBottom: 3 }}>
+      <span>{label}</span>
       {info && (
-        <span className="info-icon-wrap" tabIndex={0}>
+        <span className="info-icon-wrap" tabIndex={0} style={{ flexShrink: 0, marginTop: 1 }}>
           <MdSchedule size={11} style={{ opacity: 0.55 }} />
           <span className="info-tooltip">{info}</span>
         </span>
       )}
     </div>
-    <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
   </div>
 );
 
