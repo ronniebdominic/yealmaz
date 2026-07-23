@@ -851,12 +851,19 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async 
       clinicId,
       clinic: { isExcluded: true },
       paymentStatus: 'PENDING',
+      // A bill only covers work that's actually done — cases still in
+      // production (accepted yesterday, in progress, etc.) aren't billable
+      // yet and must not appear here, even though their paymentStatus is
+      // also PENDING. Matches the same rule already enforced in /trusted.
+      status: 'DELIVERED',
     };
 
+    // Filtered by deliveryDate, not createdAt — this bill is "what did we
+    // deliver (and are owed for) in this period," not "what was ordered."
     if (dateFrom || dateTo) {
-      where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = startOfDay(dateFrom);
-      if (dateTo) where.createdAt.lte = endOfDay(dateTo);
+      where.deliveryDate = {};
+      if (dateFrom) where.deliveryDate.gte = startOfDay(dateFrom);
+      if (dateTo) where.deliveryDate.lte = endOfDay(dateTo);
     }
 
     const cases = await prisma.case.findMany({
