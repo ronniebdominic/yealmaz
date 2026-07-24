@@ -3,6 +3,8 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache } = require('../cache');
+const { startOfDay, endOfDay } = require('../utils/dateRange');
+const { DEPT_SHORT_LABELS, localDayKey } = require('../utils/scanAttribution');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -60,6 +62,85 @@ router.get('/case/:caseId', protect, restrict('ADMIN', 'LAB_TECH'), async (req, 
     res.json(c);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch case.' });
+  }
+});
+
+// GET /api/lab/my-performance — the logged-in tech's own scan activity:
+// summary stats plus a real, paginated scan-by-scan history (not just the
+// in-session "Today's Scans" list on the lab dashboard, which resets on
+// reload). Self-scoped by matching CaseStage.scannedBy against this
+// account's own name — there's no way to query anyone else's data through
+// this endpoint. See utils/scanAttribution.js for how a scan is matched
+// back to an account; the roster-wide admin equivalent is
+// GET /api/dashboard/lab-performance.
+router.get('/my-performance', protect, restrict('ADMIN', 'LAB_TECH'), async (req, res) => {
+  try {
+    const { from, to, page = 1, limit = 20 } = req.query;
+    const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
+    const defaultFrom = new Date(); defaultFrom.setDate(defaultFrom.getDate() - 29); defaultFrom.setHours(0, 0, 0, 0);
+    const dateFrom = from ? startOfDay(from) : defaultFrom;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // The exact prefix a scan by this account is stamped with — see
+    // scan.js: scannedBy = `${techName} (${dept.short})`.
+    const where = { scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { startsWith: `${req.user.name} (` } };
+
+    const [scans, totalScans, allInRange] = await Promise.all([
+      prisma.caseStage.findMany({
+        where,
+        include: { case: { select: { caseNumber: true, patientName: true, workType: true, clinic: { select: { name: true } } } } },
+        orderBy: { scannedAt: 'desc' },
+        skip, take: parseInt(limit),
+      }),
+      prisma.caseStage.count({ where }),
+      // Full (unpaginated) set within range, for the summary stats below —
+      // the list above is paginated, the stats aren't.
+      prisma.caseStage.findMany({ where, select: { scannedAt: true, caseId: true, scannedBy: true } }),
+    ]);
+
+    const cases = new Set();
+    const deptCounts = {};
+    const dailyCounts = {};
+    let lastActiveAt = null;
+    for (const s of allInRange) {
+      cases.add(s.caseId);
+      const m = /\(([A-Z0-9_]+)\)$/.exec(s.scannedBy || '');
+      if (m) deptCounts[m[1]] = (deptCounts[m[1]] || 0) + 1;
+      const day = localDayKey(s.scannedAt);
+      dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+      if (!lastActiveAt || s.scannedAt > lastActiveAt) lastActiveAt = s.scannedAt;
+    }
+    const activeDays = Object.keys(dailyCounts).length;
+    const departmentBreakdown = Object.entries(deptCounts)
+      .map(([code, count]) => ({ code, label: DEPT_SHORT_LABELS[code] || code, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({
+      range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      summary: {
+        totalScans: allInRange.length,
+        uniqueCases: cases.size,
+        activeDays,
+        avgPerActiveDay: activeDays > 0 ? Math.round((allInRange.length / activeDays) * 10) / 10 : 0,
+        departmentBreakdown,
+        dailyCounts,
+        lastActiveAt,
+      },
+      scans: scans.map(s => ({
+        id: s.id,
+        caseNumber: s.case?.caseNumber,
+        patientName: s.case?.patientName,
+        workType: s.case?.workType,
+        clinicName: s.case?.clinic?.name,
+        stageName: s.stageName,
+        scannedAt: s.scannedAt,
+        notes: s.notes,
+      })),
+      pagination: { total: totalScans, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(totalScans / parseInt(limit)) },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not load your performance.' });
   }
 });
 

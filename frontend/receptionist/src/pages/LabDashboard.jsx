@@ -3,13 +3,15 @@ import { useAuth } from '../AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MdScience, MdContentCut, MdBiotech, MdComputer, MdSettings, MdPrint,
   MdBuild, MdPalette, MdAccountBalance, MdDiamond, MdAutoAwesome,
   MdLocalFireDepartment, MdSearch, MdCheckCircle, MdInventory2, MdPerson,
-  MdPhotoCamera, MdBackHand, MdLightbulb, MdInbox, MdLogout,
+  MdPhotoCamera, MdBackHand, MdLightbulb, MdInbox, MdLogout, MdClose,
+  MdInsights, MdCalendarToday,
 } from 'react-icons/md';
+import { todayLocal, toLocalDateString } from '../utils/date';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
@@ -307,12 +309,187 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
   );
 }
 
+// ── My Performance ─────────────────────────────────────────
+// A tech's own scan activity — summary stats plus the real scan-by-scan
+// history (unlike "Today's Scans" below, which is just an in-session list
+// that resets on reload). Self-scoped server-side; there's no way for this
+// screen to show anyone else's data.
+const RANGE_PRESETS = [
+  { id: '7',  label: '7 Days' },
+  { id: '30', label: '30 Days' },
+  { id: '90', label: '90 Days' },
+];
+
+function MiniSparkline({ dailyCounts, from, to }) {
+  const start = new Date(from);
+  const end = new Date(to);
+  const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+  const bucketCount = Math.min(totalDays, 18);
+  const bucketSize = Math.ceil(totalDays / bucketCount);
+
+  const buckets = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const bStart = new Date(start); bStart.setDate(bStart.getDate() + i * bucketSize);
+    const bEnd = new Date(start); bEnd.setDate(bEnd.getDate() + Math.min((i + 1) * bucketSize, totalDays) - 1);
+    if (bStart > end) break;
+    let sum = 0;
+    for (let d = new Date(bStart); d <= bEnd && d <= end; d.setDate(d.getDate() + 1)) {
+      sum += dailyCounts[toLocalDateString(d)] || 0;
+    }
+    buckets.push({ from: bStart, to: bEnd, count: sum });
+  }
+  const max = Math.max(1, ...buckets.map(b => b.count));
+  const fmt = (d) => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 40 }}>
+      {buckets.map((b, i) => (
+        <div key={i}
+          title={`${fmt(b.from)}${b.to > b.from ? ` – ${fmt(b.to)}` : ''}: ${b.count} scan${b.count !== 1 ? 's' : ''}`}
+          style={{
+            flex: 1, minWidth: 4, borderRadius: '3px 3px 0 0',
+            height: `${Math.max((b.count / max) * 100, b.count > 0 ? 12 : 4)}%`,
+            background: i === buckets.length - 1 ? 'var(--accent)' : 'var(--accent)66',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MyPerformanceModal({ onClose }) {
+  const [rangeDays, setRangeDays] = useState('30');
+  const [page, setPage] = useState(1);
+  const toDate = todayLocal();
+  const fromDate = (() => {
+    const d = new Date(); d.setDate(d.getDate() - (parseInt(rangeDays) - 1));
+    return toLocalDateString(d);
+  })();
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['lab', 'my-performance', fromDate, toDate, page],
+    queryFn: () => api.get('/lab/my-performance', { params: { from: fromDate, to: toDate, page, limit: 15 } }).then(r => r.data),
+    staleTime: 30_000,
+  });
+
+  const summary = data?.summary;
+  const scans = data?.scans ?? [];
+  const pagination = data?.pagination ?? {};
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 250, display: 'flex', flexDirection: 'column', maxWidth: 520, margin: '0 auto' }}>
+      <div style={{ background: 'var(--navy)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 700, fontSize: 15 }}>
+          <MdInsights size={19} /> My Performance
+        </div>
+        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <MdClose size={17} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        {/* Range presets */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {RANGE_PRESETS.map(p => (
+            <button key={p.id} onClick={() => { setRangeDays(p.id); setPage(1); }}
+              style={{
+                flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+                border: `2px solid ${rangeDays === p.id ? 'var(--accent)' : 'var(--border)'}`,
+                background: rangeDays === p.id ? 'var(--accent-dim, rgba(26,86,160,0.08))' : 'var(--surface)',
+                color: rangeDays === p.id ? 'var(--accent)' : 'var(--text-2)',
+              }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {isLoading ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 40 }}>Loading…</div>
+        ) : isError ? (
+          <div style={{ textAlign: 'center', color: 'var(--red)', padding: 40 }}>Could not load your performance.</div>
+        ) : (
+          <>
+            {/* Summary */}
+            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: summary?.totalScans ? 14 : 0 }}>
+                {[
+                  ['Scans', summary?.totalScans ?? 0],
+                  ['Cases', summary?.uniqueCases ?? 0],
+                  ['Active Days', summary?.activeDays ?? 0],
+                  ['Avg / Day', summary?.avgPerActiveDay ?? 0],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              {summary?.totalScans > 0 && (
+                <>
+                  <MiniSparkline dailyCounts={summary.dailyCounts} from={fromDate} to={toDate} />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 12 }}>
+                    {summary.departmentBreakdown.map(d => (
+                      <span key={d.code} style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)' }}>
+                        {d.label} · {d.count}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Scan history */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <MdCalendarToday size={12} /> Scan History
+            </div>
+            {scans.length === 0 ? (
+              <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '28px 16px', textAlign: 'center' }}>
+                <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
+                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans in this range</div>
+              </div>
+            ) : (
+              scans.map(s => (
+                <div key={s.id} style={{
+                  background: 'var(--surface)', borderRadius: 10, padding: '11px 14px', marginBottom: 8,
+                  border: '1px solid var(--border)', borderLeft: `3px solid ${STAGE_COLORS[s.stageName] || 'var(--accent)'}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{s.caseNumber || '—'}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-1)' }}>{s.patientName}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>{s.workType} · {s.clinicName}</div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
+                      <div style={{ fontSize: 10.5, background: 'var(--surface-2)', color: 'var(--text-2)', padding: '2px 7px', borderRadius: 20, fontWeight: 700, marginBottom: 4, whiteSpace: 'nowrap' }}>
+                        {STAGE_LABELS[s.stageName] || s.stageName}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'dd MMM, h:mm a')}</div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+            {pagination.totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Page {page} / {pagination.totalPages}</span>
+                <button className="btn btn-ghost btn-sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Lab Tech Dashboard ───────────────────────────────
 export default function LabDashboard() {
   const { user, logout } = useAuth();
   const [department, setDepartment] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [showPerformance, setShowPerformance] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanComment, setScanComment] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -392,6 +569,7 @@ export default function LabDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
             <MdPerson size={13} /> {user?.name?.split(' ')[0]}
           </div>
+          <button onClick={() => setShowPerformance(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="My Performance"><MdInsights size={18} /></button>
           <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Logout"><MdLogout size={18} /></button>
         </div>
       </div>
@@ -509,6 +687,7 @@ export default function LabDashboard() {
       {/* ── Modals ── */}
       {showScanner && <QRScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
       {showManual && <ManualEntryModal onSubmit={handleScan} onClose={() => setShowManual(false)} />}
+      {showPerformance && <MyPerformanceModal onClose={() => setShowPerformance(false)} />}
       {scanResult && (
         <ScanResultModal
           result={scanResult}
