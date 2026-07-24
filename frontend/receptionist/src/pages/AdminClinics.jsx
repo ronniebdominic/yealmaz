@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
+import ExportMenu from '../components/ExportMenu';
 import api from '../api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
+import { todayLocal } from '../utils/date';
 import {
   MdEdit, MdLocalHospital, MdAutoAwesome, MdVpnKey, MdCheckCircle, MdSearch,
   MdPause, MdPlayArrow, MdHandshake,
@@ -400,17 +402,36 @@ export default function AdminClinics() {
     <AdminLayout>
       <div className="topbar">
         <div className="topbar-title">Clinics</div>
-        <button
-          onClick={() => setShowForm(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'var(--blue)', color: '#fff', border: 'none',
-            borderRadius: 8, padding: '7px 16px', fontSize: 13,
-            fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          + New Clinic
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ExportMenu
+            data={filtered}
+            columns={[
+              { header: 'Clinic Name',      value: c => c.name },
+              { header: 'Code',             value: c => c.code || '' },
+              { header: 'Station',          value: c => c.station || '' },
+              { header: 'Zone',             value: c => c.zone?.name || '' },
+              { header: 'Email',            value: c => c.email || '' },
+              { header: 'Phone',            value: c => c.phone || '' },
+              { header: 'Address',          value: c => c.address || '' },
+              { header: 'Trusted Partner',  value: c => c.isExcluded ? 'Yes' : 'No' },
+              { header: 'Status',           value: c => c.isActive ? 'Active' : 'Inactive' },
+              { header: 'Added',            value: c => c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : '' },
+            ]}
+            filename={`clinics_${todayLocal()}`}
+            title="Clinics"
+          />
+          <button
+            onClick={() => setShowForm(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--blue)', color: '#fff', border: 'none',
+              borderRadius: 8, padding: '7px 16px', fontSize: 13,
+              fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            + New Clinic
+          </button>
+        </div>
       </div>
 
       <div className="content">
