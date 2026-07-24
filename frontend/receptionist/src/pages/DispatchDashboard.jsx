@@ -875,6 +875,21 @@ export default function DispatchDashboard() {
     }
   };
 
+  const [selfPickupId, setSelfPickupId] = useState(null);
+  const handleSelfPickup = async (c) => {
+    if (!window.confirm(`Confirm ${c.clinic?.name || 'the clinic'} is picking up this case themselves — no delivery partner will be assigned. This marks the case as delivered.`)) return;
+    setSelfPickupId(c.id);
+    try {
+      await api.post(`/dispatch/${c.id}/self-pickup`);
+      toast.success('Marked as self pickup — case delivered');
+      refetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not record self pickup');
+    } finally {
+      setSelfPickupId(null);
+    }
+  };
+
   const handleCancelPickup = async (reason) => {
     if (!cancelModal || !reason?.trim()) return;
     setCancelling(true);
@@ -1550,6 +1565,7 @@ export default function DispatchDashboard() {
                             </Td>
                             <Td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} isRemake={c.remake} /></Td>
                             <Td>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                               <button
                                 className="btn btn-primary btn-sm"
                                 style={{ whiteSpace: 'nowrap' }}
@@ -1557,6 +1573,16 @@ export default function DispatchDashboard() {
                               >
                                 <MdLocalShipping className="mi" size={14} /> Dispatch
                               </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ whiteSpace: 'nowrap' }}
+                                onClick={() => handleSelfPickup(c)}
+                                disabled={selfPickupId === c.id}
+                                title="Clinic is collecting this case in person"
+                              >
+                                {selfPickupId === c.id ? '…' : <><MdPerson className="mi" size={14} /> Self Pickup</>}
+                              </button>
+                              </div>
                             </Td>
                           </tr>
                         );

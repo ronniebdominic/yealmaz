@@ -536,4 +536,57 @@ router.post('/:caseId/send-out', protect, restrict('DISPATCH', 'ADMIN'), async (
   }
 });
 
+// ── POST /api/dispatch/:caseId/self-pickup ────────────────
+// The dentist/clinic comes to the lab and collects the finished case
+// themselves — the delivery-side mirror of /self-dropoff on the intake
+// side. No delivery partner is involved, so the case skips OUT_FOR_DELIVERY
+// entirely and goes straight to DELIVERED, same as delivery.js's /deliver
+// (DeliveryLog, clinic notification, cache invalidation) minus the driver-
+// specific bits, since no driver — and therefore no open DeliveryLog row —
+// was ever assigned for this leg.
+router.post('/:caseId/self-pickup', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  try {
+    const existing = await prisma.case.findUnique({ where: { id: req.params.caseId }, include: { clinic: { select: { name: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+    if (existing.status !== 'READY_TO_DISPATCH') {
+      return res.status(400).json({ error: 'Case is not ready for dispatch.' });
+    }
+
+    const now = new Date();
+    const updated = await prisma.case.update({
+      where: { id: req.params.caseId },
+      data: { status: 'DELIVERED', deliveryDate: now, assignedDeliveryId: null },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId,
+        stageName: 'DELIVERED',
+        scannedBy: req.user.name,
+        notes: `Self pickup by ${existing.clinic?.name || 'clinic'} — collected in person, no delivery partner`,
+      }
+    });
+
+    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+
+    const io = req.app.get('io');
+    io.to(`clinic_${updated.clinicId}`).emit('case_updated', {
+      caseId: updated.id, caseNumber: updated.caseNumber,
+      status: 'DELIVERED', message: 'Your case has been picked up!'
+    });
+    io.to('lab_staff').emit('case_delivered', { caseId: updated.id, caseNumber: updated.caseNumber });
+
+    sendPushToClinic(prisma, updated.clinicId, {
+      title: '✅ Case Picked Up',
+      body: `Case ${updated.caseNumber} (${updated.patientName}) was picked up in person.`,
+      data: { caseId: updated.id, caseNumber: updated.caseNumber, screen: 'CaseDetail' },
+    });
+
+    res.json({ success: true, case: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Could not record self pickup.' });
+  }
+});
+
 module.exports = router;
