@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportMenu from '../components/ExportMenu';
@@ -17,7 +18,7 @@ import {
   MdPaid, MdPendingActions, MdAutorenew, MdInventory2, MdBarChart,
   MdSchedule, MdTrackChanges, MdSearch, MdFileDownload, MdCancel,
   MdErrorOutline, MdScience, MdHandshake, MdClose, MdCheck, MdChevronLeft,
-  MdChevronRight, MdInfoOutline, MdHelpOutline,
+  MdChevronRight, MdInfoOutline, MdHelpOutline, MdWarning, MdEmojiEvents,
 } from 'react-icons/md';
 
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
@@ -265,6 +266,7 @@ const DRILL_MAP = {
 
 // ── Main component ────────────────────────────────────────
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [selectedClinic, setSelectedClinic] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState(''); // committed on Enter/blur — avoids a request per keystroke
@@ -302,6 +304,15 @@ export default function AdminDashboard() {
 
   const error = queryError ? (queryError.response?.data?.error || 'Failed to load analytics.') : '';
   const { kpi, monthlyTrend, revenueByClinic, revenueByWorkType, clinicList } = data || {};
+
+  const { data: invSummary } = useQuery({
+    queryKey: ['inventory', 'summary'],
+    queryFn: () => api.get('/inventory/summary').then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
+  const topMiller = invSummary?.topMillerName
+    ? `${invSummary.topMillerName}${invSummary.topMillerPoints ? ` (${invSummary.topMillerPoints} pts)` : ''}`
+    : '—';
 
   const drill = drillKey ? DRILL_MAP[drillKey] : null;
 
@@ -604,6 +615,23 @@ export default function AdminDashboard() {
                 />
               </div>
             )}
+
+            {/* ── Section 4: Inventory ── */}
+            <SectionHeader>Inventory</SectionHeader>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+              <ColorTile icon={MdWarning} label="Low Stock Items" value={invSummary?.lowStockCount ?? '—'}
+                sub="Below reorder threshold" color="var(--red)" bg="var(--red-dim)"
+                onClick={() => navigate('/admin/inventory')}
+                info="Stock items whose quantity on hand has fallen to or below the low-stock alert threshold the Inventory Manager set for them." />
+              <ColorTile icon={MdPendingActions} label="Pending Goods Requests" value={invSummary?.pendingRequestsCount ?? '—'}
+                sub="Awaiting review" color="var(--amber)" bg="var(--amber-dim)"
+                onClick={() => navigate('/admin/inventory')}
+                info="Goods requests from lab techs that the Inventory Manager hasn't accepted or rejected yet." />
+              <ColorTile icon={MdEmojiEvents} label="Top Milling Bonus Earner" value={topMiller}
+                sub="All-time bonus points" color="var(--green)" bg="var(--green-dim)"
+                onClick={() => navigate('/admin/inventory')}
+                info="The lab tech with the most bonus points earned for yielding more than 30 crowns from a single milling blank." />
+            </div>
 
             {/* ── Charts ── */}
             <div className="glass-card" style={{ marginBottom: 20 }}>

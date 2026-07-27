@@ -35,6 +35,14 @@ model User {
   notifications       Notification[]
   assignedDeliveries  Case[]         @relation("AssignedDeliveries")
 
+  // Inventory / milling bonus
+  inventoryTxnsPerformed    InventoryTransaction[]    @relation("InventoryTxnPerformedBy")
+  inventoryRequestsMade     InventoryRequest[]        @relation("InventoryRequestedBy")
+  inventoryRequestsReviewed InventoryRequest[]        @relation("InventoryReviewedBy")
+  millingYields             MillingYield[]            @relation("MillingYieldsByUser")
+  staffPoints               StaffPoints?              @relation("StaffPointsUser")
+  staffRewardTransactions   StaffRewardTransaction[]  @relation("StaffRewardTxnUser")
+
   @@map("users")
 }
 
@@ -46,6 +54,7 @@ enum Role {
   DISPATCH
   LAB_TECH
   FINANCE
+  INVENTORY_MANAGER
 }
 
 // ── ZONES ──────────────────────────────────────────────
@@ -406,6 +415,126 @@ model RewardRedemption {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   @@map("reward_redemptions")
+}
+
+// ── INVENTORY ──────────────────────────────────────────
+model InventoryItem {
+  id               String   @id @default(uuid())
+  name             String
+  unit             String                       // free text: "pcs", "box", "kg"
+  quantityOnHand   Int      @default(0)
+  reorderThreshold Int?                          // null = no low-stock alert
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  transactions InventoryTransaction[]
+  requests     InventoryRequest[]
+  @@map("inventory_items")
+}
+
+enum InventoryTxnType {
+  RESTOCK
+  ISSUED
+  ADJUSTMENT
+}
+
+model InventoryTransaction {
+  id               String            @id @default(uuid())
+  itemId           String
+  item             InventoryItem     @relation(fields: [itemId], references: [id])
+  type             InventoryTxnType
+  quantity         Int               // SIGNED delta: RESTOCK/ADJUSTMENT-up positive, ISSUED/ADJUSTMENT-down negative
+  relatedRequestId String?
+  relatedRequest   InventoryRequest? @relation(fields: [relatedRequestId], references: [id])
+  performedById    String
+  performedBy      User              @relation("InventoryTxnPerformedBy", fields: [performedById], references: [id])
+  note             String?
+  createdAt        DateTime          @default(now())
+
+  @@index([itemId])
+  @@index([createdAt])
+  @@map("inventory_transactions")
+}
+
+enum InventoryRequestStatus {
+  PENDING
+  FULFILLED
+  REJECTED
+}
+
+model InventoryRequest {
+  id                String                 @id @default(uuid())
+  itemId            String
+  item              InventoryItem          @relation(fields: [itemId], references: [id])
+  requestedById     String
+  requestedBy       User                   @relation("InventoryRequestedBy", fields: [requestedById], references: [id])
+  department        String                 // picked by the requester at submit time
+  quantityRequested Int
+  quantityApproved  Int?
+  status            InventoryRequestStatus @default(PENDING)
+  requesterNote     String?
+  reviewedById      String?
+  reviewedBy        User?                  @relation("InventoryReviewedBy", fields: [reviewedById], references: [id])
+  reviewNote        String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  transactions InventoryTransaction[]
+  @@index([status])
+  @@index([requestedById])
+  @@map("inventory_requests")
+}
+
+// ── MILLING BONUS ──────────────────────────────────────
+// Crown-yield tracking is deliberately caseless: one sintering blank can
+// produce crowns for several different cases in one firing, and the case
+// scan flow (scan.js) has no batch/blank concept linking them. A lab tech
+// logs blank -> crown yield as an independent event, not tied to any case.
+model MillingYield {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation("MillingYieldsByUser", fields: [userId], references: [id])
+  blanksUsed     Int      @default(1)
+  crownsProduced Int
+  bonusPoints    Int      @default(0)   // computed against MillingBonusSetting and frozen at write time
+  createdAt      DateTime @default(now())
+
+  rewardTransactions StaffRewardTransaction[]
+  @@index([userId])
+  @@index([createdAt])
+  @@map("milling_yields")
+}
+
+model MillingBonusSetting {
+  id                  String   @id @default(uuid())
+  minCrownsPerBlank   Int      @default(30)  // bonus only when crownsProduced > this
+  pointsPerExtraCrown Int      @default(5)   // bonus = (crownsProduced - minCrownsPerBlank) * pointsPerExtraCrown
+  updatedAt           DateTime @updatedAt
+  @@map("milling_bonus_settings")
+}
+
+model StaffPoints {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation("StaffPointsUser", fields: [userId], references: [id])
+  totalEarned Int      @default(0)
+  updatedAt   DateTime @updatedAt
+  @@map("staff_points")
+}
+
+model StaffRewardTransaction {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation("StaffRewardTxnUser", fields: [userId], references: [id])
+  points        Int
+  description   String
+  sourceYieldId String?
+  sourceYield   MillingYield? @relation(fields: [sourceYieldId], references: [id])
+  createdAt     DateTime      @default(now())
+
+  @@index([userId])
+  @@map("staff_reward_transactions")
 }
 
 // ── GOOGLE SHEETS SYNC ─────────────────────────────────

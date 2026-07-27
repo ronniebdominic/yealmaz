@@ -25,6 +25,11 @@ const TTL_RULES = [
   { prefix: 'payments:trusted:',     ttl: 30    }, // 30s  — per-clinic case drill-down
   { prefix: 'payments:clinic-balances', ttl: 30 }, // 30s  — outstanding-balance aggregation
   { prefix: 'delivery:',             ttl: 60    }, // 1 m  — dispatch queue
+  { prefix: 'inventory:items',       ttl: 300   }, // 5 m  — changes only via explicit CRUD/adjust
+  { prefix: 'inventory:requests',    ttl: 30    }, // 30s  — queue should feel live
+  { prefix: 'inventory:transactions', ttl: 60   }, // 1 m  — ledger/report view
+  { prefix: 'dashboard:inventory-summary', ttl: 300 }, // 5 m — glance KPIs
+  { prefix: 'milling:leaderboard',   ttl: 300   }, // 5 m  — staff points leaderboard
 ];
 const DEFAULT_TTL = 300; // 5 m fallback
 

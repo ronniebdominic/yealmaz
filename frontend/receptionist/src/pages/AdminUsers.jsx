@@ -9,16 +9,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
-  MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow,
+  MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse,
 } from 'react-icons/md';
 
 // ── Constants ─────────────────────────────────────────────
 const ROLES = [
-  { value: 'RECEPTIONIST', label: 'Receptionist',   icon: MdFolder },
-  { value: 'LAB_TECH',     label: 'Lab Technician', icon: MdBiotech },
-  { value: 'DELIVERY',     label: 'Delivery',       icon: MdLocalShipping },
-  { value: 'DISPATCH',     label: 'Dispatch',       icon: MdInventory2 },
-  { value: 'FINANCE',      label: 'Finance',        icon: MdPaid },
+  { value: 'RECEPTIONIST',      label: 'Receptionist',       icon: MdFolder },
+  { value: 'LAB_TECH',          label: 'Lab Technician',     icon: MdBiotech },
+  { value: 'DELIVERY',          label: 'Delivery',           icon: MdLocalShipping },
+  { value: 'DISPATCH',          label: 'Dispatch',           icon: MdInventory2 },
+  { value: 'FINANCE',           label: 'Finance',            icon: MdPaid },
+  { value: 'INVENTORY_MANAGER', label: 'Inventory Manager',  icon: MdWarehouse },
 ];
 
 const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.value, r]));
@@ -42,11 +43,12 @@ const DEPARTMENTS = [
 ];
 
 const ROLE_COLORS = {
-  RECEPTIONIST: { bg: 'rgba(26,86,160,0.1)',   color: 'var(--blue)' },
-  LAB_TECH:     { bg: 'rgba(124,58,237,0.1)',  color: '#7C3AED'     },
-  DELIVERY:     { bg: 'rgba(217,119,6,0.1)',   color: '#D97706'     },
-  DISPATCH:     { bg: 'rgba(14,165,233,0.1)',  color: '#0EA5E9'     },
-  FINANCE:      { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
+  RECEPTIONIST:      { bg: 'rgba(26,86,160,0.1)',   color: 'var(--blue)' },
+  LAB_TECH:          { bg: 'rgba(124,58,237,0.1)',  color: '#7C3AED'     },
+  DELIVERY:          { bg: 'rgba(217,119,6,0.1)',   color: '#D97706'     },
+  DISPATCH:          { bg: 'rgba(14,165,233,0.1)',  color: '#0EA5E9'     },
+  FINANCE:           { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
+  INVENTORY_MANAGER: { bg: 'rgba(180,83,9,0.1)',    color: '#B45309'     },
 };
 
 

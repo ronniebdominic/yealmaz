@@ -9,7 +9,7 @@ import {
   MdBuild, MdPalette, MdAccountBalance, MdDiamond, MdAutoAwesome,
   MdLocalFireDepartment, MdSearch, MdCheckCircle, MdInventory2, MdPerson,
   MdPhotoCamera, MdBackHand, MdLightbulb, MdInbox, MdLogout, MdClose,
-  MdInsights, MdCalendarToday,
+  MdInsights, MdCalendarToday, MdAddBox, MdCelebration,
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString } from '../utils/date';
 
@@ -483,6 +483,140 @@ function MyPerformanceModal({ onClose }) {
   );
 }
 
+// ── Request Goods (any lab tech, any department) ───────────
+function RequestGoodsModal({ onClose }) {
+  const { user } = useAuth();
+  const [itemId, setItemId] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [department, setDepartment] = useState(user?.departments?.[0] || '');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: items = [] } = useQuery({
+    queryKey: ['inventory', 'items', 'active'],
+    queryFn: () => api.get('/inventory/items', { params: { activeOnly: true } }).then(r => r.data),
+  });
+
+  const departmentOptions = (user?.departments?.length ? user.departments : ['GENERAL'])
+    .map(code => DEPARTMENTS.find(d => d.code === code)?.label || code);
+
+  const submit = async () => {
+    if (!itemId || !quantity || !department) { toast.error('Item, quantity and department are required'); return; }
+    setSaving(true);
+    try {
+      await api.post('/inventory/requests', { itemId, quantityRequested: parseInt(quantity), department, note: note.trim() || undefined });
+      toast.success('Request sent to Inventory Manager');
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not submit request');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 36px', animation: 'slideUp 0.2s ease' }}>
+        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}><MdAddBox size={17} /> Request Goods</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>ITEM</div>
+            <select value={itemId} onChange={e => setItemId(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14 }}>
+              <option value="">Select an item…</option>
+              {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>QUANTITY</div>
+            <input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>DEPARTMENT</div>
+            <select value={department} onChange={e => setDepartment(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14 }}>
+              {departmentOptions.map(label => <option key={label} value={label}>{label}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>NOTE (OPTIONAL)</div>
+            <textarea rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Anything the Inventory Manager should know…"
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
+            {saving ? 'Sending…' : 'Send Request'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Record Blank Yield (Milling department only) ───────────
+function MillingYieldModal({ onClose }) {
+  const [blanksUsed, setBlanksUsed] = useState('1');
+  const [crownsProduced, setCrownsProduced] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    const crowns = parseInt(crownsProduced);
+    if (!crowns || crowns <= 0) { toast.error('Enter how many crowns you produced'); return; }
+    setSaving(true);
+    try {
+      const res = await api.post('/milling/yield', { blanksUsed: parseInt(blanksUsed) || 1, crownsProduced: crowns });
+      if (res.data.bonusAwarded) {
+        toast.success(`🎉 Bonus! +${res.data.bonusPoints} points for ${crowns} crowns from one blank`, { duration: 5000, icon: <MdCelebration size={18} /> });
+      } else {
+        toast.success('Yield recorded');
+      }
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not record yield');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 36px', animation: 'slideUp 0.2s ease' }}>
+        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}><MdSettings size={17} /> Record Blank Yield</div>
+        <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>Yielding more than 30 crowns from one blank earns a bonus.</p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>BLANKS USED</div>
+            <input type="number" min="1" value={blanksUsed} onChange={e => setBlanksUsed(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>CROWNS PRODUCED</div>
+            <input type="number" min="1" value={crownsProduced} onChange={e => setCrownsProduced(e.target.value)} autoFocus
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={submit} disabled={saving}>
+            {saving ? 'Saving…' : 'Save Yield'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Lab Tech Dashboard ───────────────────────────────
 export default function LabDashboard() {
   const { user, logout } = useAuth();
@@ -490,6 +624,8 @@ export default function LabDashboard() {
   const [showScanner, setShowScanner] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
+  const [showRequestGoods, setShowRequestGoods] = useState(false);
+  const [showMillingYield, setShowMillingYield] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanComment, setScanComment] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -569,6 +705,7 @@ export default function LabDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
             <MdPerson size={13} /> {user?.name?.split(' ')[0]}
           </div>
+          <button onClick={() => setShowRequestGoods(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Request Goods"><MdAddBox size={18} /></button>
           <button onClick={() => setShowPerformance(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="My Performance"><MdInsights size={18} /></button>
           <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Logout"><MdLogout size={18} /></button>
         </div>
@@ -644,6 +781,14 @@ export default function LabDashboard() {
                   </button>
                 </div>
 
+                {/* Milling-only: blank -> crown yield bonus tracking */}
+                {activeDept === 'MILLING' && (
+                  <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', gap: 8, marginBottom: 16, borderColor: selectedDept.color, color: selectedDept.color }}
+                    onClick={() => setShowMillingYield(true)}>
+                    <MdCelebration size={16} /> Record Blank Yield
+                  </button>
+                )}
+
                 {/* Quick tip */}
                 <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 24, display: 'flex', gap: 6 }}>
                   <MdLightbulb size={14} style={{ flexShrink: 0, marginTop: 1 }} /> <span>Scan the QR code attached to the physical case. Each scan advances the case to <strong style={{ color: 'var(--text-2)' }}>{selectedDept.label}</strong> stage and notifies the clinic.</span>
@@ -688,6 +833,8 @@ export default function LabDashboard() {
       {showScanner && <QRScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
       {showManual && <ManualEntryModal onSubmit={handleScan} onClose={() => setShowManual(false)} />}
       {showPerformance && <MyPerformanceModal onClose={() => setShowPerformance(false)} />}
+      {showRequestGoods && <RequestGoodsModal onClose={() => setShowRequestGoods(false)} />}
+      {showMillingYield && <MillingYieldModal onClose={() => setShowMillingYield(false)} />}
       {scanResult && (
         <ScanResultModal
           result={scanResult}

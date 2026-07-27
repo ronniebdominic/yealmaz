@@ -53,6 +53,12 @@ io.on('connection', (socket) => {
     console.log(`Delivery exec ${userId} joined their room`);
   });
 
+  // Inventory manager joins the goods-request notification room
+  socket.on('join_inventory', () => {
+    socket.join('inventory_staff');
+    console.log('Inventory manager joined inventory room');
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
@@ -94,6 +100,8 @@ app.use('/api/scan',          require('./routes/scan'));      // Public QR scan 
 app.use('/api/prices',        require('./routes/prices'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/rewards',       require('./routes/rewards'));
+app.use('/api/inventory',     require('./routes/inventory'));
+app.use('/api/milling',       require('./routes/milling'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────
