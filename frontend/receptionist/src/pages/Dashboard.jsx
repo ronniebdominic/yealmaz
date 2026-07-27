@@ -1008,6 +1008,7 @@ function FinishingSection() {
                 { header: 'Case #',             value: c => c.caseNumber },
                 { header: 'Work Type',          value: c => c.workType },
                 { header: 'Units',              value: c => c.units ?? '' },
+                { header: 'Zone',                value: c => c.clinic?.zone?.name ?? '' },
                 { header: 'Finishing Stage',    value: c => FINISHING_LABELS[c.finishingStage] || c.finishingStage },
                 { header: 'Reached Finishing',  value: c => format(new Date(c.finishingScannedAt), 'dd MMM yyyy, h:mm a') },
                 { header: 'Scanned By',         value: c => c.finishingScannedBy },
@@ -1032,7 +1033,7 @@ function FinishingSection() {
               <thead>
                 <tr>
                   <th>Case #</th><th>Clinic</th><th>Patient</th><th>Work Type</th>
-                  <th>Units</th><th>Finishing Stage</th><th>Reached Finishing</th><th>Scanned By</th><th>Current Status</th>
+                  <th>Units</th><th>Zone</th><th>Finishing Stage</th><th>Reached Finishing</th><th>Scanned By</th><th>Current Status</th>
                   <th style={{ minWidth: 170 }}>Actions</th>
                 </tr>
               </thead>
@@ -1044,6 +1045,7 @@ function FinishingSection() {
                     <td><span className="patient-name">{c.patientName}</span></td>
                     <td style={{ fontSize: 13 }}>{c.workType}</td>
                     <td style={{ textAlign: 'center', color: 'var(--text-2)', fontWeight: 600 }}>{c.units ?? '—'}</td>
+                    <td style={{ fontSize: 12 }}>{c.clinic?.zone?.name || '—'}</td>
                     <td style={{ fontSize: 12 }}>{FINISHING_LABELS[c.finishingStage] || c.finishingStage}</td>
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(c.finishingScannedAt), 'dd MMM yyyy, h:mm a')}</td>
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.finishingScannedBy || '—'}</td>

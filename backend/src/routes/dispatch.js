@@ -116,7 +116,7 @@ router.get('/milling', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) 
     const cases = await prisma.case.findMany({
       where: { status: 'MILLING_SINTERING' },
       include: {
-        clinic: { select: { id: true, code: true, name: true } },
+        clinic: { select: { id: true, code: true, name: true, station: true, zone: { select: { id: true, name: true } } } },
         stages: { where: { stageName: 'MILLING_SINTERING' }, orderBy: { scannedAt: 'desc' }, take: 1 }
       },
       orderBy: { dueDate: 'asc' }

@@ -1355,6 +1355,7 @@ export default function DispatchDashboard() {
                       { header: 'Case No.',    value: c => c.caseNumber },
                       { header: 'Product',     value: c => c.workType },
                       { header: 'Unit',        value: c => c.units ?? '' },
+                      { header: 'Zone',        value: c => c.clinic?.zone?.name ?? '' },
                       { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
                     ]}
                     filename="in-milling"
@@ -1378,6 +1379,7 @@ export default function DispatchDashboard() {
                         <Th>Case No.</Th>
                         <Th>Product</Th>
                         <Th>Unit</Th>
+                        <Th>Zone</Th>
                         <Th>Due Date</Th>
                         <Th>Reached Milling</Th>
                       </tr>
@@ -1395,6 +1397,7 @@ export default function DispatchDashboard() {
                             <Td><span className="case-number">{c.caseNumber || '—'}</span></Td>
                             <Td style={{ fontSize: 12 }}>{c.workType}</Td>
                             <Td style={{ textAlign: 'center' }}>{c.units ?? '—'}</Td>
+                            <Td style={{ fontSize: 12 }}>{c.clinic?.zone?.name || '—'}</Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}</Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>{stage ? format(new Date(stage.scannedAt), 'dd MMM yyyy, h:mm a') : '—'}</Td>
                           </tr>
