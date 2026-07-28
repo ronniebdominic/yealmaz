@@ -230,10 +230,11 @@ export function printCaseLabel(data) {
       <div class="info-label">Units</div>
       <div class="info-value">${data.units ?? '—'}</div>
     </div>
+    ${data.shade ? `
     <div class="info-cell">
       <div class="info-label">Shade</div>
-      <div class="info-value">${data.shade || '—'}</div>
-    </div>
+      <div class="info-value">${data.shade}</div>
+    </div>` : ''}
     ${data.toothNumbers ? `
     <div class="info-cell full teeth">
       <div class="info-label">Teeth</div>

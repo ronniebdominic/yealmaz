@@ -185,9 +185,13 @@ export default function NewCase() {
     const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
     const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
     if (unitPrice === undefined) return null;
-    const count = flatRateMap[form.workType] ? 1 : Math.max(1, selectedTeeth.length);
+    const count = flatRateMap[form.workType]
+      ? 1
+      : selectedTeeth.length > 0
+        ? selectedTeeth.length
+        : Math.max(1, parseInt(manualUnits) || 1);
     return unitPrice * count;
-  }, [form.workType, form.deliveryType, selectedTeeth.length, priceMap, expressPriceMap]);
+  }, [form.workType, form.deliveryType, selectedTeeth.length, manualUnits, priceMap, expressPriceMap, flatRateMap]);
 
   // Auto-calculate price with remake/redo modifier — includes the arch scan
   // fee (Br 500/arch) on top of the work-type price for 3D-file intake.
@@ -312,7 +316,11 @@ export default function NewCase() {
     if (!form.workType || priceMap[form.workType] == null) return null;
     const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
     const unitPrice  = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
-    const count = flatRateMap[form.workType] ? 1 : Math.max(1, selectedTeeth.length);
+    const count = flatRateMap[form.workType]
+      ? 1
+      : selectedTeeth.length > 0
+        ? selectedTeeth.length
+        : Math.max(1, parseInt(manualUnits) || 1);
     const workTypeFull = unitPrice * count;
     const full = workTypeFull + archFee;
     const archNote = archFee > 0
