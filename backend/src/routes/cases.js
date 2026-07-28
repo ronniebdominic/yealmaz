@@ -327,9 +327,12 @@ router.post('/', protect, async (req, res) => {
 
     // Shade, doctor name, and doctor contact are mandatory for new orders.
     // Historical/back-dated entries (a deliveryDate is supplied) are exempt.
+    // Aligner cases have no shade to record — same detection used everywhere
+    // else this work type gets special-cased (odontogram, due-date pattern).
+    const isAlignerCase = String(workType || '').toLowerCase().includes('aligner');
     if (!deliveryDate) {
       const missing = [];
-      if (!shade || !String(shade).trim())             missing.push('shade');
+      if (!isAlignerCase && (!shade || !String(shade).trim())) missing.push('shade');
       if (!doctorName || !String(doctorName).trim())   missing.push("doctor's name");
       if (!doctorPhone || !String(doctorPhone).trim()) missing.push("doctor's contact");
       if (missing.length) {
