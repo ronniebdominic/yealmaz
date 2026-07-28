@@ -375,6 +375,27 @@ export default function NewCase() {
                 </div>
               </div>
 
+              {/* Work type — driven first so aligner-only fields below (Shade,
+                  Tooth Selection) never render in the first place, instead of
+                  appearing then disappearing once a work type is picked. */}
+              <div className="form-group">
+                <label>Work Type *</label>
+                <select value={form.workType} onChange={handleWorkTypeChange} required>
+                  <option value="">— Select work type —</option>
+                  {workTypeGroups.length === 0 ? (
+                    <option disabled>Loading work types…</option>
+                  ) : workTypeGroups.map(group => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.types.map(t => (
+                        <option key={t} value={t}>
+                          {t}{priceMap[t] != null ? ` — Br ${priceMap[t].toLocaleString('en-US')}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
               {/* Patient info */}
               <div className="grid-2">
                 <div className="form-group">
@@ -477,25 +498,6 @@ export default function NewCase() {
                     />
                   </>
                 )}
-              </div>
-
-              {/* Work type — driven by pricing DB */}
-              <div className="form-group">
-                <label>Work Type *</label>
-                <select value={form.workType} onChange={handleWorkTypeChange} required>
-                  <option value="">— Select work type —</option>
-                  {workTypeGroups.length === 0 ? (
-                    <option disabled>Loading work types…</option>
-                  ) : workTypeGroups.map(group => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.types.map(t => (
-                        <option key={t} value={t}>
-                          {t}{priceMap[t] != null ? ` — Br ${priceMap[t].toLocaleString('en-US')}` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
               </div>
 
               {/* Remake / Redo flags */}
