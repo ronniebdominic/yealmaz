@@ -102,6 +102,9 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/rewards',       require('./routes/rewards'));
 app.use('/api/inventory',     require('./routes/inventory'));
 app.use('/api/milling',       require('./routes/milling'));
+app.use('/api/employees',     require('./routes/employees'));
+app.use('/api/attendance',    require('./routes/attendance'));  // POST /events is public: biometric-device callback (own secret auth)
+app.use('/api/payroll',       require('./routes/payroll'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────

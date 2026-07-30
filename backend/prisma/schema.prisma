@@ -43,6 +43,18 @@ model User {
   staffPoints               StaffPoints?              @relation("StaffPointsUser")
   staffRewardTransactions   StaffRewardTransaction[]  @relation("StaffRewardTxnUser")
 
+  // HR / attendance / payroll — relation-only, no scalar columns added to
+  // User itself, so existing broad User queries (dropdowns, lists) never
+  // touch or expose this data unless explicitly included.
+  employeeProfile          EmployeeProfile?      @relation("EmployeeProfileUser")
+  attendanceEvents         AttendanceEvent[]     @relation("AttendanceEventsUser")
+  attendanceEventsRecorded AttendanceEvent[]     @relation("AttendanceEventsRecordedBy")
+  leaveRecords             LeaveRecord[]         @relation("LeaveRecordsUser")
+  leaveRecordsRecorded     LeaveRecord[]         @relation("LeaveRecordsRecordedBy")
+  payrollEntries           PayrollEntry[]        @relation("PayrollEntriesUser")
+  payrollRunsCreated       PayrollRun[]          @relation("PayrollRunsCreatedBy")
+  payrollAdjustmentsAdded  PayrollAdjustment[]   @relation("PayrollAdjustmentsAddedBy")
+
   @@map("users")
 }
 
@@ -55,6 +67,7 @@ enum Role {
   LAB_TECH
   FINANCE
   INVENTORY_MANAGER
+  HR_MANAGER
 }
 
 // ── ZONES ──────────────────────────────────────────────
@@ -535,6 +548,151 @@ model StaffRewardTransaction {
 
   @@index([userId])
   @@map("staff_reward_transactions")
+}
+
+// ── EMPLOYEE / ATTENDANCE / PAYROLL ────────────────────
+// Kept strictly separate from User: EmployeeProfile is the only place
+// sensitive employment/financial data lives, so the many existing broad
+// User queries elsewhere in the app (dropdowns, staff lists) never touch
+// or risk exposing it.
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+model EmployeeProfile {
+  id               String           @id @default(uuid())
+  userId           String           @unique
+  user             User             @relation("EmployeeProfileUser", fields: [userId], references: [id])
+  employeeCode     String?          @unique // maps to whatever ID a future biometric device uses
+  position         String?
+  hireDate         DateTime?
+  baseSalary       Float?
+  bankName         String?
+  bankAccount      String?
+  employmentStatus EmploymentStatus @default(ACTIVE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("employee_profiles")
+}
+
+enum AttendanceEventType {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum AttendanceSource {
+  BIOMETRIC
+  MANUAL
+}
+
+// Caseless, caseless-adjacent ledger of raw clock events. Biometric-device
+// integration is not live yet — POST /api/attendance/events is built and
+// secured, ready to receive real device pushes once one is chosen; every
+// row today comes from HR's manual entry (source: MANUAL).
+model AttendanceEvent {
+  id           String              @id @default(uuid())
+  userId       String
+  user         User                @relation("AttendanceEventsUser", fields: [userId], references: [id])
+  timestamp    DateTime
+  type         AttendanceEventType
+  source       AttendanceSource
+  deviceId     String?
+  recordedById String?             // HR staff who manually entered it; null for biometric-sourced rows
+  recordedBy   User?               @relation("AttendanceEventsRecordedBy", fields: [recordedById], references: [id])
+  note         String?
+  createdAt    DateTime            @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+  @@map("attendance_events")
+}
+
+enum LeaveStatus {
+  APPROVED
+  REJECTED
+}
+
+// HR logs these directly on an employee's behalf (v1 has no self-service
+// submission flow) — status defaults APPROVED since HR is the one
+// entering it authoritatively; REJECTED exists to correct a mistaken entry.
+model LeaveRecord {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation("LeaveRecordsUser", fields: [userId], references: [id])
+  fromDate     DateTime
+  toDate       DateTime
+  reason       String?
+  status       LeaveStatus @default(APPROVED)
+  recordedById String
+  recordedBy   User        @relation("LeaveRecordsRecordedBy", fields: [recordedById], references: [id])
+  note         String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@map("leave_records")
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  FINALIZED
+}
+
+model PayrollRun {
+  id          String           @id @default(uuid())
+  periodMonth Int              // 1-12
+  periodYear  Int
+  status      PayrollRunStatus @default(DRAFT)
+  createdById String
+  createdBy   User             @relation("PayrollRunsCreatedBy", fields: [createdById], references: [id])
+  finalizedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  entries PayrollEntry[]
+
+  @@unique([periodMonth, periodYear])
+  @@map("payroll_runs")
+}
+
+// netPay = baseSalarySnapshot + sum(adjustments), rounded to 2dp, recomputed
+// whenever an adjustment is added — the only place money moves. No
+// automatic tax/pension/attendance deduction is ever computed; every
+// deduction (including an attendance-based one, if HR wants one) is a
+// manually entered PayrollAdjustment row.
+model PayrollEntry {
+  id                 String   @id @default(uuid())
+  runId              String
+  run                PayrollRun @relation(fields: [runId], references: [id])
+  userId             String
+  user               User     @relation("PayrollEntriesUser", fields: [userId], references: [id])
+  baseSalarySnapshot Float    // frozen from EmployeeProfile.baseSalary at run-creation time
+  netPay             Float
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  adjustments PayrollAdjustment[]
+
+  @@index([runId])
+  @@index([userId])
+  @@map("payroll_entries")
+}
+
+model PayrollAdjustment {
+  id        String       @id @default(uuid())
+  entryId   String
+  entry     PayrollEntry @relation(fields: [entryId], references: [id])
+  label     String       // e.g. "Attendance deduction", "Transport allowance", "Income tax" — all manual
+  amount    Float        // signed: + bonus, - deduction
+  addedById String
+  addedBy   User         @relation("PayrollAdjustmentsAddedBy", fields: [addedById], references: [id])
+  createdAt DateTime     @default(now())
+
+  @@index([entryId])
+  @@map("payroll_adjustments")
 }
 
 // ── GOOGLE SHEETS SYNC ─────────────────────────────────

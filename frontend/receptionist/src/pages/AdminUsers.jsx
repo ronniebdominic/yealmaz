@@ -9,7 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
-  MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse,
+  MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
 } from 'react-icons/md';
 
 // ── Constants ─────────────────────────────────────────────
@@ -20,6 +20,7 @@ const ROLES = [
   { value: 'DISPATCH',          label: 'Dispatch',           icon: MdInventory2 },
   { value: 'FINANCE',           label: 'Finance',            icon: MdPaid },
   { value: 'INVENTORY_MANAGER', label: 'Inventory Manager',  icon: MdWarehouse },
+  { value: 'HR_MANAGER',        label: 'HR Manager',         icon: MdGroups },
 ];
 
 const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.value, r]));
@@ -49,6 +50,7 @@ const ROLE_COLORS = {
   DISPATCH:          { bg: 'rgba(14,165,233,0.1)',  color: '#0EA5E9'     },
   FINANCE:           { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
   INVENTORY_MANAGER: { bg: 'rgba(180,83,9,0.1)',    color: '#B45309'     },
+  HR_MANAGER:        { bg: 'rgba(14,116,144,0.1)',  color: '#0E7490'     },
 };
 
 

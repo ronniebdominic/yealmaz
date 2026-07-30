@@ -16,6 +16,8 @@ import AdminZones from './pages/AdminZones';
 import AdminRewards from './pages/AdminRewards';
 import AdminInventory from './pages/AdminInventory';
 import InventoryDashboard from './pages/InventoryDashboard';
+import AdminHR from './pages/AdminHR';
+import HRDashboard from './pages/HRDashboard';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Delivery from './pages/Delivery';
@@ -51,6 +53,7 @@ function RoleHome() {
   if (user.role === 'LAB_TECH') return <LabDashboard />;
   if (user.role === 'FINANCE') return <FinanceDashboard />;
   if (user.role === 'INVENTORY_MANAGER') return <InventoryDashboard />;
+  if (user.role === 'HR_MANAGER') return <HRDashboard />;
   if (user.role === 'ADMIN' && user.email === 'admindashboard@yealmaz.com') return <Navigate to="/admin" replace />;
   return <Dashboard />;
 }
@@ -74,6 +77,7 @@ function AppRoutes() {
       <Route path="/admin/zones" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminZones /></ProtectedRoute>} />
       <Route path="/admin/rewards" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminRewards /></ProtectedRoute>} />
       <Route path="/admin/inventory" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminInventory /></ProtectedRoute>} />
+      <Route path="/admin/hr" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminHR /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

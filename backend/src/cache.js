@@ -30,6 +30,12 @@ const TTL_RULES = [
   { prefix: 'inventory:transactions', ttl: 60   }, // 1 m  — ledger/report view
   { prefix: 'dashboard:inventory-summary', ttl: 300 }, // 5 m — glance KPIs
   { prefix: 'milling:leaderboard',   ttl: 300   }, // 5 m  — staff points leaderboard
+  { prefix: 'employees',             ttl: 300   }, // 5 m  — employee profile list, changes rarely
+  { prefix: 'attendance:events',     ttl: 30    }, // 30s  — recent event feed, feels live
+  { prefix: 'attendance:leave',      ttl: 60    }, // 1 m  — leave record list
+  { prefix: 'payroll:runs',          ttl: 60    }, // 1 m
+  { prefix: 'payroll:entries',       ttl: 30    }, // 30s
+  { prefix: 'dashboard:hr-summary',  ttl: 300   }, // 5 m  — glance KPIs
 ];
 const DEFAULT_TTL = 300; // 5 m fallback
 

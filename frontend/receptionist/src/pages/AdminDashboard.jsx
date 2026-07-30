@@ -18,7 +18,7 @@ import {
   MdPaid, MdPendingActions, MdAutorenew, MdInventory2, MdBarChart,
   MdSchedule, MdTrackChanges, MdSearch, MdFileDownload, MdCancel,
   MdErrorOutline, MdScience, MdHandshake, MdClose, MdCheck, MdChevronLeft,
-  MdChevronRight, MdInfoOutline, MdHelpOutline, MdWarning, MdEmojiEvents,
+  MdChevronRight, MdInfoOutline, MdHelpOutline, MdWarning, MdEmojiEvents, MdPersonOff,
 } from 'react-icons/md';
 
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
@@ -313,6 +313,12 @@ export default function AdminDashboard() {
   const topMiller = invSummary?.topMillerName
     ? `${invSummary.topMillerName}${invSummary.topMillerPoints ? ` (${invSummary.topMillerPoints} pts)` : ''}`
     : '—';
+
+  const { data: hrSummary } = useQuery({
+    queryKey: ['payroll', 'summary'],
+    queryFn: () => api.get('/payroll/summary').then(r => r.data),
+    staleTime: 5 * 60_000,
+  });
 
   const drill = drillKey ? DRILL_MAP[drillKey] : null;
 
@@ -631,6 +637,19 @@ export default function AdminDashboard() {
                 sub="All-time bonus points" color="var(--green)" bg="var(--green-dim)"
                 onClick={() => navigate('/admin/inventory')}
                 info="The lab tech with the most bonus points earned for yielding more than 30 crowns from a single milling blank." />
+            </div>
+
+            {/* ── Section 5: HR & Payroll ── */}
+            <SectionHeader>HR & Payroll</SectionHeader>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: 24 }}>
+              <ColorTile icon={MdPersonOff} label="Employees Missing a Profile" value={hrSummary?.missingProfileCount ?? '—'}
+                sub="No salary/code set" color="var(--red)" bg="var(--red-dim)"
+                onClick={() => navigate('/admin/hr')}
+                info="Active staff accounts with no employee profile yet, or a profile missing a base salary — payroll can't include them properly until this is filled in." />
+              <ColorTile icon={MdPaid} label="Current Payroll Run" value={hrSummary?.currentRunStatus ?? '—'}
+                sub={hrSummary?.currentRunPeriod || 'No run yet'} color="var(--blue)" bg="rgba(21,101,192,0.08)"
+                onClick={() => navigate('/admin/hr')}
+                info="The most recent payroll run's status — DRAFT means it's still being prepared, FINALIZED means the pay period is locked in." />
             </div>
 
             {/* ── Charts ── */}
