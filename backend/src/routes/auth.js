@@ -25,7 +25,9 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Case-insensitive lookup — some staff emails were seeded with mixed
+    // case, but a login form shouldn't require typing the exact case back.
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid email or password.' });
@@ -67,7 +69,11 @@ router.post('/clinic/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const clinic = await prisma.clinic.findUnique({ where: { email } });
+    // Case-insensitive lookup — the clinic app lowercases the email before
+    // sending, but many clinic emails were seeded with mixed case (e.g.
+    // "KalDentalClinicCMC@yealmaz.com"), so an exact-case match silently
+    // rejected otherwise-correct logins.
+    const clinic = await prisma.clinic.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
 
     if (!clinic || !clinic.isActive) {
       return res.status(401).json({ error: 'Invalid email or password.' });
