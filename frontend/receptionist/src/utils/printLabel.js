@@ -237,7 +237,7 @@ export function printCaseLabel(data) {
     </div>` : ''}
     ${data.toothNumbers ? `
     <div class="info-cell full teeth">
-      <div class="info-label">Teeth</div>
+      <div class="info-label">Teeth (FDI Numbering)</div>
       <div class="info-value">${data.toothNumbers}</div>
     </div>` : ''}
     <div class="info-cell">
