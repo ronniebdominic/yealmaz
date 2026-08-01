@@ -268,13 +268,15 @@ router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (
 // ── GET /api/cases/:id ───────────────────────────────────
 router.get('/:id', protect, async (req, res) => {
   try {
-    // Stage `notes` are internal LMS-staff comments — never send them to the
-    // clinic portal. The cache entry is shared across all roles (it's the same
-    // underlying case), so strip notes on the way out rather than fragmenting
-    // the cache per-role.
+    // Stage `notes` are internal LMS-staff comments, and `scannedBy` names
+    // the specific employee who scanned each stage — neither should reach
+    // the clinic portal (clinics only need to see status progression, not
+    // internal staff attribution). The cache entry is shared across all
+    // roles (it's the same underlying case), so strip these on the way out
+    // rather than fragmenting the cache per-role.
     const forClinic = (data) => {
       if (req.user.role !== 'CLINIC' || !data) return data;
-      return { ...data, stages: data.stages?.map(({ notes, ...s }) => s) };
+      return { ...data, stages: data.stages?.map(({ notes, scannedBy, ...s }) => s) };
     };
 
     const cacheKey = `case:${req.params.id}`;
