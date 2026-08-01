@@ -1,5 +1,6 @@
 // Ye-Almaz — Cases Routes
 const express = require('express');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
@@ -16,8 +17,10 @@ const prisma = new PrismaClient();
 // Backed by the Postgres sequence `case_number_seq` (seeded to 26005687), so
 // numbering is atomic/concurrency-safe and unaffected by out-of-band imported
 // numbers (e.g. the in-progress YDL2680xxxxx series).
-async function generateCaseNumber() {
-  const rows = await prisma.$queryRaw`SELECT nextval('case_number_seq') AS n`;
+// `db` is either the module-level `prisma` client or a `$transaction`
+// callback's tx client — same shape for the calls used here.
+async function generateCaseNumber(db) {
+  const rows = await db.$queryRaw`SELECT nextval('case_number_seq') AS n`;
   return `YDL${rows[0].n.toString()}`;
 }
 
@@ -35,9 +38,9 @@ function patternDays(workType) {
   return 5;
 }
 
-async function getDueDays(workType, isExpress = false) {
+async function getDueDays(db, workType, isExpress = false) {
   try {
-    const record = await prisma.workTypePrice.findUnique({
+    const record = await db.workTypePrice.findUnique({
       where: { workType },
       select: { durationDays: true, expressDurationDays: true },
     });
@@ -47,10 +50,134 @@ async function getDueDays(workType, isExpress = false) {
   return patternDays(workType);
 }
 
+// ── Shared single-case creation ───────────────────────────
+// Used by both POST / (one item) and POST /bulk (N items, one per call,
+// inside a single transaction) — the only place a Case row gets created,
+// so the two entry points can never drift apart. Throws { status, message }
+// on validation failure; the caller's route handler catches and responds.
+// `db` is either `prisma` or a `$transaction` tx client.
+async function createSingleCase(db, fields, actorUser) {
+  const {
+    patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
+    toothNumbers, units, shade, notes, remake, redo, remakeReason, dueDate, totalAmount,
+    deliveryType, deliveryDate, dropOffAtLab, clinicId, orderGroupId,
+  } = fields;
+
+  if (!patientName || !workType) {
+    throw { status: 400, message: 'Patient name and work type are required.' };
+  }
+
+  // Shade, doctor name, and doctor contact are mandatory for new orders.
+  // Historical/back-dated entries (a deliveryDate is supplied) are exempt.
+  // Aligner cases have no shade to record — same detection used everywhere
+  // else this work type gets special-cased (odontogram, due-date pattern).
+  const isAlignerCase = String(workType || '').toLowerCase().includes('aligner');
+  if (!deliveryDate) {
+    const missing = [];
+    if (!isAlignerCase && (!shade || !String(shade).trim())) missing.push('shade');
+    if (!doctorName || !String(doctorName).trim())   missing.push("doctor's name");
+    if (!doctorPhone || !String(doctorPhone).trim()) missing.push("doctor's contact");
+    if (missing.length) {
+      throw { status: 400, message: `Please provide: ${missing.join(', ')}.` };
+    }
+  }
+
+  if (!clinicId) throw { status: 400, message: 'Clinic ID is required.' };
+
+  const isExpress = deliveryType === 'EXPRESS';
+  // Auto-calculate due date from work type; use manual value only if explicitly provided
+  const autoDays = await getDueDays(db, workType, isExpress);
+  const autoDate = new Date();
+  autoDate.setDate(autoDate.getDate() + autoDays);
+  const resolvedDueDate = dueDate ? new Date(dueDate) : autoDate;
+
+  // Compute units from toothNumbers if not explicitly provided
+  const resolvedUnits = units != null
+    ? parseInt(units)
+    : toothNumbers
+      ? toothNumbers.split(',').map(t => t.trim()).filter(Boolean).length
+      : null;
+
+  // Determine final status first so we know whether to generate a case number.
+  // PENDING_PICKUP cases (mobile submissions, phone orders) go through dispatch → pickup →
+  // receptionist acceptance. The scan/case number and QR code are assigned at acceptance,
+  // NOT at submission, so the clinic doesn't see a number that implies the case is in production.
+  const finalStatus = deliveryDate ? 'DELIVERED' : (dropOffAtLab ? 'CASE_ACCEPTED' : 'PENDING_PICKUP');
+  const needsScanNumber = finalStatus !== 'PENDING_PICKUP';
+  const caseNumber = needsScanNumber ? await generateCaseNumber(db) : null;
+
+  const newCase = await db.case.create({
+    data: {
+      caseNumber,
+      patientName,
+      patientAge: patientAge ? parseInt(patientAge) : null,
+      doctorName: doctorName || null,
+      doctorPhone: doctorPhone || null,
+      patientGender: patientGender || null,
+      workType,
+      toothNumbers,
+      units: resolvedUnits,
+      shade,
+      notes,
+      remake:       remake === true || remake === 'true',
+      redo:         redo   === true || redo   === 'true',
+      remakeReason: remakeReason || null,
+      dueDate: resolvedDueDate,
+      totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+      deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
+      deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
+      clinicId,
+      receptionistId: actorUser.role === 'RECEPTIONIST' ? actorUser.id : null,
+      status: finalStatus,
+      orderGroupId: orderGroupId || null,
+    }
+  });
+
+  // QR code is only meaningful once a case is in lab production.
+  // Skip for PENDING_PICKUP cases — it will be generated when the receptionist accepts.
+  let updatedCase = newCase;
+  if (needsScanNumber) {
+    const qrData = `${process.env.APP_URL}/api/scan/${newCase.id}`;
+    const qrCodeUrl = await QRCode.toDataURL(qrData, {
+      width: 300, margin: 2,
+      color: { dark: '#1A56A0', light: '#FFFFFF' }
+    });
+    updatedCase = await db.case.update({
+      where: { id: newCase.id },
+      data: { qrCodeUrl, qrCodeData: qrData },
+      include: { clinic: { select: { name: true } } }
+    });
+  } else {
+    updatedCase = await db.case.findUnique({
+      where: { id: newCase.id },
+      include: { clinic: { select: { name: true } } }
+    });
+  }
+
+  await db.caseStage.create({
+    data: {
+      caseId: newCase.id,
+      stageName: newCase.status,
+      scannedBy: actorUser.name,
+      notes: deliveryDate
+        ? 'Case registered as historical/delivered'
+        : dropOffAtLab
+          ? 'Case dropped off at lab directly'
+          : 'Case registered — awaiting impression pickup'
+    }
+  });
+
+  await db.payment.create({
+    data: { caseId: newCase.id, status: 'PENDING', amount: totalAmount ? parseFloat(totalAmount) : null }
+  });
+
+  return updatedCase;
+}
+
 // ── GET /api/cases ───────────────────────────────────────
 router.get('/', protect, async (req, res) => {
   try {
-    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', sortBy = 'date', dateFrom, dateTo, dateBy, remake, redo } = req.query;
+    const { status, paymentStatus, search, clinicId, page = 1, limit = 20, sortDir = 'desc', sortBy = 'date', dateFrom, dateTo, dateBy, remake, redo, orderGroupId } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const dateOrder  = sortDir === 'asc' ? 'asc' : 'desc';
     const orderByCol  = sortBy === 'caseNumber' ? 'caseNumber' : 'createdAt';
@@ -58,6 +185,7 @@ router.get('/', protect, async (req, res) => {
     const where = {};
     if (req.user.role === 'CLINIC') where.clinicId = req.user.id;
     else if (clinicId) where.clinicId = clinicId;
+    if (orderGroupId) where.orderGroupId = orderGroupId;
     if (status) {
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
       where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
@@ -89,7 +217,7 @@ router.get('/', protect, async (req, res) => {
     if (redo   === 'true')  where.redo   = true;
     if (redo   === 'false') where.redo   = false;
 
-    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, sortBy, dateFrom, dateTo, dateBy, remake, redo })}`;
+    const cacheKey = `cases:${req.user.role}:${req.user.id}:${JSON.stringify({ status, paymentStatus, search, clinicId, page, limit, sortDir, sortBy, dateFrom, dateTo, dateBy, remake, redo, orderGroupId })}`;
     const cached = await appCache.get(cacheKey);
     if (cached) return res.json(cached);
 
@@ -317,123 +445,12 @@ router.get('/:id', protect, async (req, res) => {
 // ── POST /api/cases ──────────────────────────────────────
 router.post('/', protect, async (req, res) => {
   try {
-    const {
-      patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
-      toothNumbers, units, shade, notes, remake, redo, remakeReason, dueDate, totalAmount, deliveryType, deliveryDate,
-      dropOffAtLab
-    } = req.body;
-
-    if (!patientName || !workType) {
-      return res.status(400).json({ error: 'Patient name and work type are required.' });
-    }
-
-    // Shade, doctor name, and doctor contact are mandatory for new orders.
-    // Historical/back-dated entries (a deliveryDate is supplied) are exempt.
-    // Aligner cases have no shade to record — same detection used everywhere
-    // else this work type gets special-cased (odontogram, due-date pattern).
-    const isAlignerCase = String(workType || '').toLowerCase().includes('aligner');
-    if (!deliveryDate) {
-      const missing = [];
-      if (!isAlignerCase && (!shade || !String(shade).trim())) missing.push('shade');
-      if (!doctorName || !String(doctorName).trim())   missing.push("doctor's name");
-      if (!doctorPhone || !String(doctorPhone).trim()) missing.push("doctor's contact");
-      if (missing.length) {
-        return res.status(400).json({ error: `Please provide: ${missing.join(', ')}.` });
-      }
-    }
-
     const clinicId = req.user.role === 'CLINIC' ? req.user.id : req.body.clinicId;
-    if (!clinicId) return res.status(400).json({ error: 'Clinic ID is required.' });
-
-    const isExpress = deliveryType === 'EXPRESS';
-    // Auto-calculate due date from work type; use manual value only if explicitly provided
-    const autoDays = await getDueDays(workType, isExpress);
-    const autoDate = new Date();
-    autoDate.setDate(autoDate.getDate() + autoDays);
-    const resolvedDueDate = dueDate ? new Date(dueDate) : autoDate;
-
-    // Compute units from toothNumbers if not explicitly provided
-    const resolvedUnits = units != null
-      ? parseInt(units)
-      : toothNumbers
-        ? toothNumbers.split(',').map(t => t.trim()).filter(Boolean).length
-        : null;
-
-    // Determine final status first so we know whether to generate a case number.
-    // PENDING_PICKUP cases (mobile submissions, phone orders) go through dispatch → pickup →
-    // receptionist acceptance. The scan/case number and QR code are assigned at acceptance,
-    // NOT at submission, so the clinic doesn't see a number that implies the case is in production.
-    const finalStatus = deliveryDate ? 'DELIVERED' : (dropOffAtLab ? 'CASE_ACCEPTED' : 'PENDING_PICKUP');
-    const needsScanNumber = finalStatus !== 'PENDING_PICKUP';
-    const caseNumber = needsScanNumber ? await generateCaseNumber() : null;
-
-    const newCase = await prisma.case.create({
-      data: {
-        caseNumber,
-        patientName,
-        patientAge: patientAge ? parseInt(patientAge) : null,
-        doctorName: doctorName || null,
-        doctorPhone: doctorPhone || null,
-        patientGender: patientGender || null,
-        workType,
-        toothNumbers,
-        units: resolvedUnits,
-        shade,
-        notes,
-        remake:       remake === true || remake === 'true',
-        redo:         redo   === true || redo   === 'true',
-        remakeReason: remakeReason || null,
-        dueDate: resolvedDueDate,
-        totalAmount: totalAmount ? parseFloat(totalAmount) : null,
-        deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
-        deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
-        clinicId,
-        receptionistId: req.user.role === 'RECEPTIONIST' ? req.user.id : null,
-        status: finalStatus,
-      }
-    });
-
-    // QR code is only meaningful once a case is in lab production.
-    // Skip for PENDING_PICKUP cases — it will be generated when the receptionist accepts.
-    let updatedCase = newCase;
-    if (needsScanNumber) {
-      const qrData = `${process.env.APP_URL}/api/scan/${newCase.id}`;
-      const qrCodeUrl = await QRCode.toDataURL(qrData, {
-        width: 300, margin: 2,
-        color: { dark: '#1A56A0', light: '#FFFFFF' }
-      });
-      updatedCase = await prisma.case.update({
-        where: { id: newCase.id },
-        data: { qrCodeUrl, qrCodeData: qrData },
-        include: { clinic: { select: { name: true } } }
-      });
-    } else {
-      updatedCase = await prisma.case.findUnique({
-        where: { id: newCase.id },
-        include: { clinic: { select: { name: true } } }
-      });
-    }
-
-    await prisma.caseStage.create({
-      data: {
-        caseId: newCase.id,
-        stageName: newCase.status,
-        scannedBy: req.user.name,
-        notes: deliveryDate
-          ? 'Case registered as historical/delivered'
-          : dropOffAtLab
-            ? 'Case dropped off at lab directly'
-            : 'Case registered — awaiting impression pickup'
-      }
-    });
-
-    await prisma.payment.create({
-      data: { caseId: newCase.id, status: 'PENDING', amount: totalAmount ? parseFloat(totalAmount) : null }
-    });
+    const updatedCase = await createSingleCase(prisma, { ...req.body, clinicId }, req.user);
 
     // Award reward points if submitted by a clinic
     if (req.user.role === 'CLINIC') {
-      awardCasePoints(req.user.id, newCase.id, newCase.caseNumber).catch(() => {});
+      awardCasePoints(req.user.id, updatedCase.id, updatedCase.caseNumber).catch(() => {});
     }
 
     await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
@@ -449,8 +466,61 @@ router.post('/', protect, async (req, res) => {
 
     res.status(201).json(updatedCase);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[POST /cases]', err);
     res.status(500).json({ error: err.message || 'Could not create case.' });
+  }
+});
+
+// ── POST /api/cases/bulk ──────────────────────────────────
+// Multiple work-type items for the same patient visit in one submission
+// (e.g. 2 Zirconia crowns for 2 teeth + a separate PFM crown) — each item
+// becomes its own independently-tracked Case (own case number/QR/CaseStage/
+// Payment, moves through the department pipeline on its own), lightly
+// linked via a shared orderGroupId. Single-item submissions keep using
+// POST / above — this route requires at least 2 items.
+router.post('/bulk', protect, async (req, res) => {
+  try {
+    const { items, ...shared } = req.body;
+    if (!Array.isArray(items) || items.length < 2) {
+      return res.status(400).json({ error: 'items must be an array of at least 2 work-type entries.' });
+    }
+
+    const clinicId = req.user.role === 'CLINIC' ? req.user.id : shared.clinicId;
+    const orderGroupId = crypto.randomUUID();
+
+    const cases = await prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const item of items) {
+        created.push(await createSingleCase(tx, { ...shared, ...item, clinicId, orderGroupId }, req.user));
+      }
+      return created;
+    });
+
+    // Reward points + socket emits happen after the transaction commits —
+    // same as the single-case path, so a slow non-DB call never holds a DB lock.
+    if (req.user.role === 'CLINIC') {
+      for (const c of cases) awardCasePoints(req.user.id, c.id, c.caseNumber).catch(() => {});
+    }
+
+    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
+
+    const io = req.app.get('io');
+    for (const c of cases) {
+      io.to('lab_staff').emit('new_case', {
+        caseId: c.id,
+        caseNumber: c.caseNumber,
+        patientName: c.patientName,
+        clinicName: c.clinic.name,
+        workType: c.workType
+      });
+    }
+
+    res.status(201).json({ cases });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[POST /cases/bulk]', err);
+    res.status(500).json({ error: err.message || 'Could not create cases.' });
   }
 });
 
@@ -484,7 +554,7 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
     // Generate scan/case number only if not already assigned
     let caseNumber = existing.caseNumber;
     if (!caseNumber) {
-      caseNumber = await generateCaseNumber();
+      caseNumber = await generateCaseNumber(prisma);
     }
 
     const resolvedUnits = units != null
@@ -832,7 +902,7 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
     let caseNumber = existing.caseNumber;
     let assignedNumber = false;
     if (!caseNumber && status !== 'PENDING_PICKUP') {
-      caseNumber = await generateCaseNumber();
+      caseNumber = await generateCaseNumber(prisma);
       assignedNumber = true;
     }
 

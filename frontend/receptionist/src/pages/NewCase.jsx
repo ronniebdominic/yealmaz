@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   MdEmail, MdBolt, MdWarning, MdAutorenew, MdTwoWheeler, MdMoveToInbox,
-  MdLocalShipping,
+  MdLocalShipping, MdAdd, MdDeleteOutline,
 } from 'react-icons/md';
 import { toLocalDateString } from '../utils/date';
 
@@ -103,24 +103,311 @@ const errStyle = { fontSize: 11, color: 'var(--red)', marginTop: 3, fontWeight: 
 const isAlignerWorkType = (wt) => /aligner/i.test(wt || '');
 const TRAY_COUNT_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
 
+let itemKeySeq = 0;
+const emptyItem = () => ({
+  key: `item-${++itemKeySeq}`,
+  workType: '', shade: '', totalAmount: '', dueDate: '',
+  remake: false, redo: false, remakeReason: '',
+  selectedTeeth: [], manualUnits: '',
+});
+
+// ── One work-type item within a (possibly multi-item) order ──────────
+// Everything that used to be a single set of top-level fields on the New
+// Case form (Work Type, Shade, Tooth Selection, Units, Remake/Redo, Amount)
+// now lives here, repeated once per item — each item becomes its own
+// independently-tracked Case (own case number/QR) on submit.
+function WorkItemForm({
+  item, index, onChange, onRemove, canRemove,
+  priceMap, expressPriceMap, flatRateMap, durationMap, expressDurationMap,
+  workTypeGroups, deliveryType, archFee, applyArchFee, error, clearError,
+}) {
+  const isAligner = isAlignerWorkType(item.workType);
+
+  const handleWorkTypeChange = (e) => {
+    const wt = e.target.value;
+    const aligner = isAlignerWorkType(wt);
+    onChange({ workType: wt, ...(aligner ? { shade: '' } : {}), ...(aligner && item.selectedTeeth.length > 0 ? { selectedTeeth: [] } : {}) });
+  };
+
+  const toggleTooth = (num) => {
+    const next = item.selectedTeeth.includes(num)
+      ? item.selectedTeeth.filter(t => t !== num)
+      : [...item.selectedTeeth, num].sort((a, b) => a - b);
+    onChange({ selectedTeeth: next });
+  };
+
+  const setCheck = (field) => (e) => {
+    const checked = e.target.checked;
+    if (field === 'remake' && checked) return onChange({ remake: true, redo: false });
+    if (field === 'redo'   && checked) return onChange({ redo: true, remake: false });
+    onChange({ [field]: checked });
+  };
+
+  // Base price before remake/redo modifier
+  const basePrice = useMemo(() => {
+    if (!item.workType || Object.keys(priceMap).length === 0) return null;
+    const useExpress = deliveryType === 'EXPRESS' && expressPriceMap[item.workType] != null;
+    const unitPrice = useExpress ? expressPriceMap[item.workType] : priceMap[item.workType];
+    if (unitPrice === undefined) return null;
+    const count = flatRateMap[item.workType]
+      ? 1
+      : item.selectedTeeth.length > 0
+        ? item.selectedTeeth.length
+        : Math.max(1, parseInt(item.manualUnits) || 1);
+    return unitPrice * count;
+  }, [item.workType, deliveryType, item.selectedTeeth.length, item.manualUnits, priceMap, expressPriceMap, flatRateMap]);
+
+  // Auto-calculate price with remake/redo modifier — includes the arch scan
+  // fee (Br 500/arch) on this item only when it's the one carrying it.
+  useEffect(() => {
+    if (basePrice === null) return;
+    const fee = applyArchFee ? archFee : 0;
+    const combined = basePrice + fee;
+    let amount;
+    if (item.remake) {
+      amount = '0';
+    } else if (item.redo) {
+      amount = String(Math.round(combined * 0.5 * 100) / 100);
+    } else {
+      amount = String(combined);
+    }
+    onChange({ totalAmount: amount });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basePrice, applyArchFee, archFee, item.remake, item.redo]);
+
+  // Auto-set due date
+  useEffect(() => {
+    if (!item.workType) return;
+    const isExpress = deliveryType === 'EXPRESS';
+    const days = isExpress && expressDurationMap[item.workType] != null
+      ? expressDurationMap[item.workType]
+      : durationMap[item.workType] ?? null;
+    onChange({ dueDate: calcDueDate(item.workType, days) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.workType, deliveryType, durationMap, expressDurationMap]);
+
+  // Price label shown next to Amount field
+  const priceLabel = (() => {
+    if (!item.workType || priceMap[item.workType] == null) return null;
+    const useExpress = deliveryType === 'EXPRESS' && expressPriceMap[item.workType] != null;
+    const unitPrice  = useExpress ? expressPriceMap[item.workType] : priceMap[item.workType];
+    const count = flatRateMap[item.workType]
+      ? 1
+      : item.selectedTeeth.length > 0
+        ? item.selectedTeeth.length
+        : Math.max(1, parseInt(item.manualUnits) || 1);
+    const workTypeFull = unitPrice * count;
+    const fee = applyArchFee ? archFee : 0;
+    const full = workTypeFull + fee;
+    const archNote = fee > 0
+      ? <> + Br {fee.toLocaleString('en-US')} scan fee</>
+      : null;
+    if (item.remake) {
+      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>Remake — <strong style={{ color: 'var(--red)' }}>Free (Br 0)</strong></span>;
+    }
+    if (item.redo) {
+      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+        Redo 50% — <strong style={{ color: 'var(--amber)' }}>Br {(full * 0.5).toLocaleString('en-US')}</strong>
+      </span>;
+    }
+    return flatRateMap[item.workType] ? (
+      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}flat — Br {unitPrice.toLocaleString('en-US')}{archNote} = <strong style={{ color: 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+      </span>
+    ) : (
+      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+      </span>
+    );
+  })();
+
+  return (
+    <div style={{
+      border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 14,
+      background: 'var(--surface-2)', position: 'relative',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Item {index + 1}
+        </div>
+        {canRemove && (
+          <button type="button" onClick={onRemove}
+            style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700 }}>
+            <MdDeleteOutline size={15} /> Remove
+          </button>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label>Work Type *</label>
+        <select value={item.workType} onChange={handleWorkTypeChange} required>
+          <option value="">— Select work type —</option>
+          {workTypeGroups.length === 0 ? (
+            <option disabled>Loading work types…</option>
+          ) : workTypeGroups.map(group => (
+            <optgroup key={group.label} label={group.label}>
+              {group.types.map(t => (
+                <option key={t} value={t}>
+                  {t}{priceMap[t] != null ? ` — Br ${priceMap[t].toLocaleString('en-US')}` : ''}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+
+      {!isAligner && (
+        <div className="form-group">
+          <label>Shade *</label>
+          <input
+            placeholder="e.g. A2, B1"
+            value={item.shade}
+            onChange={e => { onChange({ shade: e.target.value }); clearError(); }}
+            style={error ? { borderColor: 'var(--red)' } : {}}
+          />
+          {error && <div style={errStyle}><MdWarning className="mi" size={12} /> {error}</div>}
+        </div>
+      )}
+
+      {!isAligner && (
+        <div className="form-group">
+          <label>Tooth Selection <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}>(FDI numbering — click to select)</span></label>
+          <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 10, padding: '14px 16px', overflowX: 'auto',
+          }}>
+            <Odontogram selected={item.selectedTeeth} onToggle={toggleTooth} onClear={() => onChange({ selectedTeeth: [] })} />
+          </div>
+        </div>
+      )}
+
+      <div className="form-group">
+        {isAligner ? (
+          <>
+            <label>Number of Trays</label>
+            <select value={item.manualUnits} onChange={e => onChange({ manualUnits: e.target.value })}>
+              <option value="">— Select tray count —</option>
+              {TRAY_COUNT_OPTIONS.map(n => <option key={n} value={n}>{n} tray{n > 1 ? 's' : ''}</option>)}
+            </select>
+          </>
+        ) : (
+          <>
+            <label>Units
+              {item.selectedTeeth.length > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                  auto-filled from tooth selection
+                </span>
+              )}
+            </label>
+            <input
+              type="number" min="1"
+              placeholder="Enter number of units"
+              value={item.selectedTeeth.length > 0 ? item.selectedTeeth.length : item.manualUnits}
+              onChange={e => { if (item.selectedTeeth.length === 0) onChange({ manualUnits: e.target.value }); }}
+              readOnly={item.selectedTeeth.length > 0}
+              style={item.selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+            />
+          </>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label>Item Type</label>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {[
+            {
+              field: 'remake', checked: item.remake,
+              label: 'Remake', icon: MdAutorenew, desc: 'Free — no charge to clinic',
+              color: 'var(--red)', bg: '#FFF1F2', border: '#FECACA',
+            },
+            {
+              field: 'redo', checked: item.redo,
+              label: 'Redo', icon: MdAutorenew, desc: '50% of work-type price',
+              color: 'var(--amber)', bg: 'var(--amber-dim)', border: '#FCD34D',
+            },
+          ].map(opt => (
+            <label
+              key={opt.field}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                border: `2px solid ${opt.checked ? opt.border : 'var(--border)'}`,
+                background: opt.checked ? opt.bg : 'var(--surface)',
+                transition: 'border-color .15s, background .15s',
+                userSelect: 'none',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={opt.checked}
+                onChange={setCheck(opt.field)}
+                style={{ width: 16, height: 16, accentColor: opt.color, cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? opt.color : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <opt.icon size={13} /> {opt.label}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        {item.remake && (
+          <div style={{ marginTop: 10 }}>
+            <input
+              placeholder="Remake reason (optional)"
+              value={item.remakeReason}
+              onChange={e => onChange({ remakeReason: e.target.value })}
+              style={{ width: '100%' }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="grid-2">
+        <div className="form-group">
+          <label>
+            Due Date
+            {item.workType && (
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                auto · {getDueDays(item.workType)} days from today
+              </span>
+            )}
+          </label>
+          <input type="date" value={item.dueDate} onChange={e => onChange({ dueDate: e.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Amount (Br) {priceLabel}</label>
+          <input
+            type="number"
+            placeholder="Auto-calculated from work type"
+            value={item.totalAmount}
+            onChange={e => onChange({ totalAmount: e.target.value })}
+            style={item.remake ? { color: 'var(--text-3)' } : item.redo ? { color: 'var(--amber)', fontWeight: 600 } : {}}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────
 export default function NewCase() {
   const navigate = useNavigate();
   const [clinics, setClinics] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedTeeth, setSelectedTeeth] = useState([]);
-  const [manualUnits, setManualUnits] = useState('');
   const [errors, setErrors] = useState({});
+  const [itemErrors, setItemErrors] = useState({});
+  const [items, setItems] = useState([emptyItem()]);
   const [form, setForm] = useState({
     clinicId: '', patientName: '', patientAge: '', doctorName: '',
-    doctorPhone: '', patientGender: '',
-    workType: '', shade: '', notes: '', dueDate: '', totalAmount: '',
+    doctorPhone: '', patientGender: '', notes: '',
     deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
-    remake: false, redo: false, remakeReason: '',
     archUpper: false, archLower: false,
   });
 
   // Digital-scan intake fee: Br 500 per arch, on top of the work-type price.
+  // Applied to the first item only — one scan session covers the whole visit.
   const ARCH_FEE = 500;
   const archFee = (form.intakeMethod === 'EMAIL_3D_FILE')
     ? (form.archUpper ? ARCH_FEE : 0) + (form.archLower ? ARCH_FEE : 0)
@@ -179,48 +466,6 @@ export default function NewCase() {
     return result;
   }, [pricesData]);
 
-  // Base price before remake/redo modifier
-  const basePrice = useMemo(() => {
-    if (!form.workType || Object.keys(priceMap).length === 0) return null;
-    const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
-    const unitPrice = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
-    if (unitPrice === undefined) return null;
-    const count = flatRateMap[form.workType]
-      ? 1
-      : selectedTeeth.length > 0
-        ? selectedTeeth.length
-        : Math.max(1, parseInt(manualUnits) || 1);
-    return unitPrice * count;
-  }, [form.workType, form.deliveryType, selectedTeeth.length, manualUnits, priceMap, expressPriceMap, flatRateMap]);
-
-  // Auto-calculate price with remake/redo modifier — includes the arch scan
-  // fee (Br 500/arch) on top of the work-type price for 3D-file intake.
-  useEffect(() => {
-    if (basePrice === null) return;
-    const combined = basePrice + archFee;
-    let amount;
-    if (form.remake) {
-      amount = '0';
-    } else if (form.redo) {
-      amount = String(Math.round(combined * 0.5 * 100) / 100);
-    } else {
-      amount = String(combined);
-    }
-    setForm(prev => ({ ...prev, totalAmount: amount }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basePrice, archFee, form.remake, form.redo]);
-
-  // Auto-set due date
-  useEffect(() => {
-    if (!form.workType) return;
-    const isExpress = form.deliveryType === 'EXPRESS';
-    const days = isExpress && expressDurationMap[form.workType] != null
-      ? expressDurationMap[form.workType]
-      : durationMap[form.workType] ?? null;
-    setForm(prev => ({ ...prev, dueDate: calcDueDate(form.workType, days) }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.workType, form.deliveryType, durationMap, expressDurationMap]);
-
   useEffect(() => { loadClinics(); }, []);
 
   const loadClinics = async () => {
@@ -231,78 +476,95 @@ export default function NewCase() {
   };
 
   const set = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
-  const handleWorkTypeChange = (e) => {
-    const wt = e.target.value;
-    const aligner = isAlignerWorkType(wt);
-    setForm(prev => ({ ...prev, workType: wt, ...(aligner ? { shade: '' } : {}) }));
-    // Aligner cases are tracked by tray count, not tooth position or shade —
-    // clear any odontogram selection so units falls back to the tray-count
-    // dropdown, and clear shade since it isn't shown/required.
-    if (aligner && selectedTeeth.length > 0) setSelectedTeeth([]);
-  };
-  const setCheck = (field) => (e) => {
-    const checked = e.target.checked;
-    setForm(prev => {
-      if (field === 'remake' && checked) return { ...prev, remake: true, redo: false };
-      if (field === 'redo'   && checked) return { ...prev, redo: true, remake: false };
-      return { ...prev, [field]: checked };
-    });
-  };
+  const setCheck = (field) => (e) => setForm(prev => ({ ...prev, [field]: e.target.checked }));
 
-  const toggleTooth = (num) => {
-    setSelectedTeeth(prev =>
-      prev.includes(num)
-        ? prev.filter(t => t !== num)
-        : [...prev, num].sort((a, b) => a - b)
-    );
+  const updateItem = (index, patch) => {
+    setItems(prev => prev.map((it, i) => i === index ? { ...it, ...patch } : it));
   };
+  const addItem = () => setItems(prev => [...prev, emptyItem()]);
+  const removeItem = (index) => setItems(prev => prev.filter((_, i) => i !== index));
 
   const validate = () => {
     const e = {};
-    if (!isAlignerWorkType(form.workType) && !form.shade.trim())
-                                   e.shade      = 'Shade is required';
     if (!form.doctorName.trim())  e.doctorName  = "Doctor's name is required";
     if (!form.doctorPhone.trim()) e.doctorPhone = 'Contact / phone is required';
-    return e;
+
+    const ie = {};
+    items.forEach((item, i) => {
+      if (!isAlignerWorkType(item.workType) && !item.shade.trim()) {
+        ie[i] = 'Shade is required';
+      }
+    });
+    return { e, ie };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.clinicId)    return toast.error('Please select a clinic');
     if (!form.patientName) return toast.error('Patient name is required');
-    if (!form.workType)    return toast.error('Work type is required');
+    if (items.some(it => !it.workType)) return toast.error('Work type is required for every item');
     if (form.intakeMethod === 'EMAIL_3D_FILE' && !form.archUpper && !form.archLower) {
       return toast.error('Select at least one arch (Upper/Lower) that was scanned');
     }
 
-    const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      toast.error(Object.values(errs)[0]);
+    const { e: fieldErrs, ie: itemErrs } = validate();
+    if (Object.keys(fieldErrs).length > 0 || Object.keys(itemErrs).length > 0) {
+      setErrors(fieldErrs);
+      setItemErrors(itemErrs);
+      toast.error(Object.values(fieldErrs)[0] || Object.values(itemErrs)[0]);
       return;
     }
     setErrors({});
+    setItemErrors({});
 
     setSubmitting(true);
     try {
-      const resolvedUnits = selectedTeeth.length > 0
-        ? selectedTeeth.length
-        : manualUnits ? parseInt(manualUnits) : undefined;
       const isEmailFile = form.intakeMethod === 'EMAIL_3D_FILE';
       const archLabel = [form.archUpper && 'Upper', form.archLower && 'Lower'].filter(Boolean).join(' & ');
       const scanNote = isEmailFile
         ? `3D file intake — Arches scanned: ${archLabel || 'none selected'}${archFee > 0 ? ` (Br ${archFee.toLocaleString('en-US')} scan fee)` : ''}`
         : null;
-      const res = await api.post('/cases', {
-        ...form,
-        notes: [scanNote, form.notes].filter(Boolean).join('\n'),
-        toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
-        units: resolvedUnits,
+      const sharedNotes = [scanNote, form.notes].filter(Boolean).join('\n');
+      const dropOffAtLab = form.intakeMethod === 'DROP_OFF' || isEmailFile;
+
+      const buildItemPayload = (item) => {
+        const resolvedUnits = item.selectedTeeth.length > 0
+          ? item.selectedTeeth.length
+          : item.manualUnits ? parseInt(item.manualUnits) : undefined;
+        return {
+          workType: item.workType,
+          shade: item.shade,
+          toothNumbers: item.selectedTeeth.length > 0 ? item.selectedTeeth.join(', ') : undefined,
+          units: resolvedUnits,
+          remake: item.remake,
+          redo: item.redo,
+          remakeReason: item.remakeReason,
+          dueDate: item.dueDate,
+          totalAmount: item.totalAmount,
+        };
+      };
+
+      const shared = {
+        clinicId: form.clinicId,
+        patientName: form.patientName,
+        patientAge: form.patientAge,
+        doctorName: form.doctorName,
+        doctorPhone: form.doctorPhone,
+        patientGender: form.patientGender,
+        notes: sharedNotes,
+        deliveryType: form.deliveryType,
         deliveryDate: form.deliveryDate || undefined,
-        // Digital-file intake has no physical pickup step — accept immediately, same as a lab drop-off.
-        dropOffAtLab: form.intakeMethod === 'DROP_OFF' || isEmailFile,
-      });
-      toast.success(`Case ${res.data.caseNumber} created!`);
+        dropOffAtLab,
+      };
+
+      if (items.length === 1) {
+        const res = await api.post('/cases', { ...shared, ...buildItemPayload(items[0]) });
+        toast.success(`Case ${res.data.caseNumber} created!`);
+      } else {
+        const res = await api.post('/cases/bulk', { ...shared, items: items.map(buildItemPayload) });
+        const numbers = res.data.cases.map(c => c.caseNumber).join(', ');
+        toast.success(`${res.data.cases.length} cases created! ${numbers}`);
+      }
       navigate('/cases');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to create case');
@@ -310,42 +572,6 @@ export default function NewCase() {
       setSubmitting(false);
     }
   };
-
-  // Price label shown next to Amount field
-  const priceLabel = (() => {
-    if (!form.workType || priceMap[form.workType] == null) return null;
-    const useExpress = form.deliveryType === 'EXPRESS' && expressPriceMap[form.workType] != null;
-    const unitPrice  = useExpress ? expressPriceMap[form.workType] : priceMap[form.workType];
-    const count = flatRateMap[form.workType]
-      ? 1
-      : selectedTeeth.length > 0
-        ? selectedTeeth.length
-        : Math.max(1, parseInt(manualUnits) || 1);
-    const workTypeFull = unitPrice * count;
-    const full = workTypeFull + archFee;
-    const archNote = archFee > 0
-      ? <> + Br {archFee.toLocaleString('en-US')} scan fee</>
-      : null;
-    if (form.remake) {
-      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>Remake — <strong style={{ color: 'var(--red)' }}>Free (Br 0)</strong></span>;
-    }
-    if (form.redo) {
-      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        Redo 50% — <strong style={{ color: 'var(--amber)' }}>Br {(full * 0.5).toLocaleString('en-US')}</strong>
-      </span>;
-    }
-    return flatRateMap[form.workType] ? (
-      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}flat — Br {unitPrice.toLocaleString('en-US')}{archNote} = <strong style={{ color: 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
-      </span>
-    ) : (
-      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
-      </span>
-    );
-  })();
-
-  const isAligner = isAlignerWorkType(form.workType);
 
   return (
     <Layout>
@@ -373,27 +599,6 @@ export default function NewCase() {
                 <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
                   New clinic? Ask them to register via the clinic app first.
                 </div>
-              </div>
-
-              {/* Work type — driven first so aligner-only fields below (Shade,
-                  Tooth Selection) never render in the first place, instead of
-                  appearing then disappearing once a work type is picked. */}
-              <div className="form-group">
-                <label>Work Type *</label>
-                <select value={form.workType} onChange={handleWorkTypeChange} required>
-                  <option value="">— Select work type —</option>
-                  {workTypeGroups.length === 0 ? (
-                    <option disabled>Loading work types…</option>
-                  ) : workTypeGroups.map(group => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.types.map(t => (
-                        <option key={t} value={t}>
-                          {t}{priceMap[t] != null ? ` — Br ${priceMap[t].toLocaleString('en-US')}` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
               </div>
 
               {/* Patient info */}
@@ -433,125 +638,45 @@ export default function NewCase() {
                 </div>
               </div>
 
-              <div className={isAligner ? '' : 'grid-2'}>
-                <div className="form-group">
-                  <label>Patient Gender</label>
-                  <select value={form.patientGender} onChange={set('patientGender')}>
-                    <option value="">— Select —</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
-                </div>
-                {!isAligner && (
-                  <div className="form-group">
-                    <label>Shade *</label>
-                    <input
-                      placeholder="e.g. A2, B1"
-                      value={form.shade}
-                      onChange={e => { set('shade')(e); setErrors(prev => ({ ...prev, shade: '' })); }}
-                      style={errors.shade ? { borderColor: 'var(--red)' } : {}}
-                    />
-                    {errors.shade && <div style={errStyle}><MdWarning className="mi" size={12} /> {errors.shade}</div>}
-                  </div>
-                )}
+              <div className="form-group">
+                <label>Patient Gender</label>
+                <select value={form.patientGender} onChange={set('patientGender')}>
+                  <option value="">— Select —</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
               </div>
 
-              {/* Odontogram — aligner cases track tray count instead */}
-              {!isAligner && (
-                <div className="form-group">
-                  <label>Tooth Selection <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}>(FDI numbering — click to select)</span></label>
-                  <div style={{
-                    background: 'var(--surface-2)', border: '1px solid var(--border)',
-                    borderRadius: 10, padding: '14px 16px', overflowX: 'auto',
-                  }}>
-                    <Odontogram selected={selectedTeeth} onToggle={toggleTooth} onClear={() => setSelectedTeeth([])} />
-                  </div>
-                </div>
-              )}
-
-              {/* Units */}
+              {/* Work items — one work type per item; add more for a
+                  multi-item order (e.g. 2 Zirconia crowns + a PFM crown)
+                  for the same patient visit. */}
               <div className="form-group">
-                {isAligner ? (
-                  <>
-                    <label>Number of Trays</label>
-                    <select value={manualUnits} onChange={e => setManualUnits(e.target.value)}>
-                      <option value="">— Select tray count —</option>
-                      {TRAY_COUNT_OPTIONS.map(n => <option key={n} value={n}>{n} tray{n > 1 ? 's' : ''}</option>)}
-                    </select>
-                  </>
-                ) : (
-                  <>
-                    <label>Units
-                      {selectedTeeth.length > 0 && (
-                        <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                          auto-filled from tooth selection
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="number" min="1"
-                      placeholder="Enter number of units"
-                      value={selectedTeeth.length > 0 ? selectedTeeth.length : manualUnits}
-                      onChange={e => { if (selectedTeeth.length === 0) setManualUnits(e.target.value); }}
-                      readOnly={selectedTeeth.length > 0}
-                      style={selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-                    />
-                  </>
-                )}
-              </div>
-
-              {/* Remake / Redo flags */}
-              <div className="form-group">
-                <label>Case Type</label>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {[
-                    {
-                      field: 'remake', checked: form.remake,
-                      label: 'Remake', icon: MdAutorenew, desc: 'Free — no charge to clinic',
-                      color: 'var(--red)', bg: '#FFF1F2', border: '#FECACA',
-                    },
-                    {
-                      field: 'redo', checked: form.redo,
-                      label: 'Redo', icon: MdAutorenew, desc: '50% of work-type price',
-                      color: 'var(--amber)', bg: 'var(--amber-dim)', border: '#FCD34D',
-                    },
-                  ].map(opt => (
-                    <label
-                      key={opt.field}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                        border: `2px solid ${opt.checked ? opt.border : 'var(--border)'}`,
-                        background: opt.checked ? opt.bg : 'var(--surface)',
-                        transition: 'border-color .15s, background .15s',
-                        userSelect: 'none',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={opt.checked}
-                        onChange={setCheck(opt.field)}
-                        style={{ width: 16, height: 16, accentColor: opt.color, cursor: 'pointer' }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? opt.color : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                          <opt.icon size={13} /> {opt.label}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {form.remake && (
-                  <div style={{ marginTop: 10 }}>
-                    <input
-                      placeholder="Remake reason (optional)"
-                      value={form.remakeReason}
-                      onChange={set('remakeReason')}
-                      style={{ width: '100%' }}
-                    />
-                  </div>
-                )}
+                <label>Work Order{items.length > 1 ? `s (${items.length})` : ''}</label>
+                {items.map((item, i) => (
+                  <WorkItemForm
+                    key={item.key}
+                    item={item}
+                    index={i}
+                    onChange={patch => updateItem(i, patch)}
+                    onRemove={() => removeItem(i)}
+                    canRemove={items.length > 1}
+                    priceMap={priceMap}
+                    expressPriceMap={expressPriceMap}
+                    flatRateMap={flatRateMap}
+                    durationMap={durationMap}
+                    expressDurationMap={expressDurationMap}
+                    workTypeGroups={workTypeGroups}
+                    deliveryType={form.deliveryType}
+                    archFee={archFee}
+                    applyArchFee={i === 0}
+                    error={itemErrors[i]}
+                    clearError={() => setItemErrors(prev => ({ ...prev, [i]: '' }))}
+                  />
+                ))}
+                <button type="button" onClick={addItem} className="btn btn-ghost"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <MdAdd size={16} /> Add another work item
+                </button>
               </div>
 
               {/* Intake Method */}
@@ -605,7 +730,7 @@ export default function NewCase() {
                           <input
                             type="checkbox"
                             checked={opt.checked}
-                            onChange={e => setForm(prev => ({ ...prev, [opt.field]: e.target.checked }))}
+                            onChange={setCheck(opt.field)}
                             style={{ width: 16, height: 16, accentColor: 'var(--blue)', cursor: 'pointer' }}
                           />
                           <span style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? 'var(--blue)' : 'var(--text-1)' }}>{opt.label}</span>
@@ -614,7 +739,7 @@ export default function NewCase() {
                     </div>
                     {archFee > 0 && (
                       <div style={{ fontSize: 12, color: 'var(--blue)', marginTop: 8, fontWeight: 600 }}>
-                        Scan fee: Br {archFee.toLocaleString('en-US')} — added on top of the work-type price below.
+                        Scan fee: Br {archFee.toLocaleString('en-US')} — added on top of the {items.length > 1 ? 'first item’s' : 'work-type'} price above.
                       </div>
                     )}
                   </div>
@@ -653,34 +778,11 @@ export default function NewCase() {
                 </div>
               </div>
 
-              <div className="grid-2">
-                <div className="form-group">
-                  <label>
-                    Due Date
-                    {form.workType && (
-                      <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                        auto · {getDueDays(form.workType)} days from today
-                      </span>
-                    )}
-                  </label>
-                  <input type="date" value={form.dueDate} onChange={set('dueDate')} />
-                </div>
-                <div className="form-group">
-                  <label>Delivery Date
-                    <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>for historical cases</span>
-                  </label>
-                  <input type="date" value={form.deliveryDate} onChange={set('deliveryDate')} />
-                </div>
-                <div className="form-group">
-                  <label>Amount (Br) {priceLabel}</label>
-                  <input
-                    type="number"
-                    placeholder="Auto-calculated from work type"
-                    value={form.totalAmount}
-                    onChange={set('totalAmount')}
-                    style={form.remake ? { color: 'var(--text-3)' } : form.redo ? { color: 'var(--amber)', fontWeight: 600 } : {}}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Delivery Date
+                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>for historical cases</span>
+                </label>
+                <input type="date" value={form.deliveryDate} onChange={set('deliveryDate')} />
               </div>
 
               <div className="form-group">
@@ -690,7 +792,11 @@ export default function NewCase() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Creating…' : '+ Create Case & Generate QR'}
+                  {submitting
+                    ? 'Creating…'
+                    : items.length > 1
+                      ? `+ Create ${items.length} Cases & Generate QRs`
+                      : '+ Create Case & Generate QR'}
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => navigate('/cases')}>
                   Cancel

@@ -75,11 +75,21 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [siblings, setSiblings] = useState([]);
 
   useEffect(() => {
     loadCase();
     loadComments();
   }, [caseId]);
+
+  // If this case was created as part of a multi-item order, show the
+  // other items it was ordered alongside (same orderGroupId).
+  useEffect(() => {
+    if (!data?.orderGroupId) { setSiblings([]); return; }
+    api.get('/cases', { params: { orderGroupId: data.orderGroupId, limit: 50 } })
+      .then(res => setSiblings((res.data.cases || []).filter(c => c.id !== data.id)))
+      .catch(() => {});
+  }, [data?.orderGroupId, data?.id]);
 
   const loadComments = async () => {
     try {
@@ -214,6 +224,22 @@ export default function CaseDetailModal({ caseId, onClose }) {
         </div>
 
         <div className="modal-body">
+          {/* Multi-item order — other work-type items ordered together for this patient visit */}
+          {siblings.length > 0 && (
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
+              <div style={{ fontWeight: 700, color: 'var(--blue)', marginBottom: 4 }}>
+                Part of a {siblings.length + 1}-item order for {data.patientName}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {siblings.map(s => (
+                  <span key={s.id} className="case-number" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {s.caseNumber || '—'} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>({s.workType})</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Remake/redo lineage — this case's own scan number, branched from an earlier one */}
           {(data.originalCase || data.remakes?.length > 0) && (
             <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>

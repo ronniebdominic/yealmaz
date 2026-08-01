@@ -165,6 +165,13 @@ model Case {
   originalCase    Case?       @relation("CaseLineage", fields: [originalCaseId], references: [id])
   remakes         Case[]      @relation("CaseLineage")
 
+  // Shared UUID stamped on every case created together in one multi-item
+  // "New Case" submission (e.g. 2 Zirconia + 1 PFM for the same patient
+  // visit) — each item is still its own independently-tracked Case. Null
+  // for ordinary single-item cases. No relation — just a lookup key via
+  // GET /cases?orderGroupId=.
+  orderGroupId    String?
+
   stages             CaseStage[]
   payment            Payment?
   deliveryLogs       DeliveryLog[]
@@ -183,6 +190,7 @@ model Case {
   @@index([deliveryDate])
   @@index([assignedDeliveryId])
   @@index([originalCaseId])
+  @@index([orderGroupId])
   @@map("cases")
 }
 

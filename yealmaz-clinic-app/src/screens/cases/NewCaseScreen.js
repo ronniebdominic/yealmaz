@@ -119,21 +119,274 @@ function Odontogram({ selected, onToggle }) {
   );
 }
 
+let itemKeySeq = 0;
+const emptyItem = () => ({
+  key: `item-${++itemKeySeq}`,
+  workType: '', shade: '', dueDate: '', isRedo: false,
+  selectedTeeth: [], manualUnits: '',
+});
+
+// ── One work-type item within a (possibly multi-item) order ──────────
+// Everything that used to be a single set of screen-level fields (Tooth
+// Selection, Work Type, Shade, Redo, Due Date, estimated Amount) now lives
+// here, repeated once per item — each item becomes its own independently-
+// tracked case (own case number/QR) on submit.
+function WorkItemCard({
+  item, index, onChange, onRemove, canRemove,
+  priceMap, durationMap, expressDurationMap, deliveryType,
+}) {
+  const [showWorkTypes, setShowWorkTypes] = useState(false);
+  const [showShades, setShowShades] = useState(false);
+  const [customShade, setCustomShade] = useState(false);
+  const [autoCalcDays, setAutoCalcDays] = useState(null);
+
+  const selectedPrice = useMemo(() => {
+    const p = priceMap[item.workType];
+    if (!p) return null;
+    const isExpress = deliveryType === 'EXPRESS' && p.expressPrice != null;
+    const unit = isExpress ? p.expressPrice : p.price;
+    const isFlat = FLAT_PRICE_TYPES.has(item.workType);
+    const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
+    const total = Math.round(unit * count * (item.isRedo ? 0.5 : 1));
+    return { unit, count, isFlat, isExpress, isRedo: item.isRedo, total };
+  }, [priceMap, item.workType, deliveryType, item.selectedTeeth.length, item.isRedo]);
+
+  useEffect(() => {
+    if (!item.workType) return;
+    const isExpress = deliveryType === 'EXPRESS';
+    let days = isExpress && expressDurationMap[item.workType] != null
+      ? expressDurationMap[item.workType]
+      : durationMap[item.workType];
+    if (days == null) days = getDueDays(item.workType);
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    onChange({ dueDate: d.toISOString().slice(0, 10) });
+    setAutoCalcDays(days);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.workType, deliveryType, durationMap, expressDurationMap]);
+
+  const selectWorkType = (w) => {
+    onChange({ workType: w });
+    setShowWorkTypes(false);
+  };
+
+  const toggleTooth = (num) => {
+    const next = item.selectedTeeth.includes(num)
+      ? item.selectedTeeth.filter(t => t !== num)
+      : [...item.selectedTeeth, num].sort((a, b) => a - b);
+    onChange({ selectedTeeth: next });
+  };
+
+  return (
+    <View style={styles.itemCard}>
+      <View style={styles.itemCardHeader}>
+        <Text style={styles.itemCardTitle}>ITEM {index + 1}</Text>
+        {canRemove && (
+          <TouchableOpacity onPress={onRemove}>
+            <Text style={styles.itemRemove}>Remove</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Tooth Selection */}
+      <Text style={styles.subHint}>Tap teeth to mark affected tooth/teeth (FDI numbering)</Text>
+      <View style={{ marginTop: 10 }}>
+        <Odontogram selected={item.selectedTeeth} onToggle={toggleTooth} />
+      </View>
+
+      <View style={styles.teethSummaryRow}>
+        {item.selectedTeeth.length > 0 ? (
+          <>
+            <Text style={styles.teethSelected}>
+              Selected: <Text style={{ color: Colors.blue, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
+            </Text>
+            <TouchableOpacity onPress={() => onChange({ selectedTeeth: [] })}>
+              <Text style={styles.clearBtn}>Clear all</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Text style={styles.teethNone}>No teeth selected</Text>
+        )}
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>
+          Units{item.selectedTeeth.length > 0 ? ' (auto)' : ''}
+        </Text>
+        <TextInput
+          style={[styles.input, item.selectedTeeth.length > 0 && { opacity: 0.6 }]}
+          keyboardType="numeric"
+          placeholder="Enter number of units"
+          placeholderTextColor={Colors.textMuted}
+          value={item.selectedTeeth.length > 0 ? String(item.selectedTeeth.length) : item.manualUnits}
+          onChangeText={v => { if (item.selectedTeeth.length === 0) onChange({ manualUnits: v }); }}
+          editable={item.selectedTeeth.length === 0}
+        />
+      </View>
+
+      {/* Work Details */}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Work Type *</Text>
+        <TouchableOpacity
+          style={[styles.input, styles.selectInput]}
+          onPress={() => setShowWorkTypes(!showWorkTypes)}
+        >
+          <Text style={item.workType ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
+            {item.workType || 'Select work type…'}
+          </Text>
+          <Text style={styles.selectArrow}>{showWorkTypes ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+        {showWorkTypes && (
+          <View style={styles.dropdown}>
+            {Object.keys(priceMap).length === 0 ? (
+              <Text style={{ padding: Spacing.md, fontSize: 13, color: Colors.text3, fontStyle: 'italic' }}>
+                No work types available yet — please contact the lab.
+              </Text>
+            ) : (
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
+                {Object.values(priceMap).map(p => (
+                  <TouchableOpacity
+                    key={p.workType}
+                    style={[styles.dropdownItem, styles.dropdownItemRow, item.workType === p.workType && styles.dropdownItemActive]}
+                    onPress={() => selectWorkType(p.workType)}
+                  >
+                    <Text style={[styles.dropdownText, { flex: 1 }, item.workType === p.workType && styles.dropdownTextActive]} numberOfLines={1}>
+                      {p.workType}
+                    </Text>
+                    <Text style={styles.dropdownPrice}>Br {Number(p.price).toLocaleString('en-US')}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
+        {selectedPrice && (
+          <View style={styles.priceBox}>
+            <Text style={styles.priceBoxLabel}>Estimated Amount</Text>
+            <Text style={styles.priceBoxValue}>
+              Br {selectedPrice.total.toLocaleString('en-US')}
+              {!selectedPrice.isRedo && !selectedPrice.isFlat && selectedPrice.count > 1 && (
+                <Text style={styles.priceBoxSub}>  ·  Br {selectedPrice.unit.toLocaleString('en-US')} × {selectedPrice.count}</Text>
+              )}
+              {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ express</Text>}
+              {selectedPrice.isRedo && <Text style={styles.priceBoxSub}>  ·  ♻️ 50% redo</Text>}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {!/aligner/i.test(item.workType || '') && (
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Shade *</Text>
+          <TouchableOpacity
+            style={[styles.input, styles.selectInput]}
+            onPress={() => { setShowShades(prev => !prev); setCustomShade(false); }}
+          >
+            <Text style={item.shade ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
+              {item.shade || 'Select shade…'}
+            </Text>
+            <Text style={styles.selectArrow}>{showShades ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {showShades && (
+            <View style={styles.dropdown}>
+              <ScrollView nestedScrollEnabled style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
+                {SHADE_GROUPS.map(g => (
+                  <View key={g.group} style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
+                    <Text style={styles.shadeGroupLabel}>{g.group}</Text>
+                    <View style={styles.shadeChips}>
+                      {g.shades.map(s => (
+                        <TouchableOpacity
+                          key={s}
+                          style={[styles.shadeChip, item.shade === s && styles.shadeChipActive]}
+                          onPress={() => { onChange({ shade: s }); setShowShades(false); setCustomShade(false); }}
+                        >
+                          <Text style={[styles.shadeChipText, item.shade === s && styles.shadeChipTextActive]}>{s}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+                <TouchableOpacity
+                  style={[styles.dropdownItem, { marginTop: 4 }]}
+                  onPress={() => { setShowShades(false); setCustomShade(true); if (ALL_SHADES.includes(item.shade)) onChange({ shade: '' }); }}
+                >
+                  <Text style={[styles.dropdownText, { color: Colors.blue }]}>✏️  Custom shade…</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          )}
+          {customShade && (
+            <TextInput
+              style={[styles.input, { marginTop: 6 }]}
+              placeholder="Type shade (e.g. OM3, 3M2)…"
+              placeholderTextColor={Colors.text3}
+              value={item.shade}
+              onChangeText={v => onChange({ shade: v })}
+              autoFocus
+            />
+          )}
+        </View>
+      )}
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Redo / Replacement</Text>
+        <TouchableOpacity
+          onPress={() => onChange({ isRedo: !item.isRedo })}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
+            borderRadius: Radius.md, borderWidth: 1.5,
+            borderColor: item.isRedo ? Colors.amber : Colors.border,
+            backgroundColor: item.isRedo ? Colors.amber + '12' : Colors.bg,
+          }}
+        >
+          <Text style={{ fontSize: 18 }}>{item.isRedo ? '☑' : '☐'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: item.isRedo ? Colors.amber : Colors.text1 }}>
+              This is a redo / replacement
+            </Text>
+            <Text style={{ fontSize: 11, color: Colors.text3 }}>
+              Replacing an existing restoration — charged at 50%
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Due Date</Text>
+        {autoCalcDays ? (
+          <View style={{
+            backgroundColor: Colors.blue + '10',
+            borderWidth: 1.5, borderColor: Colors.blue + '40',
+            borderRadius: Radius.md, padding: Spacing.md,
+          }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.blue }}>
+              📅 {formatDueDate(item.dueDate)}
+            </Text>
+            <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 2 }}>
+              Auto-calculated · {autoCalcDays} day{autoCalcDays !== 1 ? 's' : ''} for {item.workType}
+            </Text>
+          </View>
+        ) : (
+          <Text style={{ fontSize: 12, color: Colors.text3, fontStyle: 'italic' }}>
+            Select a work type to auto-calculate the due date
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
 
 // ── Screen ────────────────────────────────────────────────
 export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
-    patientGender: '', workType: '', shade: '', notes: '', dueDate: '',
-    deliveryType: 'NORMAL', deliveryDate: '', isRedo: false,
+    patientGender: '', notes: '',
+    deliveryType: 'NORMAL', deliveryDate: '',
   });
-  const [selectedTeeth, setSelectedTeeth] = useState([]);
-  const [manualUnits, setManualUnits] = useState('');
+  const [items, setItems] = useState([emptyItem()]);
   const [submitting, setSubmitting] = useState(false);
-  const [showWorkTypes, setShowWorkTypes] = useState(false);
-  const [showShades, setShowShades] = useState(false);
-  const [customShade, setCustomShade] = useState(false);
-  const [autoCalcDays, setAutoCalcDays] = useState(null);
   // The lab's pricing list is the single source of truth for selectable work types
   const [priceList, setPriceList] = useState([]);
 
@@ -158,55 +411,27 @@ export default function NewCaseScreen({ navigation }) {
     [priceList]
   );
 
-  // Price for the currently selected work type (redo/replacement is charged at 50%)
-  const selectedPrice = useMemo(() => {
-    const p = priceMap[form.workType];
-    if (!p) return null;
-    const isExpress = form.deliveryType === 'EXPRESS' && p.expressPrice != null;
-    const unit = isExpress ? p.expressPrice : p.price;
-    const isFlat = FLAT_PRICE_TYPES.has(form.workType);
-    const count = isFlat ? 1 : Math.max(1, selectedTeeth.length);
-    const total = Math.round(unit * count * (form.isRedo ? 0.5 : 1));
-    return { unit, count, isFlat, isExpress, isRedo: form.isRedo, total };
-  }, [priceMap, form.workType, form.deliveryType, selectedTeeth.length, form.isRedo]);
-
   const set = (field) => (val) => setForm(prev => ({ ...prev, [field]: val }));
 
-  // Auto-calculate the due date from the pricing list whenever work type / delivery type changes
-  useEffect(() => {
-    if (!form.workType) return;
-    const isExpress = form.deliveryType === 'EXPRESS';
-    let days = isExpress && expressDurationMap[form.workType] != null
-      ? expressDurationMap[form.workType]
-      : durationMap[form.workType];
-    if (days == null) days = getDueDays(form.workType);
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    setForm(prev => ({ ...prev, dueDate: d.toISOString().slice(0, 10) }));
-    setAutoCalcDays(days);
-  }, [form.workType, form.deliveryType, durationMap, expressDurationMap]);
-
-  const selectWorkType = (w) => {
-    setForm(prev => ({ ...prev, workType: w }));
-    setShowWorkTypes(false);
+  const updateItem = (index, patch) => {
+    setItems(prev => prev.map((it, i) => i === index ? { ...it, ...patch } : it));
   };
-
-  const toggleTooth = (num) => {
-    setSelectedTeeth(prev =>
-      prev.includes(num)
-        ? prev.filter(t => t !== num)
-        : [...prev, num].sort((a, b) => a - b)
-    );
-  };
+  const addItem = () => setItems(prev => [...prev, emptyItem()]);
+  const removeItem = (index) => setItems(prev => prev.filter((_, i) => i !== index));
 
   const validate = () => {
     if (!form.patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return false; }
-    if (!form.workType) { Alert.alert('Required', 'Please select a work type.'); return false; }
-    // Shade, doctor name & contact are mandatory for new orders (historical entries with a delivery date are exempt)
+    if (items.some(it => !it.workType)) { Alert.alert('Required', 'Please select a work type for every item.'); return false; }
+    // Doctor name/contact/shade are mandatory for new orders (historical entries with a delivery date are exempt)
     if (!form.deliveryDate) {
       if (!form.doctorName.trim())  { Alert.alert('Required', "Please enter the doctor's name."); return false; }
       if (!form.doctorPhone.trim()) { Alert.alert('Required', "Please enter the doctor's contact number."); return false; }
-      if (!form.shade.trim())       { Alert.alert('Required', 'Please enter the shade.'); return false; }
+      for (const it of items) {
+        if (!/aligner/i.test(it.workType) && !it.shade.trim()) {
+          Alert.alert('Required', 'Please select a shade for every non-aligner item.');
+          return false;
+        }
+      }
     }
     return true;
   };
@@ -215,20 +440,46 @@ export default function NewCaseScreen({ navigation }) {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const resolvedUnits = selectedTeeth.length > 0
-        ? selectedTeeth.length
-        : manualUnits ? parseInt(manualUnits) : undefined;
-      const res = await api.post('/cases', {
-        ...form,
-        toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
-        units: resolvedUnits,
+      const buildItemPayload = (item) => {
+        const resolvedUnits = item.selectedTeeth.length > 0
+          ? item.selectedTeeth.length
+          : item.manualUnits ? parseInt(item.manualUnits) : undefined;
+        const p = priceMap[item.workType];
+        const isExpress = form.deliveryType === 'EXPRESS' && p?.expressPrice != null;
+        const unit = p ? (isExpress ? p.expressPrice : p.price) : null;
+        const isFlat = FLAT_PRICE_TYPES.has(item.workType);
+        const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
+        const totalAmount = unit != null ? Math.round(unit * count * (item.isRedo ? 0.5 : 1)) : undefined;
+        return {
+          workType: item.workType,
+          shade: item.shade,
+          toothNumbers: item.selectedTeeth.length > 0 ? item.selectedTeeth.join(', ') : undefined,
+          units: resolvedUnits,
+          isRedo: item.isRedo,
+          totalAmount,
+        };
+      };
+
+      const shared = {
+        patientName: form.patientName,
+        doctorName: form.doctorName,
+        doctorPhone: form.doctorPhone,
+        patientGender: form.patientGender,
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
+        notes: form.notes,
+        deliveryType: form.deliveryType,
         deliveryDate: form.deliveryDate || undefined,
-        totalAmount: selectedPrice ? selectedPrice.total : undefined,
-      });
+      };
+
+      if (items.length === 1) {
+        await api.post('/cases', { ...shared, ...buildItemPayload(items[0]) });
+      } else {
+        await api.post('/cases/bulk', { ...shared, items: items.map(buildItemPayload) });
+      }
+
       Toast.show({
         type: 'success',
-        text1: 'Case Submitted!',
+        text1: items.length > 1 ? `${items.length} Cases Submitted!` : 'Case Submitted!',
         text2: 'Dispatch will assign a driver to collect the impression.',
         visibilityTime: 4000,
       });
@@ -326,213 +577,43 @@ export default function NewCaseScreen({ navigation }) {
             </View>
           </View>
 
-          <View style={styles.row}>
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Age</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 34"
-                placeholderTextColor={Colors.text3}
-                value={form.patientAge}
-                onChangeText={set('patientAge')}
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={{ width: 12 }} />
-            <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Shade *</Text>
-              <TouchableOpacity
-                style={[styles.input, styles.selectInput]}
-                onPress={() => { setShowShades(prev => !prev); setCustomShade(false); }}
-              >
-                <Text style={form.shade ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
-                  {form.shade || 'Select shade…'}
-                </Text>
-                <Text style={styles.selectArrow}>{showShades ? '▲' : '▼'}</Text>
-              </TouchableOpacity>
-              {showShades && (
-                <View style={styles.dropdown}>
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
-                    {SHADE_GROUPS.map(g => (
-                      <View key={g.group} style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
-                        <Text style={styles.shadeGroupLabel}>{g.group}</Text>
-                        <View style={styles.shadeChips}>
-                          {g.shades.map(s => (
-                            <TouchableOpacity
-                              key={s}
-                              style={[styles.shadeChip, form.shade === s && styles.shadeChipActive]}
-                              onPress={() => { set('shade')(s); setShowShades(false); setCustomShade(false); }}
-                            >
-                              <Text style={[styles.shadeChipText, form.shade === s && styles.shadeChipTextActive]}>{s}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                    ))}
-                    <TouchableOpacity
-                      style={[styles.dropdownItem, { marginTop: 4 }]}
-                      onPress={() => { setShowShades(false); setCustomShade(true); if (ALL_SHADES.includes(form.shade)) set('shade')(''); }}
-                    >
-                      <Text style={[styles.dropdownText, { color: Colors.blue }]}>✏️  Custom shade…</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              )}
-              {customShade && (
-                <TextInput
-                  style={[styles.input, { marginTop: 6 }]}
-                  placeholder="Type shade (e.g. OM3, 3M2)…"
-                  placeholderTextColor={Colors.text3}
-                  value={form.shade}
-                  onChangeText={set('shade')}
-                  autoFocus
-                />
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* ── Tooth Selection ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>TOOTH SELECTION</Text>
-          <Text style={styles.subHint}>Tap teeth to mark affected tooth/teeth (FDI numbering)</Text>
-
-          <View style={{ marginTop: 10 }}>
-            <Odontogram selected={selectedTeeth} onToggle={toggleTooth} />
-          </View>
-
-          <View style={styles.teethSummaryRow}>
-            {selectedTeeth.length > 0 ? (
-              <>
-                <Text style={styles.teethSelected}>
-                  Selected: <Text style={{ color: Colors.blue, fontWeight: '700' }}>{selectedTeeth.join(', ')}</Text>
-                </Text>
-                <TouchableOpacity onPress={() => setSelectedTeeth([])}>
-                  <Text style={styles.clearBtn}>Clear all</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <Text style={styles.teethNone}>No teeth selected</Text>
-            )}
-          </View>
-
           <View style={styles.formGroup}>
-            <Text style={styles.label}>
-              Units{selectedTeeth.length > 0 ? ' (auto)' : ''}
-            </Text>
+            <Text style={styles.label}>Age</Text>
             <TextInput
-              style={[styles.input, selectedTeeth.length > 0 && { opacity: 0.6 }]}
+              style={styles.input}
+              placeholder="e.g. 34"
+              placeholderTextColor={Colors.text3}
+              value={form.patientAge}
+              onChangeText={set('patientAge')}
               keyboardType="numeric"
-              placeholder="Enter number of units"
-              placeholderTextColor={Colors.textMuted}
-              value={selectedTeeth.length > 0 ? String(selectedTeeth.length) : manualUnits}
-              onChangeText={v => { if (selectedTeeth.length === 0) setManualUnits(v); }}
-              editable={selectedTeeth.length === 0}
             />
           </View>
         </View>
 
-        {/* ── Work Details ── */}
+        {/* ── Work Items — one per work type; add more for a multi-item
+            order (e.g. 2 Zirconia + a PFM crown) for the same visit ── */}
+        <Text style={styles.itemsHeading}>WORK ORDER{items.length > 1 ? `S (${items.length})` : ''}</Text>
+        {items.map((item, i) => (
+          <WorkItemCard
+            key={item.key}
+            item={item}
+            index={i}
+            onChange={patch => updateItem(i, patch)}
+            onRemove={() => removeItem(i)}
+            canRemove={items.length > 1}
+            priceMap={priceMap}
+            durationMap={durationMap}
+            expressDurationMap={expressDurationMap}
+            deliveryType={form.deliveryType}
+          />
+        ))}
+        <TouchableOpacity style={styles.addItemBtn} onPress={addItem} activeOpacity={0.8}>
+          <Text style={styles.addItemBtnText}>＋ Add another work item</Text>
+        </TouchableOpacity>
+
+        {/* ── Delivery ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>WORK DETAILS</Text>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Work Type *</Text>
-            <TouchableOpacity
-              style={[styles.input, styles.selectInput]}
-              onPress={() => setShowWorkTypes(!showWorkTypes)}
-            >
-              <Text style={form.workType ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
-                {form.workType || 'Select work type…'}
-              </Text>
-              <Text style={styles.selectArrow}>{showWorkTypes ? '▲' : '▼'}</Text>
-            </TouchableOpacity>
-            {showWorkTypes && (
-              <View style={styles.dropdown}>
-                {priceList.length === 0 ? (
-                  <Text style={{ padding: Spacing.md, fontSize: 13, color: Colors.text3, fontStyle: 'italic' }}>
-                    No work types available yet — please contact the lab.
-                  </Text>
-                ) : (
-                  <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-                    {priceList.map(p => (
-                      <TouchableOpacity
-                        key={p.workType}
-                        style={[styles.dropdownItem, styles.dropdownItemRow, form.workType === p.workType && styles.dropdownItemActive]}
-                        onPress={() => selectWorkType(p.workType)}
-                      >
-                        <Text style={[styles.dropdownText, { flex: 1 }, form.workType === p.workType && styles.dropdownTextActive]} numberOfLines={1}>
-                          {p.workType}
-                        </Text>
-                        <Text style={styles.dropdownPrice}>Br {Number(p.price).toLocaleString('en-US')}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            )}
-
-            {/* Estimated amount from the lab's price list */}
-            {selectedPrice && (
-              <View style={styles.priceBox}>
-                <Text style={styles.priceBoxLabel}>Estimated Amount</Text>
-                <Text style={styles.priceBoxValue}>
-                  Br {selectedPrice.total.toLocaleString('en-US')}
-                  {!selectedPrice.isRedo && !selectedPrice.isFlat && selectedPrice.count > 1 && (
-                    <Text style={styles.priceBoxSub}>  ·  Br {selectedPrice.unit.toLocaleString('en-US')} × {selectedPrice.count}</Text>
-                  )}
-                  {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ express</Text>}
-                  {selectedPrice.isRedo && <Text style={styles.priceBoxSub}>  ·  ♻️ 50% redo</Text>}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Redo / Replacement</Text>
-            <TouchableOpacity
-              onPress={() => set('isRedo')(!form.isRedo)}
-              activeOpacity={0.8}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
-                borderRadius: Radius.md, borderWidth: 1.5,
-                borderColor: form.isRedo ? Colors.amber : Colors.border,
-                backgroundColor: form.isRedo ? Colors.amber + '12' : Colors.bg,
-              }}
-            >
-              <Text style={{ fontSize: 18 }}>{form.isRedo ? '☑' : '☐'}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: form.isRedo ? Colors.amber : Colors.text1 }}>
-                  This is a redo / replacement
-                </Text>
-                <Text style={{ fontSize: 11, color: Colors.text3 }}>
-                  Replacing an existing restoration — charged at 50%
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Due Date</Text>
-            {autoCalcDays ? (
-              <View style={{
-                backgroundColor: Colors.blue + '10',
-                borderWidth: 1.5, borderColor: Colors.blue + '40',
-                borderRadius: Radius.md, padding: Spacing.md,
-              }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.blue }}>
-                  📅 {formatDueDate(form.dueDate)}
-                </Text>
-                <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 2 }}>
-                  Auto-calculated · {autoCalcDays} day{autoCalcDays !== 1 ? 's' : ''} for {form.workType}
-                </Text>
-              </View>
-            ) : (
-              <Text style={{ fontSize: 12, color: Colors.text3, fontStyle: 'italic' }}>
-                Select a work type to auto-calculate the due date
-              </Text>
-            )}
-          </View>
+          <Text style={styles.sectionTitle}>DELIVERY</Text>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Delivery Type</Text>
@@ -606,7 +687,7 @@ export default function NewCaseScreen({ navigation }) {
           >
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.submitText}>Submit Case</Text>
+              : <Text style={styles.submitText}>{items.length > 1 ? `Submit ${items.length} Cases` : 'Submit Case'}</Text>
             }
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
@@ -641,6 +722,31 @@ const styles = StyleSheet.create({
   subHint: {
     fontSize: 11, color: Colors.text3, marginBottom: 2,
   },
+
+  itemsHeading: {
+    fontSize: 11, fontWeight: '700', color: Colors.text3,
+    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 2,
+  },
+  itemCard: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    padding: Spacing.lg, marginBottom: Spacing.md, ...Shadow.sm,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  itemCardHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8,
+  },
+  itemCardTitle: {
+    fontSize: 11, fontWeight: '800', color: Colors.text3, letterSpacing: 0.6,
+  },
+  itemRemove: {
+    fontSize: 12, fontWeight: '700', color: Colors.red,
+  },
+  addItemBtn: {
+    borderWidth: 1.5, borderColor: Colors.blue, borderStyle: 'dashed',
+    borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  addItemBtnText: { fontSize: 13, fontWeight: '700', color: Colors.blue },
 
   formGroup: { marginBottom: Spacing.lg },
   label: {
