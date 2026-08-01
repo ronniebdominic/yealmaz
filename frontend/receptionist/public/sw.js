@@ -1,6 +1,6 @@
 // Ye-Almaz Staff Frontend — Service Worker
 // Bump CACHE version any time you want to force all clients to get fresh files
-const CACHE = 'ya-staff-v3';
+const CACHE = 'ya-staff-v4';
 
 self.addEventListener('install', (e) => {
   // Take over immediately without waiting for old tabs to close
@@ -58,5 +58,55 @@ self.addEventListener('fetch', e => {
       }).catch(() => cached || new Response('', { status: 503 }));
       return cached || networkFetch;
     })
+  );
+});
+
+// ── Push notifications ───────────────────────────────────────
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'Ye-Almaz', body: event.data.text() };
+  }
+
+  const { title, body, icon = '/logo.png', data = {} } = payload;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: '/logo.png',
+      vibrate: [200, 100, 200],
+      data,
+      requireInteraction: false,
+    })
+  );
+});
+
+// ── Notification click: open / focus the app ──────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const caseId = event.notification.data?.caseId;
+  const url = caseId ? `/?caseId=${caseId}` : '/';
+
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        for (const client of windowClients) {
+          if ('focus' in client) {
+            client.focus();
+            client.postMessage({ type: 'OPEN_CASE', caseId });
+            return;
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(url);
+        }
+      })
   );
 });

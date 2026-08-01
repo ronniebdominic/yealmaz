@@ -34,6 +34,7 @@ model User {
   deliveries          DeliveryLog[]
   notifications       Notification[]
   assignedDeliveries  Case[]         @relation("AssignedDeliveries")
+  pushSubscriptions   PushSubscription[]
 
   // Inventory / milling bonus
   inventoryTxnsPerformed    InventoryTransaction[]    @relation("InventoryTxnPerformedBy")
@@ -343,10 +344,15 @@ model WorkTypePrice {
 }
 
 // ── PUSH SUBSCRIPTIONS ─────────────────────────────────
+// Exactly one of clinicId/userId is set per row (enforced in app code, not
+// the DB) — clinicId for the clinic app, userId for staff (currently just
+// DELIVERY) subscribing from the receptionist web app.
 model PushSubscription {
   id        String   @id @default(uuid())
-  clinicId  String
-  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  clinicId  String?
+  clinic    Clinic?  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   endpoint  String   @unique
   p256dh    String
   auth      String
@@ -586,24 +592,31 @@ enum AttendanceEventType {
 enum AttendanceSource {
   BIOMETRIC
   MANUAL
+  GEOFENCE // self-service clock-in/out, accepted only within ATTENDANCE_RADIUS_METERS of the lab
 }
 
 // Caseless, caseless-adjacent ledger of raw clock events. Biometric-device
 // integration is not live yet — POST /api/attendance/events is built and
-// secured, ready to receive real device pushes once one is chosen; every
-// row today comes from HR's manual entry (source: MANUAL).
+// secured, ready to receive real device pushes once one is chosen; most
+// rows today come from HR's manual entry (source: MANUAL) or delivery
+// agents' self-service geofenced clock-in/out (source: GEOFENCE).
 model AttendanceEvent {
-  id           String              @id @default(uuid())
-  userId       String
-  user         User                @relation("AttendanceEventsUser", fields: [userId], references: [id])
-  timestamp    DateTime
-  type         AttendanceEventType
-  source       AttendanceSource
-  deviceId     String?
-  recordedById String?             // HR staff who manually entered it; null for biometric-sourced rows
-  recordedBy   User?               @relation("AttendanceEventsRecordedBy", fields: [recordedById], references: [id])
-  note         String?
-  createdAt    DateTime            @default(now())
+  id             String              @id @default(uuid())
+  userId         String
+  user           User                @relation("AttendanceEventsUser", fields: [userId], references: [id])
+  timestamp      DateTime
+  type           AttendanceEventType
+  source         AttendanceSource
+  deviceId       String?
+  recordedById   String?             // HR staff who manually entered it; null for biometric/geofence-sourced rows
+  recordedBy     User?               @relation("AttendanceEventsRecordedBy", fields: [recordedById], references: [id])
+  note           String?
+  // Self-reported location backing a GEOFENCE event — an audit trail HR can
+  // review, not a spoofing-proof guarantee.
+  latitude       Float?
+  longitude      Float?
+  distanceMeters Float?
+  createdAt      DateTime            @default(now())
 
   @@index([userId])
   @@index([timestamp])

@@ -16,9 +16,22 @@ const prisma = new PrismaClient();
 const DUPLICATE_WINDOW_MS = 60 * 1000;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
 
-// Shared validation for both the public device endpoint and manual entry —
-// validates rather than blindly persisting whatever a callback claims.
-async function recordEvent({ userId, timestamp, type, source, deviceId, recordedById }) {
+// Distance between two lat/lng points in meters (haversine formula).
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius, meters
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Shared validation for the public device endpoint, manual entry, and
+// self-service geofenced clock-in/out — validates rather than blindly
+// persisting whatever a callback (or a phone's GPS) claims.
+async function recordEvent({ userId, timestamp, type, source, deviceId, recordedById, latitude, longitude, distanceMeters }) {
   const ts = new Date(timestamp);
   if (isNaN(ts.getTime())) throw { status: 400, message: 'Invalid timestamp.' };
   if (ts.getTime() - Date.now() > FUTURE_SKEW_MS) throw { status: 400, message: 'Timestamp is too far in the future.' };
@@ -46,7 +59,10 @@ async function recordEvent({ userId, timestamp, type, source, deviceId, recorded
   }
 
   return prisma.attendanceEvent.create({
-    data: { userId, timestamp: ts, type, source, deviceId: deviceId || null, recordedById: recordedById || null, note },
+    data: {
+      userId, timestamp: ts, type, source, deviceId: deviceId || null, recordedById: recordedById || null, note,
+      latitude: latitude ?? null, longitude: longitude ?? null, distanceMeters: distanceMeters ?? null,
+    },
   });
 }
 
@@ -88,6 +104,65 @@ router.post('/manual', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[attendance manual]', err);
     res.status(500).json({ error: 'Could not record attendance event.' });
+  }
+});
+
+// ── POST /api/attendance/self ────────────────────────────────
+// Self-service clock-in/out — delivery agents only, accepted only within
+// ATTENDANCE_RADIUS_METERS of the lab (LAB_LATITUDE/LAB_LONGITUDE). No
+// biometric hardware involved; the phone's own GPS is the only input.
+router.post('/self', protect, restrict('DELIVERY'), async (req, res) => {
+  try {
+    const { LAB_LATITUDE, LAB_LONGITUDE, ATTENDANCE_RADIUS_METERS } = process.env;
+    if (!LAB_LATITUDE || !LAB_LONGITUDE || !ATTENDANCE_RADIUS_METERS) {
+      return res.status(503).json({ error: 'Self-service attendance is not configured yet.' });
+    }
+
+    const { type, latitude, longitude } = req.body || {};
+    if (!['CLOCK_IN', 'CLOCK_OUT'].includes(type)) {
+      return res.status(400).json({ error: 'type (CLOCK_IN/CLOCK_OUT) is required.' });
+    }
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      return res.status(400).json({ error: 'latitude and longitude are required.' });
+    }
+
+    const radius = parseFloat(ATTENDANCE_RADIUS_METERS);
+    const distance = haversineMeters(latitude, longitude, parseFloat(LAB_LATITUDE), parseFloat(LAB_LONGITUDE));
+    if (distance > radius) {
+      return res.status(403).json({
+        error: `You're ${Math.round(distance)}m from the lab — must be within ${radius}m to clock ${type === 'CLOCK_IN' ? 'in' : 'out'}.`,
+        distanceMeters: distance,
+        radiusMeters: radius,
+      });
+    }
+
+    const event = await recordEvent({
+      userId: req.user.id, timestamp: new Date().toISOString(), type, source: 'GEOFENCE',
+      latitude, longitude, distanceMeters: distance,
+    });
+    await invalidate('attendance:events*', 'dashboard:hr-summary');
+    res.status(201).json(event);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[attendance self]', err);
+    res.status(500).json({ error: 'Could not record attendance event.' });
+  }
+});
+
+// ── GET /api/attendance/self/today ───────────────────────────
+// Lets the requesting user's own app know whether to show Clock In or
+// Clock Out, without needing the HR-only GET / below.
+router.get('/self/today', protect, async (req, res) => {
+  try {
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const events = await prisma.attendanceEvent.findMany({
+      where: { userId: req.user.id, timestamp: { gte: dayStart } },
+      orderBy: { timestamp: 'asc' },
+    });
+    res.json({ events });
+  } catch (err) {
+    console.error('[attendance self/today]', err);
+    res.status(500).json({ error: 'Could not load attendance.' });
   }
 });
 

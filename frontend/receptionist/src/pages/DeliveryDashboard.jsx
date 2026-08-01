@@ -5,8 +5,28 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   MdCheckCircle, MdUndo, MdLocalHospital, MdLocationOn, MdCall, MdWarning,
-  MdSearch, MdClose, MdLogout,
+  MdSearch, MdClose, MdLogout, MdAccessTime,
 } from 'react-icons/md';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+
+// Wraps the callback-based Geolocation API in a Promise with a friendly
+// error message on denial/timeout/unavailability.
+function getCurrentPosition() {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) {
+      reject(new Error('Location is not available on this device/browser.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos.coords),
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) reject(new Error('Location permission denied. Enable it to clock in/out.'));
+        else reject(new Error('Could not get your location. Please try again.'));
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
 
 // ── Confirm modal ─────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
@@ -81,6 +101,37 @@ export default function DeliveryDashboard() {
   const [search, setSearch]   = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]   = useState('');
+  const [todayEvents, setTodayEvents] = useState([]);
+  const [clocking, setClocking] = useState(false);
+
+  usePushNotifications(!!user?.id);
+
+  const loadAttendance = useCallback(async () => {
+    try {
+      const res = await api.get('/attendance/self/today');
+      setTodayEvents(res.data.events ?? []);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => { loadAttendance(); }, [loadAttendance]);
+
+  const lastEvent = todayEvents[todayEvents.length - 1];
+  const isClockedIn = lastEvent?.type === 'CLOCK_IN';
+
+  const handleClock = async () => {
+    setClocking(true);
+    try {
+      const coords = await getCurrentPosition();
+      const type = isClockedIn ? 'CLOCK_OUT' : 'CLOCK_IN';
+      await api.post('/attendance/self', { type, latitude: coords.latitude, longitude: coords.longitude });
+      toast.success(type === 'CLOCK_IN' ? 'Clocked in!' : 'Clocked out!');
+      loadAttendance();
+    } catch (err) {
+      toast.error(err.response?.data?.error || err.message || 'Could not record attendance.');
+    } finally {
+      setClocking(false);
+    }
+  };
 
   const loadCases = useCallback(async () => {
     try {
@@ -244,6 +295,15 @@ export default function DeliveryDashboard() {
           <div style={{ fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> Live · {user?.name?.split(' ')[0]}
           </div>
+          <button onClick={handleClock} disabled={clocking}
+            style={{
+              background: isClockedIn ? '#DC2626' : '#16A34A', border: 'none', color: '#fff', borderRadius: 7,
+              padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: clocking ? 'not-allowed' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+            }}>
+            <MdAccessTime size={14} />
+            {clocking ? 'Locating…' : isClockedIn ? `Clock Out (in ${format(new Date(lastEvent.timestamp), 'HH:mm')})` : 'Clock In'}
+          </button>
           <button onClick={logout}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
             <MdLogout size={15} />

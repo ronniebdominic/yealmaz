@@ -16,19 +16,22 @@ router.get('/vapid-public-key', (req, res) => {
 });
 
 // ── POST /api/notifications/subscribe ───────────────────
-// Clinic saves their push subscription after granting permission
-router.post('/subscribe', protect, restrict('CLINIC'), async (req, res) => {
+// Clinic or delivery agent saves their push subscription after granting
+// permission. Clinics are keyed by clinicId, staff (DELIVERY) by userId.
+router.post('/subscribe', protect, restrict('CLINIC', 'DELIVERY'), async (req, res) => {
   const { endpoint, keys, userAgent } = req.body;
 
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
     return res.status(400).json({ error: 'Invalid subscription object.' });
   }
 
+  const owner = req.user.role === 'CLINIC' ? { clinicId: req.user.id } : { userId: req.user.id };
+
   try {
     await prisma.pushSubscription.upsert({
       where: { endpoint },
       create: {
-        clinicId: req.user.id,
+        ...owner,
         endpoint,
         p256dh: keys.p256dh,
         auth:   keys.auth,
@@ -37,7 +40,7 @@ router.post('/subscribe', protect, restrict('CLINIC'), async (req, res) => {
       update: {
         p256dh: keys.p256dh,
         auth:   keys.auth,
-        clinicId: req.user.id,
+        ...owner,
       },
     });
     res.json({ success: true });
@@ -48,14 +51,16 @@ router.post('/subscribe', protect, restrict('CLINIC'), async (req, res) => {
 });
 
 // ── DELETE /api/notifications/subscribe ─────────────────
-// Clinic unsubscribes (e.g. on logout or permission revoked)
-router.delete('/subscribe', protect, restrict('CLINIC'), async (req, res) => {
+// Clinic or delivery agent unsubscribes (e.g. on logout or permission revoked)
+router.delete('/subscribe', protect, restrict('CLINIC', 'DELIVERY'), async (req, res) => {
   const { endpoint } = req.body;
   if (!endpoint) return res.status(400).json({ error: 'endpoint required.' });
 
+  const owner = req.user.role === 'CLINIC' ? { clinicId: req.user.id } : { userId: req.user.id };
+
   try {
     await prisma.pushSubscription.deleteMany({
-      where: { endpoint, clinicId: req.user.id },
+      where: { endpoint, ...owner },
     });
     res.json({ success: true });
   } catch (err) {

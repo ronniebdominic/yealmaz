@@ -3,7 +3,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
-const { sendPushToClinic } = require('../utils/webpush');
+const { sendPushToClinic, sendPushToUser } = require('../utils/webpush');
 const { clawBackCasePoints } = require('../utils/rewards');
 
 const router = express.Router();
@@ -171,6 +171,13 @@ router.post('/:caseId/assign', protect, restrict('DISPATCH', 'ADMIN'), async (re
       message: `New case assigned: ${updated.caseNumber} — ${updated.patientName}`
     });
 
+    sendPushToUser(prisma, executiveId, {
+      title: '📦 New Case Assigned',
+      body: `New case assigned: ${updated.caseNumber} — ${updated.patientName}`,
+      icon: '/logo.png',
+      data: { caseId: updated.id, caseNumber: updated.caseNumber },
+    });
+
     // Push notification to the clinic
     sendPushToClinic(prisma, updated.clinicId, {
       title: '🚚 Delivery Partner Assigned',
@@ -253,6 +260,13 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
       caseId: updated.id,
       caseNumber: updated.caseNumber,
       message: `Pickup assigned: ${updated.caseNumber} — collect impression from ${updated.clinic?.name}`
+    });
+
+    sendPushToUser(prisma, executiveId, {
+      title: '📦 Pickup Assigned',
+      body: `Pickup assigned: ${updated.caseNumber} — collect impression from ${updated.clinic?.name}`,
+      icon: '/logo.png',
+      data: { caseId: updated.id, caseNumber: updated.caseNumber },
     });
 
     sendPushToClinic(prisma, updated.clinicId, {
@@ -521,6 +535,13 @@ router.post('/:caseId/send-out', protect, restrict('DISPATCH', 'ADMIN'), async (
       caseId: updated.id,
       caseNumber: updated.caseNumber,
       message: `Delivery assigned: ${updated.caseNumber} — deliver to ${updated.clinic?.name}`,
+    });
+
+    sendPushToUser(prisma, executiveId, {
+      title: '🚚 Delivery Assigned',
+      body: `Delivery assigned: ${updated.caseNumber} — deliver to ${updated.clinic?.name}`,
+      icon: '/logo.png',
+      data: { caseId: updated.id, caseNumber: updated.caseNumber },
     });
 
     sendPushToClinic(prisma, updated.clinicId, {
