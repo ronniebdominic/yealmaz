@@ -595,12 +595,14 @@ model EmployeeProfile {
 enum AttendanceEventType {
   CLOCK_IN
   CLOCK_OUT
+  BREAK_START
+  BREAK_END
 }
 
 enum AttendanceSource {
   BIOMETRIC
   MANUAL
-  GEOFENCE // self-service clock-in/out, accepted only within ATTENDANCE_RADIUS_METERS of the lab
+  GEOFENCE // self-service via the app — CLOCK_IN/CLOCK_OUT are geofenced to ATTENDANCE_RADIUS_METERS of the lab; BREAK_START/BREAK_END are not (agents are on the road)
 }
 
 // Caseless, caseless-adjacent ledger of raw clock events. Biometric-device

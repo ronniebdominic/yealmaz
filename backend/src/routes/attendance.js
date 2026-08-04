@@ -16,6 +16,9 @@ const prisma = new PrismaClient();
 const DUPLICATE_WINDOW_MS = 60 * 1000;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
 
+// "End"-type events that expect an earlier "start"-type event the same day.
+const PAIR_START = { CLOCK_OUT: 'CLOCK_IN', BREAK_END: 'BREAK_START' };
+
 // Distance between two lat/lng points in meters (haversine formula).
 function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000; // Earth radius, meters
@@ -45,17 +48,17 @@ async function recordEvent({ userId, timestamp, type, source, deviceId, recorded
   if (recent) throw { status: 409, message: 'A matching event was already recorded within the last minute.' };
 
   let note = null;
-  if (type === 'CLOCK_OUT') {
+  const startType = PAIR_START[type];
+  if (startType) {
     const dayStart = new Date(ts); dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(ts); dayEnd.setHours(23, 59, 59, 999);
-    const priorIn = await prisma.attendanceEvent.findFirst({
-      where: { userId, type: 'CLOCK_IN', timestamp: { gte: dayStart, lte: ts } },
+    const priorStart = await prisma.attendanceEvent.findFirst({
+      where: { userId, type: startType, timestamp: { gte: dayStart, lte: ts } },
       orderBy: { timestamp: 'desc' },
     });
     // Accepted-but-flagged rather than rejected — biometric terminals
     // generally have no retry logic, so dropping data silently is worse
     // than a flagged anomaly HR can review.
-    if (!priorIn) note = 'auto-flagged: no matching clock-in';
+    if (!priorStart) note = `auto-flagged: no matching ${startType === 'CLOCK_IN' ? 'clock-in' : 'break start'}`;
   }
 
   return prisma.attendanceEvent.create({
@@ -108,32 +111,41 @@ router.post('/manual', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
 });
 
 // ── POST /api/attendance/self ────────────────────────────────
-// Self-service clock-in/out — delivery agents only, accepted only within
-// ATTENDANCE_RADIUS_METERS of the lab (LAB_LATITUDE/LAB_LONGITUDE). No
+// Self-service clock-in/out + break start/end — delivery agents only. No
 // biometric hardware involved; the phone's own GPS is the only input.
+// CLOCK_IN/CLOCK_OUT are accepted only within ATTENDANCE_RADIUS_METERS of
+// the lab (LAB_LATITUDE/LAB_LONGITUDE) — start/end of shift genuinely
+// happens there. BREAK_START/BREAK_END are NOT geofenced — agents are out
+// on their route, not at the lab, when they take a break — but the
+// reported coordinates are still stored for the same audit trail.
+const SELF_TYPES = ['CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END'];
+const SHIFT_BOUNDARY_TYPES = ['CLOCK_IN', 'CLOCK_OUT'];
+
 router.post('/self', protect, restrict('DELIVERY'), async (req, res) => {
   try {
-    const { LAB_LATITUDE, LAB_LONGITUDE, ATTENDANCE_RADIUS_METERS } = process.env;
-    if (!LAB_LATITUDE || !LAB_LONGITUDE || !ATTENDANCE_RADIUS_METERS) {
-      return res.status(503).json({ error: 'Self-service attendance is not configured yet.' });
-    }
-
     const { type, latitude, longitude } = req.body || {};
-    if (!['CLOCK_IN', 'CLOCK_OUT'].includes(type)) {
-      return res.status(400).json({ error: 'type (CLOCK_IN/CLOCK_OUT) is required.' });
+    if (!SELF_TYPES.includes(type)) {
+      return res.status(400).json({ error: `type must be one of: ${SELF_TYPES.join(', ')}.` });
     }
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
       return res.status(400).json({ error: 'latitude and longitude are required.' });
     }
 
-    const radius = parseFloat(ATTENDANCE_RADIUS_METERS);
-    const distance = haversineMeters(latitude, longitude, parseFloat(LAB_LATITUDE), parseFloat(LAB_LONGITUDE));
-    if (distance > radius) {
-      return res.status(403).json({
-        error: `You're ${Math.round(distance)}m from the lab — must be within ${radius}m to clock ${type === 'CLOCK_IN' ? 'in' : 'out'}.`,
-        distanceMeters: distance,
-        radiusMeters: radius,
-      });
+    let distance = null;
+    if (SHIFT_BOUNDARY_TYPES.includes(type)) {
+      const { LAB_LATITUDE, LAB_LONGITUDE, ATTENDANCE_RADIUS_METERS } = process.env;
+      if (!LAB_LATITUDE || !LAB_LONGITUDE || !ATTENDANCE_RADIUS_METERS) {
+        return res.status(503).json({ error: 'Self-service attendance is not configured yet.' });
+      }
+      const radius = parseFloat(ATTENDANCE_RADIUS_METERS);
+      distance = haversineMeters(latitude, longitude, parseFloat(LAB_LATITUDE), parseFloat(LAB_LONGITUDE));
+      if (distance > radius) {
+        return res.status(403).json({
+          error: `You're ${Math.round(distance)}m from the lab — must be within ${radius}m to clock ${type === 'CLOCK_IN' ? 'in' : 'out'}.`,
+          distanceMeters: distance,
+          radiusMeters: radius,
+        });
+      }
     }
 
     const event = await recordEvent({

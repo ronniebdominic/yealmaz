@@ -8,6 +8,7 @@ import { MdGroups, MdPrint } from 'react-icons/md';
 
 const TABS = ['Employees', 'Attendance', 'Leave', 'Payroll Runs'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const ATTENDANCE_TYPE_LABELS = { CLOCK_IN: 'Clock In', CLOCK_OUT: 'Clock Out', BREAK_START: 'Start Break', BREAK_END: 'End Break' };
 
 export default function AdminHR() {
   const [tab, setTab] = useState('Employees');
@@ -95,7 +96,7 @@ export default function AdminHR() {
                   ) : attendance.events.map(ev => (
                     <tr key={ev.id}>
                       <td style={{ fontWeight: 600 }}>{ev.user?.name}</td>
-                      <td style={{ textAlign: 'center' }}>{ev.type === 'CLOCK_IN' ? 'Clock In' : 'Clock Out'}</td>
+                      <td style={{ textAlign: 'center' }}>{ATTENDANCE_TYPE_LABELS[ev.type] || ev.type}</td>
                       <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{format(new Date(ev.timestamp), 'dd MMM yyyy, h:mm a')}</td>
                       <td style={{ textAlign: 'center' }}>{ev.source}</td>
                       <td style={{ fontSize: 12, color: ev.note ? 'var(--red)' : 'var(--text-3)' }}>{ev.note || '—'}</td>

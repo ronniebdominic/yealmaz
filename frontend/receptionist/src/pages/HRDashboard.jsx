@@ -18,6 +18,7 @@ const TABS = [
 ];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const ATTENDANCE_TYPE_LABELS = { CLOCK_IN: 'Clock In', CLOCK_OUT: 'Clock Out', BREAK_START: 'Start Break', BREAK_END: 'End Break' };
 
 const inputStyle = { width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #D1D5DB', boxSizing: 'border-box' };
 const pillStyle = { flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #D1D5DB', background: '#F9FAFB', color: '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 };
@@ -131,9 +132,11 @@ function ClockEventModal({ employees, onClose, onSaved }) {
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={() => setType('CLOCK_IN')} style={{ ...pillStyle, ...(type === 'CLOCK_IN' ? { background: '#DCFCE7', color: '#166534', border: '1.5px solid #16A34A' } : {}) }}>Clock In</button>
             <button onClick={() => setType('CLOCK_OUT')} style={{ ...pillStyle, ...(type === 'CLOCK_OUT' ? { background: '#FEF3C7', color: '#92400E', border: '1.5px solid #D97706' } : {}) }}>Clock Out</button>
+            <button onClick={() => setType('BREAK_START')} style={{ ...pillStyle, ...(type === 'BREAK_START' ? { background: '#FEF3C7', color: '#92400E', border: '1.5px solid #D97706' } : {}) }}>Start Break</button>
+            <button onClick={() => setType('BREAK_END')} style={{ ...pillStyle, ...(type === 'BREAK_END' ? { background: '#DBEAFE', color: '#1E40AF', border: '1.5px solid #2563EB' } : {}) }}>End Break</button>
           </div>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', marginBottom: 4 }}>TIME</div>
@@ -407,7 +410,7 @@ export default function HRDashboard() {
                   ) : attendance.events.map(ev => (
                     <tr key={ev.id} style={{ borderTop: '1px solid #F3F4F6' }}>
                       <td style={{ padding: '9px 14px', fontWeight: 600 }}>{ev.user?.name}</td>
-                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>{ev.type === 'CLOCK_IN' ? 'Clock In' : 'Clock Out'}</td>
+                      <td style={{ padding: '9px 14px', textAlign: 'center' }}>{ATTENDANCE_TYPE_LABELS[ev.type] || ev.type}</td>
                       <td style={{ padding: '9px 14px', color: '#6B7280' }}>{format(new Date(ev.timestamp), 'dd MMM yyyy, h:mm a')}</td>
                       <td style={{ padding: '9px 14px', textAlign: 'center' }}>{ev.source}</td>
                       <td style={{ padding: '9px 14px', color: ev.note ? '#DC2626' : '#9CA3AF', fontSize: 12 }}>{ev.note || '—'}</td>
