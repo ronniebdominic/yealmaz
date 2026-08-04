@@ -24,6 +24,7 @@ import Delivery from './pages/Delivery';
 import DeliveryDashboard from './pages/DeliveryDashboard';
 import DispatchDashboard from './pages/DispatchDashboard';
 import FinanceDashboard from './pages/FinanceDashboard';
+import AdminViewBanner from './components/AdminViewBanner';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -43,6 +44,19 @@ function ProtectedRoute({ children, allowedRoles, allowedEmail }) {
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
   if (allowedEmail && user.email !== allowedEmail) return <Navigate to="/" replace />;
   return children;
+}
+
+// Wraps a role dashboard reached via /view/* with the "admin view mode"
+// banner — but only when the visitor is actually the admin previewing it,
+// not when a real holder of that role reaches the same route directly.
+function ViewAsPage({ label, children }) {
+  const { user } = useAuth();
+  return (
+    <>
+      {user?.role === 'ADMIN' && <AdminViewBanner label={label} />}
+      {children}
+    </>
+  );
 }
 
 function RoleHome() {
@@ -78,6 +92,18 @@ function AppRoutes() {
       <Route path="/admin/rewards" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminRewards /></ProtectedRoute>} />
       <Route path="/admin/inventory" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminInventory /></ProtectedRoute>} />
       <Route path="/admin/hr" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminHR /></ProtectedRoute>} />
+
+      {/* Admin "view as" — lets the admin account open the operational
+          dashboard each role normally logs into directly, without a
+          separate login per role. Same allowedEmail gate as /admin/*. */}
+      <Route path="/view/receptionist" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Receptionist"><Dashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/finance" element={<ProtectedRoute allowedRoles={['ADMIN','FINANCE']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Finance"><FinanceDashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/dispatch" element={<ProtectedRoute allowedRoles={['ADMIN','DISPATCH']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Dispatch"><DispatchDashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','DELIVERY']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Delivery"><DeliveryDashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/lab" element={<ProtectedRoute allowedRoles={['ADMIN','LAB_TECH']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Lab"><LabDashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/hr" element={<ProtectedRoute allowedRoles={['ADMIN','HR_MANAGER']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="HR"><HRDashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/inventory" element={<ProtectedRoute allowedRoles={['ADMIN','INVENTORY_MANAGER']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Inventory"><InventoryDashboard /></ViewAsPage></ProtectedRoute>} />
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

@@ -4,7 +4,21 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
   MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge, MdWarehouse, MdGroups,
+  MdDesk, MdPointOfSale, MdLocalShipping, MdTwoWheeler, MdScience, MdSupervisorAccount, MdInventory,
 } from 'react-icons/md';
+
+// Dashboards each staff role normally logs into directly — the admin
+// account can open any of these to view/operate them without a separate
+// login. Routed under /view/*, gated to the admin account (see App.jsx).
+const VIEW_AS_ITEMS = [
+  { path: '/view/receptionist', label: 'Receptionist',  icon: MdDesk },
+  { path: '/view/finance',      label: 'Finance',       icon: MdPointOfSale },
+  { path: '/view/dispatch',     label: 'Dispatch',      icon: MdLocalShipping },
+  { path: '/view/delivery',     label: 'Delivery',      icon: MdTwoWheeler },
+  { path: '/view/lab',          label: 'Lab',           icon: MdScience },
+  { path: '/view/hr',           label: 'HR Portal',     icon: MdSupervisorAccount },
+  { path: '/view/inventory',    label: 'Inventory',     icon: MdInventory },
+];
 
 function NavItems({ active, onNav }) {
   return (
@@ -45,6 +59,13 @@ function NavItems({ active, onNav }) {
       <button className={active('/admin/hr')} onClick={() => onNav('/admin/hr')}>
         <MdGroups className="mi" size={17} /> HR & Payroll
       </button>
+
+      <div className="nav-section-label">Switch Dashboard</div>
+      {VIEW_AS_ITEMS.map(item => (
+        <button key={item.path} className={active(item.path)} onClick={() => onNav(item.path)}>
+          <item.icon className="mi" size={17} /> {item.label}
+        </button>
+      ))}
     </>
   );
 }
