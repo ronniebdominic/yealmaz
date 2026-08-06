@@ -383,12 +383,21 @@ export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
     patientGender: '', notes: '',
-    deliveryType: 'NORMAL', deliveryDate: '',
+    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
+    archUpper: false, archLower: false,
   });
   const [items, setItems] = useState([emptyItem()]);
   const [submitting, setSubmitting] = useState(false);
   // The lab's pricing list is the single source of truth for selectable work types
   const [priceList, setPriceList] = useState([]);
+
+  // Digital-scan intake fee: Br 500 per arch, on top of the work-type price.
+  // Applied to the first item only — one scan session covers the whole visit.
+  // Mirrors the receptionist app's New Case page exactly.
+  const ARCH_FEE = 500;
+  const archFee = (form.intakeMethod === 'EMAIL_3D_FILE')
+    ? (form.archUpper ? ARCH_FEE : 0) + (form.archLower ? ARCH_FEE : 0)
+    : 0;
 
   useEffect(() => {
     api.get('/prices').then(res => setPriceList(res.data || [])).catch(() => {});
@@ -422,6 +431,10 @@ export default function NewCaseScreen({ navigation }) {
   const validate = () => {
     if (!form.patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return false; }
     if (items.some(it => !it.workType)) { Alert.alert('Required', 'Please select a work type for every item.'); return false; }
+    if (form.intakeMethod === 'EMAIL_3D_FILE' && !form.archUpper && !form.archLower) {
+      Alert.alert('Required', 'Select at least one arch (Upper/Lower) that was scanned.');
+      return false;
+    }
     // Doctor name/contact/shade are mandatory for new orders (historical entries with a delivery date are exempt)
     if (!form.deliveryDate) {
       if (!form.doctorName.trim())  { Alert.alert('Required', "Please enter the doctor's name."); return false; }
@@ -440,7 +453,7 @@ export default function NewCaseScreen({ navigation }) {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const buildItemPayload = (item) => {
+      const buildItemPayload = (item, index) => {
         const resolvedUnits = item.selectedTeeth.length > 0
           ? item.selectedTeeth.length
           : item.manualUnits ? parseInt(item.manualUnits) : undefined;
@@ -449,7 +462,9 @@ export default function NewCaseScreen({ navigation }) {
         const unit = p ? (isExpress ? p.expressPrice : p.price) : null;
         const isFlat = FLAT_PRICE_TYPES.has(item.workType);
         const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
-        const totalAmount = unit != null ? Math.round(unit * count * (item.isRedo ? 0.5 : 1)) : undefined;
+        // Arch scan fee rides on the first item only — one scan session covers the whole visit.
+        const fee = index === 0 ? archFee : 0;
+        const totalAmount = unit != null ? Math.round((unit * count + fee) * (item.isRedo ? 0.5 : 1)) : undefined;
         return {
           workType: item.workType,
           shade: item.shade,
@@ -460,19 +475,27 @@ export default function NewCaseScreen({ navigation }) {
         };
       };
 
+      const isEmailFile = form.intakeMethod === 'EMAIL_3D_FILE';
+      const archLabel = [form.archUpper && 'Upper', form.archLower && 'Lower'].filter(Boolean).join(' & ');
+      const scanNote = isEmailFile
+        ? `3D file intake — Arches scanned: ${archLabel || 'none selected'}${archFee > 0 ? ` (Br ${archFee.toLocaleString('en-US')} scan fee)` : ''}`
+        : null;
+      const dropOffAtLab = form.intakeMethod === 'DROP_OFF' || isEmailFile;
+
       const shared = {
         patientName: form.patientName,
         doctorName: form.doctorName,
         doctorPhone: form.doctorPhone,
         patientGender: form.patientGender,
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
-        notes: form.notes,
+        notes: [scanNote, form.notes].filter(Boolean).join('\n'),
         deliveryType: form.deliveryType,
         deliveryDate: form.deliveryDate || undefined,
+        dropOffAtLab,
       };
 
       if (items.length === 1) {
-        await api.post('/cases', { ...shared, ...buildItemPayload(items[0]) });
+        await api.post('/cases', { ...shared, ...buildItemPayload(items[0], 0) });
       } else {
         await api.post('/cases/bulk', { ...shared, items: items.map(buildItemPayload) });
       }
@@ -480,7 +503,9 @@ export default function NewCaseScreen({ navigation }) {
       Toast.show({
         type: 'success',
         text1: items.length > 1 ? `${items.length} Cases Submitted!` : 'Case Submitted!',
-        text2: 'Dispatch will assign a driver to collect the impression.',
+        text2: dropOffAtLab
+          ? 'Your case is on its way into production — no pickup needed.'
+          : 'Dispatch will assign a driver to collect the impression.',
         visibilityTime: 4000,
       });
       navigation.navigate('Main', { screen: 'Cases' });
@@ -610,6 +635,76 @@ export default function NewCaseScreen({ navigation }) {
         <TouchableOpacity style={styles.addItemBtn} onPress={addItem} activeOpacity={0.8}>
           <Text style={styles.addItemBtnText}>＋ Add another work item</Text>
         </TouchableOpacity>
+
+        {/* ── Intake Method ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>INTAKE METHOD</Text>
+
+          <View style={{ gap: 10 }}>
+            {[
+              { value: 'PICKUP',        label: 'To Be Picked Up',   icon: '🛵', desc: 'A delivery exec will collect the impression from you' },
+              { value: 'DROP_OFF',      label: 'Dropped at Lab',    icon: '📦', desc: 'You’re bringing the impression to the lab yourself' },
+              { value: 'EMAIL_3D_FILE', label: '3D File (Digital Scan)', icon: '💻', desc: 'You’re sending an intraoral scan file instead of a physical impression' },
+            ].map(opt => {
+              const active = form.intakeMethod === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => set('intakeMethod')(opt.value)}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 10,
+                    padding: 12, borderRadius: Radius.md, borderWidth: 2,
+                    borderColor: active ? Colors.blue : Colors.border,
+                    backgroundColor: active ? Colors.blue + '12' : Colors.bg,
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>{opt.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.blue : Colors.text1 }}>
+                      {opt.label}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.text3 }}>{opt.desc}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {form.intakeMethod === 'EMAIL_3D_FILE' && (
+            <View style={{ marginTop: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.blue + '10', borderWidth: 1.5, borderColor: Colors.blue + '40' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.blue, marginBottom: 8 }}>
+                Arch(es) Scanned — Br {ARCH_FEE.toLocaleString('en-US')} per arch
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {[
+                  { field: 'archUpper', label: 'Upper Arch', checked: form.archUpper },
+                  { field: 'archLower', label: 'Lower Arch', checked: form.archLower },
+                ].map(opt => (
+                  <TouchableOpacity
+                    key={opt.field}
+                    onPress={() => set(opt.field)(!opt.checked)}
+                    activeOpacity={0.8}
+                    style={{
+                      flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+                      padding: 10, borderRadius: Radius.md, borderWidth: 1.5,
+                      borderColor: opt.checked ? Colors.blue : Colors.border,
+                      backgroundColor: opt.checked ? Colors.surface : Colors.bg,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{opt.checked ? '☑' : '☐'}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: opt.checked ? Colors.blue : Colors.text1 }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {archFee > 0 && (
+                <Text style={{ fontSize: 12, color: Colors.blue, marginTop: 8, fontWeight: '600' }}>
+                  Scan fee: Br {archFee.toLocaleString('en-US')} — added on top of the {items.length > 1 ? 'first item’s' : 'work-type'} price.
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
 
         {/* ── Delivery ── */}
         <View style={styles.section}>
