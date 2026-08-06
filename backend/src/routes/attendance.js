@@ -135,12 +135,20 @@ router.post('/self', protect, restrict(...STAFF_ROLES), async (req, res) => {
 
     let distance = null;
     if (SHIFT_BOUNDARY_TYPES.includes(type)) {
-      const { LAB_LATITUDE, LAB_LONGITUDE, ATTENDANCE_RADIUS_METERS } = process.env;
-      if (!LAB_LATITUDE || !LAB_LONGITUDE || !ATTENDANCE_RADIUS_METERS) {
+      const labLat = parseFloat(process.env.LAB_LATITUDE);
+      const labLon = parseFloat(process.env.LAB_LONGITUDE);
+      const radius = parseFloat(process.env.ATTENDANCE_RADIUS_METERS);
+      // Number.isFinite, not a truthy/!! check — an unparseable env var
+      // (empty, missing, or non-numeric junk) must FAIL CLOSED as "not
+      // configured," never silently pass through. `distance > NaN` is
+      // always false in JS, which would otherwise accept a clock-in from
+      // anywhere on Earth without ever rejecting it.
+      if (!Number.isFinite(labLat) || !Number.isFinite(labLon) || !Number.isFinite(radius)) {
+        console.error('[attendance self] LAB_LATITUDE/LAB_LONGITUDE/ATTENDANCE_RADIUS_METERS missing or non-numeric:',
+          { LAB_LATITUDE: process.env.LAB_LATITUDE, LAB_LONGITUDE: process.env.LAB_LONGITUDE, ATTENDANCE_RADIUS_METERS: process.env.ATTENDANCE_RADIUS_METERS });
         return res.status(503).json({ error: 'Self-service attendance is not configured yet.' });
       }
-      const radius = parseFloat(ATTENDANCE_RADIUS_METERS);
-      distance = haversineMeters(latitude, longitude, parseFloat(LAB_LATITUDE), parseFloat(LAB_LONGITUDE));
+      distance = haversineMeters(latitude, longitude, labLat, labLon);
       if (distance > radius) {
         return res.status(403).json({
           error: `You're ${Math.round(distance)}m from the lab — must be within ${radius}m to clock ${type === 'CLOCK_IN' ? 'in' : 'out'}.`,
