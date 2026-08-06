@@ -807,12 +807,16 @@ const BILLING_VIEWS = [
   { id: 'invoices', label: 'Invoices', icon: MdDescription },
   { id: 'verify',   label: 'Verify Payments', icon: MdCreditCard },
 ];
-function BillingTab({ view = 'invoices', onView }) {
+function BillingTab({ view = 'invoices', onView, scope = 'FULL' }) {
   const queryClient = useQueryClient();
+  // Cashier has no backend access to /payments/invoices or /clinics (not
+  // scoped by caller yet — see docs/enhancements-plan.md §9) — hide that
+  // view rather than let them click into a 403.
+  const views = scope === 'CASHIER' ? BILLING_VIEWS.filter(v => v.id !== 'invoices') : BILLING_VIEWS;
   return (
     <>
       <div className="filters" style={{ margin: '0 0 18px', flexWrap: 'wrap' }}>
-        {BILLING_VIEWS.map(v => (
+        {views.map(v => (
           <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <v.icon size={14} /> {v.label}
           </button>
@@ -2575,21 +2579,34 @@ const NAV_GROUPS = [
 ];
 const MAIN_TABS = NAV_GROUPS.flatMap(g => g.items);
 
+// Narrower finance accounts (client request 5/8/2026): FINANCE_AP only follows
+// up Trusted Partners; FINANCE_CASHIER only does day-to-day collection. Both
+// are enforced backend-side (restrict() in payments.js/dashboard.js) — this
+// scope just keeps the UI from linking to pages/queries those roles get a
+// 403 from.
+const scopeForRole = (role) => role === 'FINANCE_AP' ? 'AP' : role === 'FINANCE_CASHIER' ? 'CASHIER' : 'FULL';
+
 export default function FinanceDashboard() {
   const { user, logout } = useAuth();
-  const [tab, setTab]    = useState('dashboard');
-  const [billingView, setBillingView] = useState('invoices'); // invoices | verify
+  const scope = scopeForRole(user?.role);
+  const [tab, setTab]    = useState(() => scope === 'AP' ? 'trusted' : scope === 'CASHIER' ? 'billing' : 'dashboard');
+  const [billingView, setBillingView] = useState(() => scope === 'CASHIER' ? 'verify' : 'invoices'); // invoices | verify
   const [reportView, setReportView]   = useState('overview');  // overview | history | balances | cases
   const [open, setOpen]  = useState(false);
   const queryClient      = useQueryClient();
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'FN';
+  const roleLabel = scope === 'AP' ? 'Finance — AP' : scope === 'CASHIER' ? 'Finance — Cashier' : 'Finance';
 
+  // dashboard/summary and finance-report are FULL-scope only (backend restrict()
+  // doesn't grant them to FINANCE_AP/FINANCE_CASHIER) — AP/Cashier skip the
+  // 'dashboard' tab entirely, so these would just be wasted 403s otherwise.
   const { data: summary } = useQuery({
     queryKey: ['dashboard', 'summary'],
     queryFn: fetchSummary,
     staleTime: 60_000,
     refetchInterval: 120_000,
+    enabled: scope === 'FULL',
   });
 
   const { data: pending = [] } = useQuery({
@@ -2597,12 +2614,14 @@ export default function FinanceDashboard() {
     queryFn: fetchPending,
     staleTime: 30_000,
     refetchInterval: 60_000,
+    enabled: scope !== 'AP',
   });
 
   const { data: billing = [] } = useQuery({
     queryKey: ['payments', 'billing'],
     queryFn: fetchBilling,
     staleTime: 60_000,
+    enabled: scope !== 'AP',
   });
 
   // Accurate trusted-partner status straight from the summary endpoint
@@ -2611,6 +2630,7 @@ export default function FinanceDashboard() {
     queryFn: fetchTrustedSummary,
     staleTime: 60_000,
     refetchInterval: 120_000,
+    enabled: scope !== 'CASHIER',
   });
   const trustedOutstanding = trustedSummary.filter(c => c.outstanding > 0).length;
   const trustedBillsDue    = trustedSummary.filter(c => c.billOverdue).length;
@@ -2620,6 +2640,7 @@ export default function FinanceDashboard() {
     queryFn: () => fetchFinanceReport({}),
     staleTime: 120_000,
     refetchInterval: 120_000,
+    enabled: scope === 'FULL',
   });
 
   const uploadedCount  = billing.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED').length;
@@ -2637,10 +2658,19 @@ export default function FinanceDashboard() {
 
   const setTabAndClose = (id) => { setTab(id); setOpen(false); };
 
+  // AP only follows up Trusted Partners; Cashier only does Billing/collection —
+  // trim the nav (and thus the only tabs reachable) to match what the backend
+  // actually grants each role.
+  const navGroups = scope === 'AP'
+    ? NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => i.id === 'trusted') })).filter(g => g.items.length)
+    : scope === 'CASHIER'
+    ? NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => i.id === 'billing') })).filter(g => g.items.length)
+    : NAV_GROUPS;
+
   // Shared nav renderer — used by both the mobile drawer and the desktop sidebar
   const NavList = ({ onNav }) => (
     <nav className="sidebar-nav">
-      {NAV_GROUPS.map(grp => (
+      {navGroups.map(grp => (
         <React.Fragment key={grp.group}>
           <div className="nav-section-label">{grp.group}</div>
           {grp.items.map(item => {
@@ -2678,7 +2708,7 @@ export default function FinanceDashboard() {
         <div className="drawer-logo">
           <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>Finance</span>
+          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>{roleLabel}</span>
         </div>
         <NavList onNav={setTabAndClose} />
         <div className="drawer-footer">
@@ -2687,7 +2717,7 @@ export default function FinanceDashboard() {
             <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
-              <div className="user-role">Finance</div>
+              <div className="user-role">{roleLabel}</div>
             </div>
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
@@ -2702,7 +2732,7 @@ export default function FinanceDashboard() {
             style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }}
           />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>Finance</span>
+          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>{roleLabel}</span>
         </div>
 
         <NavList onNav={setTab} />
@@ -2713,7 +2743,7 @@ export default function FinanceDashboard() {
             <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
-              <div className="user-role">Finance</div>
+              <div className="user-role">{roleLabel}</div>
             </div>
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
@@ -2814,7 +2844,7 @@ export default function FinanceDashboard() {
 
           {/* ── Tab content ─────────────────────────────── */}
           {tab === 'ready'    && <ReadyForDeliveryTab />}
-          {tab === 'billing'  && <BillingTab view={billingView} onView={setBillingView} />}
+          {tab === 'billing'  && <BillingTab view={billingView} onView={setBillingView} scope={scope} />}
           {tab === 'trusted'  && <TrustedPartnersTab queryClient={queryClient} />}
           {tab === 'report'   && <ReportTab view={reportView} onView={setReportView} />}
         </div>

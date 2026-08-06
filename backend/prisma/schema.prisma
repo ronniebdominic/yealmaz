@@ -69,6 +69,8 @@ enum Role {
   FINANCE
   INVENTORY_MANAGER
   HR_MANAGER
+  FINANCE_AP
+  FINANCE_CASHIER
 }
 
 // ── ZONES ──────────────────────────────────────────────

@@ -679,7 +679,7 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
 
 // ── GET /api/dashboard/trusted-partners-summary ──────────
 // Per-clinic aggregated stats for trusted partner (isExcluded) clinics
-router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
   const cacheKey = 'payments:trusted-summary';
   const cached = await appCache.get(cacheKey);
   if (cached) return res.json(cached);

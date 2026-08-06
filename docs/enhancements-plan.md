@@ -130,12 +130,19 @@ Detailed in the Excel beyond the 6 bullets. Much is partially built.
 - **Phase 3 — DONE.** Excel export via existing `xlsx` dep: `backend/src/utils/excel.js` helper + `GET /api/cases/export` + `GET /api/payments/export`; frontend `downloadExport()` in `api.js` + Export buttons on Cases page, reception ready list, and Finance → History tab. No migration.
 - **A2 — DONE (code).** `isRedo` flag on Case (distinct from `remake`): redo/replacement = replacing an existing in-mouth restoration, charged at 50%. Toggle on both new-case forms halves the amount; backend stores `isRedo`; dashboard "Redo" counter now counts `isRedo` (was `status:REMAKE`); CaseDetailModal shows a Redo row. **Needs migration (below).**
 - **B2 — DONE.** Removed the "Ready for Delivery" list from the reception dashboard (duplicated Dispatch); kept the Ready-to-Dispatch count. No migration.
+- **Phase 5 — code DONE.** `FINANCE_AP` (trusted-partner follow-up: `/payments/trusted`, `/payments/statement/:clinicId`, `/payments/:caseId/fs-number`, `/payments/:caseId/collect`, `/dashboard/trusted-partners-summary`) and `FINANCE_CASHIER` (`/payments/:caseId/collect`, `/payments/billing`, `/payments/pending`, `/payments/:caseId/verify`, `/payments/gateway`) added to the `Role` enum and wired into `payments.js`/`dashboard.js` `restrict()`. `FinanceDashboard.jsx` now derives a `scope` (`FULL`/`AP`/`CASHIER`) from `user.role`, trims the sidebar/drawer nav to just the tab each scope can reach, defaults straight into that tab (skipping the mixed 'dashboard' overview, which calls FULL-only endpoints), and disables queries the role has no backend access to. `AdminUsers.jsx` role dropdown + colors updated so Admin can create the two accounts. Plain `FINANCE` role is untouched (still full access). **Needs migration (below).**
 
 ### ⚠️ PENDING MIGRATIONS — run in Supabase SQL Editor before deploying that code, then deploy (Railway `npm run build` auto-runs `prisma generate`)
 
 **A2 — `isRedo` column. CRITICAL: deploying A2 code without this column breaks `POST /cases` (case creation) AND the dashboard summary — run this FIRST/with the A2 deploy.** Additive & safe:
 ```sql
 ALTER TABLE cases ADD COLUMN IF NOT EXISTS "isRedo" BOOLEAN NOT NULL DEFAULT false;
+```
+
+**Phase 5 — new `Role` enum values. CRITICAL: deploying this code without these values breaks login/user-creation for the two new roles (and Prisma Client generation expects them to match `schema.prisma`) — run before/with this deploy.** Additive & safe:
+```sql
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'FINANCE_AP';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'FINANCE_CASHIER';
 ```
 
 **B4 — `case_comments` table** (only the comments feature 500s without it; not catastrophic):
@@ -150,3 +157,48 @@ CREATE TABLE IF NOT EXISTS case_comments (
 );
 CREATE INDEX IF NOT EXISTS "case_comments_caseId_idx" ON case_comments("caseId");
 ```
+
+---
+
+## 9. Phase 5 — Finance role split: Accounts Payable + Cashier accounts
+
+Source: client WhatsApp 5/8/2026 — two proposed finance accounts: (1) an "accounts payable" account that only follows up trusted partners, (2) a "cashier" account that does daily real-time collection from upfront-paying clinics, described as a stopgap "until Chapa is integrated."
+
+**Note for the client:** Chapa online payment is already fully implemented in this codebase ([payments.js](../backend/src/routes/payments.js) — `chapa-nodejs`, initialize/webhook/verify flow). Worth clarifying with them whether the cashier role is still wanted as a permanent walk-in/cash-collection role (most labs need one regardless of gateway status) or whether they believed Chapa wasn't live yet.
+
+### Design decision — recommend confirming before building
+Add two new **hard, backend-enforced** `Role` enum values — `FINANCE_AP` and `FINANCE_CASHIER` — following the same pattern as the existing `HR_MANAGER` / `INVENTORY_MANAGER` roles, rather than a soft permission flag on the existing `FINANCE` role. This app's entire authz model is `restrict('ROLE', ...)` at the route level ([auth.js](../backend/src/middleware/auth.js)), so a real Role value keeps AP/Cashier access enforced at the API layer even if the frontend is bypassed, and costs only a one-line addition per route. The existing `FINANCE` role is untouched and keeps full access — recommended as the "finance manager/owner" account that can still see everything.
+
+**Confirm with client:** keep `FINANCE` (full access) as a third role for oversight, or should AP/Cashier fully replace it?
+
+### Backend changes
+1. **schema.prisma**: add `FINANCE_AP`, `FINANCE_CASHIER` to `enum Role`.
+2. **payments.js** — extend `restrict()` allow-lists:
+   - **AP scope** (trusted-partner follow-up only): `GET /trusted`, `GET /statement/:clinicId`, `POST /:caseId/fs-number` → add `FINANCE_AP`.
+   - **Cashier scope** (upfront/walk-in collection): `POST /:caseId/collect`, `GET /billing`, `GET /pending`, `POST /:caseId/verify` (screenshot approval is also a real-time payment confirmation) → add `FINANCE_CASHIER`.
+   - Deliberately **not** granting AP/Cashier `GET /export`, `/invoices`, `/gateway`, `/history` — none of these endpoints scope results by caller (an AP or Cashier user would see *all* payments, not just their slice), so until that scoping exists those stay `ADMIN, FINANCE` only.
+3. **dashboard.js** — `finance-report`, `clinic-balances`, `trusted-partners-summary` stay `ADMIN, FINANCE` only (aggregate views, not needed by either single-purpose UI yet).
+
+### Frontend changes
+1. **App.jsx** (~line 68): route `FINANCE_AP` / `FINANCE_CASHIER` to `<FinanceDashboard />` like `FINANCE`, passing a `scope` prop derived from `user.role`.
+2. **FinanceDashboard.jsx**: gate tabs by scope — `FULL` (`FINANCE`/`ADMIN`) unchanged; `AP` shows only Trusted Partners; `CASHIER` shows only Billing/Collect (+ Verify Payments). This is a UX convenience layer — the real guard is the backend `restrict()` change above.
+3. **AdminUsers.jsx**: add `FINANCE_AP` ("Finance — AP") and `FINANCE_CASHIER` ("Finance — Cashier") to the `ROLE_MAP` dropdown + `ROLE_COLORS` so Admin can create these accounts from the existing Users screen.
+
+### Migration
+```sql
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'FINANCE_AP';
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'FINANCE_CASHIER';
+```
+Additive & safe — run in Supabase SQL editor before deploying the code that references these values (same flow as §0).
+
+### Open decisions
+- Retire plain `FINANCE` once AP/Cashier exist, or keep it as a third "sees everything" role?
+- Should Cashier get `POST /:caseId/request` (send payment request/amount due), or only collect against an amount already set by Dispatch/Reception (current behavior)?
+- Confirm with client what "until Chapa is integrated" means, given Chapa is already live in code.
+
+### Sequencing
+1. Migration (enum values) — additive, zero risk.
+2. `payments.js` `restrict()` updates.
+3. `AdminUsers.jsx` role dropdown (needed to actually create the two accounts).
+4. `FinanceDashboard.jsx` tab gating.
+5. Manual QA: create one AP + one Cashier test user, confirm each only sees/can hit their scoped tabs/endpoints, confirm a stray call to an out-of-scope endpoint 403s.

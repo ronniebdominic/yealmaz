@@ -258,7 +258,7 @@ router.get('/chapa/status/:caseId', protect, async (req, res) => {
 });
 
 // ── POST /api/payments/:caseId/verify ───────────────────
-router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'FINANCE_CASHIER'), async (req, res) => {
   try {
     const { action, rejectionReason } = req.body;
     if (!['APPROVE', 'REJECT'].includes(action)) {
@@ -331,7 +331,7 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
 });
 
 // ── GET /api/payments/billing ────────────────────────────
-router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'FINANCE_CASHIER'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:billing:${page}:${limit}`;
@@ -435,7 +435,7 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
 
 // ── POST /api/payments/:caseId/collect ──────────────────
 // Admin manually marks payment as collected (cash, bank transfer, etc.) — no screenshot needed
-router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASHIER', 'FINANCE_AP'), async (req, res) => {
   try {
     const { amount, notes, taxWithheld } = req.body;
 
@@ -595,7 +595,7 @@ router.post('/:caseId/override', protect, restrict('ADMIN'), async (req, res) =>
 });
 
 // ── GET /api/payments/pending ────────────────────────────
-router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), async (req, res) => {
+router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'FINANCE_CASHIER'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:pending:${page}:${limit}`;
@@ -626,7 +626,7 @@ router.get('/pending', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE'), as
 // ── GET /api/payments/gateway ────────────────────────────
 // Clinic-app payment transactions (online gateway + screenshot uploads) with
 // their outcome, so finance can see success / failed / pending at a glance.
-router.get('/gateway', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+router.get('/gateway', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASHIER'), async (req, res) => {
   const { limit = 200 } = req.query;
   const cacheKey = `payments:gateway:${limit}`;
   const cached = await appCache.get(cacheKey);
@@ -788,7 +788,7 @@ router.get('/invoices', protect, restrict('ADMIN', 'FINANCE'), async (req, res) 
 
 // ── GET /api/payments/trusted ────────────────────────────
 // Pending cases from isExcluded clinics — collected in person by finance
-router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+router.get('/trusted', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
   const { page = 1, limit = 20, search = '', clinicId } = req.query;
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const cacheKey = `payments:trusted:${page}:${limit}:${search}:${clinicId || ''}`;
@@ -842,7 +842,7 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE'), async (req, res) =
 
 // ── GET /api/payments/statement/:clinicId ────────────────
 // All outstanding (PENDING) cases for a trusted clinic, optionally filtered by month
-router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
   const { clinicId } = req.params;
   const { dateFrom, dateTo } = req.query;
 
@@ -886,7 +886,7 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE'), async 
 // Manually recorded FS number (the clinic's paper sales-invoice/fiscal
 // receipt number) — Finance types this in while reconciling a Trusted
 // Partner bill, since the lab has no fiscal-device integration.
-router.post('/:caseId/fs-number', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+router.post('/:caseId/fs-number', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
   const { caseId } = req.params;
   const { fsNumber } = req.body;
 

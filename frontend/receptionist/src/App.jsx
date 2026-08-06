@@ -65,7 +65,7 @@ function RoleHome() {
   if (user.role === 'DELIVERY') return <DeliveryDashboard />;
   if (user.role === 'DISPATCH') return <DispatchDashboard />;
   if (user.role === 'LAB_TECH') return <LabDashboard />;
-  if (user.role === 'FINANCE') return <FinanceDashboard />;
+  if (user.role === 'FINANCE' || user.role === 'FINANCE_AP' || user.role === 'FINANCE_CASHIER') return <FinanceDashboard />;
   if (user.role === 'INVENTORY_MANAGER') return <InventoryDashboard />;
   if (user.role === 'HR_MANAGER') return <HRDashboard />;
   if (user.role === 'ADMIN' && user.email === 'admindashboard@yealmaz.com') return <Navigate to="/admin" replace />;
