@@ -8,6 +8,7 @@ import {
   MdLogout, MdAdd, MdEdit, MdClose, MdWarning, MdCheckCircle,
   MdCancel, MdHistory, MdInventory2, MdPendingActions, MdTrendingUp, MdTrendingDown,
 } from 'react-icons/md';
+import AttendanceClock from '../components/AttendanceClock';
 
 const TABS = [
   { id: 'stock', label: 'Stock', icon: MdInventory2 },
@@ -241,8 +242,9 @@ export default function InventoryDashboard() {
             <span style={{ fontSize: 11, background: 'rgba(180,83,9,0.25)', color: '#FBBF24', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>Inventory Manager</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#B45309', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</div>
+          <AttendanceClock />
           <button onClick={logout} title="Logout"
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
             <MdLogout size={15} />

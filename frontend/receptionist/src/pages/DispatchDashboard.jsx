@@ -19,6 +19,7 @@ import {
   MdClose, MdLocalHospital, MdMap, MdSearch, MdDelete, MdBlock,
 } from 'react-icons/md';
 import { todayLocal } from '../utils/date';
+import AttendanceClock from '../components/AttendanceClock';
 
 const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—';
 
@@ -995,6 +996,7 @@ export default function DispatchDashboard() {
         </div>
         <SidebarNav close={() => setOpen(false)} />
         <div className="drawer-footer">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /></div>
           <div className="user-info">
             <div className="user-avatar" style={{ background: '#3B82F6', color: '#fff' }}>{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Dispatch</div></div>
@@ -1011,6 +1013,7 @@ export default function DispatchDashboard() {
         </div>
         <SidebarNav />
         <div className="sidebar-footer">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /></div>
           <div className="user-info">
             <div className="user-avatar" style={{ background: '#3B82F6', color: '#fff' }}>{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Dispatch</div></div>

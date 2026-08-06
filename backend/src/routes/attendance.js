@@ -111,17 +111,19 @@ router.post('/manual', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
 });
 
 // ── POST /api/attendance/self ────────────────────────────────
-// Self-service clock-in/out + break start/end — delivery agents only. No
-// biometric hardware involved; the phone's own GPS is the only input.
-// CLOCK_IN/CLOCK_OUT are accepted only within ATTENDANCE_RADIUS_METERS of
-// the lab (LAB_LATITUDE/LAB_LONGITUDE) — start/end of shift genuinely
-// happens there. BREAK_START/BREAK_END are NOT geofenced — agents are out
-// on their route, not at the lab, when they take a break — but the
+// Self-service clock-in/out + break start/end — any staff account (not
+// CLINIC/ADMIN). No biometric hardware involved; the phone's own GPS is
+// the only input. CLOCK_IN/CLOCK_OUT are accepted only within
+// ATTENDANCE_RADIUS_METERS of the lab (LAB_LATITUDE/LAB_LONGITUDE) —
+// start/end of shift genuinely happens there. BREAK_START/BREAK_END are
+// NOT geofenced — most relevant for delivery agents, who are out on their
+// route rather than at the lab, but applies uniformly to everyone; the
 // reported coordinates are still stored for the same audit trail.
 const SELF_TYPES = ['CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END'];
 const SHIFT_BOUNDARY_TYPES = ['CLOCK_IN', 'CLOCK_OUT'];
+const STAFF_ROLES = ['DELIVERY', 'RECEPTIONIST', 'DISPATCH', 'LAB_TECH', 'FINANCE', 'INVENTORY_MANAGER', 'HR_MANAGER'];
 
-router.post('/self', protect, restrict('DELIVERY'), async (req, res) => {
+router.post('/self', protect, restrict(...STAFF_ROLES), async (req, res) => {
   try {
     const { type, latitude, longitude } = req.body || {};
     if (!SELF_TYPES.includes(type)) {

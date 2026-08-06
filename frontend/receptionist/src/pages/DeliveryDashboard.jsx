@@ -5,28 +5,10 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   MdCheckCircle, MdUndo, MdLocalHospital, MdLocationOn, MdCall, MdWarning,
-  MdSearch, MdClose, MdLogout, MdAccessTime, MdFreeBreakfast,
+  MdSearch, MdClose, MdLogout,
 } from 'react-icons/md';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-
-// Wraps the callback-based Geolocation API in a Promise with a friendly
-// error message on denial/timeout/unavailability.
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!('geolocation' in navigator)) {
-      reject(new Error('Location is not available on this device/browser.'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve(pos.coords),
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) reject(new Error('Location permission denied. Enable it to clock in/out.'));
-        else reject(new Error('Could not get your location. Please try again.'));
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  });
-}
+import AttendanceClock from '../components/AttendanceClock';
 
 // ── Confirm modal ─────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
@@ -101,47 +83,8 @@ export default function DeliveryDashboard() {
   const [search, setSearch]   = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]   = useState('');
-  const [todayEvents, setTodayEvents] = useState([]);
-  const [clocking, setClocking] = useState(false);
 
   usePushNotifications(!!user?.id);
-
-  const loadAttendance = useCallback(async () => {
-    try {
-      const res = await api.get('/attendance/self/today');
-      setTodayEvents(res.data.events ?? []);
-    } catch (e) { console.error(e); }
-  }, []);
-
-  useEffect(() => { loadAttendance(); }, [loadAttendance]);
-
-  // Attendance state, derived purely from today's last event — mirrors what
-  // the backend itself infers (no separate "current status" endpoint needed).
-  const lastEvent = todayEvents[todayEvents.length - 1];
-  const onBreak = lastEvent?.type === 'BREAK_START';
-  const isClockedIn = lastEvent?.type === 'CLOCK_IN' || lastEvent?.type === 'BREAK_END';
-  // lastEvent isn't necessarily the CLOCK_IN itself once breaks are in play
-  // (e.g. it could be a BREAK_END) — find the actual clock-in time for the label.
-  const clockInEvent = [...todayEvents].reverse().find(e => e.type === 'CLOCK_IN');
-
-  const CLOCK_TOAST = {
-    CLOCK_IN: 'Clocked in!', CLOCK_OUT: 'Clocked out!',
-    BREAK_START: 'Break started!', BREAK_END: 'Break ended!',
-  };
-
-  const handleClock = async (type) => {
-    setClocking(true);
-    try {
-      const coords = await getCurrentPosition();
-      await api.post('/attendance/self', { type, latitude: coords.latitude, longitude: coords.longitude });
-      toast.success(CLOCK_TOAST[type]);
-      loadAttendance();
-    } catch (err) {
-      toast.error(err.response?.data?.error || err.message || 'Could not record attendance.');
-    } finally {
-      setClocking(false);
-    }
-  };
 
   const loadCases = useCallback(async () => {
     try {
@@ -305,41 +248,7 @@ export default function DeliveryDashboard() {
           <div style={{ fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> Live · {user?.name?.split(' ')[0]}
           </div>
-          {onBreak ? (
-            <button onClick={() => handleClock('BREAK_END')} disabled={clocking}
-              style={{
-                background: '#2563EB', border: 'none', color: '#fff', borderRadius: 7,
-                padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: clocking ? 'not-allowed' : 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-              }}>
-              <MdFreeBreakfast size={14} />
-              {clocking ? 'Locating…' : `End Break (since ${format(new Date(lastEvent.timestamp), 'HH:mm')})`}
-            </button>
-          ) : (
-            <>
-              {isClockedIn && (
-                <button onClick={() => handleClock('BREAK_START')} disabled={clocking}
-                  style={{
-                    background: '#D97706', border: 'none', color: '#fff', borderRadius: 7,
-                    padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: clocking ? 'not-allowed' : 'pointer',
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                  }}>
-                  <MdFreeBreakfast size={14} /> Start Break
-                </button>
-              )}
-              <button onClick={() => handleClock(isClockedIn ? 'CLOCK_OUT' : 'CLOCK_IN')} disabled={clocking}
-                style={{
-                  background: isClockedIn ? '#DC2626' : '#16A34A', border: 'none', color: '#fff', borderRadius: 7,
-                  padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: clocking ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                }}>
-                <MdAccessTime size={14} />
-                {clocking ? 'Locating…' : isClockedIn
-                  ? `Clock Out${clockInEvent ? ` (in ${format(new Date(clockInEvent.timestamp), 'HH:mm')})` : ''}`
-                  : 'Clock In'}
-              </button>
-            </>
-          )}
+          <AttendanceClock />
           <button onClick={logout}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
             <MdLogout size={15} />
