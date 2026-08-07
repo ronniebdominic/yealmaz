@@ -5,8 +5,10 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../../api/client';
-import { Colors, Spacing, Radius, Shadow } from '../../utils/theme';
+import { Colors, Spacing, Radius, Shadow, FontFamily } from '../../utils/theme';
+import GlassCard from '../../components/GlassCard';
 
 const SHADE_GROUPS = [
   { group: 'Vita A',  shades: ['A1', 'A2', 'A3', 'A3.5', 'A4'] },
@@ -73,8 +75,8 @@ function Odontogram({ selected, onToggle }) {
             justifyContent: 'center',
             marginHorizontal: 1,
             borderWidth: 1.5,
-            borderColor: active ? Colors.blue : Colors.border,
-            backgroundColor: active ? Colors.blue : Colors.surface,
+            borderColor: active ? Colors.primary : Colors.border,
+            backgroundColor: active ? Colors.primary : Colors.surface,
             borderTopLeftRadius: isUpper ? 4 : 0,
             borderTopRightRadius: isUpper ? 4 : 0,
             borderBottomLeftRadius: isUpper ? 0 : 4,
@@ -178,7 +180,7 @@ function WorkItemCard({
   };
 
   return (
-    <View style={styles.itemCard}>
+    <GlassCard strong style={styles.itemCard}>
       <View style={styles.itemCardHeader}>
         <Text style={styles.itemCardTitle}>ITEM {index + 1}</Text>
         {canRemove && (
@@ -198,7 +200,7 @@ function WorkItemCard({
         {item.selectedTeeth.length > 0 ? (
           <>
             <Text style={styles.teethSelected}>
-              Selected: <Text style={{ color: Colors.blue, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
+              Selected: <Text style={{ color: Colors.primary, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
             </Text>
             <TouchableOpacity onPress={() => onChange({ selectedTeeth: [] })}>
               <Text style={styles.clearBtn}>Clear all</Text>
@@ -234,7 +236,7 @@ function WorkItemCard({
           <Text style={item.workType ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
             {item.workType || 'Select work type…'}
           </Text>
-          <Text style={styles.selectArrow}>{showWorkTypes ? '▲' : '▼'}</Text>
+          <MaterialCommunityIcons name={showWorkTypes ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.text3} />
         </TouchableOpacity>
         {showWorkTypes && (
           <View style={styles.dropdown}>
@@ -286,7 +288,7 @@ function WorkItemCard({
             <Text style={item.shade ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
               {item.shade || 'Select shade…'}
             </Text>
-            <Text style={styles.selectArrow}>{showShades ? '▲' : '▼'}</Text>
+            <MaterialCommunityIcons name={showShades ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.text3} />
           </TouchableOpacity>
           {showShades && (
             <View style={styles.dropdown}>
@@ -311,7 +313,7 @@ function WorkItemCard({
                   style={[styles.dropdownItem, { marginTop: 4 }]}
                   onPress={() => { setShowShades(false); setCustomShade(true); if (ALL_SHADES.includes(item.shade)) onChange({ shade: '' }); }}
                 >
-                  <Text style={[styles.dropdownText, { color: Colors.blue }]}>✏️  Custom shade…</Text>
+                  <Text style={[styles.dropdownText, { color: Colors.primary }]}>✏️  Custom shade…</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -357,11 +359,11 @@ function WorkItemCard({
         <Text style={styles.label}>Due Date</Text>
         {autoCalcDays ? (
           <View style={{
-            backgroundColor: Colors.blue + '10',
-            borderWidth: 1.5, borderColor: Colors.blue + '40',
+            backgroundColor: Colors.primary + '10',
+            borderWidth: 1.5, borderColor: Colors.primary + '40',
             borderRadius: Radius.md, padding: Spacing.md,
           }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.blue }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.primary }}>
               📅 {formatDueDate(item.dueDate)}
             </Text>
             <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 2 }}>
@@ -374,7 +376,7 @@ function WorkItemCard({
           </Text>
         )}
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -521,7 +523,7 @@ export default function NewCaseScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor={Colors.navy} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -537,7 +539,7 @@ export default function NewCaseScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Patient Information ── */}
-        <View style={styles.section}>
+        <GlassCard strong style={styles.section}>
           <Text style={styles.sectionTitle}>PATIENT INFORMATION</Text>
 
           <View style={styles.formGroup}>
@@ -588,11 +590,11 @@ export default function NewCaseScreen({ navigation }) {
                       style={{
                         flex: 1, height: 48, alignItems: 'center', justifyContent: 'center',
                         borderRadius: Radius.md, borderWidth: 1.5,
-                        borderColor: active ? Colors.blue : Colors.border,
-                        backgroundColor: active ? Colors.blue + '15' : Colors.bg,
+                        borderColor: active ? Colors.primary : Colors.border,
+                        backgroundColor: active ? Colors.primary + '15' : Colors.bg,
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.blue : Colors.text2 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.primary : Colors.text2 }}>
                         {g}
                       </Text>
                     </TouchableOpacity>
@@ -613,7 +615,7 @@ export default function NewCaseScreen({ navigation }) {
               keyboardType="numeric"
             />
           </View>
-        </View>
+        </GlassCard>
 
         {/* ── Work Items — one per work type; add more for a multi-item
             order (e.g. 2 Zirconia + a PFM crown) for the same visit ── */}
@@ -637,14 +639,14 @@ export default function NewCaseScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* ── Intake Method ── */}
-        <View style={styles.section}>
+        <GlassCard strong style={styles.section}>
           <Text style={styles.sectionTitle}>INTAKE METHOD</Text>
 
           <View style={{ gap: 10 }}>
             {[
-              { value: 'PICKUP',        label: 'To Be Picked Up',   icon: '🛵', desc: 'A delivery exec will collect the impression from you' },
-              { value: 'DROP_OFF',      label: 'Dropped at Lab',    icon: '📦', desc: 'You’re bringing the impression to the lab yourself' },
-              { value: 'EMAIL_3D_FILE', label: '3D File (Digital Scan)', icon: '💻', desc: 'You’re sending an intraoral scan file instead of a physical impression' },
+              { value: 'PICKUP',        label: 'To Be Picked Up',   icon: 'moped',                  desc: 'A delivery exec will collect the impression from you' },
+              { value: 'DROP_OFF',      label: 'Dropped at Lab',    icon: 'package-variant-closed',  desc: 'You’re bringing the impression to the lab yourself' },
+              { value: 'EMAIL_3D_FILE', label: '3D File (Digital Scan)', icon: 'laptop',              desc: 'You’re sending an intraoral scan file instead of a physical impression' },
             ].map(opt => {
               const active = form.intakeMethod === opt.value;
               return (
@@ -655,16 +657,16 @@ export default function NewCaseScreen({ navigation }) {
                   style={{
                     flexDirection: 'row', alignItems: 'center', gap: 10,
                     padding: 12, borderRadius: Radius.md, borderWidth: 2,
-                    borderColor: active ? Colors.blue : Colors.border,
-                    backgroundColor: active ? Colors.blue + '12' : Colors.bg,
+                    borderColor: active ? Colors.primary : Colors.border,
+                    backgroundColor: active ? Colors.primary + '12' : Colors.bg,
                   }}
                 >
-                  <Text style={{ fontSize: 20 }}>{opt.icon}</Text>
+                  <MaterialCommunityIcons name={opt.icon} size={20} color={active ? Colors.primary : Colors.text2} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.blue : Colors.text1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: FontFamily.bold, color: active ? Colors.primary : Colors.text1 }}>
                       {opt.label}
                     </Text>
-                    <Text style={{ fontSize: 11, color: Colors.text3 }}>{opt.desc}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: FontFamily.regular, color: Colors.text3 }}>{opt.desc}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -672,8 +674,8 @@ export default function NewCaseScreen({ navigation }) {
           </View>
 
           {form.intakeMethod === 'EMAIL_3D_FILE' && (
-            <View style={{ marginTop: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.blue + '10', borderWidth: 1.5, borderColor: Colors.blue + '40' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.blue, marginBottom: 8 }}>
+            <View style={{ marginTop: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.primary + '10', borderWidth: 1.5, borderColor: Colors.primary + '40' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.primary, marginBottom: 8 }}>
                 Arch(es) Scanned — Br {ARCH_FEE.toLocaleString('en-US')} per arch
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -688,37 +690,37 @@ export default function NewCaseScreen({ navigation }) {
                     style={{
                       flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
                       padding: 10, borderRadius: Radius.md, borderWidth: 1.5,
-                      borderColor: opt.checked ? Colors.blue : Colors.border,
+                      borderColor: opt.checked ? Colors.primary : Colors.border,
                       backgroundColor: opt.checked ? Colors.surface : Colors.bg,
                     }}
                   >
                     <Text style={{ fontSize: 16 }}>{opt.checked ? '☑' : '☐'}</Text>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: opt.checked ? Colors.blue : Colors.text1 }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: opt.checked ? Colors.primary : Colors.text1 }}>{opt.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
               {archFee > 0 && (
-                <Text style={{ fontSize: 12, color: Colors.blue, marginTop: 8, fontWeight: '600' }}>
+                <Text style={{ fontSize: 12, color: Colors.primary, marginTop: 8, fontWeight: '600' }}>
                   Scan fee: Br {archFee.toLocaleString('en-US')} — added on top of the {items.length > 1 ? 'first item’s' : 'work-type'} price.
                 </Text>
               )}
             </View>
           )}
-        </View>
+        </GlassCard>
 
         {/* ── Delivery ── */}
-        <View style={styles.section}>
+        <GlassCard strong style={styles.section}>
           <Text style={styles.sectionTitle}>DELIVERY</Text>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Delivery Type</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {[
-                { value: 'NORMAL',  label: 'Normal Delivery',  icon: '🚚', desc: 'Standard turnaround' },
-                { value: 'EXPRESS', label: 'Express Delivery', icon: '⚡', desc: 'Priority / urgent' },
+                { value: 'NORMAL',  label: 'Normal Delivery',  icon: 'truck-delivery-outline', desc: 'Standard turnaround' },
+                { value: 'EXPRESS', label: 'Express Delivery', icon: 'lightning-bolt-outline',  desc: 'Priority / urgent' },
               ].map(opt => {
                 const active = form.deliveryType === opt.value;
-                const activeColor = opt.value === 'EXPRESS' ? Colors.amber : Colors.blue;
+                const activeColor = opt.value === 'EXPRESS' ? Colors.amber : Colors.primary;
                 return (
                   <TouchableOpacity
                     key={opt.value}
@@ -732,12 +734,12 @@ export default function NewCaseScreen({ navigation }) {
                       backgroundColor: active ? activeColor + '12' : Colors.bg,
                     }}
                   >
-                    <Text style={{ fontSize: 22 }}>{opt.icon}</Text>
+                    <MaterialCommunityIcons name={opt.icon} size={22} color={active ? activeColor : Colors.text2} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: active ? activeColor : Colors.text1 }}>
+                      <Text style={{ fontSize: 12, fontFamily: FontFamily.bold, color: active ? activeColor : Colors.text1 }}>
                         {opt.label}
                       </Text>
-                      <Text style={{ fontSize: 10, color: Colors.text3 }}>{opt.desc}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: FontFamily.regular, color: Colors.text3 }}>{opt.desc}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -770,7 +772,7 @@ export default function NewCaseScreen({ navigation }) {
               textAlignVertical="top"
             />
           </View>
-        </View>
+        </GlassCard>
 
         {/* ── Submit ── */}
         <View style={styles.submitWrap}>
@@ -796,19 +798,19 @@ export default function NewCaseScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: {
-    backgroundColor: Colors.navy, paddingTop: 52, paddingBottom: 14,
+    backgroundColor: Colors.primary, paddingTop: 52, paddingBottom: 14,
     paddingHorizontal: Spacing.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl,
   },
-  backText: { fontSize: 14, color: Colors.accent, fontWeight: '600', width: 60 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  backText: { fontSize: 14, color: '#fff', fontFamily: FontFamily.semibold, width: 60 },
+  headerTitle: { fontSize: 18, fontFamily: FontFamily.extrabold, color: '#fff' },
   scroll: { padding: Spacing.lg, paddingBottom: 60 },
 
   section: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    padding: Spacing.lg, marginBottom: Spacing.md, ...Shadow.sm,
+    padding: Spacing.lg, marginBottom: Spacing.md,
   },
   sectionTitle: {
     fontSize: 11, fontWeight: '700', color: Colors.text3,
@@ -823,9 +825,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 8, marginTop: 2,
   },
   itemCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    padding: Spacing.lg, marginBottom: Spacing.md, ...Shadow.sm,
-    borderWidth: 1, borderColor: Colors.border,
+    padding: Spacing.lg, marginBottom: Spacing.md,
   },
   itemCardHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8,
@@ -837,11 +837,11 @@ const styles = StyleSheet.create({
     fontSize: 12, fontWeight: '700', color: Colors.red,
   },
   addItemBtn: {
-    borderWidth: 1.5, borderColor: Colors.blue, borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed',
     borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center',
     marginBottom: Spacing.md,
   },
-  addItemBtnText: { fontSize: 13, fontWeight: '700', color: Colors.blue },
+  addItemBtnText: { fontSize: 13, fontWeight: '700', color: Colors.primary },
 
   formGroup: { marginBottom: Spacing.lg },
   label: {
@@ -881,10 +881,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingVertical: 13,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  dropdownItemActive: { backgroundColor: Colors.blue + '10' },
+  dropdownItemActive: { backgroundColor: Colors.primary + '10' },
   dropdownItemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dropdownText: { fontSize: 14, color: Colors.text1 },
-  dropdownTextActive: { color: Colors.blue, fontWeight: '700' },
+  dropdownTextActive: { color: Colors.primary, fontWeight: '700' },
   dropdownPrice: { fontSize: 12, fontWeight: '700', color: Colors.text3, marginLeft: 10 },
 
   // Estimated amount box
@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
   // Submit
   submitWrap: { gap: 10, marginTop: 8 },
   submitBtn: {
-    backgroundColor: Colors.blue, borderRadius: Radius.md,
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
     height: 54, alignItems: 'center', justifyContent: 'center', ...Shadow.md,
   },
   submitText: { fontSize: 16, fontWeight: '700', color: '#fff' },
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.md,
     borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg,
   },
-  shadeChipActive: { borderColor: Colors.blue, backgroundColor: Colors.blue + '15' },
+  shadeChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '15' },
   shadeChipText: { fontSize: 13, fontWeight: '600', color: Colors.text2 },
-  shadeChipTextActive: { fontSize: 13, fontWeight: '700', color: Colors.blue },
+  shadeChipTextActive: { fontSize: 13, fontWeight: '700', color: Colors.primary },
 });

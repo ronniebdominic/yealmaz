@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Image, Animated, StyleSheet, Dimensions, StatusBar } from 'react-native';
-
-const { width } = Dimensions.get('window');
+import { View, Text, Image, Animated, StyleSheet, StatusBar } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Colors, FontFamily } from '../utils/theme';
 
 export default function SplashScreen() {
   const logoScale  = useRef(new Animated.Value(0.6)).current;
@@ -52,10 +52,10 @@ export default function SplashScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B1D3A" />
+    <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      {/* Logo */}
+      {/* Logo — glass ring instead of flat white */}
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
         <View style={styles.logoRing}>
           <Image
@@ -83,14 +83,13 @@ export default function SplashScreen() {
 
       {/* Footer */}
       <Text style={styles.footer}>Ye-Almaz Dental Lab · Addis Ababa</Text>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B1D3A',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -102,9 +101,11 @@ const styles = StyleSheet.create({
     width: 130,
     height: 130,
     borderRadius: 65,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
     padding: 6,
-    shadowColor: '#F0A500',
+    shadowColor: Colors.gold,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.55,
     shadowRadius: 24,
@@ -122,15 +123,15 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 34,
-    fontWeight: '800',
+    fontFamily: FontFamily.extrabold,
     color: '#fff',
     letterSpacing: 1.5,
     marginBottom: 4,
   },
   appSub: {
     fontSize: 15,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.55)',
+    fontFamily: FontFamily.medium,
+    color: 'rgba(255,255,255,0.65)',
     letterSpacing: 3,
     textTransform: 'uppercase',
     marginBottom: 18,
@@ -138,14 +139,14 @@ const styles = StyleSheet.create({
   divider: {
     width: 40,
     height: 2,
-    backgroundColor: '#F0A500',
+    backgroundColor: Colors.gold,
     borderRadius: 2,
     marginBottom: 14,
   },
   tagline: {
     fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.35)',
+    fontFamily: FontFamily.semibold,
+    color: 'rgba(255,255,255,0.45)',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -160,14 +161,15 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#F0A500',
+    backgroundColor: Colors.gold,
   },
 
   footer: {
     position: 'absolute',
     bottom: 36,
     fontSize: 11,
-    color: 'rgba(255,255,255,0.2)',
+    fontFamily: FontFamily.regular,
+    color: 'rgba(255,255,255,0.35)',
     letterSpacing: 0.5,
   },
 });

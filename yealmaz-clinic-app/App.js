@@ -5,10 +5,14 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, Platform, Animated, StyleSheet } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import Toast from 'react-native-toast-message';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFonts, Sora_400Regular, Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold } from '@expo-google-fonts/sora';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
-import { Colors } from './src/utils/theme';
+import { Colors, Gradients, GLASS_BLUR_WEB, GLASS_BLUR_NATIVE } from './src/utils/theme';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import SplashScreen from './src/screens/SplashScreen';
 
@@ -33,9 +37,42 @@ import RewardsScreen from './src/screens/rewards/RewardsScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ name, focused }) {
-  const icons = { Home: focused?'🏠':'🏡', Cases: focused?'📋':'📄', NewCase: focused?'➕':'✚', Rewards: focused?'🎁':'🎀', Profile: focused?'👤':'👥' };
-  return <Text style={{ fontSize: 22 }}>{icons[name]}</Text>;
+const TAB_ICONS = {
+  Home: 'view-dashboard-outline',
+  Cases: 'clipboard-text-outline',
+  NewCase: 'plus-circle-outline',
+  Rewards: 'gift-outline',
+  Profile: 'account-circle-outline',
+};
+
+function TabIcon({ name, focused, color }) {
+  return <MaterialCommunityIcons name={TAB_ICONS[name]} size={focused ? 25 : 23} color={color} />;
+}
+
+// Glass tab-bar background — real blur on native, CSS backdrop-filter on web.
+function GlassTabBackground() {
+  if (Platform.OS === 'web') {
+    return (
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            backgroundColor: Colors.glassBgStrong,
+            borderTopWidth: 1,
+            borderTopColor: Colors.glassBorder,
+            backdropFilter: `blur(${GLASS_BLUR_WEB}px)`,
+            WebkitBackdropFilter: `blur(${GLASS_BLUR_WEB}px)`,
+          },
+        ]}
+      />
+    );
+  }
+  return (
+    <View style={StyleSheet.absoluteFillObject}>
+      <BlurView intensity={GLASS_BLUR_NATIVE} tint="light" style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: Colors.glassBgStrong, borderTopWidth: 1, borderTopColor: Colors.glassBorder }]} />
+    </View>
+  );
 }
 
 function MainTabs() {
@@ -43,11 +80,12 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-        tabBarActiveTintColor: Colors.blue,
+        tabBarIcon: ({ focused, color }) => <TabIcon name={route.name} focused={focused} color={color} />,
+        tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.text3,
-        tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.border, borderTopWidth: 1, height: 60, paddingBottom: 8, paddingTop: 6 },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarStyle: { backgroundColor: 'transparent', borderTopWidth: 0, height: 60, paddingBottom: 8, paddingTop: 6, elevation: 0 },
+        tabBarBackground: () => <GlassTabBackground />,
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home' }} />
@@ -75,8 +113,8 @@ function AppNavigator() {
     return <SplashScreen />;
   }
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <NavigationContainer theme={{ colors: { background: 'transparent' } }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: 'transparent' } }}>
         {!clinic ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
@@ -125,19 +163,29 @@ function OfflineBanner() {
 const offlineStyles = StyleSheet.create({
   bar: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 9999,
-    backgroundColor: '#1a1a2e', paddingVertical: 12, paddingHorizontal: 16,
+    backgroundColor: Colors.ink, paddingVertical: 12, paddingHorizontal: 16,
     alignItems: 'center',
   },
-  text: { color: '#FFD166', fontSize: 13, fontWeight: '600' },
+  text: { color: '#FFD166', fontSize: 13, fontFamily: 'Sora_600SemiBold' },
 });
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Sora_400Regular, Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold,
+  });
+
+  if (!fontsLoaded) {
+    return <SplashScreen />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <OfflineBanner />
-        <AppNavigator />
-        <Toast />
+        <LinearGradient colors={Gradients.screen} style={{ flex: 1 }}>
+          <OfflineBanner />
+          <AppNavigator />
+          <Toast />
+        </LinearGradient>
       </AuthProvider>
     </QueryClientProvider>
   );

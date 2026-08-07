@@ -8,11 +8,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import api, { API_BASE } from '../../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, Radius, Shadow, STAGES, PAYMENT_STATUS } from '../../utils/theme';
+import { Colors, Spacing, Radius, FontFamily, STAGES, PAYMENT_STATUS } from '../../utils/theme';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import GlassCard from '../../components/GlassCard';
 
 const STAGE_ORDER = [
   'CASE_ACCEPTED',
@@ -45,11 +47,11 @@ function buildInvoiceHTML(c) {
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:32px;font-size:14px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #1565C0}
-  .lab-name{font-size:20px;font-weight:800;color:#1565C0;margin-bottom:4px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #0E9F6E}
+  .lab-name{font-size:20px;font-weight:800;color:#0E9F6E;margin-bottom:4px}
   .lab-sub{font-size:11px;color:#888;line-height:1.5}
   .inv-meta{text-align:right}
-  .inv-meta h1{font-size:26px;font-weight:800;color:#1565C0;letter-spacing:2px}
+  .inv-meta h1{font-size:26px;font-weight:800;color:#0E9F6E;letter-spacing:2px}
   .inv-num{font-size:12px;color:#555;margin-top:4px;font-family:monospace}
   .status-pill{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-top:6px}
   .paid{background:#D1FAE5;color:#065F46}
@@ -62,11 +64,11 @@ function buildInvoiceHTML(c) {
   .date-val{font-size:12px;font-weight:600}
   .date-mono{font-family:monospace}
   table{width:100%;border-collapse:collapse;margin-bottom:20px}
-  thead tr{background:#1565C0;color:#fff}
+  thead tr{background:#0E9F6E;color:#fff}
   th{padding:9px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:0.5px}
   td{padding:12px 14px;border-bottom:1px solid #eee;font-size:13px}
-  .total-row td{background:#F0F5FF;font-weight:700;border-bottom:none}
-  .total-amt{color:#1565C0;font-size:18px;font-weight:800;text-align:right}
+  .total-row td{background:#EAFBF3;font-weight:700;border-bottom:none}
+  .total-amt{color:#0E9F6E;font-size:18px;font-weight:800;text-align:right}
   .notes{background:#FFFBEB;border-radius:6px;padding:12px;font-size:12px;color:#555;margin-bottom:20px}
   .footer{margin-top:32px;padding-top:14px;border-top:1px solid #eee;font-size:10px;color:#aaa;text-align:center;line-height:1.7}
 </style></head><body>
@@ -325,7 +327,7 @@ export default function CaseDetailScreen({ navigation, route }) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color={Colors.blue} size="large" />
+        <ActivityIndicator color={Colors.primary} size="large" />
       </View>
     );
   }
@@ -333,12 +335,12 @@ export default function CaseDetailScreen({ navigation, route }) {
   if (loadError || !caseData) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={{ fontSize: 32, marginBottom: 12 }}>⚠️</Text>
-        <Text style={{ color: Colors.text1, fontWeight: '700', fontSize: 16, marginBottom: 8 }}>
+        <MaterialCommunityIcons name="alert-circle-outline" size={32} color={Colors.red} style={{ marginBottom: 12 }} />
+        <Text style={{ color: Colors.text1, fontFamily: FontFamily.bold, fontSize: 16, marginBottom: 8 }}>
           {loadError ? 'Failed to load case' : 'Case not found'}
         </Text>
         {loadError ? (
-          <Text style={{ color: '#ef9a9a', fontSize: 12, textAlign: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ color: '#ef9a9a', fontSize: 12, fontFamily: FontFamily.regular, textAlign: 'center', paddingHorizontal: 32 }}>
             Cannot reach server — check your network.
           </Text>
         ) : null}
@@ -346,7 +348,7 @@ export default function CaseDetailScreen({ navigation, route }) {
     );
   }
 
-  const stage = STAGES[caseData.status] || { label: caseData.status, color: Colors.text3, icon: '📄' };
+  const stage = STAGES[caseData.status] || { label: caseData.status, color: Colors.text3, icon: 'file-outline' };
   const pay = PAYMENT_STATUS[caseData.paymentStatus];
   const canUploadPayment = ['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus);
   const hasPaymentRequest = ['PAYMENT_REQUESTED', 'REJECTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(caseData.paymentStatus);
@@ -354,33 +356,33 @@ export default function CaseDetailScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.navy} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <MaterialCommunityIcons name="chevron-left" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{caseData.patientName}</Text>
-        <View style={{ width: 60 }} />
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={Colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={Colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
 
         {/* ── Status Hero ── */}
-        <View style={[styles.statusHero, { backgroundColor: stage.color }]}>
-          <Text style={styles.statusHeroIcon}>{stage.icon}</Text>
+        <GlassCard dark radius={0} style={[styles.statusHero, { backgroundColor: stage.color + 'CC' }]}>
+          <MaterialCommunityIcons name={stage.icon} size={38} color="#fff" style={{ marginBottom: 8 }} />
           <Text style={styles.statusHeroLabel}>{stage.label}</Text>
           <Text style={styles.statusHeroCase}>{caseData.caseNumber || 'Awaiting Scan #'}</Text>
-        </View>
+        </GlassCard>
 
 
         {/* ── Case Info ── */}
-        <View style={styles.card}>
+        <GlassCard strong style={styles.card}>
           <Text style={styles.cardTitle}>Case Details</Text>
           <InfoRow label="Patient" value={caseData.patientName} />
           <InfoRow label="Work Type" value={caseData.workType} />
@@ -406,16 +408,16 @@ export default function CaseDetailScreen({ navigation, route }) {
               <Text style={styles.notesText}>{caseData.notes}</Text>
             </View>
           )}
-        </View>
+        </GlassCard>
 
         {/* ── Payment Section ── */}
-        <View style={styles.card}>
+        <GlassCard strong style={styles.card}>
           <Text style={styles.cardTitle}>Payment</Text>
 
           {/* No payment request yet */}
           {!hasPaymentRequest && (
             <View style={[styles.invoiceNotesBox, { backgroundColor: Colors.surface2 }]}>
-              <Text style={{ fontSize: 13, color: Colors.text3, textAlign: 'center', lineHeight: 19 }}>
+              <Text style={{ fontSize: 13, fontFamily: FontFamily.regular, color: Colors.text3, textAlign: 'center', lineHeight: 19 }}>
                 The lab will send you a payment request once your work is ready for collection.
               </Text>
             </View>
@@ -426,14 +428,14 @@ export default function CaseDetailScreen({ navigation, route }) {
             <>
               {/* Amount due card */}
               <View style={{
-                backgroundColor: Colors.blue + '10', borderWidth: 1.5,
-                borderColor: Colors.blue + '30', borderRadius: Radius.md,
+                backgroundColor: Colors.primary + '10', borderWidth: 1.5,
+                borderColor: Colors.primary + '30', borderRadius: Radius.md,
                 padding: Spacing.md, marginBottom: Spacing.md,
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <View>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Amount Due</Text>
-                  <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.blue }}>
+                  <Text style={{ fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Amount Due</Text>
+                  <Text style={{ fontSize: 24, fontFamily: FontFamily.extrabold, color: Colors.primaryDark }}>
                     Br {amountDue.toLocaleString('en-US')}
                   </Text>
                 </View>
@@ -445,7 +447,7 @@ export default function CaseDetailScreen({ navigation, route }) {
               {/* Payment instructions */}
               {caseData.payment?.invoiceNotes ? (
                 <View style={[styles.invoiceNotesBox, { marginBottom: Spacing.md }]}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.text3, marginBottom: 4 }}>Payment Instructions</Text>
+                  <Text style={{ fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, marginBottom: 4 }}>Payment Instructions</Text>
                   <Text style={styles.invoiceNotesText}>{caseData.payment.invoiceNotes}</Text>
                 </View>
               ) : null}
@@ -478,7 +480,7 @@ export default function CaseDetailScreen({ navigation, route }) {
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>
-                      <Text style={styles.chapaBtnIcon}>💳</Text>
+                      <MaterialCommunityIcons name="credit-card-outline" size={18} color="#fff" />
                       <Text style={styles.chapaBtnText}>Pay Online with Chapa</Text>
                     </>
                   )}
@@ -496,9 +498,12 @@ export default function CaseDetailScreen({ navigation, route }) {
 
               {canUploadPayment && showManualUpload && (
                 <View style={styles.uploadSection}>
-                  <Text style={styles.uploadTitle}>
-                    {caseData.paymentStatus === 'REJECTED' ? '🔄 Re-upload Receipt' : '📤 Upload Payment Receipt'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <MaterialCommunityIcons name={caseData.paymentStatus === 'REJECTED' ? 'restore' : 'tray-arrow-up'} size={16} color={Colors.text1} />
+                    <Text style={styles.uploadTitle}>
+                      {caseData.paymentStatus === 'REJECTED' ? 'Re-upload Receipt' : 'Upload Payment Receipt'}
+                    </Text>
+                  </View>
                   <Text style={styles.uploadSub}>
                     Upload a screenshot of your bank transfer or payment receipt.
                   </Text>
@@ -516,7 +521,12 @@ export default function CaseDetailScreen({ navigation, route }) {
                         >
                           {uploading
                             ? <ActivityIndicator color="#fff" size="small" />
-                            : <Text style={styles.uploadBtnText}>✓ Submit</Text>
+                            : (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <MaterialCommunityIcons name="check" size={16} color="#fff" />
+                                <Text style={styles.uploadBtnText}>Submit</Text>
+                              </View>
+                            )
                           }
                         </TouchableOpacity>
                       </View>
@@ -524,11 +534,11 @@ export default function CaseDetailScreen({ navigation, route }) {
                   ) : (
                     <View style={styles.uploadBtns}>
                       <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} activeOpacity={0.85}>
-                        <Text style={styles.photoBtnIcon}>📷</Text>
+                        <MaterialCommunityIcons name="camera-outline" size={26} color={Colors.text2} />
                         <Text style={styles.photoBtnText}>Take Photo</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.photoBtn} onPress={pickImage} activeOpacity={0.85}>
-                        <Text style={styles.photoBtnIcon}>🖼️</Text>
+                        <MaterialCommunityIcons name="image-outline" size={26} color={Colors.text2} />
                         <Text style={styles.photoBtnText}>Gallery</Text>
                       </TouchableOpacity>
                     </View>
@@ -578,26 +588,27 @@ export default function CaseDetailScreen({ navigation, route }) {
                   disabled={generatingPdf}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.pdfBtnText}>{generatingPdf ? 'Generating…' : '📄 View PDF'}</Text>
+                  {!generatingPdf && <MaterialCommunityIcons name="file-pdf-box" size={16} color="#fff" />}
+                  <Text style={styles.pdfBtnText}>{generatingPdf ? 'Generating…' : 'View PDF'}</Text>
                 </TouchableOpacity>
               </View>
             </>
           )}
-        </View>
+        </GlassCard>
 
         {/* ── Stage Timeline ── */}
-        <View style={styles.card}>
+        <GlassCard strong style={styles.card}>
           <Text style={styles.cardTitle}>Stage History</Text>
           {caseData.stages?.length === 0 ? (
-            <Text style={{ color: Colors.text3, fontSize: 13 }}>No stage scans yet.</Text>
+            <Text style={{ color: Colors.text3, fontSize: 13, fontFamily: FontFamily.regular }}>No stage scans yet.</Text>
           ) : (
             caseData.stages?.map((s, i) => {
-              const st = STAGES[s.stageName] || { label: s.stageName, color: Colors.text3, icon: '📄' };
+              const st = STAGES[s.stageName] || { label: s.stageName, color: Colors.text3, icon: 'file-outline' };
               return (
                 <View key={s.id} style={styles.timelineItem}>
                   <View style={styles.timelineDotWrap}>
                     <View style={[styles.timelineDot, { backgroundColor: st.color }]}>
-                      <Text style={{ fontSize: 10 }}>{st.icon}</Text>
+                      <MaterialCommunityIcons name={st.icon} size={15} color="#fff" />
                     </View>
                     {i < caseData.stages.length - 1 && <View style={styles.timelineLine} />}
                   </View>
@@ -613,7 +624,7 @@ export default function CaseDetailScreen({ navigation, route }) {
               );
             })
           )}
-        </View>
+        </GlassCard>
 
       </ScrollView>
     </View>
@@ -621,131 +632,113 @@ export default function CaseDetailScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
 
   // Header
   header: {
-    backgroundColor: Colors.navy, paddingTop: 52, paddingBottom: 14,
+    backgroundColor: Colors.primary, paddingTop: 52, paddingBottom: 14,
     paddingHorizontal: Spacing.lg,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl,
   },
-  backBtn: { width: 60 },
-  backText: { fontSize: 14, color: Colors.accent, fontWeight: '600' },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#fff', flex: 1, textAlign: 'center' },
+  backBtn: { width: 40 },
+  headerTitle: { fontSize: 16, fontFamily: FontFamily.bold, color: '#fff', flex: 1, textAlign: 'center' },
 
   scroll: { paddingBottom: 40 },
 
   // Status hero
   statusHero: {
-    alignItems: 'center', paddingVertical: 28,
+    alignItems: 'center', paddingVertical: 28, marginHorizontal: Spacing.lg, marginTop: Spacing.md,
+    borderRadius: Radius.lg,
   },
-  statusHeroIcon: { fontSize: 40, marginBottom: 8 },
-  statusHeroLabel: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  statusHeroCase: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontFamily: 'monospace' },
+  statusHeroLabel: { fontSize: 20, fontFamily: FontFamily.extrabold, color: '#fff', marginBottom: 4 },
+  statusHeroCase: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: 'monospace' },
 
-  // Progress
-  progressWrap: { marginTop: 8 },
-  progressTrack: { height: 6, backgroundColor: Colors.border, borderRadius: 3, marginBottom: 16 },
-  progressFill: { height: 6, backgroundColor: Colors.accent, borderRadius: 3 },
-  progressSteps: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressStep: { alignItems: 'center', flex: 1 },
-  stepDot: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: Colors.border, alignItems: 'center', justifyContent: 'center',
-    marginBottom: 4,
-  },
-  stepDotDone: { backgroundColor: Colors.accent + '30' },
-  stepDotCurrent: { backgroundColor: Colors.accent, ...Shadow.sm },
-  stepIcon: { fontSize: 12 },
-  stepLabel: { fontSize: 8, color: Colors.text3, textAlign: 'center', lineHeight: 11 },
   sectionLabel: {
-    fontSize: 11, fontWeight: '700', color: Colors.text3,
+    fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3,
     letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12,
   },
 
   // Card
   card: {
-    backgroundColor: Colors.surface, marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md, borderRadius: Radius.lg, padding: Spacing.lg,
-    ...Shadow.sm,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md, padding: Spacing.lg,
   },
-  cardTitle: { fontSize: 14, fontWeight: '700', color: Colors.text1, marginBottom: 12 },
+  cardTitle: { fontSize: 14, fontFamily: FontFamily.bold, color: Colors.text1, marginBottom: 12 },
 
   // Info rows
   infoRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  infoLabel: { fontSize: 13, color: Colors.text3, fontWeight: '500' },
-  infoValue: { fontSize: 13, color: Colors.text1, fontWeight: '600', maxWidth: '60%', textAlign: 'right' },
+  infoLabel: { fontSize: 13, color: Colors.text3, fontFamily: FontFamily.medium },
+  infoValue: { fontSize: 13, color: Colors.text1, fontFamily: FontFamily.semibold, maxWidth: '60%', textAlign: 'right' },
 
   // Notes
   notesBox: {
     backgroundColor: Colors.surface2, borderRadius: Radius.md,
     padding: Spacing.md, marginTop: Spacing.md,
   },
-  notesLabel: { fontSize: 11, fontWeight: '700', color: Colors.text3, marginBottom: 4 },
-  notesText: { fontSize: 13, color: Colors.text2, lineHeight: 19 },
+  notesLabel: { fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, marginBottom: 4 },
+  notesText: { fontSize: 13, color: Colors.text2, fontFamily: FontFamily.regular, lineHeight: 19 },
 
   // Invoice card
   invoiceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
-  invoiceTitle: { fontSize: 11, fontWeight: '700', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  invoiceNumber: { fontSize: 15, fontWeight: '800', color: Colors.blue, fontFamily: 'monospace' },
+  invoiceTitle: { fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  invoiceNumber: { fontSize: 15, fontWeight: '800', color: Colors.primaryDark, fontFamily: 'monospace' },
   invoiceAmountBadge: { borderRadius: Radius.md, padding: Spacing.sm, alignItems: 'flex-end' },
-  invoiceAmountLabel: { fontSize: 10, fontWeight: '700', color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  invoiceAmount: { fontSize: 22, fontWeight: '800', color: Colors.blue },
+  invoiceAmountLabel: { fontSize: 10, fontFamily: FontFamily.bold, color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  invoiceAmount: { fontSize: 22, fontFamily: FontFamily.extrabold },
   invoiceDivider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.md },
   invoiceRows: { gap: 2 },
   invoiceRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  invoiceRowLabel: { fontSize: 13, color: Colors.text3, fontWeight: '500' },
-  invoiceRowValue: { fontSize: 13, color: Colors.text1, fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
+  invoiceRowLabel: { fontSize: 13, color: Colors.text3, fontFamily: FontFamily.medium },
+  invoiceRowValue: { fontSize: 13, color: Colors.text1, fontFamily: FontFamily.semibold, maxWidth: '55%', textAlign: 'right' },
   invoiceNotesBox: { backgroundColor: '#FFFBEB', borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.md },
-  invoiceNotesText: { fontSize: 12, color: Colors.text2, lineHeight: 18 },
+  invoiceNotesText: { fontSize: 12, color: Colors.text2, fontFamily: FontFamily.regular, lineHeight: 18 },
   pdfBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.blue, borderRadius: Radius.md,
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
     paddingVertical: 8, paddingHorizontal: 14,
   },
-  pdfBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  pdfBtnText: { fontSize: 13, fontFamily: FontFamily.bold, color: '#fff' },
 
   // Payment
   payStatusBadge: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, marginBottom: Spacing.md },
-  payStatusText: { fontSize: 13, fontWeight: '700' },
+  payStatusText: { fontSize: 13, fontFamily: FontFamily.bold },
   rejectionBox: { backgroundColor: Colors.redDim, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md },
-  rejectionTitle: { fontSize: 12, fontWeight: '700', color: Colors.red, marginBottom: 4 },
-  rejectionText: { fontSize: 13, color: Colors.red },
+  rejectionTitle: { fontSize: 12, fontFamily: FontFamily.bold, color: Colors.red, marginBottom: 4 },
+  rejectionText: { fontSize: 13, color: Colors.red, fontFamily: FontFamily.regular },
   screenshotWrap: { marginBottom: Spacing.md },
-  screenshotLabel: { fontSize: 12, fontWeight: '600', color: Colors.text3, marginBottom: 8 },
+  screenshotLabel: { fontSize: 12, fontFamily: FontFamily.semibold, color: Colors.text3, marginBottom: 8 },
   screenshotImg: { width: '100%', height: 160, borderRadius: Radius.md, backgroundColor: Colors.border },
 
   // Chapa online payment
   chapaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#1565C0', borderRadius: Radius.md,
+    backgroundColor: Colors.primary, borderRadius: Radius.md,
     paddingVertical: 14, marginBottom: Spacing.sm,
-    ...Shadow.sm,
+    shadowColor: Colors.primaryDark, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 2,
   },
-  chapaBtnIcon: { fontSize: 18 },
-  chapaBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  chapaBtnText: { fontSize: 15, fontFamily: FontFamily.bold, color: '#fff' },
   secondaryOptionBtn: { alignItems: 'center', paddingVertical: 10 },
-  secondaryOptionText: { fontSize: 13, fontWeight: '600', color: Colors.blue, textDecorationLine: 'underline' },
+  secondaryOptionText: { fontSize: 13, fontFamily: FontFamily.semibold, color: Colors.primaryDark, textDecorationLine: 'underline' },
 
   // Upload
   uploadSection: {
     backgroundColor: Colors.surface2, borderRadius: Radius.md,
     padding: Spacing.md, marginTop: 4,
   },
-  uploadTitle: { fontSize: 14, fontWeight: '700', color: Colors.text1, marginBottom: 4 },
-  uploadSub: { fontSize: 12, color: Colors.text3, marginBottom: Spacing.md, lineHeight: 17 },
+  uploadTitle: { fontSize: 14, fontFamily: FontFamily.bold, color: Colors.text1 },
+  uploadSub: { fontSize: 12, color: Colors.text3, fontFamily: FontFamily.regular, marginBottom: Spacing.md, lineHeight: 17 },
   uploadBtns: { flexDirection: 'row', gap: 10 },
   photoBtn: {
     flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md,
     padding: Spacing.lg, alignItems: 'center', gap: 6,
     borderWidth: 1.5, borderColor: Colors.border, borderStyle: 'dashed',
   },
-  photoBtnIcon: { fontSize: 28 },
-  photoBtnText: { fontSize: 13, fontWeight: '600', color: Colors.text2 },
+  photoBtnText: { fontSize: 13, fontFamily: FontFamily.semibold, color: Colors.text2 },
   previewWrap: { gap: 10 },
   previewImg: { width: '100%', height: 180, borderRadius: Radius.md },
   previewActions: { flexDirection: 'row', gap: 10 },
@@ -753,12 +746,12 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.md,
     padding: 12, alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
   },
-  changeBtnText: { fontSize: 14, fontWeight: '600', color: Colors.text2 },
+  changeBtnText: { fontSize: 14, fontFamily: FontFamily.semibold, color: Colors.text2 },
   uploadBtn: {
     flex: 2, backgroundColor: Colors.green, borderRadius: Radius.md,
     padding: 12, alignItems: 'center',
   },
-  uploadBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  uploadBtnText: { fontSize: 14, fontFamily: FontFamily.bold, color: '#fff' },
 
   // Timeline
   timelineItem: { flexDirection: 'row', gap: 12, marginBottom: Spacing.md },
@@ -772,7 +765,7 @@ const styles = StyleSheet.create({
     marginTop: 4, marginBottom: -8,
   },
   timelineContent: { flex: 1, paddingTop: 6 },
-  timelineLabel: { fontSize: 13, fontWeight: '700', color: Colors.text1 },
-  timelineTime: { fontSize: 11, color: Colors.text3, marginTop: 2 },
-  timelineNotes: { fontSize: 11, color: Colors.text3, marginTop: 2, fontStyle: 'italic' },
+  timelineLabel: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.text1 },
+  timelineTime: { fontSize: 11, color: Colors.text3, fontFamily: FontFamily.regular, marginTop: 2 },
+  timelineNotes: { fontSize: 11, color: Colors.text3, fontFamily: FontFamily.regular, marginTop: 2, fontStyle: 'italic' },
 });

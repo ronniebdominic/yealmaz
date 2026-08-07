@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B1D3A"
+      "backgroundColor": "#0E9F6E"
     },
     "ios": {
       "supportsTablet": false,
@@ -22,7 +22,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0B1D3A"
+        "backgroundColor": "#0E9F6E"
       },
       "package": "com.yealmaz.clinic",
       "permissions": [
@@ -40,8 +40,8 @@
       "name": "Ye-Almaz Clinic",
       "shortName": "Ye-Almaz",
       "description": "Ye-Almaz Dental Laboratory — Clinic Portal",
-      "themeColor": "#0B1D3A",
-      "backgroundColor": "#0B1D3A",
+      "themeColor": "#0E9F6E",
+      "backgroundColor": "#0E9F6E",
       "display": "standalone",
       "orientation": "portrait",
       "lang": "en",
@@ -55,7 +55,8 @@
           "cameraPermission": "Allow Ye-Almaz Clinic to use your camera to take payment photos."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ]
   }
 }
