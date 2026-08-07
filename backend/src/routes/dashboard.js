@@ -571,6 +571,26 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
       if (!existing || (!existing.isActive && t.isActive)) byName.set(key, t);
     }
 
+    // First-name fallback — a scan embeds whatever the account's name WAS at
+    // the moment it was scanned (no persistent link), so filling in an
+    // account's full legal name later (e.g. "Ashish" → "Ashish Arun Sale",
+    // done for HR/payroll) orphans every scan recorded before that edit: the
+    // old short name no longer exact-matches the new full one. Recover those
+    // by first name, but only when it's unambiguous — if two techs share a
+    // first name, guessing wrong is worse than leaving the scan unattributed.
+    const byFirstNameCounts = new Map();
+    for (const t of techs) {
+      const first = t.name.trim().toLowerCase().split(/\s+/)[0];
+      byFirstNameCounts.set(first, (byFirstNameCounts.get(first) || 0) + 1);
+    }
+    const byFirstName = new Map();
+    for (const t of techs) {
+      const first = t.name.trim().toLowerCase().split(/\s+/)[0];
+      if (byFirstNameCounts.get(first) !== 1) continue; // ambiguous, skip
+      const existing = byFirstName.get(first);
+      if (!existing || (!existing.isActive && t.isActive)) byFirstName.set(first, t);
+    }
+
     const perTech = new Map(techs.map(t => [t.id, {
       id: t.id, name: t.name, isActive: t.isActive, departments: t.departments,
       totalScans: 0, cases: new Set(), deptCounts: {}, dailyCounts: {}, lastActiveAt: null,
@@ -581,7 +601,8 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
       const m = SCAN_PATTERN.exec(s.scannedBy || '');
       if (!m) continue; // not a department scan (status change, dispatch action, "System", etc.)
       const [, rawName, short] = m;
-      const tech = byName.get(rawName.trim().toLowerCase());
+      const cleanRawName = rawName.trim().toLowerCase();
+      const tech = byName.get(cleanRawName) || byFirstName.get(cleanRawName.split(/\s+/)[0]);
       if (!tech) { unattributedScans++; continue; }
 
       const agg = perTech.get(tech.id);
