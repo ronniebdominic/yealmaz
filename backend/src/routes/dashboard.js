@@ -559,7 +559,17 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
 
     // Exact-name lookup — case-insensitive-trim, since a tech's display
     // name is what's embedded in the string and typed once at account setup.
-    const byName = new Map(techs.map(t => [t.name.trim().toLowerCase(), t]));
+    // Some accounts are shared/department-style logins (e.g. "Scanning")
+    // that can get deactivated and recreated when staff changes — if two
+    // accounts ever share a name, an inactive one must never win this slot
+    // over an active one, or every historical scan for that name silently
+    // collapses onto the wrong (often defunct) account.
+    const byName = new Map();
+    for (const t of techs) {
+      const key = t.name.trim().toLowerCase();
+      const existing = byName.get(key);
+      if (!existing || (!existing.isActive && t.isActive)) byName.set(key, t);
+    }
 
     const perTech = new Map(techs.map(t => [t.id, {
       id: t.id, name: t.name, isActive: t.isActive, departments: t.departments,
