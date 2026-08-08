@@ -9,6 +9,8 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { localDayKey } = require('../utils/scanAttribution');
+const { resolveShiftForUserDate, computeDaySummary } = require('../services/attendanceDaySummary');
+const { getLeaveDayCount } = require('../utils/leaveDayCount');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -221,20 +223,48 @@ router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
 });
 
 // ── Leave — HR logs these directly on an employee's behalf ─
+// leaveTypeId/dayPortion are optional passthroughs (Phase 1 HR expansion) —
+// existing callers that omit them keep working unchanged, defaulting to no
+// type and a full day. When both a type and an APPROVED status are given,
+// this also writes the matching USED ledger entry (see leave.js's
+// getLeaveDayCount for the holiday-excluding day-count logic) in the same
+// transaction, so a leave record and its ledger deduction can never drift
+// apart.
 router.post('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {
-    const { userId, fromDate, toDate, reason, status } = req.body || {};
+    const { userId, fromDate, toDate, reason, status, leaveTypeId, dayPortion } = req.body || {};
     if (!userId || !fromDate || !toDate) return res.status(400).json({ error: 'userId, fromDate and toDate are required.' });
-    const record = await prisma.leaveRecord.create({
-      data: {
-        userId, fromDate: new Date(fromDate), toDate: new Date(toDate),
-        reason: reason?.trim() || null,
-        status: status === 'REJECTED' ? 'REJECTED' : 'APPROVED',
-        recordedById: req.user.id,
-      },
-      include: { user: { select: { id: true, name: true } } },
+    const finalStatus = status === 'REJECTED' ? 'REJECTED' : 'APPROVED';
+    const from = new Date(fromDate), to = new Date(toDate);
+
+    const record = await prisma.$transaction(async (tx) => {
+      const created = await tx.leaveRecord.create({
+        data: {
+          userId, fromDate: from, toDate: to,
+          reason: reason?.trim() || null,
+          status: finalStatus,
+          recordedById: req.user.id,
+          leaveTypeId: leaveTypeId || null,
+          dayPortion: dayPortion || 'FULL',
+        },
+        include: { user: { select: { id: true, name: true } }, leaveType: true },
+      });
+
+      if (leaveTypeId && finalStatus === 'APPROVED') {
+        const days = await getLeaveDayCount(tx, from, to, dayPortion || 'FULL');
+        if (days > 0) {
+          await tx.leaveLedgerEntry.create({
+            data: {
+              userId, leaveTypeId, transactionType: 'USED', days: -days,
+              effectiveDate: from, relatedLeaveRecordId: created.id, recordedById: req.user.id,
+            },
+          });
+        }
+      }
+      return created;
     });
-    await invalidate('attendance:leave*', 'dashboard:hr-summary');
+
+    await invalidate('attendance:leave*', 'dashboard:hr-summary', 'leave:*');
     res.status(201).json(record);
   } catch (err) {
     console.error(err);
@@ -244,20 +274,196 @@ router.post('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res)
 
 router.get('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {
-    const { userId, from, to } = req.query;
+    const { userId, from, to, leaveTypeId } = req.query;
     const where = {};
     if (userId) where.userId = userId;
+    if (leaveTypeId) where.leaveTypeId = leaveTypeId;
     if (from) where.fromDate = { gte: startOfDay(from) };
     if (to) where.toDate = { lte: endOfDay(to) };
     const records = await prisma.leaveRecord.findMany({
       where,
-      include: { user: { select: { id: true, name: true } }, recordedBy: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true } }, recordedBy: { select: { id: true, name: true } }, leaveType: true },
       orderBy: { fromDate: 'desc' },
     });
     res.json(records);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load leave records.' });
+  }
+});
+
+// ── GET /api/attendance/summary?date=&userId=&department= ──
+// Roster-wide day view backing the Attendance dashboard: one computed
+// status per employee for the given date, plus aggregate KPI counts.
+// Reuses the same isSharedAccount:false posture as GET /api/employees so
+// department/system logins never show up as "employees" here either.
+router.get('/summary', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { date, userId, department } = req.query;
+    const day = date ? new Date(`${date}T00:00:00`) : new Date();
+    if (isNaN(day.getTime())) return res.status(400).json({ error: 'Invalid date.' });
+    day.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+
+    const where = { isSharedAccount: false, isActive: true };
+    if (userId) where.id = userId;
+    if (department) where.departments = { has: department };
+
+    const [employees, events, leaveRecords, holiday, corrections, assignments] = await Promise.all([
+      prisma.user.findMany({ where, select: { id: true, name: true, departments: true, role: true } }),
+      prisma.attendanceEvent.findMany({ where: { timestamp: { gte: day, lte: dayEnd } } }),
+      prisma.leaveRecord.findMany({ where: { status: 'APPROVED', fromDate: { lte: dayEnd }, toDate: { gte: day } } }),
+      prisma.holiday.findUnique({ where: { date: day } }).catch(() => null),
+      prisma.attendanceCorrection.findMany({ where: { date: day } }),
+      prisma.shiftAssignment.findMany({
+        where: { effectiveFrom: { lte: day }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: day } }] },
+        orderBy: { effectiveFrom: 'desc' },
+        include: { shift: true },
+      }),
+    ]);
+
+    const eventsByUser = new Map();
+    for (const e of events) {
+      if (!eventsByUser.has(e.userId)) eventsByUser.set(e.userId, []);
+      eventsByUser.get(e.userId).push(e);
+    }
+    const leaveByUser = new Map(leaveRecords.map(l => [l.userId, l]));
+    const correctionByUser = new Map(corrections.map(c => [c.userId, c]));
+    // First match per user wins (already ordered effectiveFrom desc).
+    const shiftByUser = new Map();
+    for (const a of assignments) if (!shiftByUser.has(a.userId)) shiftByUser.set(a.userId, a.shift);
+
+    const counts = { present: 0, absent: 0, onLeave: 0, late: 0, earlyDeparture: 0, missingPunch: 0, overtime: 0 };
+    const results = employees.map(emp => {
+      const summary = computeDaySummary({
+        date: day,
+        events: eventsByUser.get(emp.id) || [],
+        shift: shiftByUser.get(emp.id) || null,
+        holiday,
+        leaveRecord: leaveByUser.get(emp.id) || null,
+        correction: correctionByUser.get(emp.id) || null,
+      });
+      if (summary.status === 'PRESENT' || summary.status === 'IN_PROGRESS') counts.present++;
+      if (summary.status === 'ABSENT') counts.absent++;
+      if (summary.status === 'ON_LEAVE' || summary.status === 'HALF_DAY_LEAVE') counts.onLeave++;
+      if (summary.status === 'MISSING_PUNCH') counts.missingPunch++;
+      if (summary.late) counts.late++;
+      if (summary.earlyDepartureMinutes > 0) counts.earlyDeparture++;
+      if (summary.overtimeHours > 0) counts.overtime++;
+      return {
+        id: emp.id, name: emp.name, departments: emp.departments, role: emp.role,
+        shift: shiftByUser.get(emp.id) ? { id: shiftByUser.get(emp.id).id, name: shiftByUser.get(emp.id).name } : null,
+        ...summary,
+      };
+    });
+
+    res.json({ date: localDayKey(day), counts, employees: results });
+  } catch (err) {
+    console.error('[attendance summary]', err);
+    res.status(500).json({ error: 'Could not load attendance summary.' });
+  }
+});
+
+// ── GET /api/attendance/summary/range?userId=&from=&to= ────
+// One employee across a date range — powers the Employee Profile's
+// Attendance tab. Loops computeDaySummary per day (range is expected to be
+// weeks/months, not years, so this stays cheap).
+router.get('/summary/range', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { userId, from, to } = req.query;
+    if (!userId || !from || !to) return res.status(400).json({ error: 'userId, from and to are required.' });
+    const fromDate = startOfDay(from), toDate = endOfDay(to);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return res.status(400).json({ error: 'Invalid from/to.' });
+
+    const [events, leaveRecords, holidays, corrections, assignments] = await Promise.all([
+      prisma.attendanceEvent.findMany({ where: { userId, timestamp: { gte: fromDate, lte: toDate } } }),
+      prisma.leaveRecord.findMany({ where: { userId, status: 'APPROVED', fromDate: { lte: toDate }, toDate: { gte: fromDate } } }),
+      prisma.holiday.findMany({ where: { date: { gte: fromDate, lte: toDate } } }),
+      prisma.attendanceCorrection.findMany({ where: { userId, date: { gte: fromDate, lte: toDate } } }),
+      prisma.shiftAssignment.findMany({
+        where: { userId, effectiveFrom: { lte: toDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: fromDate } }] },
+        include: { shift: true }, orderBy: { effectiveFrom: 'asc' },
+      }),
+    ]);
+
+    const holidayByDay = new Map(holidays.map(h => [localDayKey(h.date), h]));
+    const correctionByDay = new Map(corrections.map(c => [localDayKey(c.date), c]));
+
+    const days = [];
+    for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+      const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
+      const dayEvents = events.filter(e => e.timestamp >= dayStart && e.timestamp <= dayEnd);
+      const shiftForDay = [...assignments].reverse().find(a =>
+        a.effectiveFrom <= dayEnd && (!a.effectiveTo || a.effectiveTo >= dayStart))?.shift || null;
+      const leaveForDay = leaveRecords.find(l => l.fromDate <= dayEnd && l.toDate >= dayStart) || null;
+
+      days.push(computeDaySummary({
+        date: dayStart,
+        events: dayEvents,
+        shift: shiftForDay,
+        holiday: holidayByDay.get(localDayKey(dayStart)) || null,
+        leaveRecord: leaveForDay,
+        correction: correctionByDay.get(localDayKey(dayStart)) || null,
+      }));
+    }
+
+    res.json({ range: { from: fromDate.toISOString(), to: toDate.toISOString() }, days });
+  } catch (err) {
+    console.error('[attendance summary/range]', err);
+    res.status(500).json({ error: 'Could not load attendance range.' });
+  }
+});
+
+// ── Attendance corrections ──────────────────────────────────
+// Additive audit record only — AttendanceEvent rows are never edited or
+// deleted. original* is captured from the current raw-derived summary at
+// write time so nothing about "what changed" is ever ambiguous later.
+router.post('/corrections', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { userId, date, correctedClockIn, correctedClockOut, reason } = req.body || {};
+    if (!userId || !date || !reason?.trim()) return res.status(400).json({ error: 'userId, date and reason are required.' });
+    const day = new Date(`${date}T00:00:00`);
+    if (isNaN(day.getTime())) return res.status(400).json({ error: 'Invalid date.' });
+    const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+
+    const events = await prisma.attendanceEvent.findMany({ where: { userId, timestamp: { gte: day, lte: dayEnd } } });
+    const shift = await resolveShiftForUserDate(prisma, userId, day);
+    const before = computeDaySummary({ date: day, events, shift, holiday: null, leaveRecord: null, correction: null });
+
+    const correction = await prisma.attendanceCorrection.create({
+      data: {
+        userId, date: day,
+        originalClockIn: before.clockIn, originalClockOut: before.clockOut,
+        correctedClockIn: correctedClockIn ? new Date(correctedClockIn) : null,
+        correctedClockOut: correctedClockOut ? new Date(correctedClockOut) : null,
+        reason: reason.trim(), approvedById: req.user.id,
+      },
+    });
+    await invalidate('attendance:*', 'dashboard:hr-summary');
+    res.status(201).json(correction);
+  } catch (err) {
+    console.error('[attendance corrections create]', err);
+    res.status(500).json({ error: 'Could not record correction.' });
+  }
+});
+
+router.get('/corrections', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { userId, from, to } = req.query;
+    const where = {};
+    if (userId) where.userId = userId;
+    if (from) where.date = { ...(where.date || {}), gte: startOfDay(from) };
+    if (to) where.date = { ...(where.date || {}), lte: endOfDay(to) };
+    const corrections = await prisma.attendanceCorrection.findMany({
+      where,
+      include: { user: { select: { id: true, name: true } }, approvedBy: { select: { id: true, name: true } } },
+      orderBy: { date: 'desc' },
+    });
+    res.json(corrections);
+  } catch (err) {
+    console.error('[attendance corrections list]', err);
+    res.status(500).json({ error: 'Could not load corrections.' });
   }
 });
 

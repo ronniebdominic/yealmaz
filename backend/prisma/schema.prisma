@@ -57,6 +57,21 @@ model User {
   payrollRunsCreated       PayrollRun[]          @relation("PayrollRunsCreatedBy")
   payrollAdjustmentsAdded  PayrollAdjustment[]   @relation("PayrollAdjustmentsAddedBy")
 
+  // HR Phase 1 — Shifts / Timesheets / Overtime / Leave ledger / corrections
+  managedProfiles            EmployeeProfile[]        @relation("EmployeeProfileManager")
+  shiftAssignments           ShiftAssignment[]        @relation("ShiftAssignmentsUser")
+  shiftAssignmentsCreated    ShiftAssignment[]        @relation("ShiftAssignmentsCreatedBy")
+  timesheetEntries           TimesheetEntry[]         @relation("TimesheetEntriesUser")
+  timesheetEntriesRecorded   TimesheetEntry[]         @relation("TimesheetEntriesRecordedBy")
+  overtimeRecords            OvertimeRecord[]         @relation("OvertimeRecordsUser")
+  overtimeRecordsApproved    OvertimeRecord[]         @relation("OvertimeRecordsApprovedBy")
+  leaveLedgerEntries         LeaveLedgerEntry[]       @relation("LeaveLedgerUser")
+  leaveLedgerEntriesRecorded LeaveLedgerEntry[]       @relation("LeaveLedgerRecordedBy")
+  attendanceCorrections         AttendanceCorrection[] @relation("AttendanceCorrectionsUser")
+  attendanceCorrectionsApproved AttendanceCorrection[] @relation("AttendanceCorrectionsApprovedBy")
+  employmentHistory           EmploymentHistory[]      @relation("EmploymentHistoryUser")
+  employmentHistoryChanged    EmploymentHistory[]      @relation("EmploymentHistoryChangedBy")
+
   @@map("users")
 }
 
@@ -578,6 +593,13 @@ enum EmploymentStatus {
   TERMINATED
 }
 
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
 model EmployeeProfile {
   id               String           @id @default(uuid())
   userId           String           @unique
@@ -589,8 +611,27 @@ model EmployeeProfile {
   bankName         String?
   bankAccount      String?
   employmentStatus EmploymentStatus @default(ACTIVE)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+
+  // Personal info (Phase 1 HR expansion)
+  photoUrl              String?
+  preferredName         String?
+  dateOfBirth           DateTime?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  address               String?
+
+  // Employment info (Phase 1 HR expansion)
+  employmentType   EmploymentType?
+  confirmationDate DateTime?
+  probationEndDate DateTime?
+  noticePeriodDays Int?
+  endDate          DateTime? // termination/last-day date
+  workLocation     String?   // free-text internal work area — this is a single-lab system, not a branch model
+  managerId        String?
+  manager          User?     @relation("EmployeeProfileManager", fields: [managerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("employee_profiles")
 }
@@ -641,6 +682,12 @@ enum LeaveStatus {
   REJECTED
 }
 
+enum LeaveDayPortion {
+  FULL
+  HALF_AM
+  HALF_PM
+}
+
 // HR logs these directly on an employee's behalf (v1 has no self-service
 // submission flow) — status defaults APPROVED since HR is the one
 // entering it authoritatively; REJECTED exists to correct a mistaken entry.
@@ -657,6 +704,13 @@ model LeaveRecord {
   note         String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+
+  // Phase 1 HR expansion — nullable/defaulted so existing rows keep working
+  leaveTypeId String?
+  leaveType   LeaveType?      @relation(fields: [leaveTypeId], references: [id])
+  dayPortion  LeaveDayPortion @default(FULL)
+
+  ledgerEntries LeaveLedgerEntry[] @relation("LedgerFromLeaveRecord")
 
   @@index([userId])
   @@map("leave_records")
@@ -719,6 +773,237 @@ model PayrollAdjustment {
 
   @@index([entryId])
   @@map("payroll_adjustments")
+}
+
+// ── SHIFTS ─────────────────────────────────────────────
+enum ShiftHolidayHandling {
+  NO_WORK
+  OPTIONAL
+  WORK
+}
+
+model Shift {
+  id                             String               @id @default(uuid())
+  name                           String
+  startTime                      String               // "HH:mm", interpreted in server TZ (Africa/Addis_Ababa)
+  endTime                        String
+  breakMinutes                   Int                  @default(0)
+  gracePeriodMinutes             Int                  @default(0)
+  lateThresholdMinutes           Int                  @default(0) // additional buffer after grace before "Late"
+  earlyDepartureThresholdMinutes Int                  @default(0)
+  overtimeThresholdMinutes       Int?                 // null = derive from (end-start-break)
+  workingDays                    Int[]                @default([1, 2, 3, 4, 5]) // 0=Sun..6=Sat
+  holidayHandling                ShiftHolidayHandling @default(NO_WORK)
+  isActive                       Boolean              @default(true) // soft-delete only — ShiftAssignment history references it
+  createdAt                      DateTime             @default(now())
+  updatedAt                      DateTime             @updatedAt
+
+  assignments     ShiftAssignment[]
+  overtimeRecords OvertimeRecord[]
+
+  @@map("shifts")
+}
+
+// Changing an employee's shift closes out the currently-open assignment
+// (sets effectiveTo) and inserts a new row — never overwrites, so shift
+// history is always reconstructable.
+model ShiftAssignment {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation("ShiftAssignmentsUser", fields: [userId], references: [id])
+  shiftId       String
+  shift         Shift     @relation(fields: [shiftId], references: [id])
+  effectiveFrom DateTime
+  effectiveTo   DateTime? // null = currently active
+  note          String?
+  createdById   String
+  createdBy     User      @relation("ShiftAssignmentsCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([shiftId])
+  @@map("shift_assignments")
+}
+
+// ── TIMESHEETS ─────────────────────────────────────────
+enum TimesheetStatus {
+  APPROVED
+  REJECTED
+}
+
+// Manual time-activity entries — for LAB_TECH users this is a supplement to
+// (not a replacement for) their existing CaseStage scan history, which
+// GET /api/timesheets/lab-tech-enrichment surfaces read-only alongside
+// these rows.
+model TimesheetEntry {
+  id           String          @id @default(uuid())
+  userId       String
+  user         User            @relation("TimesheetEntriesUser", fields: [userId], references: [id])
+  date         DateTime        // local calendar day
+  startTime    DateTime
+  endTime      DateTime
+  category     String          // one of the hardcoded PRODUCTIVE/NON_PRODUCTIVE constants in timesheets.js
+  productive   Boolean
+  notes        String?
+  status       TimesheetStatus @default(APPROVED) // HR enters authoritatively, same posture as LeaveRecord
+  recordedById String
+  recordedBy   User            @relation("TimesheetEntriesRecordedBy", fields: [recordedById], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([date])
+  @@map("timesheet_entries")
+}
+
+// ── OVERTIME ───────────────────────────────────────────
+enum OvertimeSource {
+  AUTO_DETECTED
+  MANUAL
+}
+
+enum OvertimeApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OvertimePayrollStatus {
+  UNPAID
+  PAID
+}
+
+// Phase 1 tracks hours + approval only — payrollStatus stays UNPAID with no
+// automatic PayrollAdjustment creation until Phase 2 wires in Salary
+// Structures.
+model OvertimeRecord {
+  id             String                 @id @default(uuid())
+  userId         String
+  user           User                   @relation("OvertimeRecordsUser", fields: [userId], references: [id])
+  date           DateTime
+  shiftId        String?
+  shift          Shift?                 @relation(fields: [shiftId], references: [id])
+  regularHours   Float
+  overtimeHours  Float
+  reason         String?
+  source         OvertimeSource         @default(AUTO_DETECTED)
+  approvalStatus OvertimeApprovalStatus @default(PENDING)
+  approvedById   String?
+  approvedBy     User?                  @relation("OvertimeRecordsApprovedBy", fields: [approvedById], references: [id])
+  approvedAt     DateTime?
+  payrollStatus  OvertimePayrollStatus  @default(UNPAID)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([userId, date]) // idempotent auto-detection
+  @@index([userId])
+  @@map("overtime_records")
+}
+
+// ── LEAVE TYPES / BALANCE LEDGER / HOLIDAYS ─────────────
+model LeaveType {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  defaultAnnualDays Float?
+  requiresApproval  Boolean  @default(true)
+  isPaid            Boolean  @default(true)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  leaveRecords  LeaveRecord[]
+  ledgerEntries LeaveLedgerEntry[]
+
+  @@map("leave_types")
+}
+
+enum LeaveLedgerTxnType {
+  ENTITLEMENT
+  USED
+  CARRY_FORWARD
+  EXPIRED
+  ADJUSTMENT
+}
+
+// Balance is always sum(days) for a user+leaveType — never a single stored
+// number, so entitlement/usage/carry-forward/adjustment stay auditable.
+model LeaveLedgerEntry {
+  id                    String             @id @default(uuid())
+  userId                String
+  user                  User               @relation("LeaveLedgerUser", fields: [userId], references: [id])
+  leaveTypeId           String
+  leaveType             LeaveType          @relation(fields: [leaveTypeId], references: [id])
+  transactionType       LeaveLedgerTxnType
+  days                  Float              // signed: negative for USED/EXPIRED, positive for ENTITLEMENT/CARRY_FORWARD
+  effectiveDate         DateTime
+  relatedLeaveRecordId  String?
+  relatedLeaveRecord    LeaveRecord?       @relation("LedgerFromLeaveRecord", fields: [relatedLeaveRecordId], references: [id])
+  note                  String?
+  recordedById          String
+  recordedBy            User               @relation("LeaveLedgerRecordedBy", fields: [recordedById], references: [id])
+  createdAt             DateTime           @default(now())
+
+  @@index([userId])
+  @@index([leaveTypeId])
+  @@map("leave_ledger_entries")
+}
+
+enum HolidayType {
+  COMPANY
+  PUBLIC
+}
+
+model Holiday {
+  id        String      @id @default(uuid())
+  date      DateTime    @unique
+  name      String
+  type      HolidayType @default(PUBLIC)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("holidays")
+}
+
+// ── ATTENDANCE CORRECTIONS / EMPLOYMENT HISTORY ─────────
+// Additive audit record — AttendanceEvent rows are never edited or deleted.
+// original*/corrected* are both stored so nothing about a correction is
+// ever ambiguous or silently lost.
+model AttendanceCorrection {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation("AttendanceCorrectionsUser", fields: [userId], references: [id])
+  date              DateTime
+  originalClockIn   DateTime?
+  originalClockOut  DateTime?
+  correctedClockIn  DateTime?
+  correctedClockOut DateTime?
+  reason            String
+  approvedById      String
+  approvedBy        User     @relation("AttendanceCorrectionsApprovedBy", fields: [approvedById], references: [id])
+  createdAt         DateTime @default(now())
+
+  @@index([userId])
+  @@index([date])
+  @@map("attendance_corrections")
+}
+
+// Lightweight change log — written automatically by PATCH
+// /employees/:userId/profile when position/employmentStatus/managerId change.
+model EmploymentHistory {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation("EmploymentHistoryUser", fields: [userId], references: [id])
+  field         String   // 'position' | 'employmentStatus' | 'managerId' | ...
+  oldValue      String?
+  newValue      String?
+  effectiveDate DateTime @default(now())
+  changedById   String
+  changedBy     User     @relation("EmploymentHistoryChangedBy", fields: [changedById], references: [id])
+  note          String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@map("employment_history")
 }
 
 // ── GOOGLE SHEETS SYNC ─────────────────────────────────

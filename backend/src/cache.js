@@ -36,6 +36,12 @@ const TTL_RULES = [
   { prefix: 'payroll:runs',          ttl: 60    }, // 1 m
   { prefix: 'payroll:entries',       ttl: 30    }, // 30s
   { prefix: 'dashboard:hr-summary',  ttl: 300   }, // 5 m  — glance KPIs
+  { prefix: 'shifts:',               ttl: 300   }, // 5 m  — shift config, changes rarely
+  { prefix: 'attendance:summary:',   ttl: 60    }, // 1 m  — workforce day view, feels live-ish
+  { prefix: 'leave:types',           ttl: 300   }, // 5 m  — leave type config
+  { prefix: 'leave:holidays',        ttl: 300   }, // 5 m  — holiday calendar, changes rarely
+  { prefix: 'timesheets:',           ttl: 60    }, // 1 m
+  { prefix: 'overtime:',             ttl: 60    }, // 1 m
 ];
 const DEFAULT_TTL = 300; // 5 m fallback
 
