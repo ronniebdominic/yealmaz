@@ -30,11 +30,11 @@ const uploadPhotoToCloudinary = (buffer, userId) => new Promise((resolve, reject
 });
 
 // Fields whose changes are worth a permanent EmploymentHistory row —
-// position/status/manager are the ones that matter for "who reported to
-// whom, and when did their role change" record-keeping. Everything else on
-// EmployeeProfile (personal info, salary — salary changes are Phase 2's
-// concern once Salary Structures exist) isn't tracked here.
-const TRACKED_FIELDS = ['position', 'employmentStatus', 'managerId'];
+// position/status/manager for "who reported to whom, and when did their
+// role change" record-keeping, plus baseSalary (Phase 2's Salary History
+// requirement — "never overwrite historical salary information" — reuses
+// this same generic log rather than a bespoke SalaryHistory table).
+const TRACKED_FIELDS = ['position', 'employmentStatus', 'managerId', 'baseSalary'];
 
 // ── GET /api/employees ────────────────────────────────────
 router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {

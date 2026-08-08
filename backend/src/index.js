@@ -109,6 +109,10 @@ app.use('/api/shifts',        require('./routes/shifts'));
 app.use('/api/timesheets',    require('./routes/timesheets'));
 app.use('/api/overtime',      require('./routes/overtime'));
 app.use('/api/leave',         require('./routes/leave'));
+app.use('/api/salary-structures', require('./routes/salary-structures'));
+app.use('/api/incentives',    require('./routes/incentives'));
+app.use('/api/advances',      require('./routes/advances'));
+app.use('/api/expenses',      require('./routes/expenses'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────
