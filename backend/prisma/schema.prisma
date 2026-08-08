@@ -25,6 +25,7 @@ model User {
   zoneId     String?  // for DELIVERY: the broader zone (a collective of stations) they're assigned to cover
   zone       Zone?    @relation(fields: [zoneId], references: [id])
   isActive   Boolean  @default(true)
+  isSharedAccount Boolean @default(false) // department/role login (e.g. "Zirconia Fitting", "Finance Department") — not a real person, so HR & Payroll excludes it from the employee list
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

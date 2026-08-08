@@ -19,6 +19,9 @@ router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   if (cached) return res.json(cached);
   try {
     const users = await prisma.user.findMany({
+      // Department/role logins ("Zirconia Fitting", "Finance Department", ...)
+      // aren't real people — HR & Payroll only manages actual employees.
+      where: { isSharedAccount: false },
       select: {
         id: true, name: true, email: true, role: true, phone: true, isActive: true,
         employeeProfile: true,

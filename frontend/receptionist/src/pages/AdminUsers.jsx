@@ -63,17 +63,18 @@ const ROLE_COLORS = {
 function UserFormModal({ initial, onSaved, onClose }) {
   const isEdit = !!initial?.id;
   const [form, setForm] = useState(initial ? {
-    name:        initial.name        || '',
-    email:       initial.email       || '',
-    phone:       initial.phone       || '',
-    station:     initial.station     || '',
-    zoneId:      initial.zoneId      || '',
-    role:        initial.role        || 'RECEPTIONIST',
-    departments: initial.departments || [],
-    password:    '',
+    name:            initial.name            || '',
+    email:           initial.email           || '',
+    phone:           initial.phone           || '',
+    station:         initial.station         || '',
+    zoneId:          initial.zoneId          || '',
+    role:            initial.role            || 'RECEPTIONIST',
+    departments:     initial.departments     || [],
+    isSharedAccount: initial.isSharedAccount || false,
+    password:        '',
   } : {
     name: '', email: '', phone: '', station: '', zoneId: '',
-    role: 'RECEPTIONIST', departments: [], password: generatePassword(),
+    role: 'RECEPTIONIST', departments: [], isSharedAccount: false, password: generatePassword(),
   });
   const [showPass,           setShowPass]           = useState(!isEdit);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -108,6 +109,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
         zoneId: form.zoneId || '',
         role:  form.role,
         departments: form.role === 'LAB_TECH' ? form.departments : [],
+        isSharedAccount: form.isSharedAccount,
       };
       if (form.password.trim()) payload.password = form.password.trim();
 
@@ -164,6 +166,22 @@ function UserFormModal({ initial, onSaved, onClose }) {
                 ))}
               </select>
             </Field>
+
+            {/* Shared/department login — not a real person (e.g. "Zirconia Fitting",
+                "Finance Department"). Excluded from the HR & Payroll employee list. */}
+            <div style={{ gridColumn: '1 / -1', marginBottom: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-2)' }}>
+                <input type="checkbox" checked={form.isSharedAccount}
+                  onChange={e => set('isSharedAccount', e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: 'var(--blue)', cursor: 'pointer' }} />
+                This is a shared/department login, not a real person
+              </label>
+              {form.isSharedAccount && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3, marginLeft: 23 }}>
+                  Won't appear in HR & Payroll's employee list.
+                </div>
+              )}
+            </div>
 
             {/* Departments — LAB_TECH only, multi-select */}
             {form.role === 'LAB_TECH' && (
@@ -463,8 +481,14 @@ export default function AdminUsers() {
                             <div style={{ width: 26, height: 26, borderRadius: 7, background: roleColor.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                               {u.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                             </div>
-                            <div style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className="patient-name" title={u.name}>
+                            <div style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 6 }} className="patient-name" title={u.name}>
                               {u.name}
+                              {u.isSharedAccount && (
+                                <span title="Shared/department login — excluded from HR & Payroll" style={{
+                                  fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 999,
+                                  background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border)', flexShrink: 0,
+                                }}>SHARED</span>
+                              )}
                             </div>
                           </div>
                         </td>

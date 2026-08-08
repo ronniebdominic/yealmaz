@@ -148,7 +148,7 @@ router.get('/summary', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
   if (cached) return res.json(cached);
   try {
     const [missingProfileCount, currentRun] = await Promise.all([
-      prisma.user.count({ where: { isActive: true, OR: [{ employeeProfile: null }, { employeeProfile: { baseSalary: null } }] } }),
+      prisma.user.count({ where: { isActive: true, isSharedAccount: false, OR: [{ employeeProfile: null }, { employeeProfile: { baseSalary: null } }] } }),
       prisma.payrollRun.findFirst({ orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }] }),
     ]);
     const result = {
