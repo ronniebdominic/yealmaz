@@ -489,7 +489,7 @@ export default function AdminDashboard() {
           <>
             {/* ── Section 1: Financial Projection ── */}
             <SectionHeader>Financial Projection</SectionHeader>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+            <div className="stats-grid tooltip-below" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
               <ColorTile icon={MdAssignment} label="Total Cases" value={kpi?.totalCases ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')}

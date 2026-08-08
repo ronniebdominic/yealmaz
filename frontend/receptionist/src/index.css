@@ -280,6 +280,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 .info-icon-wrap:hover .info-tooltip,.info-icon-wrap:focus-visible .info-tooltip{
   visibility:visible;opacity:1;transform:translateX(-50%) translateY(0);
 }
+/* Opt-in variant for rows near the top of a page — opening upward there
+   leaves no room and overlaps whatever's above (e.g. the Filters bar), so
+   these open downward from the icon instead. */
+.tooltip-below .info-tooltip{
+  bottom:auto;top:calc(100% + 8px);transform:translateX(-50%) translateY(-4px);
+}
+.tooltip-below .info-tooltip::after{
+  top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--navy,#0F2044);
+}
+.tooltip-below .info-icon-wrap:hover .info-tooltip,.tooltip-below .info-icon-wrap:focus-visible .info-tooltip{
+  transform:translateX(-50%) translateY(0);
+}
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 /* Tablet: ≤ 900px — collapse 4-col stat grid to 2 cols */
