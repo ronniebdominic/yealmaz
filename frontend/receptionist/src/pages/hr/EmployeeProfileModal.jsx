@@ -13,8 +13,8 @@ import { MdEdit, MdEventBusy } from 'react-icons/md';
 import ProfileModal from './components/ProfileModal';
 import LeaveModal from './components/LeaveModal';
 
-const PHASE1_TABS = ['Overview', 'Attendance', 'Timesheets', 'Leave', 'Overtime', 'Payroll', 'Activity'];
-const FUTURE_TABS = ['Performance', 'Incentives', 'Expenses', 'Advances', 'Goals', 'Skills', 'Training', 'Certifications', 'Documents', 'Assets'];
+const LIVE_TABS = ['Overview', 'Attendance', 'Timesheets', 'Leave', 'Overtime', 'Incentives', 'Advances', 'Expenses', 'Payroll', 'Activity'];
+const FUTURE_TABS = ['Performance', 'Goals', 'Skills', 'Training', 'Certifications', 'Documents', 'Assets'];
 
 function InfoRow({ label, value }) {
   return (
@@ -69,7 +69,7 @@ export default function EmployeeProfileModal({ employeeId, employees, onClose, r
         </div>
 
         <div className="filters" style={{ padding: '12px 24px 0' }}>
-          {PHASE1_TABS.map(t => (
+          {LIVE_TABS.map(t => (
             <button key={t} className={`filter-chip ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</button>
           ))}
           {FUTURE_TABS.map(t => (
@@ -83,6 +83,9 @@ export default function EmployeeProfileModal({ employeeId, employees, onClose, r
           {tab === 'Timesheets' && <TimesheetsTabInner employeeId={employeeId} role={employee.role} />}
           {tab === 'Leave' && <LeaveTabInner employeeId={employeeId} />}
           {tab === 'Overtime' && <OvertimeTabInner employeeId={employeeId} />}
+          {tab === 'Incentives' && <IncentivesTabInner employeeId={employeeId} />}
+          {tab === 'Advances' && <AdvancesTabInner employeeId={employeeId} />}
+          {tab === 'Expenses' && <ExpensesTabInner employeeId={employeeId} />}
           {tab === 'Payroll' && <PayrollTabInner employeeId={employeeId} />}
           {tab === 'Activity' && <ActivityTabInner employeeId={employeeId} />}
         </div>
@@ -277,6 +280,90 @@ function OvertimeTabInner({ employeeId }) {
               <td>{format(new Date(r.date), 'dd MMM yyyy')}</td>
               <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--amber)' }}>{r.overtimeHours}h</td>
               <td style={{ textAlign: 'center' }}><span className={`badge ${r.approvalStatus === 'APPROVED' ? 'badge-verified' : ''}`}>{r.approvalStatus}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Incentives ────────────────────────────────────────────
+function IncentivesTabInner({ employeeId }) {
+  const { data: awards = [] } = useQuery({
+    queryKey: ['hr', 'employee-incentives', employeeId],
+    queryFn: () => api.get('/incentives/awards', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Rule</th><th>Period</th><th style={{ textAlign: 'center' }}>Actual</th><th style={{ textAlign: 'center' }}>Target</th><th style={{ textAlign: 'center' }}>Amount</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+        <tbody>
+          {awards.length === 0 ? (
+            <tr><td colSpan={6} className="empty-state">No incentive awards</td></tr>
+          ) : awards.map(a => (
+            <tr key={a.id}>
+              <td style={{ fontWeight: 600 }}>{a.rule?.name}</td>
+              <td>{a.periodMonth}/{a.periodYear}</td>
+              <td style={{ textAlign: 'center' }}>{a.actualValue}</td>
+              <td style={{ textAlign: 'center' }}>{a.targetValue}</td>
+              <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--green)' }}>Br {a.awardedAmount.toLocaleString('en-US')}</td>
+              <td style={{ textAlign: 'center' }}><span className={`badge ${a.status !== 'PENDING' ? 'badge-verified' : ''}`}>{a.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Advances & Loans ──────────────────────────────────────
+function AdvancesTabInner({ employeeId }) {
+  const { data: advances = [] } = useQuery({
+    queryKey: ['hr', 'employee-advances', employeeId],
+    queryFn: () => api.get('/advances', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Type</th><th style={{ textAlign: 'center' }}>Amount</th><th style={{ textAlign: 'center' }}>Installment</th><th style={{ textAlign: 'center' }}>Outstanding</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+        <tbody>
+          {advances.length === 0 ? (
+            <tr><td colSpan={5} className="empty-state">No advances or loans</td></tr>
+          ) : advances.map(a => (
+            <tr key={a.id}>
+              <td style={{ fontWeight: 600 }}>{a.type}</td>
+              <td style={{ textAlign: 'center' }}>Br {a.amount.toLocaleString('en-US')}</td>
+              <td style={{ textAlign: 'center' }}>Br {a.installmentAmount.toLocaleString('en-US')}</td>
+              <td style={{ textAlign: 'center', fontWeight: 700, color: a.outstandingBalance > 0 ? 'var(--amber)' : 'var(--green)' }}>Br {a.outstandingBalance.toLocaleString('en-US')}</td>
+              <td style={{ textAlign: 'center' }}><span className={`badge ${['ACTIVE', 'COMPLETED'].includes(a.status) ? 'badge-verified' : ''}`}>{a.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Expenses ──────────────────────────────────────────────
+function ExpensesTabInner({ employeeId }) {
+  const { data: claims = [] } = useQuery({
+    queryKey: ['hr', 'employee-expenses', employeeId],
+    queryFn: () => api.get('/expenses', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Category</th><th>Date</th><th style={{ textAlign: 'center' }}>Amount</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+        <tbody>
+          {claims.length === 0 ? (
+            <tr><td colSpan={4} className="empty-state">No expense claims</td></tr>
+          ) : claims.map(c => (
+            <tr key={c.id}>
+              <td style={{ fontWeight: 600 }}>{c.category}</td>
+              <td>{format(new Date(c.date), 'dd MMM yyyy')}</td>
+              <td style={{ textAlign: 'center' }}>Br {c.amount.toLocaleString('en-US')}</td>
+              <td style={{ textAlign: 'center' }}><span className={`badge ${['REIMBURSED', 'FINANCE_APPROVED'].includes(c.status) ? 'badge-verified' : ''}`}>{c.status}</span></td>
             </tr>
           ))}
         </tbody>

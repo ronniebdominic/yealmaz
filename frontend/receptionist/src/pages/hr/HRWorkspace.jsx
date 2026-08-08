@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import {
   MdGroups, MdAccessTime, MdEventBusy, MdPaid, MdMoreHoriz, MdAdd, MdClose,
   MdSchedule, MdTimer, MdEventNote, MdCalendarMonth,
+  MdAccountBalanceWallet, MdEmojiEvents, MdCreditCard, MdReceiptLong,
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
 
@@ -23,6 +24,10 @@ import ShiftsPanel from './more/ShiftsPanel';
 import TimesheetsPanel from './more/TimesheetsPanel';
 import OvertimePanel from './more/OvertimePanel';
 import HolidaysPanel from './more/HolidaysPanel';
+import SalaryStructuresPanel from './more/SalaryStructuresPanel';
+import IncentivesPanel from './more/IncentivesPanel';
+import AdvancesPanel from './more/AdvancesPanel';
+import ExpensesPanel from './more/ExpensesPanel';
 
 const MAIN_TABS = [
   { label: 'Employees', icon: MdGroups },
@@ -35,6 +40,10 @@ const MORE_TABS = [
   { label: 'Overtime', icon: MdTimer },
   { label: 'Shifts', icon: MdEventNote },
   { label: 'Holidays', icon: MdCalendarMonth },
+  { label: 'Salary Structures', icon: MdAccountBalanceWallet },
+  { label: 'Incentives', icon: MdEmojiEvents },
+  { label: 'Advances', icon: MdCreditCard },
+  { label: 'Expenses', icon: MdReceiptLong },
 ];
 
 // ── Add Employee — a quick account-create (name/email/role/password),
@@ -154,6 +163,10 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
       {tab === 'Overtime' && <OvertimePanel />}
       {tab === 'Shifts' && <ShiftsPanel employees={employees} />}
       {tab === 'Holidays' && <HolidaysPanel />}
+      {tab === 'Salary Structures' && <SalaryStructuresPanel employees={employees} />}
+      {tab === 'Incentives' && <IncentivesPanel />}
+      {tab === 'Advances' && <AdvancesPanel employees={employees} />}
+      {tab === 'Expenses' && <ExpensesPanel employees={employees} />}
 
       {selectedEmployeeId && (
         <EmployeeProfileModal employeeId={selectedEmployeeId} employees={employees}

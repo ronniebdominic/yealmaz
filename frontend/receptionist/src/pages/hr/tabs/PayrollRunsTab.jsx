@@ -1,17 +1,27 @@
-// Ye-Almaz — Payroll Runs tab. Lifted from the old AdminHR.jsx (viewer) +
-// HRDashboard.jsx (create/finalize/adjust) — same behavior, one
-// implementation. Phase 2 will extend this (Salary Structures, Incentives,
-// Advances) rather than rebuild it.
+// Ye-Almaz — Payroll Runs tab. Phase 1 gave this a single DRAFT→FINALIZED
+// state; Phase 2 adds the full DRAFT→PROCESSING→REVIEW→APPROVED→PAID→
+// FINALIZED ("Closed") workflow, a totals summary, and distinguishes
+// auto-generated adjustments (salary structure/overtime/advances/
+// expenses/incentives, pulled in automatically at run creation) from
+// HR's manual ones.
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../../api';
 import toast from 'react-hot-toast';
-import { MdAdd, MdCheckCircle, MdPrint } from 'react-icons/md';
+import { MdAdd, MdArrowForward, MdPrint, MdAutoAwesome } from 'react-icons/md';
 import { printPayslip } from '../../../utils/printPayslip';
 import { inputStyle } from '../../../utils/adminForms';
 import AdjustmentModal from '../components/AdjustmentModal';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WORKFLOW = ['DRAFT', 'PROCESSING', 'REVIEW', 'APPROVED', 'PAID', 'FINALIZED'];
+const STATUS_LABELS = { DRAFT: 'Draft', PROCESSING: 'Processing', REVIEW: 'Review', APPROVED: 'Approved', PAID: 'Paid', FINALIZED: 'Closed' };
+const ADJUSTABLE_STATUSES = ['DRAFT', 'PROCESSING', 'REVIEW'];
+
+function StatusBadge({ status }) {
+  const isTerminal = status === 'FINALIZED' || status === 'PAID';
+  return <span className={`badge ${isTerminal ? 'badge-verified' : ''}`}>{STATUS_LABELS[status] || status}</span>;
+}
 
 export default function PayrollRunsTab({ canManage }) {
   const qc = useQueryClient();
@@ -41,13 +51,15 @@ export default function PayrollRunsTab({ canManage }) {
     } catch (err) { toast.error(err.response?.data?.error || 'Could not create run'); }
   };
 
-  const finalizeRun = async (runId) => {
-    if (!window.confirm('Finalize this payroll run? No further adjustments can be added afterward.')) return;
+  const advanceRun = async (run) => {
+    const idx = WORKFLOW.indexOf(run.status);
+    const next = WORKFLOW[idx + 1];
+    if (next === 'FINALIZED' && !window.confirm('Close this payroll run? Once closed it cannot be reopened or adjusted.')) return;
     try {
-      await api.patch(`/payroll/runs/${runId}/finalize`);
-      toast.success('Payroll run finalized');
+      await api.patch(`/payroll/runs/${run.id}/advance`);
+      toast.success(`Run moved to ${STATUS_LABELS[next]}`);
       refresh();
-    } catch (err) { toast.error(err.response?.data?.error || 'Could not finalize run'); }
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not advance run'); }
   };
 
   return (
@@ -83,9 +95,7 @@ export default function PayrollRunsTab({ canManage }) {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 600 }}>{MONTH_NAMES[r.periodMonth - 1]} {r.periodYear}</td>
                   <td style={{ textAlign: 'center' }}>{r._count?.entries ?? 0}</td>
-                  <td style={{ textAlign: 'center' }}>
-                    <span className={`badge ${r.status === 'FINALIZED' ? 'badge-verified' : ''}`}>{r.status}</span>
-                  </td>
+                  <td style={{ textAlign: 'center' }}><StatusBadge status={r.status} /></td>
                   <td>{r.createdBy?.name || '—'}</td>
                   <td style={{ textAlign: 'right' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setActiveRunId(r.id)}>View</button>
@@ -99,30 +109,49 @@ export default function PayrollRunsTab({ canManage }) {
 
       {activeRun && (
         <div className="card">
-          <div className="card-header">
-            <div className="card-title">{MONTH_NAMES[activeRun.periodMonth - 1]} {activeRun.periodYear} — Entries</div>
-            {canManage && activeRun.status === 'DRAFT' && (
-              <button className="btn btn-success btn-sm" onClick={() => finalizeRun(activeRun.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <MdCheckCircle size={14} /> Finalize Run
+          <div className="card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div className="card-title">{MONTH_NAMES[activeRun.periodMonth - 1]} {activeRun.periodYear} — Entries</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                Workflow: {WORKFLOW.map(s => STATUS_LABELS[s]).join(' → ')} — currently <strong>{STATUS_LABELS[activeRun.status]}</strong>
+              </div>
+            </div>
+            {canManage && WORKFLOW.indexOf(activeRun.status) < WORKFLOW.length - 1 && (
+              <button className="btn btn-success btn-sm" onClick={() => advanceRun(activeRun)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <MdArrowForward size={14} /> Advance to {STATUS_LABELS[WORKFLOW[WORKFLOW.indexOf(activeRun.status) + 1]]}
               </button>
             )}
           </div>
+
+          {activeRun.totals && (
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', padding: 16, marginBottom: 0 }}>
+              <div className="stat-card"><div className="stat-value">Br {activeRun.totals.grossEarnings.toLocaleString('en-US')}</div><div className="stat-label">Gross Earnings</div></div>
+              <div className="stat-card"><div className="stat-value" style={{ color: 'var(--red)' }}>Br {Math.abs(activeRun.totals.deductions).toLocaleString('en-US')}</div><div className="stat-label">Deductions</div></div>
+              <div className="stat-card"><div className="stat-value" style={{ color: 'var(--blue)' }}>Br {activeRun.totals.netPay.toLocaleString('en-US')}</div><div className="stat-label">Total Net Pay</div></div>
+            </div>
+          )}
+
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Employee</th><th style={{ textAlign: 'center' }}>Base Salary</th><th style={{ textAlign: 'center' }}>Adjustments</th><th style={{ textAlign: 'center' }}>Net Pay</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
+                <tr><th>Employee</th><th style={{ textAlign: 'center' }}>Base Salary</th><th>Adjustments</th><th style={{ textAlign: 'center' }}>Net Pay</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
               </thead>
               <tbody>
                 {activeRun.entries.map(entry => (
                   <tr key={entry.id}>
                     <td style={{ fontWeight: 600 }}>{entry.user?.name}</td>
                     <td style={{ textAlign: 'center' }}>Br {entry.baseSalarySnapshot.toLocaleString('en-US')}</td>
-                    <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-3)' }}>
-                      {entry.adjustments.length === 0 ? '—' : entry.adjustments.map(a => `${a.label} (${a.amount >= 0 ? '+' : ''}${a.amount})`).join(', ')}
+                    <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      {entry.adjustments.length === 0 ? '—' : entry.adjustments.map(a => (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {a.autoGenerated && <MdAutoAwesome size={11} title="Auto-generated" style={{ opacity: 0.6 }} />}
+                          {a.label} ({a.amount >= 0 ? '+' : ''}{a.amount})
+                        </div>
+                      ))}
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>Br {entry.netPay.toLocaleString('en-US')}</td>
                     <td style={{ textAlign: 'right' }}>
-                      {canManage && activeRun.status === 'DRAFT' && (
+                      {canManage && ADJUSTABLE_STATUSES.includes(activeRun.status) && (
                         <button className="btn btn-ghost btn-sm" onClick={() => setAdjustmentEntry(entry)} style={{ marginRight: 6 }}><MdAdd size={13} /> Adjust</button>
                       )}
                       <button className="btn btn-ghost btn-sm" onClick={() => printPayslip(entry, activeRun)}><MdPrint size={13} /> Payslip</button>
