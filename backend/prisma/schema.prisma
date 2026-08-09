@@ -82,6 +82,21 @@ model User {
   expenseClaims            ExpenseClaim[]             @relation("ExpenseClaimsUser")
   expenseClaimsApproved    ExpenseClaim[]             @relation("ExpenseClaimsApprovedBy")
 
+  // HR Phase 3 — Skills / Training / Certifications / Documents / Assets / Goals / Performance
+  employeeSkills             EmployeeSkill[]     @relation("EmployeeSkillsUser")
+  employeeSkillsAssessed     EmployeeSkill[]     @relation("EmployeeSkillsAssessedBy")
+  trainingRecords            TrainingRecord[]    @relation("TrainingRecordsUser")
+  trainingRecordsCreated     TrainingRecord[]    @relation("TrainingRecordsCreatedBy")
+  certifications             Certification[]     @relation("CertificationsUser")
+  employeeDocuments          EmployeeDocument[]  @relation("EmployeeDocumentsUser")
+  employeeDocumentsUploaded  EmployeeDocument[]  @relation("EmployeeDocumentsUploadedBy")
+  assetAssignments           AssetAssignment[]   @relation("AssetAssignmentsUser")
+  assetAssignmentsAssigned   AssetAssignment[]   @relation("AssetAssignmentsAssignedBy")
+  goals                      Goal[]              @relation("GoalsUser")
+  goalsCreated               Goal[]              @relation("GoalsCreatedBy")
+  performanceReviews         PerformanceReview[] @relation("PerformanceReviewsUser")
+  performanceReviewsGiven    PerformanceReview[] @relation("PerformanceReviewsReviewer")
+
   @@map("users")
 }
 
@@ -1267,6 +1282,201 @@ model EmploymentHistory {
 
   @@index([userId])
   @@map("employment_history")
+}
+
+// ── PHASE 3: SKILLS / TRAINING / CERTIFICATIONS ─────────
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  EXPERT
+}
+
+model Skill {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  department String?
+  createdAt  DateTime @default(now())
+
+  employees EmployeeSkill[]
+
+  @@map("skills")
+}
+
+model EmployeeSkill {
+  id             String     @id @default(uuid())
+  userId         String
+  user           User       @relation("EmployeeSkillsUser", fields: [userId], references: [id])
+  skillId        String
+  skill          Skill      @relation(fields: [skillId], references: [id])
+  level          SkillLevel @default(BEGINNER)
+  assessedById   String?
+  assessedBy     User?      @relation("EmployeeSkillsAssessedBy", fields: [assessedById], references: [id])
+  assessedAt     DateTime   @default(now())
+  certificateUrl String?
+  expiryDate     DateTime?
+
+  @@unique([userId, skillId])
+  @@index([userId])
+  @@map("employee_skills")
+}
+
+enum TrainingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model TrainingRecord {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation("TrainingRecordsUser", fields: [userId], references: [id])
+  title          String
+  trainerName    String?
+  date           DateTime
+  durationHours  Float?
+  score          Float?
+  certificateUrl String?
+  status         TrainingStatus @default(SCHEDULED)
+  createdById    String
+  createdBy      User           @relation("TrainingRecordsCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime       @default(now())
+
+  @@index([userId])
+  @@map("training_records")
+}
+
+// status (Valid/Expiring Soon/Expired) is computed from expiryDate at read
+// time, never stored — it would silently go stale otherwise.
+model Certification {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation("CertificationsUser", fields: [userId], references: [id])
+  name           String
+  issueDate      DateTime
+  expiryDate     DateTime?
+  certificateUrl String?
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@map("certifications")
+}
+
+// ── PHASE 3: DOCUMENTS / ASSETS ─────────────────────────
+enum EmployeeDocumentType {
+  CONTRACT
+  ID
+  CERTIFICATE
+  TRAINING
+  SALARY_REVISION
+  PROMOTION
+  PAYSLIP
+  WARNING
+  OTHER
+}
+
+model EmployeeDocument {
+  id           String               @id @default(uuid())
+  userId       String
+  user         User                 @relation("EmployeeDocumentsUser", fields: [userId], references: [id])
+  type         EmployeeDocumentType @default(OTHER)
+  name         String
+  fileUrl      String
+  version      Int                  @default(1)
+  expiryDate   DateTime?
+  note         String?
+  uploadedById String
+  uploadedBy   User                 @relation("EmployeeDocumentsUploadedBy", fields: [uploadedById], references: [id])
+  createdAt    DateTime             @default(now())
+
+  @@index([userId])
+  @@map("employee_documents")
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  RETURNED
+  LOST
+}
+
+model CompanyAsset {
+  id           String      @id @default(uuid())
+  name         String
+  type         String      // e.g. "Laptop", "Phone", "PPE", "ID Card" — free text, not hard-coded
+  serialNumber String?
+  status       AssetStatus @default(AVAILABLE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  assignments AssetAssignment[]
+
+  @@map("company_assets")
+}
+
+model AssetAssignment {
+  id           String       @id @default(uuid())
+  assetId      String
+  asset        CompanyAsset @relation(fields: [assetId], references: [id])
+  userId       String
+  user         User         @relation("AssetAssignmentsUser", fields: [userId], references: [id])
+  assignedAt   DateTime     @default(now())
+  returnedAt   DateTime?
+  condition    String?
+  assignedById String
+  assignedBy   User         @relation("AssetAssignmentsAssignedBy", fields: [assignedById], references: [id])
+  note         String?
+
+  @@index([assetId])
+  @@index([userId])
+  @@map("asset_assignments")
+}
+
+// ── PHASE 3: GOALS / PERFORMANCE ────────────────────────
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  MISSED
+}
+
+model Goal {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation("GoalsUser", fields: [userId], references: [id])
+  title       String
+  description String?
+  targetValue Float?
+  actualValue Float?
+  unit        String?
+  dueDate     DateTime?
+  status      GoalStatus @default(ACTIVE)
+  createdById String
+  createdBy   User       @relation("GoalsCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId])
+  @@map("goals")
+}
+
+// Qualitative manager review only — the actual metrics (cases, productive
+// hours, QC pass rate, attendance %, target achievement) are computed
+// on-the-fly from existing data (CaseStage, TimesheetEntry, Attendance,
+// Goals/IncentiveAward) rather than duplicated into this table.
+model PerformanceReview {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("PerformanceReviewsUser", fields: [userId], references: [id])
+  reviewerId  String
+  reviewer    User     @relation("PerformanceReviewsReviewer", fields: [reviewerId], references: [id])
+  periodMonth Int
+  periodYear  Int
+  rating      Int?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, periodMonth, periodYear])
+  @@index([userId])
+  @@map("performance_reviews")
 }
 
 // ── GOOGLE SHEETS SYNC ─────────────────────────────────

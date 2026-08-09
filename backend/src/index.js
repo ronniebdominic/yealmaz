@@ -114,6 +114,12 @@ app.use('/api/incentives',    require('./routes/incentives'));
 app.use('/api/advances',      require('./routes/advances'));
 app.use('/api/expenses',      require('./routes/expenses'));
 app.use('/api/reports',       require('./routes/reports'));
+app.use('/api/skills',        require('./routes/skills'));
+app.use('/api/training',      require('./routes/training'));
+app.use('/api/documents',     require('./routes/documents'));
+app.use('/api/assets',        require('./routes/assets'));
+app.use('/api/goals',         require('./routes/goals'));
+app.use('/api/performance',   require('./routes/performance'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────
