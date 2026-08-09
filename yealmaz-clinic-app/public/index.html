@@ -3,8 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0E9F6E" />
-    <meta name="description" content="Ye-Almaz Dental Laboratory — Clinic Portal" />
+
+    <!-- theme-color/description/favicon.ico are auto-injected here by the
+         Metro web export from app.json's `web` config — no need to
+         duplicate them by hand. -->
 
     <!-- PWA meta tags -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -12,8 +14,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ye-Almaz" />
 
+    <!-- Web App Manifest — required (alongside the service worker below)
+         for Chrome/Edge/Android to consider this installable as a PWA. -->
+    <link rel="manifest" href="/manifest.json" />
+
     <!-- Apple touch icon (Safari "Add to Home Screen") -->
-    <link rel="apple-touch-icon" href="/assets/icon.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
 
     <title>Ye-Almaz Clinic</title>
 
@@ -27,13 +34,9 @@
       }
     </style>
 
-    <!-- Expo injects bundle here -->
-    %FAVICON%
-    %EXPO_WEB_LINKS%
   </head>
   <body>
     <div id="root"></div>
-    %EXPO_WEB_SCRIPTS%
 
     <!-- Service Worker Registration -->
     <script>

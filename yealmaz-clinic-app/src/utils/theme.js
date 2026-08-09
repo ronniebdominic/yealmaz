@@ -66,7 +66,7 @@ export const Gradients = {
 
 // Sora, loaded via @expo-google-fonts/sora in App.js (useFonts) for
 // native, and via a Google Fonts <link> + global CSS override in
-// web/index.html for the PWA. Both point at these same family names so
+// public/index.html for the PWA. Both point at these same family names so
 // Typography works identically on both.
 const FONT_REGULAR  = 'Sora_400Regular';
 const FONT_MEDIUM   = 'Sora_500Medium';
