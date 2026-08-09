@@ -2,7 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+
+    <!-- react-native-web's required root reset — Metro's own default
+         template includes this automatically, but does NOT inject it when
+         a custom public/index.html exists (this file). Without it, #root's
+         flex:1 has no ancestor height to flex within, so the whole RN Web
+         tree collapses to content-height instead of filling the screen —
+         this is what broke the app after switching to a custom template. -->
+    <style id="expo-reset">
+      html, body { height: 100%; }
+      body { overflow: hidden; }
+      #root { display: flex; height: 100%; flex: 1; }
+    </style>
 
     <!-- theme-color/description/favicon.ico are auto-injected here by the
          Metro web export from app.json's `web` config — no need to
@@ -36,6 +49,7 @@
 
   </head>
   <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
 
     <!-- Service Worker Registration -->
