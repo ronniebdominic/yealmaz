@@ -97,6 +97,14 @@ model User {
   performanceReviews         PerformanceReview[] @relation("PerformanceReviewsUser")
   performanceReviewsGiven    PerformanceReview[] @relation("PerformanceReviewsReviewer")
 
+  // HR Phase 4 — Onboarding / Offboarding / Recruitment
+  onboardingTasks          OnboardingTask[]  @relation("OnboardingTasksUser")
+  onboardingTasksCompleted OnboardingTask[]  @relation("OnboardingTasksCompletedBy")
+  offboardingCase          OffboardingCase?  @relation("OffboardingCasesUser")
+  offboardingCasesCreated  OffboardingCase[] @relation("OffboardingCasesCreatedBy")
+  candidatesHired          Candidate[]       @relation("CandidatesHiredUser")
+  candidatesCreated        Candidate[]       @relation("CandidatesCreatedBy")
+
   @@map("users")
 }
 
@@ -1477,6 +1485,83 @@ model PerformanceReview {
   @@unique([userId, periodMonth, periodYear])
   @@index([userId])
   @@map("performance_reviews")
+}
+
+// ── PHASE 4: ONBOARDING / OFFBOARDING / RECRUITMENT ─────
+model OnboardingTask {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation("OnboardingTasksUser", fields: [userId], references: [id])
+  label         String
+  isDone        Boolean   @default(false)
+  sortOrder     Int       @default(0)
+  completedAt   DateTime?
+  completedById String?
+  completedBy   User?     @relation("OnboardingTasksCompletedBy", fields: [completedById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@map("onboarding_tasks")
+}
+
+enum OffboardingStatus {
+  RESIGNATION
+  NOTICE
+  ASSET_RETURN
+  ACCESS_REVOCATION
+  LEAVE_SETTLEMENT
+  FINAL_PAYROLL
+  EXIT_INTERVIEW
+  ARCHIVED
+}
+
+// ARCHIVED sets EmployeeProfile.employmentStatus = TERMINATED + endDate
+// (both already exist from Phase 1) — "do not delete employee history",
+// so offboarding is purely additive status tracking, never a delete.
+model OffboardingCase {
+  id                 String            @id @default(uuid())
+  userId             String            @unique
+  user               User              @relation("OffboardingCasesUser", fields: [userId], references: [id])
+  resignationDate    DateTime
+  lastWorkingDate    DateTime?
+  reason             String?
+  status             OffboardingStatus @default(RESIGNATION)
+  exitInterviewNotes String?
+  createdById        String
+  createdBy          User              @relation("OffboardingCasesCreatedBy", fields: [createdById], references: [id])
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@map("offboarding_cases")
+}
+
+enum CandidateStatus {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+}
+
+model Candidate {
+  id          String          @id @default(uuid())
+  name        String
+  email       String?
+  phone       String?
+  position    String?
+  source      String?
+  status      CandidateStatus @default(APPLIED)
+  resumeUrl   String?
+  notes       String?
+  hiredUserId String?
+  hiredUser   User?           @relation("CandidatesHiredUser", fields: [hiredUserId], references: [id])
+  createdById String
+  createdBy   User            @relation("CandidatesCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("candidates")
 }
 
 // ── GOOGLE SHEETS SYNC ─────────────────────────────────

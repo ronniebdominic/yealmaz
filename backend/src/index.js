@@ -120,6 +120,10 @@ app.use('/api/documents',     require('./routes/documents'));
 app.use('/api/assets',        require('./routes/assets'));
 app.use('/api/goals',         require('./routes/goals'));
 app.use('/api/performance',   require('./routes/performance'));
+app.use('/api/onboarding',    require('./routes/onboarding'));
+app.use('/api/offboarding',   require('./routes/offboarding'));
+app.use('/api/recruitment',   require('./routes/recruitment'));
+app.use('/api/hr-analytics',  require('./routes/hr-analytics'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────
