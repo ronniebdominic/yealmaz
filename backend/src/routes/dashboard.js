@@ -647,6 +647,78 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
   }
 });
 
+// ── GET /api/dashboard/delivery-performance ─────────────
+// Per-delivery-agent stats, same shape/spirit as lab-performance above,
+// but attribution is via DeliveryLog.deliveryById — a real FK, not a name
+// string — so there's no equivalent of lab-performance's name-matching
+// fragility here.
+router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const cacheKey = `dashboard:delivery-performance:${from || ''}:${to || ''}`;
+    const cached = await appCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
+    const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
+
+    const [agents, logs] = await Promise.all([
+      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true, station: true } }),
+      prisma.deliveryLog.findMany({
+        where: { deliveredAt: { gte: dateFrom, lte: dateTo } },
+        select: { deliveryById: true, deliveredAt: true, caseId: true, case: { select: { dueDate: true, clinic: { select: { name: true } } } } },
+      }),
+    ]);
+
+    const perAgent = new Map(agents.map(a => [a.id, {
+      id: a.id, name: a.name, isActive: a.isActive, station: a.station,
+      totalDeliveries: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
+      onTime: 0, late: 0, lastActiveAt: null,
+    }]));
+    let unattributedDeliveries = 0;
+
+    for (const log of logs) {
+      const agg = perAgent.get(log.deliveryById);
+      if (!agg) { unattributedDeliveries++; continue; }
+      agg.totalDeliveries++;
+      agg.cases.add(log.caseId);
+      if (log.case?.clinic?.name) agg.clinics.add(log.case.clinic.name);
+      const day = localDayKey(log.deliveredAt);
+      agg.dailyCounts[day] = (agg.dailyCounts[day] || 0) + 1;
+      if (!agg.lastActiveAt || log.deliveredAt > agg.lastActiveAt) agg.lastActiveAt = log.deliveredAt;
+      if (log.case?.dueDate) {
+        if (log.deliveredAt <= log.case.dueDate) agg.onTime++; else agg.late++;
+      }
+    }
+
+    const result = {
+      range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      unattributedDeliveries,
+      agents: [...perAgent.values()].map(a => {
+        const activeDays = Object.keys(a.dailyCounts).length;
+        const onTimeTotal = a.onTime + a.late;
+        return {
+          id: a.id, name: a.name, isActive: a.isActive, station: a.station,
+          totalDeliveries: a.totalDeliveries,
+          uniqueCases: a.cases.size,
+          uniqueClinics: a.clinics.size,
+          activeDays,
+          avgPerActiveDay: activeDays > 0 ? Math.round((a.totalDeliveries / activeDays) * 10) / 10 : 0,
+          onTimeRate: onTimeTotal > 0 ? Math.round((a.onTime / onTimeTotal) * 100) : null,
+          dailyCounts: a.dailyCounts,
+          lastActiveAt: a.lastActiveAt,
+        };
+      }).sort((a, b) => b.totalDeliveries - a.totalDeliveries),
+    };
+
+    await appCache.set(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    console.error('[delivery-performance]', err);
+    res.status(500).json({ error: 'Could not load delivery performance.' });
+  }
+});
+
 // ── GET /api/dashboard/clinic-balances ──────────────────
 // Per-clinic outstanding payment totals for Finance dashboard
 router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {

@@ -53,6 +53,56 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
   }
 });
 
+// ── GET /api/delivery/history ────────────────────────────
+// A delivery agent's own full delivery archive — GET /assigned only ever
+// shows today's completed deliveries (it's a live working board), so
+// anything from a prior day is otherwise invisible to the person who
+// delivered it. Matched via DeliveryLog.deliveryById (a real FK, not a
+// name string) rather than Case.assignedDeliveryId, which gets cleared
+// back to null once a case is delivered.
+router.get('/history', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search, from, to, userId } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const isDeliveryExec = req.user.role === 'DELIVERY';
+
+    const logWhere = { deliveredAt: { not: null } };
+    if (isDeliveryExec) logWhere.deliveryById = req.user.id;
+    else if (userId) logWhere.deliveryById = userId;
+    if (from) logWhere.deliveredAt = { ...logWhere.deliveredAt, gte: new Date(`${from}T00:00:00`) };
+    if (to) { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); logWhere.deliveredAt = { ...logWhere.deliveredAt, lte: d }; }
+
+    const caseWhere = {
+      deliveryLogs: { some: logWhere },
+      ...(search ? {
+        OR: [
+          { caseNumber: { contains: search, mode: 'insensitive' } },
+          { patientName: { contains: search, mode: 'insensitive' } },
+          { clinic: { name: { contains: search, mode: 'insensitive' } } },
+        ],
+      } : {}),
+    };
+
+    const [cases, total] = await Promise.all([
+      prisma.case.findMany({
+        where: caseWhere,
+        include: {
+          clinic: { select: { name: true, station: true } },
+          deliveryLogs: { where: logWhere, orderBy: { deliveredAt: 'desc' }, take: 1 },
+        },
+        orderBy: { deliveryDate: 'desc' },
+        skip, take: parseInt(limit),
+      }),
+      prisma.case.count({ where: caseWhere }),
+    ]);
+
+    res.json({ cases, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } });
+  } catch (err) {
+    console.error('[delivery history]', err);
+    res.status(500).json({ error: 'Could not load delivery history.' });
+  }
+});
+
 // ── POST /api/delivery/:caseId/collect-impression ────────
 // Delivery exec confirms impression collected from clinic → case enters production
 router.post('/:caseId/collect-impression', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {

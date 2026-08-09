@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   MdCheckCircle, MdUndo, MdLocalHospital, MdLocationOn, MdCall, MdWarning,
-  MdSearch, MdClose, MdLogout,
+  MdSearch, MdClose, MdLogout, MdArchive, MdExpandLess, MdExpandMore,
 } from 'react-icons/md';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import AttendanceClock from '../components/AttendanceClock';
@@ -75,6 +75,114 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
 }
 
 // ── Main ─────────────────────────────────────────────────
+// ── Archive — a delivery agent's full delivery history ───
+// GET /delivery/assigned (the live board above) only ever shows today's
+// completed deliveries; anything older is otherwise invisible to the
+// person who delivered it. This is a separate, independently-paginated
+// fetch from /delivery/history so browsing history never disturbs the
+// live board's own polling/state.
+function DeliveryArchive() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, totalPages: 1 });
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+
+  const load = useCallback(async (p = 1) => {
+    setLoading(true);
+    try {
+      const res = await api.get('/delivery/history', {
+        params: { page: p, limit: 20, search: search || undefined, from: dateFrom || undefined, to: dateTo || undefined },
+      });
+      setItems(res.data.cases ?? []);
+      setPagination(res.data.pagination ?? { total: 0, page: 1, totalPages: 1 });
+      setPage(p);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [search, dateFrom, dateTo]);
+
+  useEffect(() => { if (open) load(1); }, [open, load]);
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid #E5E7EB', marginTop: 18 }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#374151' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MdArchive size={16} /> My Delivery Archive{pagination.total > 0 ? ` (${pagination.total})` : ''}</span>
+        {open ? <MdExpandLess size={18} /> : <MdExpandMore size={18} />}
+      </button>
+      {open && (
+        <div style={{ borderTop: '1px solid #E5E7EB' }}>
+          <div style={{ padding: '12px 16px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', background: '#F9FAFB' }}>
+            <div style={{ flex: 2, minWidth: 180 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4 }}>SEARCH</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 10px', background: '#fff' }}>
+                <MdSearch size={14} color="#9CA3AF" />
+                <input placeholder="Clinic, case no., patient…" value={search} onChange={e => setSearch(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && load(1)}
+                  style={{ border: 'none', outline: 'none', fontSize: 13, flex: 1 }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4 }}>FROM</div>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4 }}>TO</div>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB' }} />
+            </div>
+            <button onClick={() => load(1)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#1A56A0', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Filter
+            </button>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: 30, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading…</div>
+          ) : items.length === 0 ? (
+            <div style={{ padding: 30, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No deliveries found</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F9FAFB' }}>
+                  <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Clinic / Case</th>
+                  <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Patient</th>
+                  <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Delivered</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map(c => (
+                  <tr key={c.id} style={{ borderTop: '1px solid #F3F4F6' }}>
+                    <td style={{ padding: '9px 14px' }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{c.clinic?.name}</div>
+                      {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{c.caseNumber}</div>}
+                    </td>
+                    <td style={{ padding: '9px 14px', fontSize: 13, color: '#374151' }}>{c.patientName || '—'}</td>
+                    <td style={{ padding: '9px 14px', fontSize: 12, color: '#6B7280' }}>
+                      {c.deliveryLogs?.[0]?.deliveredAt ? format(new Date(c.deliveryLogs[0].deliveredAt), 'dd MMM yyyy, h:mm a') : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {pagination.totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, padding: '12px 0', borderTop: '1px solid #F3F4F6' }}>
+              <button onClick={() => load(page - 1)} disabled={page <= 1}
+                style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #E5E7EB', background: '#fff', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}>‹ Prev</button>
+              <span style={{ fontSize: 12, color: '#6B7280', alignSelf: 'center' }}>Page {page} of {pagination.totalPages}</span>
+              <button onClick={() => load(page + 1)} disabled={page >= pagination.totalPages}
+                style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #E5E7EB', background: '#fff', fontSize: 12, cursor: page >= pagination.totalPages ? 'not-allowed' : 'pointer', opacity: page >= pagination.totalPages ? 0.5 : 1 }}>Next ›</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DeliveryDashboard() {
   const { user, logout } = useAuth();
   const [cases, setCases]     = useState([]);
@@ -368,6 +476,8 @@ export default function DeliveryDashboard() {
             )}
           </div>
         )}
+
+        <DeliveryArchive />
       </div>
 
       {modal && (

@@ -12,6 +12,7 @@ const TTL_RULES = [
   { prefix: 'dashboard:revenue',     ttl: 3600  }, // 1 h  — expensive aggregation
   { prefix: 'dashboard:analytics',   ttl: 1800  }, // 30m  — date-range analytics
   { prefix: 'dashboard:lab-performance', ttl: 1800 }, // 30m — per-tech scan history, changes slowly
+  { prefix: 'dashboard:delivery-performance', ttl: 1800 }, // 30m — per-agent delivery history, changes slowly
   { prefix: 'dashboard:summary',     ttl: 60    }, // 1 m  — KPI cards
   { prefix: 'dashboard:cases-by-status', ttl: 120 }, // 2 m
   { prefix: 'case:lab:',             ttl: 30    }, // 30s  — lab case detail

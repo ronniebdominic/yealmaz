@@ -35,6 +35,9 @@ function NavItems({ active, onNav }) {
       <button className={active('/admin/lab-performance')} onClick={() => onNav('/admin/lab-performance')}>
         <MdBadge className="mi" size={17} /> Lab Performance
       </button>
+      <button className={active('/admin/delivery-performance')} onClick={() => onNav('/admin/delivery-performance')}>
+        <MdLocalShipping className="mi" size={17} /> Delivery Performance
+      </button>
 
       <div className="nav-section-label">Management</div>
       <button className={active('/admin/cases')} onClick={() => onNav('/admin/cases')}>
