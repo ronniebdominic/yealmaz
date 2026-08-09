@@ -10,6 +10,7 @@ import {
   MdGroups, MdAccessTime, MdEventBusy, MdPaid, MdMoreHoriz, MdAdd, MdClose,
   MdSchedule, MdTimer, MdEventNote, MdCalendarMonth,
   MdAccountBalanceWallet, MdEmojiEvents, MdCreditCard, MdReceiptLong, MdAssessment,
+  MdPsychology, MdSchool, MdFolder, MdInventory, MdFlag,
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
 
@@ -29,6 +30,11 @@ import IncentivesPanel from './more/IncentivesPanel';
 import AdvancesPanel from './more/AdvancesPanel';
 import ExpensesPanel from './more/ExpensesPanel';
 import ReportsPanel from './more/ReportsPanel';
+import SkillsPanel from './more/SkillsPanel';
+import TrainingPanel from './more/TrainingPanel';
+import DocumentsPanel from './more/DocumentsPanel';
+import AssetsPanel from './more/AssetsPanel';
+import GoalsPanel from './more/GoalsPanel';
 
 const MAIN_TABS = [
   { label: 'Employees', icon: MdGroups },
@@ -46,6 +52,11 @@ const MORE_TABS = [
   { label: 'Advances', icon: MdCreditCard },
   { label: 'Expenses', icon: MdReceiptLong },
   { label: 'Reports', icon: MdAssessment },
+  { label: 'Goals', icon: MdFlag },
+  { label: 'Skills', icon: MdPsychology },
+  { label: 'Training', icon: MdSchool },
+  { label: 'Documents', icon: MdFolder },
+  { label: 'Assets', icon: MdInventory },
 ];
 
 // ── Add Employee — a quick account-create (name/email/role/password),
@@ -170,6 +181,11 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
       {tab === 'Advances' && <AdvancesPanel employees={employees} />}
       {tab === 'Expenses' && <ExpensesPanel employees={employees} />}
       {tab === 'Reports' && <ReportsPanel />}
+      {tab === 'Goals' && <GoalsPanel employees={employees} />}
+      {tab === 'Skills' && <SkillsPanel employees={employees} />}
+      {tab === 'Training' && <TrainingPanel employees={employees} />}
+      {tab === 'Documents' && <DocumentsPanel employees={employees} />}
+      {tab === 'Assets' && <AssetsPanel employees={employees} />}
 
       {selectedEmployeeId && (
         <EmployeeProfileModal employeeId={selectedEmployeeId} employees={employees}

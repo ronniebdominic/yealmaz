@@ -1,10 +1,8 @@
 // Ye-Almaz — Employee Profile: the comprehensive per-employee detail view.
 // Glass modal (per CaseDetailModal.jsx's visual language) with an internal
-// tab strip. Phase 1 fully implements Overview/Attendance/Timesheets/
-// Leave/Overtime/Payroll/Activity; everything outside Phase 1's scope
-// (Performance/Incentives/Expenses/Advances/Goals/Skills/Training/
-// Certifications/Assets) is a disabled "Coming soon" tab so the structure
-// is future-proof for Phases 2-3.
+// tab strip. All tabs are now live as of Phase 3 — Documents/Onboarding/
+// Offboarding/Recruitment stay in the More menu rather than duplicated
+// here (they're org-wide workflows, not naturally a single-employee view).
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api';
@@ -13,8 +11,12 @@ import { MdEdit, MdEventBusy } from 'react-icons/md';
 import ProfileModal from './components/ProfileModal';
 import LeaveModal from './components/LeaveModal';
 
-const LIVE_TABS = ['Overview', 'Attendance', 'Timesheets', 'Leave', 'Overtime', 'Incentives', 'Advances', 'Expenses', 'Payroll', 'Activity'];
-const FUTURE_TABS = ['Performance', 'Goals', 'Skills', 'Training', 'Certifications', 'Documents', 'Assets'];
+const LIVE_TABS = [
+  'Overview', 'Attendance', 'Timesheets', 'Leave', 'Overtime',
+  'Incentives', 'Advances', 'Expenses', 'Payroll',
+  'Performance', 'Goals', 'Skills', 'Training', 'Documents', 'Activity',
+];
+const FUTURE_TABS = [];
 
 function InfoRow({ label, value }) {
   return (
@@ -87,6 +89,11 @@ export default function EmployeeProfileModal({ employeeId, employees, onClose, r
           {tab === 'Advances' && <AdvancesTabInner employeeId={employeeId} />}
           {tab === 'Expenses' && <ExpensesTabInner employeeId={employeeId} />}
           {tab === 'Payroll' && <PayrollTabInner employeeId={employeeId} />}
+          {tab === 'Performance' && <PerformanceTabInner employeeId={employeeId} />}
+          {tab === 'Goals' && <GoalsTabInner employeeId={employeeId} />}
+          {tab === 'Skills' && <SkillsTabInner employeeId={employeeId} />}
+          {tab === 'Training' && <TrainingTabInner employeeId={employeeId} />}
+          {tab === 'Documents' && <DocumentsTabInner employeeId={employeeId} />}
           {tab === 'Activity' && <ActivityTabInner employeeId={employeeId} />}
         </div>
       </div>
@@ -393,6 +400,177 @@ function PayrollTabInner({ employeeId }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ── Performance (computed from existing data — see performance.js) ──
+function PerformanceTabInner({ employeeId }) {
+  const { data } = useQuery({
+    queryKey: ['hr', 'employee-performance', employeeId],
+    queryFn: () => api.get(`/performance/${employeeId}`).then(r => r.data),
+  });
+  if (!data) return <div className="empty-state">Loading…</div>;
+  const m = data.metrics;
+  return (
+    <div>
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 16 }}>
+        {m.casesHandled != null && <div className="stat-card"><div className="stat-value">{m.casesHandled}</div><div className="stat-label">Cases Handled</div></div>}
+        <div className="stat-card"><div className="stat-value">{m.productiveHours}h</div><div className="stat-label">Productive Hours</div></div>
+        <div className="stat-card"><div className="stat-value">{m.utilizationPct ?? '—'}{m.utilizationPct != null && '%'}</div><div className="stat-label">Utilization</div></div>
+        <div className="stat-card"><div className="stat-value">{m.attendancePct ?? '—'}{m.attendancePct != null && '%'}</div><div className="stat-label">Attendance</div></div>
+        <div className="stat-card"><div className="stat-value">{m.presentDays}/{m.workingDays}</div><div className="stat-label">Days Present</div></div>
+        {m.scans != null && <div className="stat-card"><div className="stat-value">{m.scans}</div><div className="stat-label">Total Scans</div></div>}
+      </div>
+      {data.reviews?.length > 0 && (
+        <div className="table-wrap">
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: 0.5, margin: '4px 0 8px' }}>MANAGER REVIEWS</div>
+          <table>
+            <thead><tr><th>Period</th><th style={{ textAlign: 'center' }}>Rating</th><th>Notes</th><th>By</th></tr></thead>
+            <tbody>
+              {data.reviews.map(r => (
+                <tr key={r.id}>
+                  <td>{r.periodMonth}/{r.periodYear}</td>
+                  <td style={{ textAlign: 'center' }}>{r.rating ?? '—'}</td>
+                  <td style={{ color: 'var(--text-3)' }}>{r.notes || '—'}</td>
+                  <td>{r.reviewer?.name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Goals ─────────────────────────────────────────────────
+function GoalsTabInner({ employeeId }) {
+  const { data: goals = [] } = useQuery({
+    queryKey: ['hr', 'employee-goals', employeeId],
+    queryFn: () => api.get('/goals', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th style={{ textAlign: 'center' }}>Target</th><th style={{ textAlign: 'center' }}>Actual</th><th>Due</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+        <tbody>
+          {goals.length === 0 ? (
+            <tr><td colSpan={5} className="empty-state">No goals set</td></tr>
+          ) : goals.map(g => (
+            <tr key={g.id}>
+              <td style={{ fontWeight: 600 }}>{g.title}</td>
+              <td style={{ textAlign: 'center' }}>{g.targetValue ?? '—'} {g.unit}</td>
+              <td style={{ textAlign: 'center' }}>{g.actualValue ?? '—'}</td>
+              <td>{g.dueDate ? format(new Date(g.dueDate), 'dd MMM yyyy') : '—'}</td>
+              <td style={{ textAlign: 'center' }}><span className={`badge ${g.status === 'ACHIEVED' ? 'badge-verified' : g.status === 'MISSED' ? 'badge-rejected' : ''}`}>{g.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Skills ────────────────────────────────────────────────
+function SkillsTabInner({ employeeId }) {
+  const { data: matrix = [] } = useQuery({
+    queryKey: ['hr', 'employee-skills', employeeId],
+    queryFn: () => api.get('/skills/matrix', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Skill</th><th style={{ textAlign: 'center' }}>Level</th><th>Assessed</th></tr></thead>
+        <tbody>
+          {matrix.length === 0 ? (
+            <tr><td colSpan={3} className="empty-state">No skills assessed</td></tr>
+          ) : matrix.map(m => (
+            <tr key={m.id}>
+              <td style={{ fontWeight: 600 }}>{m.skill?.name}</td>
+              <td style={{ textAlign: 'center' }}><span className={`badge ${m.level === 'EXPERT' ? 'badge-verified' : ''}`}>{m.level}</span></td>
+              <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(m.assessedAt), 'dd MMM yyyy')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Training & Certifications ────────────────────────────
+function TrainingTabInner({ employeeId }) {
+  const { data: training = [] } = useQuery({
+    queryKey: ['hr', 'employee-training', employeeId],
+    queryFn: () => api.get('/training/records', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  const { data: certs = [] } = useQuery({
+    queryKey: ['hr', 'employee-certifications', employeeId],
+    queryFn: () => api.get('/training/certifications', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: 0.5, margin: '4px 0 8px' }}>TRAINING</div>
+      <div className="table-wrap" style={{ marginBottom: 20 }}>
+        <table>
+          <thead><tr><th>Title</th><th>Date</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+          <tbody>
+            {training.length === 0 ? (
+              <tr><td colSpan={3} className="empty-state">No training records</td></tr>
+            ) : training.map(t => (
+              <tr key={t.id}>
+                <td style={{ fontWeight: 600 }}>{t.title}</td>
+                <td>{format(new Date(t.date), 'dd MMM yyyy')}</td>
+                <td style={{ textAlign: 'center' }}><span className={`badge ${t.status === 'COMPLETED' ? 'badge-verified' : ''}`}>{t.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: 0.5, margin: '4px 0 8px' }}>CERTIFICATIONS</div>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Expires</th><th style={{ textAlign: 'center' }}>Status</th></tr></thead>
+          <tbody>
+            {certs.length === 0 ? (
+              <tr><td colSpan={3} className="empty-state">No certifications</td></tr>
+            ) : certs.map(c => (
+              <tr key={c.id}>
+                <td style={{ fontWeight: 600 }}>{c.name}</td>
+                <td>{c.expiryDate ? format(new Date(c.expiryDate), 'dd MMM yyyy') : '—'}</td>
+                <td style={{ textAlign: 'center' }}><span className={`badge ${c.status === 'VALID' ? 'badge-verified' : c.status === 'EXPIRED' ? 'badge-rejected' : ''}`}>{c.status.replace('_', ' ')}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Documents ─────────────────────────────────────────────
+function DocumentsTabInner({ employeeId }) {
+  const { data: docs = [] } = useQuery({
+    queryKey: ['hr', 'employee-documents', employeeId],
+    queryFn: () => api.get('/documents', { params: { userId: employeeId } }).then(r => r.data),
+  });
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead><tr><th>Type</th><th>Name</th><th>Uploaded</th><th style={{ textAlign: 'right' }}>File</th></tr></thead>
+        <tbody>
+          {docs.length === 0 ? (
+            <tr><td colSpan={4} className="empty-state">No documents</td></tr>
+          ) : docs.map(d => (
+            <tr key={d.id}>
+              <td><span className="badge">{d.type.replace('_', ' ')}</span></td>
+              <td style={{ fontWeight: 600 }}>{d.name}</td>
+              <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(d.createdAt), 'dd MMM yyyy')}</td>
+              <td style={{ textAlign: 'right' }}><a href={d.fileUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">Open</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
