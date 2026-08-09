@@ -122,6 +122,203 @@ function OriginalCasePicker({ selected, onSelect, onClear }) {
   );
 }
 
+// Shared amount derivation for a work-type item's Amount field — the same
+// price×units → discount → lock logic AcceptForm's primary item computes
+// inline, factored out so <AdditionalAcceptItem> and AcceptForm's submit()
+// (for extra items) stay in sync without duplicating the arithmetic.
+function computeItemAmount({ priceMap, expressPriceMap, flatRateMap, orderType, workType, units, totalAmount, discountType, discountValue, manualUnlock }) {
+  const isExpress = orderType === 'EXPRESS';
+  const unitPrice = isExpress && expressPriceMap[workType] != null ? expressPriceMap[workType] : (priceMap[workType] ?? null);
+  const count = workType && flatRateMap[workType] ? 1 : Math.max(1, parseInt(units) || 1);
+  const calcAmt = unitPrice != null ? unitPrice * count : null;
+  const discountNum = parseFloat(discountValue);
+  const hasDiscount = discountType && !isNaN(discountNum) && discountNum >= 0;
+  const discountedAmt = hasDiscount && calcAmt != null
+    ? Math.max(0, discountType === 'PERCENT' ? calcAmt * (1 - discountNum / 100) : calcAmt - discountNum)
+    : null;
+  const isLocked = hasDiscount && discountedAmt != null && !manualUnlock;
+  return isLocked ? String(discountedAmt) : (totalAmount || (calcAmt != null ? String(calcAmt) : ''));
+}
+
+let acceptItemKeySeq = 0;
+const emptyAcceptItem = () => ({
+  key: `accept-item-${++acceptItemKeySeq}`,
+  workType: '', shade: '', selectedTeeth: [], manualUnits: '',
+  totalAmount: '', dueDate: '',
+  discountType: '', discountValue: '', manualUnlock: false,
+  remake: false, redo: false, remakeReason: '',
+});
+
+// One extra work-type item on the Accept Case form — the receptionist is
+// splitting a multi-item order out while accepting, same idea as New
+// Case's per-item repeater. Each of these becomes its own new, fully-
+// accepted Case sharing an orderGroupId with the case being accepted.
+function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, priceMap, expressPriceMap, flatRateMap, durationMap, expressDurMap, orderType }) {
+  const inputSt = { width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' };
+  const lbl     = { fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 };
+
+  const isAligner = isAlignerWorkType(item.workType);
+  const units = item.selectedTeeth.length > 0 ? String(item.selectedTeeth.length) : item.manualUnits;
+
+  const calcPriceAndDate = (wt, u) => {
+    const patch = {};
+    if (wt && priceMap[wt]) {
+      const isExp = orderType === 'EXPRESS';
+      const unitPrice = isExp && expressPriceMap[wt] != null ? expressPriceMap[wt] : (priceMap[wt] ?? null);
+      if (unitPrice != null) {
+        const count = flatRateMap[wt] ? 1 : Math.max(1, parseInt(u) || 1);
+        patch.totalAmount = String(unitPrice * count);
+      }
+      const days = isExp && expressDurMap[wt] ? expressDurMap[wt] : (durationMap[wt] ?? 5);
+      const d = new Date(); d.setDate(d.getDate() + days);
+      patch.dueDate = toLocalDateString(d);
+    }
+    return patch;
+  };
+
+  const handleWT = (wt) => {
+    const patch = { workType: wt, ...calcPriceAndDate(wt, units) };
+    if (isAlignerWorkType(wt)) {
+      if (item.selectedTeeth.length > 0) patch.selectedTeeth = [];
+      if (item.shade) patch.shade = '';
+    }
+    onChange(patch);
+  };
+  const handleManualUnits = (u) => onChange({ manualUnits: u, ...calcPriceAndDate(item.workType, u) });
+  const toggleTooth = (num) => {
+    const next = item.selectedTeeth.includes(num) ? item.selectedTeeth.filter(t => t !== num) : [...item.selectedTeeth, num].sort((a, b) => a - b);
+    onChange({ selectedTeeth: next, ...calcPriceAndDate(item.workType, String(next.length || parseInt(item.manualUnits) || 1)) });
+  };
+  const clearTeeth = () => onChange({ selectedTeeth: [], ...calcPriceAndDate(item.workType, item.manualUnits) });
+
+  const selWorkType = item.workType || '';
+  const unitPrice = orderType === 'EXPRESS' && expressPriceMap[selWorkType] != null ? expressPriceMap[selWorkType] : (priceMap[selWorkType] ?? null);
+  const count      = selWorkType && flatRateMap[selWorkType] ? 1 : Math.max(1, parseInt(units) || 1);
+  const calcAmt    = unitPrice != null ? unitPrice * count : null;
+
+  const discountNum   = parseFloat(item.discountValue);
+  const hasDiscount   = item.discountType && !isNaN(discountNum) && discountNum >= 0;
+  const discountedAmt = hasDiscount && calcAmt != null
+    ? Math.max(0, item.discountType === 'PERCENT' ? calcAmt * (1 - discountNum / 100) : calcAmt - discountNum)
+    : null;
+  const isLocked      = hasDiscount && discountedAmt != null && !item.manualUnlock;
+  const displayAmount = computeItemAmount({ priceMap, expressPriceMap, flatRateMap, orderType, workType: selWorkType, units, totalAmount: item.totalAmount, discountType: item.discountType, discountValue: item.discountValue, manualUnlock: item.manualUnlock });
+
+  return (
+    <div style={{ marginBottom: 12, padding: 14, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)' }}>Work Type {index + 2}</div>
+        <button type="button" onClick={onRemove} className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }}>✕ Remove</button>
+      </div>
+      {/* Shade + Work Type */}
+      <div style={{ display: 'grid', gridTemplateColumns: isAligner ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        {!isAligner && (
+          <div>
+            <label style={lbl}>SHADE *</label>
+            <select style={inputSt} value={item.shade} onChange={e => onChange({ shade: e.target.value })}>
+              <option value="">— Select shade —</option>
+              {SHADE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
+        <div>
+          <label style={lbl}>WORK TYPE *</label>
+          <select style={inputSt} value={selWorkType} onChange={e => handleWT(e.target.value)}>
+            <option value="">— Select work type —</option>
+            {pricesData.map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
+          </select>
+        </div>
+      </div>
+      {/* Tooth Numbers / trays */}
+      {isAligner ? (
+        <div style={{ marginBottom: 10 }}>
+          <label style={lbl}>NUMBER OF TRAYS</label>
+          <select style={inputSt} value={units || ''} onChange={e => handleManualUnits(e.target.value)}>
+            <option value="">— Select tray count —</option>
+            {TRAY_COUNT_OPTIONS.map(n => <option key={n} value={n}>{n} tray{n > 1 ? 's' : ''}</option>)}
+          </select>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginBottom: 10 }}>
+            <label style={lbl}>TOOTH NUMBERS (ODONTOGRAM)</label>
+            <div style={{ padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+              <Odontogram selected={item.selectedTeeth} onToggle={toggleTooth} onClear={clearTeeth} />
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={lbl}>UNITS{item.selectedTeeth.length > 0 && <span style={{ marginLeft: 6, fontWeight: 400 }}>(from chart)</span>}</label>
+            <input type="number" min="1" style={{ ...inputSt, ...(item.selectedTeeth.length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+              placeholder="1" value={units} readOnly={item.selectedTeeth.length > 0}
+              onChange={e => handleManualUnits(e.target.value)} />
+          </div>
+        </>
+      )}
+      {/* Discount */}
+      {selWorkType && calcAmt != null && (
+        <div style={{ marginBottom: 10 }}>
+          <label style={lbl}>DISCOUNT</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ val: '', label: 'None' }, { val: 'AMOUNT', label: 'Br Off' }, { val: 'PERCENT', label: '% Off' }].map(opt => (
+              <button key={opt.val} type="button"
+                onClick={() => onChange({ discountType: opt.val, manualUnlock: false, ...(opt.val ? {} : { discountValue: '' }) })}
+                style={{
+                  flex: 1, padding: '6px 8px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                  border: `1.5px solid ${item.discountType === opt.val ? 'var(--red)' : 'var(--border)'}`,
+                  background: item.discountType === opt.val ? 'var(--red-dim)' : 'var(--surface)',
+                  color: item.discountType === opt.val ? 'var(--red)' : 'var(--text-2)',
+                }}>{opt.label}</button>
+            ))}
+            {item.discountType && (
+              <input type="number" min="0" max={item.discountType === 'PERCENT' ? 100 : undefined} style={{ ...inputSt, flex: 1.2 }}
+                placeholder={item.discountType === 'PERCENT' ? 'e.g. 10' : 'e.g. 500'}
+                value={item.discountValue} onChange={e => onChange({ discountValue: e.target.value, manualUnlock: false })} autoFocus />
+            )}
+          </div>
+        </div>
+      )}
+      {/* Amount + Due Date */}
+      {selWorkType && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div>
+            <label style={lbl}>
+              AMOUNT (BR)
+              {calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
+              {isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {item.discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
+            </label>
+            <input type="number" style={{ ...inputSt, ...(isLocked ? { background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed' } : {}) }}
+              placeholder="Auto-calculated" value={displayAmount} readOnly={isLocked}
+              onChange={e => onChange({ totalAmount: e.target.value })} />
+            {isLocked && (
+              <button type="button" onClick={() => onChange({ manualUnlock: true, totalAmount: String(discountedAmt) })}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', marginTop: 3, padding: 0, textDecoration: 'underline' }}>
+                Unlock to edit manually
+              </button>
+            )}
+          </div>
+          <div>
+            <label style={lbl}>DUE DATE (auto)</label>
+            <input type="date" style={inputSt} value={item.dueDate} onChange={e => onChange({ dueDate: e.target.value })} />
+          </div>
+        </div>
+      )}
+      {/* Remake/Redo */}
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={item.remake} onChange={e => onChange({ remake: e.target.checked, redo: e.target.checked ? false : item.redo })} /> Remake (free)
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={item.redo} onChange={e => onChange({ redo: e.target.checked, remake: e.target.checked ? false : item.remake })} /> Redo (50%)
+        </label>
+      </div>
+      {item.remake && (
+        <input style={{ ...inputSt, marginTop: 8 }} placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
+          value={item.remakeReason} onChange={e => onChange({ remakeReason: e.target.value })} />
+      )}
+    </div>
+  );
+}
+
 function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, expressDurMap, onAccept, onCancel, submitting }) {
   const [patientName, setPatientName] = useState(isPlaceholderName(c.patientName) ? '' : c.patientName);
   const [shade,       setShade]       = useState(c.shade        || '');
@@ -155,6 +352,12 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const [isRedo,        setIsRedo]        = useState(false);
   const [remakeReason,  setRemakeReason]  = useState('');
   const [originalCase,  setOriginalCase]  = useState(null);
+  // Extra work-type items being split out while accepting — each becomes
+  // its own new, fully-accepted case sharing an orderGroupId with this one.
+  const [additionalItems, setAdditionalItems] = useState([]);
+  const addItem    = () => setAdditionalItems(prev => [...prev, emptyAcceptItem()]);
+  const updateItem = (index, patch) => setAdditionalItems(prev => prev.map((it, i) => i === index ? { ...it, ...patch } : it));
+  const removeItem = (index) => setAdditionalItems(prev => prev.filter((_, i) => i !== index));
 
   const flatRateMap = useMemo(
     () => Object.fromEntries(pricesData.map(p => [p.workType, !!p.isFlatRate])),
@@ -259,6 +462,26 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     originalCaseId: showLineage ? originalCase?.id : undefined,
     discountType: hasDiscount ? discountType : undefined,
     discountValue: hasDiscount ? discountNum : undefined,
+    additionalItems: additionalItems.length > 0 ? additionalItems.map(it => {
+      const itUnits = it.selectedTeeth.length > 0 ? String(it.selectedTeeth.length) : it.manualUnits;
+      const itDiscountNum = parseFloat(it.discountValue);
+      const itHasDiscount = it.discountType && !isNaN(itDiscountNum) && itDiscountNum >= 0;
+      return {
+        workType: it.workType,
+        shade: it.shade,
+        toothNumbers: it.selectedTeeth.length > 0 ? it.selectedTeeth.join(', ') : undefined,
+        units: itUnits,
+        totalAmount: computeItemAmount({
+          priceMap, expressPriceMap, flatRateMap, orderType,
+          workType: it.workType, units: itUnits, totalAmount: it.totalAmount,
+          discountType: it.discountType, discountValue: it.discountValue, manualUnlock: it.manualUnlock,
+        }),
+        dueDate: it.dueDate,
+        remake: it.remake, redo: it.redo, remakeReason: it.remake ? it.remakeReason : undefined,
+        discountType: itHasDiscount ? it.discountType : undefined,
+        discountValue: itHasDiscount ? itDiscountNum : undefined,
+      };
+    }) : undefined,
   });
 
   return (
@@ -388,6 +611,20 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           </div>
         </div>
       )}
+      {/* Extra work-type items — splitting one intake into multiple cases */}
+      {additionalItems.map((item, i) => (
+        <AdditionalAcceptItem
+          key={item.key} item={item} index={i}
+          onChange={patch => updateItem(i, patch)}
+          onRemove={() => removeItem(i)}
+          pricesData={pricesData} priceMap={priceMap} expressPriceMap={expressPriceMap}
+          flatRateMap={flatRateMap} durationMap={durationMap} expressDurMap={expressDurMap}
+          orderType={orderType}
+        />
+      ))}
+      <button type="button" onClick={addItem} className="btn btn-ghost btn-sm" style={{ marginBottom: 12 }}>
+        <MdAdd size={14} /> Add Another Work Type
+      </button>
       {/* Doctor + Phone */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div>
@@ -542,12 +779,17 @@ function AcceptCasesSection({ queryClient }) {
     if (!effectiveDoctorName)                      return toast.error("Doctor's name is required");
     if (!effectiveDoctorPhone)                     return toast.error("Doctor's contact is required");
 
+    const extraItems = formData.additionalItems || [];
+    if (extraItems.some(it => !it.workType))       return toast.error('Select a work type for every added item, or remove it');
+    if (extraItems.some(it => !isAlignerWorkType(it.workType) && !it.shade))
+                                                    return toast.error('Shade is required for every added work type');
+
     setSubmitting(true);
     removeFromList(c.id);
     setOpenId(null);
 
     try {
-      await api.post(`/cases/${c.id}/accept`, {
+      const res = await api.post(`/cases/${c.id}/accept`, {
         shade:        formData.shade,
         patientName:  effectivePatientName,
         doctorName:   effectiveDoctorName,
@@ -564,8 +806,14 @@ function AcceptCasesSection({ queryClient }) {
         isRedo:         formData.isRedo || undefined,
         remakeReason:   formData.remakeReason || undefined,
         originalCaseId: formData.originalCaseId || undefined,
+        discountType:   formData.discountType || undefined,
+        discountValue:  formData.discountValue != null ? formData.discountValue : undefined,
+        additionalItems: extraItems.length > 0 ? extraItems : undefined,
       });
-      toast.success('✓ Case accepted — scan number assigned');
+      const extraNumbers = res.data?.additionalCases?.map(ac => ac.caseNumber).filter(Boolean) || [];
+      toast.success(extraNumbers.length > 0
+        ? `✓ ${1 + extraNumbers.length} cases accepted — ${[res.data.caseNumber, ...extraNumbers].join(', ')}`
+        : '✓ Case accepted — scan number assigned');
       invalidate();
     } catch (err) {
       refetch();

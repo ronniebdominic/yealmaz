@@ -533,6 +533,15 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       patientAge, patientGender, deliveryType, totalAmount, dueDate,
       remake, redo, isRedo, remakeReason, originalCaseId,
       discountType, discountValue,
+      // Extra work-type items for a multi-item order the receptionist is
+      // splitting out while accepting — each becomes its own new,
+      // fully-accepted Case (own scan number, QR, stage, payment row) via
+      // the same createSingleCase() helper /cases/bulk uses, sharing an
+      // orderGroupId with the case being accepted here. Shape matches
+      // NewCase.jsx's buildItemPayload: { workType, shade, toothNumbers,
+      // units, totalAmount, dueDate, remake, redo, remakeReason,
+      // discountType, discountValue }.
+      additionalItems,
     } = req.body;
 
     if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
@@ -547,6 +556,18 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    const extraItems = Array.isArray(additionalItems) ? additionalItems.filter(it => it && it.workType) : [];
+    for (const it of extraItems) {
+      if (it.discountType && !['AMOUNT', 'PERCENT'].includes(it.discountType)) {
+        return res.status(400).json({ error: 'discountType must be AMOUNT or PERCENT.' });
+      }
+    }
+    // Splitting into multiple work-type items links them all under one
+    // orderGroupId — reuse the case's existing group if it's already part
+    // of one (e.g. re-accepting), otherwise mint a new one only when
+    // there's actually more than one item to group.
+    const orderGroupId = extraItems.length > 0 ? (existing.orderGroupId || crypto.randomUUID()) : existing.orderGroupId;
 
     // Remake/redo lineage — this case keeps getting its own new scan number
     // (assigned below, same as any other case); originalCaseId just links it
@@ -601,6 +622,20 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       // why it's lower than the standard price, not a second source of truth.
       discountType: discountType || null,
       discountValue: discountType ? parseFloat(discountValue) : null,
+      orderGroupId: orderGroupId || null,
+    };
+
+    // Split-off items should carry the patient/doctor details as they're
+    // actually being saved on THIS accept (updatedData), not the stale
+    // pre-accept row — e.g. a doctor name corrected while accepting must
+    // flow through to every sibling case too, not just the primary one.
+    const effectiveShared = {
+      patientName: updatedData.patientName ?? existing.patientName,
+      doctorName: updatedData.doctorName ?? existing.doctorName,
+      doctorPhone: updatedData.doctorPhone ?? existing.doctorPhone,
+      patientGender: updatedData.patientGender ?? existing.patientGender,
+      deliveryType: updatedData.deliveryType ?? existing.deliveryType,
+      notes: updatedData.notes ?? existing.notes,
     };
 
     // Generate QR if not already present
@@ -611,12 +646,6 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       updatedData.qrCodeData = qrData;
     }
 
-    const accepted = await prisma.case.update({
-      where: { id: req.params.id },
-      data: updatedData,
-      include: { clinic: { select: { name: true } } },
-    });
-
     const lineageFlags = [
       remake ? `Remake${remakeReason?.trim() ? ' — ' + remakeReason.trim() : ''}` : null,
       redo ? 'Redo' : null,
@@ -626,23 +655,67 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ? ` — ${lineageFlags.length ? lineageFlags.join(', ') : 'linked'} of case ${originalCase.caseNumber || originalCase.id}`
       : '';
 
-    await prisma.caseStage.create({
-      data: {
-        caseId: req.params.id,
-        stageName: 'CASE_ACCEPTED',
-        scannedBy: req.user.name,
-        notes: (notes || 'Case accepted by receptionist') + lineageNote,
-      },
-    });
+    // Accepting the primary case + splitting off any extra work-type items
+    // as sibling cases (sharing orderGroupId) is one atomic action — either
+    // all of it lands or none of it does. Wrapped in a transaction only
+    // when there's actually a split to do, so the common single-item path
+    // is unchanged from before.
+    const doAccept = async (db) => {
+      const acceptedCase = await db.case.update({
+        where: { id: req.params.id },
+        data: updatedData,
+        include: { clinic: { select: { name: true } } },
+      });
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dispatch:queue');
+      await db.caseStage.create({
+        data: {
+          caseId: req.params.id,
+          stageName: 'CASE_ACCEPTED',
+          scannedBy: req.user.name,
+          notes: (notes || 'Case accepted by receptionist') + lineageNote,
+        },
+      });
+
+      const additionalCases = [];
+      for (const item of extraItems) {
+        additionalCases.push(await createSingleCase(db, {
+          patientAge: existing.patientAge,
+          ...effectiveShared,
+          ...item,
+          clinicId: existing.clinicId,
+          dropOffAtLab: true,
+          orderGroupId,
+        }, req.user));
+      }
+
+      return { acceptedCase, additionalCases };
+    };
+
+    const { acceptedCase: accepted, additionalCases } = extraItems.length > 0
+      ? await prisma.$transaction((tx) => doAccept(tx))
+      : await doAccept(prisma);
+
+    await invalidate(
+      `case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dispatch:queue',
+      ...(additionalCases.length ? ['dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:stations'] : [])
+    );
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
     io.to(`clinic_${accepted.clinicId}`).emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
+    for (const c of additionalCases) {
+      io.to('lab_staff').emit('new_case', {
+        caseId: c.id,
+        caseNumber: c.caseNumber,
+        patientName: c.patientName,
+        clinicName: c.clinic.name,
+        workType: c.workType,
+      });
+    }
 
-    res.json(accepted);
+    res.json(additionalCases.length ? { ...accepted, additionalCases } : accepted);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[POST /cases/:id/accept]', err);
     res.status(500).json({ error: 'Could not accept case.' });
   }
