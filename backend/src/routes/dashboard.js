@@ -615,9 +615,18 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
       if (!agg.lastActiveAt || s.scannedAt > agg.lastActiveAt) agg.lastActiveAt = s.scannedAt;
     }
 
+    // Every matched scan across the whole roster in this filter — the
+    // denominator for each tech's "share of the lab's total" below. Deliberately
+    // excludes unattributedScans (unlike delivery-performance's equivalent
+    // total) since those can't be tied to any tech, current or not — same
+    // reasoning as lab-performance's per-tech totals only ever counting
+    // matched scans.
+    const totalLabScans = [...perTech.values()].reduce((sum, t) => sum + t.totalScans, 0);
+
     const result = {
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       unattributedScans,
+      totalLabScans,
       techs: [...perTech.values()].map(t => {
         const departmentBreakdown = Object.entries(t.deptCounts)
           .map(([code, count]) => ({ code, label: DEPT_SHORT_LABELS[code] || code, count }))
@@ -634,6 +643,7 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
           busiestDept: departmentBreakdown[0]?.label || null,
           activeDays,
           avgPerActiveDay: activeDays > 0 ? Math.round((t.totalScans / activeDays) * 10) / 10 : 0,
+          shareOfTotalPercent: totalLabScans > 0 ? Math.round((t.totalScans / totalLabScans) * 1000) / 10 : null,
           dailyCounts: t.dailyCounts,
           lastActiveAt: t.lastActiveAt,
         };
@@ -666,7 +676,7 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
       prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true, station: true } }),
       prisma.caseStage.findMany({
         where: { stageName: 'DELIVERED', scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
-        select: { scannedBy: true, scannedAt: true, notes: true, caseId: true, case: { select: { dueDate: true, clinic: { select: { name: true } } } } },
+        select: { scannedBy: true, scannedAt: true, notes: true, caseId: true, case: { select: { clinic: { select: { name: true } } } } },
       }),
     ]);
 
@@ -675,7 +685,7 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
     const perAgent = new Map(agents.map(a => [a.id, {
       id: a.id, name: a.name, isActive: a.isActive, station: a.station,
       totalDeliveries: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
-      onTime: 0, late: 0, lastActiveAt: null,
+      lastActiveAt: null,
     }]));
     let unattributedDeliveries = 0;
 
@@ -700,17 +710,18 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
       const day = localDayKey(s.scannedAt);
       agg.dailyCounts[day] = (agg.dailyCounts[day] || 0) + 1;
       if (!agg.lastActiveAt || s.scannedAt > agg.lastActiveAt) agg.lastActiveAt = s.scannedAt;
-      if (s.case?.dueDate) {
-        if (s.scannedAt <= s.case.dueDate) agg.onTime++; else agg.late++;
-      }
     }
+
+    // "Every delivery the lab did in that filter" — attributed + unattributed —
+    // is the denominator for each agent's share below.
+    const totalLabDeliveries = [...perAgent.values()].reduce((sum, a) => sum + a.totalDeliveries, 0) + unattributedDeliveries;
 
     const result = {
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       unattributedDeliveries,
+      totalLabDeliveries,
       agents: [...perAgent.values()].map(a => {
         const activeDays = Object.keys(a.dailyCounts).length;
-        const onTimeTotal = a.onTime + a.late;
         return {
           id: a.id, name: a.name, isActive: a.isActive, station: a.station,
           totalDeliveries: a.totalDeliveries,
@@ -718,7 +729,7 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
           uniqueClinics: a.clinics.size,
           activeDays,
           avgPerActiveDay: activeDays > 0 ? Math.round((a.totalDeliveries / activeDays) * 10) / 10 : 0,
-          onTimeRate: onTimeTotal > 0 ? Math.round((a.onTime / onTimeTotal) * 100) : null,
+          shareOfTotalPercent: totalLabDeliveries > 0 ? Math.round((a.totalDeliveries / totalLabDeliveries) * 1000) / 10 : null,
           dailyCounts: a.dailyCounts,
           lastActiveAt: a.lastActiveAt,
         };

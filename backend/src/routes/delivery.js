@@ -5,6 +5,9 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
 const { buildAgentNameMaps, matchDeliveryAgent } = require('../utils/deliveryAttribution');
+const { startOfDay, endOfDay } = require('../utils/dateRange');
+const { localDayKey } = require('../utils/scanAttribution');
+const liveLocations = require('../state/liveLocations');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -330,6 +333,143 @@ router.post('/:caseId/return-to-dispatch', protect, restrict('DELIVERY', 'ADMIN'
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not return case to dispatch.' });
+  }
+});
+
+// ── Live location tracking ───────────────────────────────
+// Opt-in on the driver's side (a visible toggle in the delivery portal,
+// defaulted off) — nothing here ever starts tracking on its own. Storage
+// is in-memory only (state/liveLocations.js) — see that file's header
+// comment for why this is deliberately not persisted.
+
+// ── POST /api/delivery/location — driver posts their current position ──
+router.post('/location', protect, restrict('DELIVERY'), async (req, res) => {
+  const { latitude, longitude, accuracy, heading, speed } = req.body || {};
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return res.status(400).json({ error: 'latitude and longitude are required numbers.' });
+  }
+  liveLocations.setPosition(req.user.id, { latitude, longitude, accuracy, heading, speed });
+
+  const io = req.app.get('io');
+  io.to('dispatch_ops').emit('driver_location', {
+    userId: req.user.id, name: req.user.name, station: req.user.station,
+    latitude, longitude, accuracy, heading, speed, updatedAt: new Date(),
+  });
+
+  res.json({ success: true });
+});
+
+// ── POST /api/delivery/location/stop — driver turns sharing off ────────
+// Removes the entry immediately rather than waiting for it to age out, so
+// switching the toggle off is reflected on the live map right away.
+router.post('/location/stop', protect, restrict('DELIVERY'), async (req, res) => {
+  liveLocations.removePosition(req.user.id);
+  const io = req.app.get('io');
+  io.to('dispatch_ops').emit('driver_location_stopped', { userId: req.user.id });
+  res.json({ success: true });
+});
+
+// ── GET /api/delivery/locations — Dispatch/Admin's current snapshot ────
+// The live map's initial load; subsequent updates arrive over the
+// 'dispatch_ops' socket room (driver_location / driver_location_stopped).
+router.get('/locations', protect, restrict('ADMIN', 'DISPATCH'), async (req, res) => {
+  try {
+    const active = liveLocations.getActivePositions();
+    if (active.length === 0) return res.json({ agents: [] });
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: active.map(a => a.userId) } },
+      select: { id: true, name: true, station: true },
+    });
+    const byId = new Map(users.map(u => [u.id, u]));
+
+    res.json({
+      agents: active
+        .filter(a => byId.has(a.userId)) // account deactivated/deleted since their last post
+        .map(a => ({ ...a, name: byId.get(a.userId).name, station: byId.get(a.userId).station })),
+    });
+  } catch (err) {
+    console.error('[delivery locations]', err);
+    res.status(500).json({ error: 'Could not load live locations.' });
+  }
+});
+
+// ── GET /api/delivery/my-performance ─────────────────────
+// The logged-in driver's own delivery activity — summary stats (incl. their
+// share of the whole lab's deliveries in the same range) plus a real,
+// paginated delivery history. Self-scoped the same way GET /delivery/history
+// and GET /dashboard/delivery-performance are — CaseStage attribution via
+// utils/deliveryAttribution.js, not DeliveryLog. Mirrors GET /lab/my-performance's
+// shape for the lab tech's equivalent self-view.
+router.get('/my-performance', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const { from, to, page = 1, limit = 20 } = req.query;
+    const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
+    const defaultFrom = new Date(); defaultFrom.setDate(defaultFrom.getDate() - 29); defaultFrom.setHours(0, 0, 0, 0);
+    const dateFrom = from ? startOfDay(from) : defaultFrom;
+
+    const [agents, stages] = await Promise.all([
+      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+      prisma.caseStage.findMany({
+        where: { stageName: 'DELIVERED', scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
+        select: {
+          scannedBy: true, scannedAt: true, notes: true, caseId: true,
+          case: { select: { caseNumber: true, patientName: true, workType: true, clinic: { select: { name: true } } } },
+        },
+        orderBy: { scannedAt: 'desc' },
+      }),
+    ]);
+
+    const nameMaps = buildAgentNameMaps(agents);
+    let totalLabDeliveries = 0;
+    const myDeliveries = [];
+    for (const s of stages) {
+      const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+      if (!agent) continue; // same exclusions as dashboard.js — self-pickups/admin edits/unmatched
+      totalLabDeliveries++;
+      if (agent.id === req.user.id) myDeliveries.push(s);
+    }
+
+    const clinics = new Set();
+    const dailyCounts = {};
+    let lastActiveAt = null;
+    for (const s of myDeliveries) {
+      if (s.case?.clinic?.name) clinics.add(s.case.clinic.name);
+      const day = localDayKey(s.scannedAt);
+      dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+      if (!lastActiveAt || s.scannedAt > lastActiveAt) lastActiveAt = s.scannedAt;
+    }
+    const activeDays = Object.keys(dailyCounts).length;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    res.json({
+      range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      summary: {
+        totalDeliveries: myDeliveries.length,
+        uniqueClinics: clinics.size,
+        activeDays,
+        avgPerActiveDay: activeDays > 0 ? Math.round((myDeliveries.length / activeDays) * 10) / 10 : 0,
+        totalLabDeliveries,
+        shareOfTotalPercent: totalLabDeliveries > 0 ? Math.round((myDeliveries.length / totalLabDeliveries) * 1000) / 10 : null,
+        dailyCounts,
+        lastActiveAt,
+      },
+      deliveries: myDeliveries.slice(skip, skip + parseInt(limit)).map(s => ({
+        id: s.caseId,
+        caseNumber: s.case?.caseNumber,
+        patientName: s.case?.patientName,
+        workType: s.case?.workType,
+        clinicName: s.case?.clinic?.name,
+        deliveredAt: s.scannedAt,
+      })),
+      pagination: {
+        total: myDeliveries.length, page: parseInt(page), limit: parseInt(limit),
+        totalPages: Math.ceil(myDeliveries.length / parseInt(limit)),
+      },
+    });
+  } catch (err) {
+    console.error('[delivery my-performance]', err);
+    res.status(500).json({ error: 'Could not load your performance.' });
   }
 });
 

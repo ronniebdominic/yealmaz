@@ -59,6 +59,14 @@ io.on('connection', (socket) => {
     console.log('Inventory manager joined inventory room');
   });
 
+  // Dispatch/Admin joins the live delivery-location room — receives
+  // driver_location/driver_location_stopped broadcasts (see delivery.js's
+  // POST /location, /location/stop).
+  socket.on('join_dispatch_ops', () => {
+    socket.join('dispatch_ops');
+    console.log('Dispatch/Admin joined dispatch_ops room');
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });

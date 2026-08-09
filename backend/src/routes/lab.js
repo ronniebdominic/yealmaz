@@ -4,7 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
-const { DEPT_SHORT_LABELS, localDayKey } = require('../utils/scanAttribution');
+const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -85,7 +85,7 @@ router.get('/my-performance', protect, restrict('ADMIN', 'LAB_TECH'), async (req
     // scan.js: scannedBy = `${techName} (${dept.short})`.
     const where = { scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { startsWith: `${req.user.name} (` } };
 
-    const [scans, totalScans, allInRange] = await Promise.all([
+    const [scans, totalScans, allInRange, labWideScans] = await Promise.all([
       prisma.caseStage.findMany({
         where,
         include: { case: { select: { caseNumber: true, patientName: true, workType: true, clinic: { select: { name: true } } } } },
@@ -96,6 +96,11 @@ router.get('/my-performance', protect, restrict('ADMIN', 'LAB_TECH'), async (req
       // Full (unpaginated) set within range, for the summary stats below —
       // the list above is paginated, the stats aren't.
       prisma.caseStage.findMany({ where, select: { scannedAt: true, caseId: true, scannedBy: true } }),
+      // Every lab tech's scans (not just this account's) in the same range,
+      // for the "share of the lab's total" stat below — same SCAN_PATTERN
+      // match GET /dashboard/lab-performance uses, so the two numbers are
+      // computed the same way.
+      prisma.caseStage.findMany({ where: { scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } }, select: { scannedBy: true } }),
     ]);
 
     const cases = new Set();
@@ -115,6 +120,9 @@ router.get('/my-performance', protect, restrict('ADMIN', 'LAB_TECH'), async (req
       .map(([code, count]) => ({ code, label: DEPT_SHORT_LABELS[code] || code, count }))
       .sort((a, b) => b.count - a.count);
 
+    const totalLabScans = labWideScans.filter(s => SCAN_PATTERN.test(s.scannedBy || '')).length;
+    const shareOfTotalPercent = totalLabScans > 0 ? Math.round((allInRange.length / totalLabScans) * 1000) / 10 : null;
+
     res.json({
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       summary: {
@@ -122,6 +130,8 @@ router.get('/my-performance', protect, restrict('ADMIN', 'LAB_TECH'), async (req
         uniqueCases: cases.size,
         activeDays,
         avgPerActiveDay: activeDays > 0 ? Math.round((allInRange.length / activeDays) * 10) / 10 : 0,
+        totalLabScans,
+        shareOfTotalPercent,
         departmentBreakdown,
         dailyCounts,
         lastActiveAt,
