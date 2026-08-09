@@ -9,7 +9,8 @@ import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { MdAdd, MdEventAvailable, MdPending, MdCheckCircle, MdUpcoming } from 'react-icons/md';
 import LeaveTypesPanel from '../components/LeaveTypesPanel';
 
-const STATUS_BADGE = { APPROVED: 'badge-verified', REJECTED: 'badge-rejected', PENDING: '' };
+const STATUS_BADGE = { APPROVED: 'badge-verified', REJECTED: 'badge-rejected', PENDING: '', MANAGER_APPROVED: '' };
+const STATUS_LABEL = { APPROVED: 'APPROVED', REJECTED: 'REJECTED', PENDING: 'AWAITING MANAGER', MANAGER_APPROVED: 'READY FOR HR' };
 
 function StatCard({ icon: Icon, label, value }) {
   return (
@@ -35,7 +36,7 @@ export default function LeaveTab({ employees, onOpenLeaveModal }) {
 
   const now = new Date();
   const activeNow = leaveRecords.filter(r => r.status === 'APPROVED' && isAfter(new Date(r.toDate), now) && isBefore(new Date(r.fromDate), addDays(now, 1))).length;
-  const pendingRequests = leaveRecords.filter(r => r.status === 'PENDING').length;
+  const pendingRequests = leaveRecords.filter(r => r.status === 'PENDING' || r.status === 'MANAGER_APPROVED').length;
   const approvedThisMonth = leaveRecords.filter(r => r.status === 'APPROVED' && new Date(r.fromDate).getMonth() === now.getMonth() && new Date(r.fromDate).getFullYear() === now.getFullYear()).length;
   const upcoming = leaveRecords.filter(r => r.status === 'APPROVED' && isAfter(new Date(r.fromDate), now)).length;
 
@@ -86,10 +87,10 @@ export default function LeaveTab({ employees, onOpenLeaveModal }) {
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.dayPortion === 'FULL' ? 'Full Day' : r.dayPortion === 'HALF_AM' ? 'Half (AM)' : 'Half (PM)'}</td>
                     <td style={{ color: 'var(--text-3)' }}>{r.reason || '—'}</td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className={`badge ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
+                      <span className={`badge ${STATUS_BADGE[r.status] || ''}`}>{STATUS_LABEL[r.status] || r.status}</span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      {r.status === 'PENDING' && (
+                      {(r.status === 'PENDING' || r.status === 'MANAGER_APPROVED') && (
                         <>
                           <button className="btn btn-ghost btn-sm" onClick={() => decide(r.id, 'APPROVED')} style={{ marginRight: 6 }}>Approve</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => decide(r.id, 'REJECTED')}>Decline</button>

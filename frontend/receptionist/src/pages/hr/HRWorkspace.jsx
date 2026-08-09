@@ -11,6 +11,7 @@ import {
   MdSchedule, MdTimer, MdEventNote, MdCalendarMonth,
   MdAccountBalanceWallet, MdEmojiEvents, MdCreditCard, MdReceiptLong, MdAssessment,
   MdPsychology, MdSchool, MdFolder, MdInventory, MdFlag,
+  MdDashboard, MdChecklist, MdPersonRemove, MdPersonSearch,
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
 
@@ -35,8 +36,13 @@ import TrainingPanel from './more/TrainingPanel';
 import DocumentsPanel from './more/DocumentsPanel';
 import AssetsPanel from './more/AssetsPanel';
 import GoalsPanel from './more/GoalsPanel';
+import OnboardingPanel from './more/OnboardingPanel';
+import OffboardingPanel from './more/OffboardingPanel';
+import RecruitmentPanel from './more/RecruitmentPanel';
+import HRAnalyticsTab from './tabs/HRAnalyticsTab';
 
 const MAIN_TABS = [
+  { label: 'Dashboard', icon: MdDashboard },
   { label: 'Employees', icon: MdGroups },
   { label: 'Attendance', icon: MdAccessTime },
   { label: 'Leave', icon: MdEventBusy },
@@ -57,6 +63,9 @@ const MORE_TABS = [
   { label: 'Training', icon: MdSchool },
   { label: 'Documents', icon: MdFolder },
   { label: 'Assets', icon: MdInventory },
+  { label: 'Onboarding', icon: MdChecklist },
+  { label: 'Offboarding', icon: MdPersonRemove },
+  { label: 'Recruitment', icon: MdPersonSearch },
 ];
 
 // ── Add Employee — a quick account-create (name/email/role/password),
@@ -118,7 +127,7 @@ function AddEmployeeModal({ onClose, onCreated }) {
 
 export default function HRWorkspace({ role = 'ADMIN' }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState('Employees');
+  const [tab, setTab] = useState('Dashboard');
   const [moreOpen, setMoreOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [showAddEmployee, setShowAddEmployee] = useState(false);

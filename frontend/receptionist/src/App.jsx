@@ -18,6 +18,7 @@ import AdminInventory from './pages/AdminInventory';
 import InventoryDashboard from './pages/InventoryDashboard';
 import AdminHR from './pages/AdminHR';
 import HRDashboard from './pages/HRDashboard';
+import LeaderDashboard from './pages/LeaderDashboard';
 import Cases from './pages/Cases';
 import NewCase from './pages/NewCase';
 import Delivery from './pages/Delivery';
@@ -68,6 +69,7 @@ function RoleHome() {
   if (user.role === 'FINANCE' || user.role === 'FINANCE_AP' || user.role === 'FINANCE_CASHIER') return <FinanceDashboard />;
   if (user.role === 'INVENTORY_MANAGER') return <InventoryDashboard />;
   if (user.role === 'HR_MANAGER') return <HRDashboard />;
+  if (user.role === 'LEADER') return <LeaderDashboard />;
   if (user.role === 'ADMIN' && user.email === 'admindashboard@yealmaz.com') return <Navigate to="/admin" replace />;
   return <Dashboard />;
 }
@@ -102,6 +104,7 @@ function AppRoutes() {
       <Route path="/view/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','DELIVERY']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Delivery"><DeliveryDashboard /></ViewAsPage></ProtectedRoute>} />
       <Route path="/view/lab" element={<ProtectedRoute allowedRoles={['ADMIN','LAB_TECH']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Lab"><LabDashboard /></ViewAsPage></ProtectedRoute>} />
       <Route path="/view/hr" element={<ProtectedRoute allowedRoles={['ADMIN','HR_MANAGER']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="HR"><HRDashboard /></ViewAsPage></ProtectedRoute>} />
+      <Route path="/view/leader" element={<ProtectedRoute allowedRoles={['ADMIN','LEADER']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Team Leader"><LeaderDashboard /></ViewAsPage></ProtectedRoute>} />
       <Route path="/view/inventory" element={<ProtectedRoute allowedRoles={['ADMIN','INVENTORY_MANAGER']} allowedEmail="admindashboard@yealmaz.com"><ViewAsPage label="Inventory"><InventoryDashboard /></ViewAsPage></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" />} />

@@ -10,7 +10,7 @@ import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
   MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
-  MdHandshake, MdPointOfSale,
+  MdHandshake, MdPointOfSale, MdSupervisorAccount,
 } from 'react-icons/md';
 
 // ── Constants ─────────────────────────────────────────────
@@ -24,6 +24,7 @@ const ROLES = [
   { value: 'FINANCE_CASHIER',   label: 'Finance — Cashier',  icon: MdPointOfSale },
   { value: 'INVENTORY_MANAGER', label: 'Inventory Manager',  icon: MdWarehouse },
   { value: 'HR_MANAGER',        label: 'HR Manager',         icon: MdGroups },
+  { value: 'LEADER',            label: 'Team Leader',        icon: MdSupervisorAccount },
 ];
 
 const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.value, r]));
@@ -56,6 +57,7 @@ const ROLE_COLORS = {
   FINANCE_CASHIER:   { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
   INVENTORY_MANAGER: { bg: 'rgba(180,83,9,0.1)',    color: '#B45309'     },
   HR_MANAGER:        { bg: 'rgba(14,116,144,0.1)',  color: '#0E7490'     },
+  LEADER:            { bg: 'rgba(219,39,119,0.1)',  color: '#DB2777'     },
 };
 
 

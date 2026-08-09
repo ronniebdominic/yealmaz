@@ -5,6 +5,7 @@ import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
   MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge, MdWarehouse, MdGroups,
   MdDesk, MdPointOfSale, MdLocalShipping, MdTwoWheeler, MdScience, MdSupervisorAccount, MdInventory,
+  MdPeopleAlt,
 } from 'react-icons/md';
 
 // Dashboards each staff role normally logs into directly — the admin
@@ -17,6 +18,7 @@ const VIEW_AS_ITEMS = [
   { path: '/view/delivery',     label: 'Delivery',      icon: MdTwoWheeler },
   { path: '/view/lab',          label: 'Lab',           icon: MdScience },
   { path: '/view/hr',           label: 'HR Portal',     icon: MdSupervisorAccount },
+  { path: '/view/leader',       label: 'Team Leader',   icon: MdPeopleAlt },
   { path: '/view/inventory',    label: 'Inventory',     icon: MdInventory },
 ];
 
