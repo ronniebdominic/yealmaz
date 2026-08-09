@@ -434,6 +434,7 @@ function AcceptCasesSection({ queryClient }) {
   const [openId, setOpenId]         = useState(null);
   const [action, setAction]         = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [arrivedSearch, setArrivedSearch] = useState('');
   // NOTE: form state for the accept form now lives in <AcceptForm> (module-level component)
   // so typing in any field no longer re-renders AcceptCasesSection or remounts CaseCard.
 
@@ -555,7 +556,14 @@ function AcceptCasesSection({ queryClient }) {
   // to avoid false "arrived" when relation join is missing from the API response.
   const inTransit    = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && (c.assignedDeliveryId || c.assignedDelivery?.id));
   // PICKUP_ASSIGNED + no driver = impression arrived at lab, driver was cleared after delivery
-  const arrivedAtLab = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && !c.assignedDeliveryId && !c.assignedDelivery?.id);
+  const arrivedAtLabAll = cases.filter(c => c.status === 'PICKUP_ASSIGNED' && !c.assignedDeliveryId && !c.assignedDelivery?.id);
+  const arrivedSearchQ = arrivedSearch.trim().toLowerCase();
+  const arrivedAtLab = arrivedSearchQ
+    ? arrivedAtLabAll.filter(c =>
+        c.caseNumber?.toLowerCase().includes(arrivedSearchQ) ||
+        c.patientName?.toLowerCase().includes(arrivedSearchQ) ||
+        c.clinic?.name?.toLowerCase().includes(arrivedSearchQ))
+    : arrivedAtLabAll;
   const underReview  = cases.filter(c => c.status === 'UNDER_REVIEW');
 
   const CaseCard = ({ c, canAct }) => {
@@ -697,18 +705,53 @@ function AcceptCasesSection({ queryClient }) {
       )}
 
       {/* Arrived at Lab — highest priority, needs immediate acceptance */}
-      {arrivedAtLab.length > 0 && (
+      {arrivedAtLabAll.length > 0 && (
         <div className="card" style={{ marginBottom: 16, border: '2px solid var(--blue)' }}>
           <div className="card-header" style={{ background: 'var(--blue)', borderRadius: '10px 10px 0 0' }}>
             <div className="card-title" style={{ color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}><MdPrecisionManufacturing className="mi" size={15} /> Arrived at Lab — Needs Acceptance</div>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>
-              {arrivedAtLab.length} case{arrivedAtLab.length !== 1 ? 's' : ''} awaiting review
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>
+                {arrivedAtLab.length} case{arrivedAtLab.length !== 1 ? 's' : ''} awaiting review
+              </span>
+              <ExportMenu
+                data={arrivedAtLab}
+                columns={[
+                  { header: 'Case #',    value: c => c.caseNumber ?? '' },
+                  { header: 'Clinic',    value: c => c.clinic?.name },
+                  { header: 'Patient',   value: c => c.patientName },
+                  { header: 'Work Type', value: c => c.workType },
+                  { header: 'Units',     value: c => c.units ?? '' },
+                  { header: 'Status',    value: c => c.status },
+                  { header: 'Payment',   value: c => c.paymentStatus },
+                  { header: 'Amount',    value: c => c.totalAmount ?? '' },
+                ]}
+                filename="arrived-at-lab"
+                title="Arrived at Lab"
+              />
+            </div>
           </div>
           <div style={{ background: '#EFF6FF', padding: '8px 16px', fontSize: 12, color: '#1D4ED8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
             <MdInventory2 size={14} /> The delivery driver has brought these impressions to the lab. Please review and Accept, reject, or put Under Review.
           </div>
-          <div>{arrivedAtLab.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
+            <div className="search-input" style={{ margin: 0, maxWidth: 320 }}>
+              <span className="icon mi"><MdSearch size={16} /></span>
+              <input
+                placeholder="Case number, patient, or clinic…"
+                value={arrivedSearch}
+                onChange={e => setArrivedSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          {arrivedAtLab.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon mi"><MdSearch size={28} /></div>
+              <div className="empty-title">No matches</div>
+              <p>No arrived case matches "{arrivedSearch}".</p>
+            </div>
+          ) : (
+            <div>{arrivedAtLab.map(c => <CaseCard key={c.id} c={c} canAct />)}</div>
+          )}
         </div>
       )}
 
