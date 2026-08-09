@@ -26,8 +26,17 @@ function StatCard({ icon: Icon, label, value, warn }) {
 }
 
 export default function HRAnalyticsTab() {
-  const { data, isLoading } = useQuery({ queryKey: ['hr', 'analytics'], queryFn: () => api.get('/hr-analytics').then(r => r.data) });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['hr', 'analytics'], queryFn: () => api.get('/hr-analytics').then(r => r.data) });
 
+  if (error) {
+    return (
+      <div className="empty-state">
+        <div className="empty-title">Couldn't load the dashboard</div>
+        <p>{error.response?.data?.error || 'Something went wrong.'}</p>
+        <button className="btn btn-ghost btn-sm" onClick={() => refetch()} style={{ marginTop: 10 }}>Retry</button>
+      </div>
+    );
+  }
   if (isLoading || !data) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Loading…</div>;
   const { counts, charts, alerts } = data;
   const pendingTotal = Object.values(alerts.pendingApprovals).reduce((s, n) => s + n, 0);

@@ -14,6 +14,7 @@ import {
   MdDashboard, MdChecklist, MdPersonRemove, MdPersonSearch,
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 import EmployeesTab from './tabs/EmployeesTab';
 import AttendanceTab from './tabs/AttendanceTab';
@@ -170,31 +171,37 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
         </div>
       </div>
 
-      {tab === 'Employees' && (
-        <EmployeesTab
-          employees={employees}
-          onSelectEmployee={e => setSelectedEmployeeId(e.id)}
-          onAddEmployee={() => setShowAddEmployee(true)}
-          refresh={refresh}
-        />
-      )}
-      {tab === 'Attendance' && <AttendanceTab employees={employees} onOpenClockEvent={() => setShowClockEvent(true)} />}
-      {tab === 'Leave' && <LeaveTab employees={employees} onOpenLeaveModal={() => setShowLeave(true)} />}
-      {tab === 'Payroll Runs' && <PayrollRunsTab canManage={role === 'HR_MANAGER' || role === 'ADMIN'} />}
-      {tab === 'Timesheets' && <TimesheetsPanel employees={employees} />}
-      {tab === 'Overtime' && <OvertimePanel />}
-      {tab === 'Shifts' && <ShiftsPanel employees={employees} />}
-      {tab === 'Holidays' && <HolidaysPanel />}
-      {tab === 'Salary Structures' && <SalaryStructuresPanel employees={employees} />}
-      {tab === 'Incentives' && <IncentivesPanel />}
-      {tab === 'Advances' && <AdvancesPanel employees={employees} />}
-      {tab === 'Expenses' && <ExpensesPanel employees={employees} />}
-      {tab === 'Reports' && <ReportsPanel />}
-      {tab === 'Goals' && <GoalsPanel employees={employees} />}
-      {tab === 'Skills' && <SkillsPanel employees={employees} />}
-      {tab === 'Training' && <TrainingPanel employees={employees} />}
-      {tab === 'Documents' && <DocumentsPanel employees={employees} />}
-      {tab === 'Assets' && <AssetsPanel employees={employees} />}
+      <ErrorBoundary key={tab}>
+        {tab === 'Dashboard' && <HRAnalyticsTab />}
+        {tab === 'Employees' && (
+          <EmployeesTab
+            employees={employees}
+            onSelectEmployee={e => setSelectedEmployeeId(e.id)}
+            onAddEmployee={() => setShowAddEmployee(true)}
+            refresh={refresh}
+          />
+        )}
+        {tab === 'Attendance' && <AttendanceTab employees={employees} onOpenClockEvent={() => setShowClockEvent(true)} />}
+        {tab === 'Leave' && <LeaveTab employees={employees} onOpenLeaveModal={() => setShowLeave(true)} />}
+        {tab === 'Payroll Runs' && <PayrollRunsTab canManage={role === 'HR_MANAGER' || role === 'ADMIN'} />}
+        {tab === 'Timesheets' && <TimesheetsPanel employees={employees} />}
+        {tab === 'Overtime' && <OvertimePanel />}
+        {tab === 'Shifts' && <ShiftsPanel employees={employees} />}
+        {tab === 'Holidays' && <HolidaysPanel />}
+        {tab === 'Salary Structures' && <SalaryStructuresPanel employees={employees} />}
+        {tab === 'Incentives' && <IncentivesPanel />}
+        {tab === 'Advances' && <AdvancesPanel employees={employees} />}
+        {tab === 'Expenses' && <ExpensesPanel employees={employees} />}
+        {tab === 'Reports' && <ReportsPanel />}
+        {tab === 'Goals' && <GoalsPanel employees={employees} />}
+        {tab === 'Skills' && <SkillsPanel employees={employees} />}
+        {tab === 'Training' && <TrainingPanel employees={employees} />}
+        {tab === 'Documents' && <DocumentsPanel employees={employees} />}
+        {tab === 'Assets' && <AssetsPanel employees={employees} />}
+        {tab === 'Onboarding' && <OnboardingPanel employees={employees} />}
+        {tab === 'Offboarding' && <OffboardingPanel employees={employees} />}
+        {tab === 'Recruitment' && <RecruitmentPanel />}
+      </ErrorBoundary>
 
       {selectedEmployeeId && (
         <EmployeeProfileModal employeeId={selectedEmployeeId} employees={employees}
