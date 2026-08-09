@@ -532,7 +532,18 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       shade, patientName, doctorName, doctorPhone, workType, units, toothNumbers, notes,
       patientAge, patientGender, deliveryType, totalAmount, dueDate,
       remake, redo, isRedo, remakeReason, originalCaseId,
+      discountType, discountValue,
     } = req.body;
+
+    if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
+      return res.status(400).json({ error: 'discountType must be AMOUNT or PERCENT.' });
+    }
+    if (discountType && (discountValue == null || isNaN(parseFloat(discountValue)) || parseFloat(discountValue) < 0)) {
+      return res.status(400).json({ error: 'discountValue must be a non-negative number when a discount type is set.' });
+    }
+    if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
+      return res.status(400).json({ error: 'A percentage discount cannot exceed 100.' });
+    }
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
@@ -584,6 +595,12 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ...(isRedo != null ? { isRedo: Boolean(isRedo) } : {}),
       ...(remake ? { remakeReason: remakeReason?.trim() || null } : {}),
       ...(originalCase ? { originalCaseId: originalCase.id } : {}),
+      // Locked at acceptance time — totalAmount above is already the final,
+      // post-discount figure (computed client-side same as the rest of this
+      // endpoint's pricing); these two fields are the audit trail explaining
+      // why it's lower than the standard price, not a second source of truth.
+      discountType: discountType || null,
+      discountValue: discountType ? parseFloat(discountValue) : null,
     };
 
     // Generate QR if not already present

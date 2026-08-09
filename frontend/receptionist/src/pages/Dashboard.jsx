@@ -136,6 +136,14 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   });
   const [orderType,   setOrderType]   = useState(c.deliveryType || 'NORMAL');
   const [totalAmount, setTotalAmount] = useState('');
+  // Discount — locked in as AMOUNT (Br off) or PERCENT (% off) at acceptance
+  // time, same as any other case detail. Once set, the Amount field becomes
+  // a computed/read-only figure instead of freehand-editable, so a discount
+  // is always an explicit, audited choice rather than someone just typing a
+  // lower number.
+  const [discountType,  setDiscountType]  = useState('');
+  const [discountValue, setDiscountValue] = useState('');
+  const [manualUnlock,  setManualUnlock]  = useState(false);
   const [dueDate,     setDueDate]     = useState('');
   const [notes,       setNotes]       = useState('');
   // Remake/redo lineage — set when this newly-accepted case is actually a
@@ -232,13 +240,25 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const count       = selWorkType && flatRateMap[selWorkType] ? 1 : Math.max(1, parseInt(units) || 1);
   const calcAmt     = unitPrice != null ? unitPrice * count : null;
 
+  const discountNum = parseFloat(discountValue);
+  const hasDiscount = discountType && !isNaN(discountNum) && discountNum >= 0;
+  const discountedAmt = hasDiscount && calcAmt != null
+    ? Math.max(0, discountType === 'PERCENT' ? calcAmt * (1 - discountNum / 100) : calcAmt - discountNum)
+    : null;
+  // Locked = a discount is set, a base price exists to discount from, and
+  // the receptionist hasn't explicitly asked to override it by hand.
+  const isLocked = hasDiscount && discountedAmt != null && !manualUnlock;
+  const displayAmount = isLocked ? discountedAmt : (totalAmount || (calcAmt ?? ''));
+
   const submit = () => onAccept({
     shade, patientName, workType: selWorkType, doctorName, doctorPhone, units,
     toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
-    orderType, totalAmount, dueDate, notes,
+    orderType, totalAmount: isLocked ? String(discountedAmt) : totalAmount, dueDate, notes,
     remake: showLineage && remake, redo: showLineage && redo, isRedo: showLineage && isRedo,
     remakeReason: showLineage ? remakeReason : undefined,
     originalCaseId: showLineage ? originalCase?.id : undefined,
+    discountType: hasDiscount ? discountType : undefined,
+    discountValue: hasDiscount ? discountNum : undefined,
   });
 
   return (
@@ -319,12 +339,48 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           </div>
         </div>
       </div>
+      {/* Discount — locked in as Amount or Percent; once set, the Amount
+          field below becomes a computed/read-only figure. */}
+      {selWorkType && calcAmt != null && (
+        <div style={{ marginBottom: 10 }}>
+          <label style={lbl}>DISCOUNT</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ val: '', label: 'None' }, { val: 'AMOUNT', label: 'Br Off' }, { val: 'PERCENT', label: '% Off' }].map(opt => (
+              <button key={opt.val} type="button"
+                onClick={() => { setDiscountType(opt.val); setManualUnlock(false); if (!opt.val) setDiscountValue(''); }}
+                style={{
+                  flex: 1, padding: '6px 8px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                  border: `1.5px solid ${discountType === opt.val ? 'var(--red)' : 'var(--border)'}`,
+                  background: discountType === opt.val ? 'var(--red-dim)' : 'var(--surface)',
+                  color: discountType === opt.val ? 'var(--red)' : 'var(--text-2)',
+                }}>{opt.label}</button>
+            ))}
+            {discountType && (
+              <input type="number" min="0" max={discountType === 'PERCENT' ? 100 : undefined} style={{ ...inputSt, flex: 1.2 }}
+                placeholder={discountType === 'PERCENT' ? 'e.g. 10' : 'e.g. 500'}
+                value={discountValue} onChange={e => { setDiscountValue(e.target.value); setManualUnlock(false); }} autoFocus />
+            )}
+          </div>
+        </div>
+      )}
       {/* Amount + Due Date */}
       {selWorkType && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
-            <label style={lbl}>AMOUNT (BR){calcAmt != null && <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}</label>
-            <input type="number" style={inputSt} placeholder="Auto-calculated" value={totalAmount || (calcAmt ?? '')} onChange={e => setTotalAmount(e.target.value)} />
+            <label style={lbl}>
+              AMOUNT (BR)
+              {calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
+              {isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
+            </label>
+            <input type="number" style={{ ...inputSt, ...(isLocked ? { background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed' } : {}) }}
+              placeholder="Auto-calculated" value={displayAmount} readOnly={isLocked}
+              onChange={e => setTotalAmount(e.target.value)} />
+            {isLocked && (
+              <button type="button" onClick={() => { setManualUnlock(true); setTotalAmount(String(discountedAmt)); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', marginTop: 3, padding: 0, textDecoration: 'underline' }}>
+                Unlock to edit manually
+              </button>
+            )}
           </div>
           <div>
             <label style={lbl}>DUE DATE (auto)</label>

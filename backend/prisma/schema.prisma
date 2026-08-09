@@ -200,7 +200,9 @@ model Case {
 
   // Payment
   paymentStatus   PaymentStatus @default(PENDING)
-  totalAmount     Float?
+  totalAmount     Float?        // final billed amount — already reflects any discount below
+  discountType    DiscountType? // set + locked at case-acceptance time; null = no discount applied
+  discountValue   Float?        // Br amount if discountType=AMOUNT, or percentage points if PERCENT
 
   // Relations
   clinicId        String
@@ -298,6 +300,11 @@ enum CaseStatus {
 enum DeliveryType {
   NORMAL
   EXPRESS
+}
+
+enum DiscountType {
+  AMOUNT
+  PERCENT
 }
 
 enum PaymentStatus {

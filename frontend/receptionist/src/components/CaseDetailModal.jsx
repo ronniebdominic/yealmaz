@@ -280,6 +280,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                     ? format(new Date(data.payment.verifiedAt), 'dd MMM yyyy')
                     : '—'],
               ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
+              ...(data.discountType ? [['Discount', data.discountType === 'PERCENT' ? `${data.discountValue}% off` : `Br ${data.discountValue?.toLocaleString('en-US')} off`]] : []),
               ...(data.payment?.taxWithheld ? [[<span key="tax-withheld" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdAccountBalance size={11} /> Tax Withheld</span>, `Br ${data.payment.taxWithheld.toLocaleString('en-US')} · Net received: Br ${((data.payment.amount ?? data.totalAmount ?? 0) - data.payment.taxWithheld).toLocaleString('en-US')}`]] : []),
               ...(data.deliveryDate ? [['Delivered On', format(new Date(data.deliveryDate), 'dd MMM yyyy, h:mm a')]] : []),
               ...(data.doctorName ? [['Doctor', data.doctorName]] : []),
