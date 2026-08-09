@@ -396,7 +396,7 @@ export default function AdminDashboard() {
 
       <div className="content">
         {/* Filters */}
-        <div className="glass-card" style={{ marginBottom: 20, padding: '14px 20px' }}>
+        <div className="glass-card" style={{ marginBottom: 20, padding: '14px 20px', position: 'relative', zIndex: 40 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Filters</span>
             <div className="search-input" style={{ minWidth: 200, margin: 0 }}>
