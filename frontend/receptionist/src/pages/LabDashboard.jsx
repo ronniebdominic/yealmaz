@@ -441,6 +441,19 @@ function MyPerformanceModal({ onClose }) {
               )}
             </div>
 
+            {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
+            {summary?.shareOfTotalPercent != null && (
+              <div style={{ background: 'var(--accent)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Your Share of the Lab</div>
+                <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>
+                  {summary.shareOfTotalPercent}% — {summary.totalScans} of {summary.totalLabScans} lab scans in this range
+                </div>
+              </div>
+            )}
+
             {/* Scan history */}
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
               <MdCalendarToday size={12} /> Scan History

@@ -21,6 +21,7 @@ import {
 import { todayLocal } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
+import LiveTrackingMap from '../components/LiveTrackingMap';
 
 const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—';
 
@@ -935,6 +936,7 @@ export default function DispatchDashboard() {
     { id: 'ready-delivery',   label: 'Ready for Delivery', icon: MdInventory2,    group: 'Delivery',   sub: 'QC done · awaiting pay' },
     { id: 'ready-dispatch',   label: 'Ready for Dispatch', icon: MdLocalShipping, group: 'Delivery',   sub: 'Paid/trusted · assign driver' },
     { id: 'en-route',         label: 'En Route',           icon: MdDirectionsBike,group: 'Delivery',   sub: 'Out for delivery'       },
+    { id: 'live-tracking',    label: 'Live Tracking',      icon: MdMap,           group: 'Delivery',   sub: 'Drivers sharing location' },
     { id: 'delivered',        label: 'Delivered',          icon: MdCheckCircle,   group: 'Completed',  sub: 'Done'                   },
     { id: 'all-cases',        label: 'All Cases',          icon: MdSearch,        group: 'Overview',   sub: 'Full history · any status' },
   ];
@@ -1764,6 +1766,21 @@ export default function DispatchDashboard() {
                     </tbody>
                   </table>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: Live Tracking ── */}
+          {tab === 'live-tracking' && (
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdMap className="mi" size={15} /> Live Tracking</div>
+              </div>
+              <div style={{ padding: 16 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, maxWidth: 640 }}>
+                  Delivery agents who've turned on location sharing from their own portal — updates live, no refresh needed.
+                </p>
+                <LiveTrackingMap />
               </div>
             </div>
           )}

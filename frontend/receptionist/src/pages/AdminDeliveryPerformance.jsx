@@ -88,7 +88,7 @@ function AgentCard({ agent, from, to }) {
         <Stat label="Deliveries" value={agent.totalDeliveries.toLocaleString('en-US')} info="Every case they marked Delivered in the selected range." />
         <Stat label="Clinics" value={agent.uniqueClinics.toLocaleString('en-US')} info="Distinct clinics they delivered to." />
         <Stat label="Active Days" value={agent.activeDays} info="Calendar days with at least one delivery in the selected range." />
-        <Stat label="On-Time" value={agent.onTimeRate != null ? `${agent.onTimeRate}%` : '—'} info="Share of deliveries completed by the case's due date. Cases with no due date aren't counted either way." />
+        <Stat label="Lab Share" value={agent.shareOfTotalPercent != null ? `${agent.shareOfTotalPercent}%` : '—'} info="Their deliveries as a share of every delivery the whole lab made in the selected range." />
       </div>
 
       {agent.totalDeliveries > 0 && <ActivitySparkline dailyCounts={agent.dailyCounts} from={from} to={to} />}
@@ -150,6 +150,11 @@ export default function AdminDeliveryPerformance() {
           </div>
         ) : (
           <>
+            {data.totalLabDeliveries > 0 && (
+              <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
+                <strong style={{ color: 'var(--text-1)' }}>{data.totalLabDeliveries.toLocaleString('en-US')}</strong> total lab deliveries in this range — each agent's "Lab Share" below is their portion of that.
+              </p>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
               {agents.map(a => <AgentCard key={a.id} agent={a} from={fromDate} to={toDate} />)}
             </div>

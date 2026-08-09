@@ -112,11 +112,12 @@ function TechCard({ tech, from, to }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 14 }}>
         <Stat label="Scans" value={tech.totalScans.toLocaleString('en-US')} info="Every department scan they performed in the selected range." />
         <Stat label="Cases" value={tech.uniqueCases.toLocaleString('en-US')} info="Distinct cases they touched — a case they scanned twice still counts once here." />
         <Stat label="Active Days" value={tech.activeDays} info="Calendar days with at least one scan in the selected range." />
         <Stat label="Avg / Day" value={tech.avgPerActiveDay} info="Total scans divided by active days — not by every day in the range, so time off doesn't drag it down." />
+        <Stat label="Lab Share" value={tech.shareOfTotalPercent != null ? `${tech.shareOfTotalPercent}%` : '—'} info="Their scans as a share of every matched scan across the whole lab in the selected range." />
       </div>
 
       {tech.totalScans > 0 && (
@@ -193,7 +194,7 @@ export default function AdminLabPerformance() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
               {techs.map(t => <TechCard key={t.id} tech={t} from={fromDate} to={toDate} />)}
             </div>
             {data.unattributedScans > 0 && (
