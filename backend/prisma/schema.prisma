@@ -120,6 +120,7 @@ enum Role {
   HR_MANAGER
   FINANCE_AP
   FINANCE_CASHIER
+  LEADER // team/department lead — first-stage approver for their direct reports' leave requests, before HR's final decision
 }
 
 // ── ZONES ──────────────────────────────────────────────
@@ -713,7 +714,8 @@ model AttendanceEvent {
 enum LeaveStatus {
   APPROVED
   REJECTED
-  PENDING // self-service requests only — HR's own direct entries skip straight to APPROVED/REJECTED
+  PENDING          // self-service request, awaiting the requester's manager (or HR if they have none)
+  MANAGER_APPROVED // manager has signed off — now awaiting HR's final decision
 }
 
 enum LeaveDayPortion {

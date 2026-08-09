@@ -123,7 +123,7 @@ router.post('/manual', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
 // reported coordinates are still stored for the same audit trail.
 const SELF_TYPES = ['CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END'];
 const SHIFT_BOUNDARY_TYPES = ['CLOCK_IN', 'CLOCK_OUT'];
-const STAFF_ROLES = ['DELIVERY', 'RECEPTIONIST', 'DISPATCH', 'LAB_TECH', 'FINANCE', 'INVENTORY_MANAGER', 'HR_MANAGER'];
+const STAFF_ROLES = ['DELIVERY', 'RECEPTIONIST', 'DISPATCH', 'LAB_TECH', 'FINANCE', 'INVENTORY_MANAGER', 'HR_MANAGER', 'LEADER'];
 
 router.post('/self', protect, restrict(...STAFF_ROLES), async (req, res) => {
   try {
@@ -288,23 +288,88 @@ router.post('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res)
   }
 });
 
+// By default this only shows requests that have cleared the manager stage
+// (MANAGER_APPROVED/APPROVED/REJECTED) plus PENDING requests from anyone
+// with no manager assigned (nobody to gate them, so they go to HR
+// directly) — a raw PENDING request awaiting its manager's decision does
+// NOT show up here. Pass includeAwaitingManager=true to see everything
+// (e.g. for an overview/audit view).
 router.get('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {
-    const { userId, from, to, leaveTypeId } = req.query;
+    const { userId, from, to, leaveTypeId, includeAwaitingManager } = req.query;
     const where = {};
     if (userId) where.userId = userId;
     if (leaveTypeId) where.leaveTypeId = leaveTypeId;
     if (from) where.fromDate = { gte: startOfDay(from) };
     if (to) where.toDate = { lte: endOfDay(to) };
-    const records = await prisma.leaveRecord.findMany({
+
+    let records = await prisma.leaveRecord.findMany({
       where,
-      include: { user: { select: { id: true, name: true } }, recordedBy: { select: { id: true, name: true } }, leaveType: true },
+      include: {
+        user: { select: { id: true, name: true, employeeProfile: { select: { managerId: true } } } },
+        recordedBy: { select: { id: true, name: true } }, leaveType: true,
+      },
       orderBy: { fromDate: 'desc' },
     });
+
+    if (!includeAwaitingManager || includeAwaitingManager === 'false') {
+      records = records.filter(r => r.status !== 'PENDING' || !r.user?.employeeProfile?.managerId);
+    }
     res.json(records);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load leave records.' });
+  }
+});
+
+// ── Manager (Leader) approval stage ──────────────────────
+// A request from someone WITH a manager must clear this stage
+// (PENDING -> MANAGER_APPROVED) before HR ever sees it in the default
+// GET /leave list above. LEADER is the intended role for this, but
+// HR_MANAGER/ADMIN can also act as a fallback approver for any team.
+router.get('/leave/team', protect, restrict('LEADER', 'HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const where = { status: 'PENDING' };
+    if (req.user.role === 'LEADER') {
+      where.user = { employeeProfile: { managerId: req.user.id } };
+    }
+    const records = await prisma.leaveRecord.findMany({
+      where,
+      include: { user: { select: { id: true, name: true } }, leaveType: true },
+      orderBy: { fromDate: 'asc' },
+    });
+    res.json(records);
+  } catch (err) {
+    console.error('[leave team]', err);
+    res.status(500).json({ error: 'Could not load team leave requests.' });
+  }
+});
+
+router.patch('/leave/:id/manager-decide', protect, restrict('LEADER', 'HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { decision, note } = req.body || {};
+    if (!['APPROVED', 'REJECTED'].includes(decision)) return res.status(400).json({ error: 'decision must be APPROVED or REJECTED.' });
+
+    const existing = await prisma.leaveRecord.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { employeeProfile: { select: { managerId: true } } } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Leave request not found.' });
+    if (existing.status !== 'PENDING') return res.status(400).json({ error: `This request is already ${existing.status}.` });
+    if (req.user.role === 'LEADER' && existing.user?.employeeProfile?.managerId !== req.user.id) {
+      return res.status(403).json({ error: 'This request is not assigned to you.' });
+    }
+
+    const updated = await prisma.leaveRecord.update({
+      where: { id: req.params.id },
+      data: { status: decision === 'APPROVED' ? 'MANAGER_APPROVED' : 'REJECTED', note: note?.trim() || null },
+      include: { user: { select: { id: true, name: true } }, leaveType: true },
+    });
+    await invalidate('attendance:leave*', 'leave:*');
+    res.json(updated);
+  } catch (err) {
+    console.error('[leave manager-decide]', err);
+    res.status(500).json({ error: 'Could not decide on leave request.' });
   }
 });
 
@@ -347,18 +412,31 @@ router.get('/leave/mine', protect, restrict(...STAFF_ROLES), async (req, res) =>
   }
 });
 
-// HR decides a PENDING request — approving writes the ledger deduction
-// (if the request has a leaveTypeId) in the same transaction as the
-// status change, mirroring the direct-entry path's atomicity.
+// HR's final decision. A request from someone WITH a manager must have
+// cleared MANAGER_APPROVED first (see PATCH /leave/:id/manager-decide) —
+// HR can't approve straight from PENDING for those, so a request can
+// never silently skip its manager's review. Requests from someone with
+// no manager assigned go straight from PENDING to HR, since there's no
+// one else to gate them. Approving writes the ledger deduction (if the
+// request has a leaveTypeId) in the same transaction as the status
+// change.
 router.patch('/leave/:id/decide', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {
     const { decision, note } = req.body || {};
     if (!['APPROVED', 'REJECTED'].includes(decision)) return res.status(400).json({ error: 'decision must be APPROVED or REJECTED.' });
 
     const record = await prisma.$transaction(async (tx) => {
-      const existing = await tx.leaveRecord.findUnique({ where: { id: req.params.id } });
+      const existing = await tx.leaveRecord.findUnique({
+        where: { id: req.params.id },
+        include: { user: { select: { employeeProfile: { select: { managerId: true } } } } },
+      });
       if (!existing) throw { status: 404, message: 'Leave request not found.' };
-      if (existing.status !== 'PENDING') throw { status: 400, message: `This request is already ${existing.status}.` };
+      if (existing.status === 'PENDING' && existing.user?.employeeProfile?.managerId) {
+        throw { status: 400, message: "This request hasn't been approved by the employee's manager yet." };
+      }
+      if (!['PENDING', 'MANAGER_APPROVED'].includes(existing.status)) {
+        throw { status: 400, message: `This request is already ${existing.status}.` };
+      }
 
       const updated = await tx.leaveRecord.update({
         where: { id: req.params.id },
