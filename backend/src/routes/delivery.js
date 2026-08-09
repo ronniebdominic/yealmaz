@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
+const { buildAgentNameMaps, matchDeliveryAgent } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -22,12 +23,35 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
+    // "Delivered today" used to be matched via DeliveryLog, but that table
+    // is barely populated in practice (see utils/deliveryAttribution.js) —
+    // attribute via today's CaseStage 'DELIVERED' rows instead, same as
+    // the archive/performance endpoints. Note this can't just join onto
+    // the `assignedDeliveryId` filter below: that column is cleared back
+    // to null the moment a case is delivered, so it's resolved as its own
+    // explicit case-ID list instead.
+    const [agents, todayStages] = await Promise.all([
+      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+      prisma.caseStage.findMany({
+        where: { stageName: 'DELIVERED', scannedAt: { gte: todayStart } },
+        select: { scannedBy: true, notes: true, caseId: true },
+      }),
+    ]);
+    const nameMaps = buildAgentNameMaps(agents);
+    const todaysDeliveredCaseIds = [];
+    for (const s of todayStages) {
+      const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+      if (agent && (!isDeliveryExec || agent.id === req.user.id)) todaysDeliveredCaseIds.push(s.caseId);
+    }
+
     const where = {
-      ...(isDeliveryExec ? { assignedDeliveryId: req.user.id } : {}),
       OR: [
-        { status: { in: ['PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } },
-        { status: 'DELIVERED', deliveryLogs: { some: { deliveredAt: { gte: todayStart } } } }
-      ]
+        {
+          ...(isDeliveryExec ? { assignedDeliveryId: req.user.id } : {}),
+          status: { in: ['PICKUP_ASSIGNED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] },
+        },
+        { status: 'DELIVERED', id: { in: todaysDeliveredCaseIds } },
+      ],
     };
 
     const [cases, total] = await Promise.all([
@@ -57,23 +81,53 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
 // A delivery agent's own full delivery archive — GET /assigned only ever
 // shows today's completed deliveries (it's a live working board), so
 // anything from a prior day is otherwise invisible to the person who
-// delivered it. Matched via DeliveryLog.deliveryById (a real FK, not a
-// name string) rather than Case.assignedDeliveryId, which gets cleared
-// back to null once a case is delivered.
+// delivered it. Matched via CaseStage, not DeliveryLog.deliveryById — see
+// utils/deliveryAttribution.js for why. Case.deliveryDate (set on every
+// DELIVERED case regardless of DeliveryLog) is used for the displayed/
+// filtered date rather than the delivery log's own timestamp.
 router.get('/history', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
   try {
     const { page = 1, limit = 20, search, from, to, userId } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const isDeliveryExec = req.user.role === 'DELIVERY';
+    const targetUserId = isDeliveryExec ? req.user.id : (userId || null);
 
-    const logWhere = { deliveredAt: { not: null } };
-    if (isDeliveryExec) logWhere.deliveryById = req.user.id;
-    else if (userId) logWhere.deliveryById = userId;
-    if (from) logWhere.deliveredAt = { ...logWhere.deliveredAt, gte: new Date(`${from}T00:00:00`) };
-    if (to) { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); logWhere.deliveredAt = { ...logWhere.deliveredAt, lte: d }; }
+    // Scoped to one agent (always true for a DELIVERY login; optional for
+    // ADMIN via ?userId=) — resolve which case IDs have a 'DELIVERED'
+    // stage attributable to them. Scanning every historical stage row is
+    // the same cost /lab-performance and /delivery-performance already
+    // pay; scoped by the same from/to the caller applied to the case list
+    // (scannedAt tracks deliveryDate closely — both are written in the
+    // same request) to keep it bounded for a narrow date filter.
+    let attributedCaseIds = null;
+    if (targetUserId) {
+      const stageWhere = { stageName: 'DELIVERED', scannedBy: { not: null } };
+      if (from || to) {
+        stageWhere.scannedAt = {};
+        if (from) stageWhere.scannedAt.gte = new Date(`${from}T00:00:00`);
+        if (to) { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); stageWhere.scannedAt.lte = d; }
+      }
+      const [agents, stages] = await Promise.all([
+        prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+        prisma.caseStage.findMany({ where: stageWhere, select: { scannedBy: true, notes: true, caseId: true } }),
+      ]);
+      const nameMaps = buildAgentNameMaps(agents);
+      attributedCaseIds = [];
+      for (const s of stages) {
+        const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+        if (agent && agent.id === targetUserId) attributedCaseIds.push(s.caseId);
+      }
+    }
 
     const caseWhere = {
-      deliveryLogs: { some: logWhere },
+      status: 'DELIVERED',
+      ...(attributedCaseIds ? { id: { in: attributedCaseIds } } : {}),
+      ...(from || to ? {
+        deliveryDate: {
+          ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
+          ...(to ? { lte: (() => { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); return d; })() } : {}),
+        },
+      } : {}),
       ...(search ? {
         OR: [
           { caseNumber: { contains: search, mode: 'insensitive' } },
@@ -86,10 +140,7 @@ router.get('/history', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) 
     const [cases, total] = await Promise.all([
       prisma.case.findMany({
         where: caseWhere,
-        include: {
-          clinic: { select: { name: true, station: true } },
-          deliveryLogs: { where: logWhere, orderBy: { deliveredAt: 'desc' }, take: 1 },
-        },
+        include: { clinic: { select: { name: true, station: true } } },
         orderBy: { deliveryDate: 'desc' },
         skip, take: parseInt(limit),
       }),

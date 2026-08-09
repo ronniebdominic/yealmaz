@@ -5,6 +5,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
+const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -649,9 +650,8 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
 
 // ── GET /api/dashboard/delivery-performance ─────────────
 // Per-delivery-agent stats, same shape/spirit as lab-performance above,
-// but attribution is via DeliveryLog.deliveryById — a real FK, not a name
-// string — so there's no equivalent of lab-performance's name-matching
-// fragility here.
+// attributed via CaseStage instead of the barely-populated DeliveryLog —
+// see utils/deliveryAttribution.js for the full rationale.
 router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -662,13 +662,15 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
     const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
     const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
 
-    const [agents, logs] = await Promise.all([
+    const [agents, stages] = await Promise.all([
       prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true, station: true } }),
-      prisma.deliveryLog.findMany({
-        where: { deliveredAt: { gte: dateFrom, lte: dateTo } },
-        select: { deliveryById: true, deliveredAt: true, caseId: true, case: { select: { dueDate: true, clinic: { select: { name: true } } } } },
+      prisma.caseStage.findMany({
+        where: { stageName: 'DELIVERED', scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
+        select: { scannedBy: true, scannedAt: true, notes: true, caseId: true, case: { select: { dueDate: true, clinic: { select: { name: true } } } } },
       }),
     ]);
+
+    const nameMaps = buildAgentNameMaps(agents);
 
     const perAgent = new Map(agents.map(a => [a.id, {
       id: a.id, name: a.name, isActive: a.isActive, station: a.station,
@@ -677,17 +679,29 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
     }]));
     let unattributedDeliveries = 0;
 
-    for (const log of logs) {
-      const agg = perAgent.get(log.deliveryById);
-      if (!agg) { unattributedDeliveries++; continue; }
+    for (const s of stages) {
+      const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+      if (!agent) {
+        // Only count it as "unattributed" if it actually looks like a real
+        // agent event that just couldn't be matched (e.g. a decommissioned
+        // account) — self-pickups/admin edits are excluded outright inside
+        // matchDeliveryAgent and shouldn't inflate this count.
+        const rawName = (s.scannedBy || '').trim();
+        if (rawName && !NON_AGENT_DELIVERY_MARKERS.has(rawName) && !isSelfPickupNote(s.notes)) {
+          unattributedDeliveries++;
+        }
+        continue;
+      }
+
+      const agg = perAgent.get(agent.id);
       agg.totalDeliveries++;
-      agg.cases.add(log.caseId);
-      if (log.case?.clinic?.name) agg.clinics.add(log.case.clinic.name);
-      const day = localDayKey(log.deliveredAt);
+      agg.cases.add(s.caseId);
+      if (s.case?.clinic?.name) agg.clinics.add(s.case.clinic.name);
+      const day = localDayKey(s.scannedAt);
       agg.dailyCounts[day] = (agg.dailyCounts[day] || 0) + 1;
-      if (!agg.lastActiveAt || log.deliveredAt > agg.lastActiveAt) agg.lastActiveAt = log.deliveredAt;
-      if (log.case?.dueDate) {
-        if (log.deliveredAt <= log.case.dueDate) agg.onTime++; else agg.late++;
+      if (!agg.lastActiveAt || s.scannedAt > agg.lastActiveAt) agg.lastActiveAt = s.scannedAt;
+      if (s.case?.dueDate) {
+        if (s.scannedAt <= s.case.dueDate) agg.onTime++; else agg.late++;
       }
     }
 

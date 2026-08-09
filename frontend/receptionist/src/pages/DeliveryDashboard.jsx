@@ -160,7 +160,7 @@ function DeliveryArchive() {
                     </td>
                     <td style={{ padding: '9px 14px', fontSize: 13, color: '#374151' }}>{c.patientName || '—'}</td>
                     <td style={{ padding: '9px 14px', fontSize: 12, color: '#6B7280' }}>
-                      {c.deliveryLogs?.[0]?.deliveredAt ? format(new Date(c.deliveryLogs[0].deliveredAt), 'dd MMM yyyy, h:mm a') : '—'}
+                      {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy, h:mm a') : '—'}
                     </td>
                   </tr>
                 ))}
