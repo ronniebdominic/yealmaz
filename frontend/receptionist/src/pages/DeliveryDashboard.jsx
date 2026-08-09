@@ -1,17 +1,22 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
-import api from '../api';
+import api, { socket } from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import {
   MdCheckCircle, MdUndo, MdLocalHospital, MdLocationOn, MdCall, MdWarning,
   MdSearch, MdClose, MdLogout, MdArchive, MdExpandLess, MdExpandMore,
+  MdMenu, MdInsights, MdMyLocation,
 } from 'react-icons/md';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useLiveLocationSharing } from '../hooks/useLiveLocationSharing';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
+import InstallAppBanner from '../components/InstallAppBanner';
+import MyDeliveryPerformanceModal from '../components/MyDeliveryPerformanceModal';
 
-// ── Confirm modal ─────────────────────────────────────────
+// ── Confirm modal — unchanged from before (already full-screen/touch-
+// friendly); only the card list feeding it changed. ────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   const [reason, setReason] = useState('');
 
@@ -74,13 +79,84 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
   );
 }
 
-// ── Main ─────────────────────────────────────────────────
-// ── Archive — a delivery agent's full delivery history ───
+// ── Job card — a touch-friendly card replacing the old table row ───────
+function JobCard({ c, section, onAction }) {
+  const isDelivery = section === 'delivery';
+  const primaryAction   = isDelivery ? 'delivered'     : c.status === 'READY_TO_DISPATCH' ? 'lab_pickup'     : 'picked_up';
+  const primaryLabel    = isDelivery ? 'Mark as Deliver' : c.status === 'READY_TO_DISPATCH' ? 'Picked up from Lab' : 'Mark as Pick up';
+  const secondaryAction = isDelivery ? 'not_delivered'  : c.status === 'READY_TO_DISPATCH' ? 'not_picked_lab' : 'not_picked_up';
+  const secondaryLabel  = isDelivery ? 'Return not delivered' : 'Not Picked up';
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: 14, marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>{c.clinic?.name || '—'}</div>
+          {c.clinic?.station && <div style={{ fontSize: 11, color: '#1A56A0', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+        </div>
+        {c.caseNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF', flexShrink: 0, whiteSpace: 'nowrap' }}>{c.caseNumber}</span>}
+      </div>
+      {c.workType && <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</div>}
+      {c.clinic?.address && (
+        <div style={{ fontSize: 13, color: '#374151', display: 'flex', alignItems: 'flex-start', gap: 5, marginBottom: 6 }}>
+          <MdLocationOn size={14} color="#9CA3AF" style={{ marginTop: 1, flexShrink: 0 }} /> {c.clinic.address}
+        </div>
+      )}
+      {c.clinic?.phone && (
+        <a href={`tel:${c.clinic.phone}`} style={{ fontSize: 13, color: '#1A56A0', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+          <MdCall size={14} /> {c.clinic.phone}
+        </a>
+      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <button onClick={() => onAction(c, primaryAction)}
+          style={{ flex: 2, background: '#16A34A', color: '#fff', border: 'none', borderRadius: 9, padding: '11px 10px', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <MdCheckCircle size={15} /> {primaryLabel}
+        </button>
+        <button onClick={() => onAction(c, secondaryAction)} title={secondaryLabel}
+          style={{ flex: 1, background: '#FEE2E2', color: '#DC2626', border: 'none', borderRadius: 9, padding: '11px 10px', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <MdUndo size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DeliveredCard({ c }) {
+  return (
+    <div style={{ background: '#F0FDF4', borderRadius: 12, border: '1px solid #BBF7D0', padding: 14, marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>{c.clinic?.name}</div>
+          {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#6B7280', marginTop: 2 }}>{c.caseNumber}</div>}
+        </div>
+        <span style={{ background: '#16A34A', color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <MdCheckCircle size={12} /> {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM') : 'Delivered'}
+        </span>
+      </div>
+      {c.clinic?.address && <div style={{ fontSize: 12, color: '#4B5563', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={12} /> {c.clinic.address}</div>}
+    </div>
+  );
+}
+
+const SECTION_STYLES = {
+  pickup:    { bg: '#DBEAFE', color: '#1E40AF', label: 'Pick-up List' },
+  delivery:  { bg: '#FEF9C3', color: '#854D0E', label: 'Delivery List' },
+  delivered: { bg: '#D1FAE5', color: '#065F46', label: 'Delivered' },
+};
+function SectionHeader({ section, count }) {
+  const s = SECTION_STYLES[section];
+  return (
+    <div style={{ background: s.bg, color: s.color, borderRadius: 10, padding: '9px 14px', fontWeight: 800, fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span>{s.label}</span><span style={{ fontWeight: 700, fontSize: 12, opacity: 0.85 }}>{count}</span>
+    </div>
+  );
+}
+
+// ── Archive — a delivery agent's full delivery history, card-styled ────
 // GET /delivery/assigned (the live board above) only ever shows today's
 // completed deliveries; anything older is otherwise invisible to the
-// person who delivered it. This is a separate, independently-paginated
-// fetch from /delivery/history so browsing history never disturbs the
-// live board's own polling/state.
+// person who delivered it. Independently-paginated fetch so browsing
+// history never disturbs the live board's own polling/state.
 function DeliveryArchive() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
@@ -107,69 +183,49 @@ function DeliveryArchive() {
   useEffect(() => { if (open) load(1); }, [open, load]);
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid #E5E7EB', marginTop: 18 }}>
+    <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid #E5E7EB', marginTop: 8 }}>
       <button onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#374151' }}>
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#374151' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MdArchive size={16} /> My Delivery Archive{pagination.total > 0 ? ` (${pagination.total})` : ''}</span>
         {open ? <MdExpandLess size={18} /> : <MdExpandMore size={18} />}
       </button>
       {open && (
-        <div style={{ borderTop: '1px solid #E5E7EB' }}>
-          <div style={{ padding: '12px 16px', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', background: '#F9FAFB' }}>
-            <div style={{ flex: 2, minWidth: 180 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4 }}>SEARCH</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #E5E7EB', borderRadius: 8, padding: '6px 10px', background: '#fff' }}>
-                <MdSearch size={14} color="#9CA3AF" />
-                <input placeholder="Clinic, case no., patient…" value={search} onChange={e => setSearch(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && load(1)}
-                  style={{ border: 'none', outline: 'none', fontSize: 13, flex: 1 }} />
-              </div>
+        <div style={{ borderTop: '1px solid #E5E7EB', padding: '12px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #E5E7EB', borderRadius: 8, padding: '7px 10px', background: '#F9FAFB' }}>
+              <MdSearch size={14} color="#9CA3AF" />
+              <input placeholder="Clinic, case no., patient…" value={search} onChange={e => setSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && load(1)}
+                style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1 }} />
             </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4 }}>FROM</div>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB' }} />
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB' }} />
+              <button onClick={() => load(1)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#1A56A0', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Go</button>
             </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4 }}>TO</div>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB' }} />
-            </div>
-            <button onClick={() => load(1)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#1A56A0', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-              Filter
-            </button>
           </div>
 
           {loading ? (
-            <div style={{ padding: 30, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading…</div>
+            <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading…</div>
           ) : items.length === 0 ? (
-            <div style={{ padding: 30, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No deliveries found</div>
+            <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No deliveries found</div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#F9FAFB' }}>
-                  <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Clinic / Case</th>
-                  <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Patient</th>
-                  <th style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Delivered</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(c => (
-                  <tr key={c.id} style={{ borderTop: '1px solid #F3F4F6' }}>
-                    <td style={{ padding: '9px 14px' }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{c.clinic?.name}</div>
-                      {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{c.caseNumber}</div>}
-                    </td>
-                    <td style={{ padding: '9px 14px', fontSize: 13, color: '#374151' }}>{c.patientName || '—'}</td>
-                    <td style={{ padding: '9px 14px', fontSize: 12, color: '#6B7280' }}>
-                      {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy, h:mm a') : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            items.map(c => (
+              <div key={c.id} style={{ borderTop: '1px solid #F3F4F6', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{c.clinic?.name}</div>
+                  <div style={{ fontSize: 12, color: '#6B7280' }}>{c.patientName || '—'}</div>
+                  {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 10.5, color: '#9CA3AF', marginTop: 1 }}>{c.caseNumber}</div>}
+                </div>
+                <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'right', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                  {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy, h:mm a') : '—'}
+                </div>
+              </div>
+            ))
           )}
 
           {pagination.totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, padding: '12px 0', borderTop: '1px solid #F3F4F6' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, paddingTop: 12, marginTop: 4, borderTop: '1px solid #F3F4F6' }}>
               <button onClick={() => load(page - 1)} disabled={page <= 1}
                 style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #E5E7EB', background: '#fff', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}>‹ Prev</button>
               <span style={{ fontSize: 12, color: '#6B7280', alignSelf: 'center' }}>Page {page} of {pagination.totalPages}</span>
@@ -183,6 +239,50 @@ function DeliveryArchive() {
   );
 }
 
+// ── Decluttered header's overflow menu — Attendance/Leave/Performance/
+// Location sharing/Logout all live here instead of crowding the top bar. ──
+function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenPerformance, onLogout }) {
+  const sectionLabel = { fontSize: 10, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 14, marginBottom: 8 };
+  const menuItem = { width: '100%', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 9, padding: '11px 12px', fontSize: 13.5, fontWeight: 700, color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' };
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 150 }} />
+      <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 290, maxWidth: '86vw', background: '#fff', zIndex: 151, boxShadow: '-6px 0 24px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', padding: '18px 16px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>{user?.name}</div>
+            <div style={{ fontSize: 11.5, color: '#9CA3AF' }}>Delivery Executive</div>
+          </div>
+          <button onClick={onClose} style={{ background: '#F3F4F6', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><MdClose size={16} /></button>
+        </div>
+
+        <div style={sectionLabel}>Attendance</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><AttendanceClock /></div>
+
+        <div style={sectionLabel}>Leave</div>
+        <LeaveRequestButton />
+
+        <div style={sectionLabel}>Live Location</div>
+        <button onClick={onToggleLocation}
+          style={{ ...menuItem, background: sharing ? '#DCFCE7' : '#F9FAFB', borderColor: sharing ? '#86EFAC' : '#E5E7EB', color: sharing ? '#15803D' : '#374151' }}>
+          <MdMyLocation size={16} /> {sharing ? 'Sharing — tap to stop' : 'Share my live location'}
+        </button>
+        {locError && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 6 }}>{locError}</div>}
+
+        <div style={sectionLabel}>Performance</div>
+        <button onClick={onOpenPerformance} style={menuItem}><MdInsights size={16} /> My Performance</button>
+
+        <div style={{ borderTop: '1px solid #E5E7EB', marginTop: 18, paddingTop: 14 }}>
+          <button onClick={onLogout} style={{ ...menuItem, background: '#FEF2F2', borderColor: '#FECACA', color: '#DC2626' }}>
+            <MdLogout size={16} /> Logout
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function DeliveryDashboard() {
   const { user, logout } = useAuth();
   const [cases, setCases]     = useState([]);
@@ -192,6 +292,11 @@ export default function DeliveryDashboard() {
   const [search, setSearch]   = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]   = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showPerformance, setShowPerformance] = useState(false);
+
+  const { sharing, error: locError, toggle: toggleLocation } = useLiveLocationSharing();
 
   usePushNotifications(!!user?.id);
 
@@ -211,13 +316,9 @@ export default function DeliveryDashboard() {
 
   useEffect(() => {
     if (!user?.id) return;
-    import('../api').then(mod => {
-      const s = mod.socket;
-      if (!s) return;
-      s.emit('join_delivery', user.id);
-      s.on('case_assigned', loadCases);
-      return () => s.off('case_assigned', loadCases);
-    }).catch(() => {});
+    socket.emit('join_delivery', user.id);
+    socket.on('case_assigned', loadCases);
+    return () => socket.off('case_assigned', loadCases);
   }, [user?.id, loadCases]);
 
   const handleAction = async (reason = '') => {
@@ -280,205 +381,115 @@ export default function DeliveryDashboard() {
 
   const pickupList = [...impressionPickups, ...labPickups]; // combined pick-up list
   const totalActive = pickupList.length + deliveryList.length;
-  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) || 'DV';
   const hasFilter = search || dateFrom || dateTo;
 
-  // ── Shared table row ─────────────────────────────────────
-  const TR = ({ c, section }) => (
-    <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
-      <td style={{ padding: '10px 14px', minWidth: 180 }}>
-        <div style={{ fontWeight: 700, color: '#111827', fontSize: 14 }}>{c.clinic?.name || '—'}</div>
-        {c.clinic?.station && <div style={{ fontSize: 11, color: '#1A56A0', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
-        {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{c.caseNumber}</div>}
-        {c.workType && <div style={{ fontSize: 11, color: '#6B7280' }}>{c.workType}{c.units ? ` · ${c.units}u` : ''}</div>}
-      </td>
-      <td style={{ padding: '10px 14px', fontSize: 13, color: '#374151', minWidth: 160 }}>
-        {c.clinic?.address
-          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={13} color="#6B7280" />{c.clinic.address}</span>
-          : <span style={{ color: '#D1D5DB' }}>—</span>}
-      </td>
-      <td style={{ padding: '10px 14px', fontSize: 13, minWidth: 140 }}>
-        {c.clinic?.phone
-          ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> {c.clinic.phone}</a>
-          : <span style={{ color: '#D1D5DB' }}>—</span>}
-      </td>
-      <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {/* Green action */}
-          <button
-            onClick={() => setModal({ case: c, action: section === 'delivery' ? 'delivered' : c.status === 'READY_TO_DISPATCH' ? 'lab_pickup' : 'picked_up' })}
-            style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <MdCheckCircle size={13} /> {section === 'delivery' ? 'Mark as Deliver' : c.status === 'READY_TO_DISPATCH' ? 'Picked up from Lab' : 'Mark as Pick up'}
-          </button>
-          {/* Red action — routes to correct return endpoint based on case type */}
-          <button
-            onClick={() => setModal({
-              case: c,
-              action: section === 'delivery'
-                ? 'not_delivered'                                          // OUT_FOR_DELIVERY → READY_TO_DISPATCH + clear driver
-                : c.status === 'READY_TO_DISPATCH'
-                  ? 'not_picked_lab'                                       // Lab pickup failed → READY_TO_DISPATCH + clear driver
-                  : 'not_picked_up'                                        // Clinic pickup failed → PENDING_PICKUP + clear driver
-            })}
-            style={{ background: '#DC2626', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            {section === 'delivery' ? <><MdUndo size={13} /> Return not delivered</> : <><MdClose size={13} /> Not Picked up</>}
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-
-  const ColHead = () => (
-    <tr style={{ background: '#F3F4F6' }}>
-      {['Clinic Name', 'Location', 'Contact', 'Action'].map(h => (
-        <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>{h}</th>
-      ))}
-    </tr>
-  );
+  const iconBtn = { background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'DM Sans, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'DM Sans, sans-serif', maxWidth: 520, margin: '0 auto' }}>
+      <InstallAppBanner />
 
-      {/* Header */}
-      <div style={{ background: '#0F2044', color: '#fff', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/logo.png" alt="logo" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 0.2 }}>Delivery Staffs Portal</div>
-            <div style={{ fontSize: 11, opacity: 0.55 }}>Job Order List</div>
+      {/* ── Header — decluttered to logo/title + active badge + menu ── */}
+      <div style={{ background: '#0F2044', color: '#fff', padding: '0 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56, position: 'sticky', top: 0, zIndex: 50 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <img src="/logo.png" alt="logo" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, letterSpacing: 0.2, whiteSpace: 'nowrap' }}>Delivery Portal</div>
+            <div style={{ fontSize: 10, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> {user?.name?.split(' ')[0]}
+            </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {totalActive > 0 && (
-            <span style={{ background: '#DC2626', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 }}>
-              {totalActive} active
+            <span style={{ background: '#DC2626', color: '#fff', borderRadius: 20, padding: '2px 9px', fontSize: 11.5, fontWeight: 700 }}>
+              {totalActive}
             </span>
           )}
-          <div style={{ fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> Live · {user?.name?.split(' ')[0]}
-          </div>
-          <AttendanceClock /> <LeaveRequestButton />
-          <button onClick={logout}
-            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
-            <MdLogout size={15} />
-          </button>
+          <button onClick={() => setSearchOpen(o => !o)} style={iconBtn} aria-label="Search"><MdSearch size={18} /></button>
+          <button onClick={() => setMenuOpen(true)} style={iconBtn} aria-label="Menu"><MdMenu size={20} /></button>
         </div>
       </div>
 
-      <div style={{ maxWidth: 1060, margin: '0 auto', padding: '20px 16px' }}>
-
-        {/* Search / Filter bar */}
-        <div style={{ background: '#fff', borderRadius: 10, padding: '12px 16px', marginBottom: 18, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', border: '1px solid #E5E7EB' }}>
-          <div style={{ flex: 2, minWidth: 200 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>SEARCH</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #E5E7EB', borderRadius: 8, padding: '7px 10px', background: '#F9FAFB' }}>
-              <MdSearch size={15} color="#9CA3AF" />
-              <input placeholder="Clinic name, case no., location…" value={search} onChange={e => setSearch(e.target.value)}
-                style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1, color: '#1F2937' }} />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>FROM</div>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#1F2937' }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', marginBottom: 4, letterSpacing: 0.5 }}>TO</div>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB', color: '#1F2937' }} />
-          </div>
-          {hasFilter && (
-            <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#DC2626', fontSize: 13, fontWeight: 700, cursor: 'pointer', alignSelf: 'flex-end' }}>
-              ✕ Clear
-            </button>
-          )}
+      {/* ── Live-sharing status strip — always visible while on, so it's
+          never a surprise that the app is transmitting location ── */}
+      {sharing && (
+        <div style={{ background: '#DCFCE7', borderBottom: '1px solid #BBF7D0', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700, color: '#15803D' }}>
+          <MdMyLocation size={14} /> Sharing your live location
+          <button onClick={toggleLocation} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#15803D', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 12.5 }}>Stop</button>
         </div>
+      )}
 
+      {/* ── Collapsible search/filter ── */}
+      {searchOpen && (
+        <div style={{ background: '#fff', borderBottom: '1px solid #E5E7EB', padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1px solid #E5E7EB', borderRadius: 8, padding: '8px 10px', background: '#F9FAFB' }}>
+            <MdSearch size={15} color="#9CA3AF" />
+            <input autoFocus placeholder="Clinic name, case no., location…" value={search} onChange={e => setSearch(e.target.value)}
+              style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1, color: '#1F2937' }} />
+            {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><MdClose size={14} color="#9CA3AF" /></button>}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB' }} />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB', background: '#F9FAFB' }} />
+            {hasFilter && (
+              <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+                style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: '#FEE2E2', color: '#DC2626', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: 14 }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#9CA3AF', fontSize: 14 }}>Loading your jobs…</div>
+        ) : totalActive === 0 && completedList.length === 0 && !hasFilter ? (
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: '48px 20px', textAlign: 'center' }}>
+            <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'center' }}><MdCheckCircle size={36} color="#16A34A" /></div>
+            <div style={{ fontWeight: 700, color: '#374151', fontSize: 16 }}>All clear!</div>
+            <div style={{ color: '#9CA3AF', marginTop: 4, fontSize: 13 }}>No jobs assigned right now. You'll be notified when a new job is ready.</div>
+          </div>
         ) : (
-          <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid #E5E7EB' }}>
+          <>
+            <SectionHeader section="pickup" count={pickupList.length} />
+            {pickupList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '14px 0', fontSize: 12.5, color: '#9CA3AF', fontStyle: 'italic' }}>No pickup jobs assigned</div>
+            ) : pickupList.map(c => <JobCard key={c.id} c={c} section="pickup" onAction={(c, action) => setModal({ case: c, action })} />)}
 
-            {/* ── PICK UP LIST ─────────────────────────────── */}
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <tbody>
-                {/* Section header — blue (Excel style) */}
-                <tr>
-                  <td colSpan={4} style={{ background: '#BFDBFE', padding: '9px 14px', fontWeight: 800, fontSize: 13, color: '#1E40AF', letterSpacing: 0.2 }}>
-                    Pick up list
-                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({pickupList.length})</span>
-                  </td>
-                </tr>
-                <ColHead />
-                {pickupList.length === 0 ? (
-                  <tr><td colSpan={4} style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>No pickup jobs assigned</td></tr>
-                ) : pickupList.map(c => <TR key={c.id} c={c} section="pickup" />)}
+            <div style={{ marginTop: 8 }}>
+              <SectionHeader section="delivery" count={deliveryList.length} />
+            </div>
+            {deliveryList.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '14px 0', fontSize: 12.5, color: '#9CA3AF', fontStyle: 'italic' }}>No deliveries in progress</div>
+            ) : deliveryList.map(c => <JobCard key={c.id} c={c} section="delivery" onAction={(c, action) => setModal({ case: c, action })} />)}
 
-                {/* Spacer */}
-                <tr><td colSpan={4} style={{ height: 2, background: '#E5E7EB' }} /></tr>
-
-                {/* ── DELIVERY LIST ─────────────────────────── */}
-                <tr>
-                  <td colSpan={4} style={{ background: '#FEF08A', padding: '9px 14px', fontWeight: 800, fontSize: 13, color: '#854D0E', letterSpacing: 0.2 }}>
-                    Delivery list
-                    <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({deliveryList.length})</span>
-                  </td>
-                </tr>
-                <ColHead />
-                {deliveryList.length === 0 ? (
-                  <tr><td colSpan={4} style={{ padding: '16px 14px', textAlign: 'center', fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' }}>No deliveries in progress</td></tr>
-                ) : deliveryList.map(c => <TR key={c.id} c={c} section="delivery" />)}
-              </tbody>
-            </table>
-
-            {/* ── DELIVERED (completed today) ─────────────── */}
             {completedList.length > 0 && (
-              <>
-                <div style={{ height: 2, background: '#E5E7EB' }} />
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <tbody>
-                    <tr>
-                      <td colSpan={4} style={{ background: '#D1FAE5', padding: '9px 14px', fontWeight: 800, fontSize: 13, color: '#065F46', letterSpacing: 0.2 }}>
-                        Delivered
-                        <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, opacity: 0.8 }}>({completedList.length})</span>
-                      </td>
-                    </tr>
-                    <ColHead />
-                    {completedList.map(c => (
-                      <tr key={c.id} style={{ borderBottom: '1px solid #E5E7EB', background: '#F0FDF4' }}>
-                        <td style={{ padding: '10px 14px' }}>
-                          <div style={{ fontWeight: 700, color: '#111827' }}>{c.clinic?.name}</div>
-                          {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF' }}>{c.caseNumber}</div>}
-                        </td>
-                        <td style={{ padding: '10px 14px', fontSize: 13, color: '#6B7280' }}>{c.clinic?.address ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={13} /> {c.clinic.address}</span> : '—'}</td>
-                        <td style={{ padding: '10px 14px', fontSize: 13 }}>
-                          {c.clinic?.phone ? <a href={`tel:${c.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> {c.clinic.phone}</a> : '—'}
-                        </td>
-                        <td style={{ padding: '10px 14px' }}>
-                          <span style={{ background: '#16A34A', color: '#fff', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <MdCheckCircle size={13} /> Delivered {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM') : ''}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
-
-            {totalActive === 0 && completedList.length === 0 && !hasFilter && (
-              <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 36, marginBottom: 10, display: 'flex', justifyContent: 'center' }}><MdCheckCircle size={36} color="#16A34A" /></div>
-                <div style={{ fontWeight: 700, color: '#374151', fontSize: 16 }}>All clear!</div>
-                <div style={{ color: '#9CA3AF', marginTop: 4 }}>No jobs assigned right now. You'll be notified when a new job is ready.</div>
+              <div style={{ marginTop: 8 }}>
+                <SectionHeader section="delivered" count={completedList.length} />
+                {completedList.map(c => <DeliveredCard key={c.id} c={c} />)}
               </div>
             )}
-          </div>
+          </>
         )}
 
         <DeliveryArchive />
       </div>
+
+      {menuOpen && (
+        <MenuPanel
+          onClose={() => setMenuOpen(false)}
+          user={user}
+          sharing={sharing}
+          locError={locError}
+          onToggleLocation={toggleLocation}
+          onOpenPerformance={() => { setMenuOpen(false); setShowPerformance(true); }}
+          onLogout={logout}
+        />
+      )}
 
       {modal && (
         <ConfirmModal
@@ -489,6 +500,8 @@ export default function DeliveryDashboard() {
           loading={processing}
         />
       )}
+
+      {showPerformance && <MyDeliveryPerformanceModal onClose={() => setShowPerformance(false)} />}
     </div>
   );
 }
