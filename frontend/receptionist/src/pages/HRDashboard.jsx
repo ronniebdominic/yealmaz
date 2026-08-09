@@ -7,6 +7,7 @@
 import { useAuth } from '../AuthContext';
 import { MdLogout } from 'react-icons/md';
 import AttendanceClock from '../components/AttendanceClock';
+import LeaveRequestButton from '../components/LeaveRequestButton';
 import HRWorkspace from './hr/HRWorkspace';
 
 export default function HRDashboard() {
@@ -25,7 +26,7 @@ export default function HRDashboard() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</div>
-          <AttendanceClock />
+          <AttendanceClock /> <LeaveRequestButton />
           <button onClick={logout} title="Logout" className="btn btn-ghost btn-sm">
             <MdLogout size={15} />
           </button>

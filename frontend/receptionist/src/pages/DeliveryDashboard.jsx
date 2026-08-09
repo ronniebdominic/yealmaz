@@ -9,6 +9,7 @@ import {
 } from 'react-icons/md';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import AttendanceClock from '../components/AttendanceClock';
+import LeaveRequestButton from '../components/LeaveRequestButton';
 
 // ── Confirm modal ─────────────────────────────────────────
 function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
@@ -248,7 +249,7 @@ export default function DeliveryDashboard() {
           <div style={{ fontSize: 12, opacity: 0.6, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} /> Live · {user?.name?.split(' ')[0]}
           </div>
-          <AttendanceClock />
+          <AttendanceClock /> <LeaveRequestButton />
           <button onClick={logout}
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
             <MdLogout size={15} />

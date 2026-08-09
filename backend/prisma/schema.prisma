@@ -690,6 +690,7 @@ model AttendanceEvent {
 enum LeaveStatus {
   APPROVED
   REJECTED
+  PENDING // self-service requests only — HR's own direct entries skip straight to APPROVED/REJECTED
 }
 
 enum LeaveDayPortion {

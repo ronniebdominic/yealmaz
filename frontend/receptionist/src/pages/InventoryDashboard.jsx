@@ -9,6 +9,7 @@ import {
   MdCancel, MdHistory, MdInventory2, MdPendingActions, MdTrendingUp, MdTrendingDown,
 } from 'react-icons/md';
 import AttendanceClock from '../components/AttendanceClock';
+import LeaveRequestButton from '../components/LeaveRequestButton';
 
 const TABS = [
   { id: 'stock', label: 'Stock', icon: MdInventory2 },
@@ -244,7 +245,7 @@ export default function InventoryDashboard() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#B45309', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</div>
-          <AttendanceClock />
+          <AttendanceClock /> <LeaveRequestButton />
           <button onClick={logout} title="Logout"
             style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 7, padding: '5px 12px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
             <MdLogout size={15} />

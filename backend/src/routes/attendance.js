@@ -222,6 +222,22 @@ router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   }
 });
 
+// Writes the USED ledger entry for an approved leave record — shared by
+// both the HR-direct-entry path (approves immediately) and the self-
+// service decide path (approves later, on HR's decision) so the ledger
+// deduction logic never drifts between the two.
+async function writeLeaveLedgerIfNeeded(tx, record, decidedById) {
+  if (!record.leaveTypeId) return;
+  const days = await getLeaveDayCount(tx, record.fromDate, record.toDate, record.dayPortion || 'FULL');
+  if (days <= 0) return;
+  await tx.leaveLedgerEntry.create({
+    data: {
+      userId: record.userId, leaveTypeId: record.leaveTypeId, transactionType: 'USED', days: -days,
+      effectiveDate: record.fromDate, relatedLeaveRecordId: record.id, recordedById: decidedById,
+    },
+  });
+}
+
 // ── Leave — HR logs these directly on an employee's behalf ─
 // leaveTypeId/dayPortion are optional passthroughs (Phase 1 HR expansion) —
 // existing callers that omit them keep working unchanged, defaulting to no
@@ -289,6 +305,76 @@ router.get('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load leave records.' });
+  }
+});
+
+// ── Self-service leave requests ──────────────────────────
+// An employee submits their own request (status starts PENDING, unlike
+// HR's direct-entry path above which defaults to APPROVED) — HR decides
+// via PATCH /leave/:id/decide. Same STAFF_ROLES list as the self-service
+// attendance clock.
+router.post('/leave/request', protect, restrict(...STAFF_ROLES), async (req, res) => {
+  try {
+    const { fromDate, toDate, reason, leaveTypeId, dayPortion } = req.body || {};
+    if (!fromDate || !toDate) return res.status(400).json({ error: 'fromDate and toDate are required.' });
+    const record = await prisma.leaveRecord.create({
+      data: {
+        userId: req.user.id, fromDate: new Date(fromDate), toDate: new Date(toDate),
+        reason: reason?.trim() || null, status: 'PENDING', recordedById: req.user.id,
+        leaveTypeId: leaveTypeId || null, dayPortion: dayPortion || 'FULL',
+      },
+      include: { leaveType: true },
+    });
+    await invalidate('attendance:leave*', 'leave:*');
+    res.status(201).json(record);
+  } catch (err) {
+    console.error('[leave request]', err);
+    res.status(500).json({ error: 'Could not submit leave request.' });
+  }
+});
+
+router.get('/leave/mine', protect, restrict(...STAFF_ROLES), async (req, res) => {
+  try {
+    const records = await prisma.leaveRecord.findMany({
+      where: { userId: req.user.id },
+      include: { leaveType: true },
+      orderBy: { fromDate: 'desc' },
+    });
+    res.json(records);
+  } catch (err) {
+    console.error('[leave mine]', err);
+    res.status(500).json({ error: 'Could not load your leave requests.' });
+  }
+});
+
+// HR decides a PENDING request — approving writes the ledger deduction
+// (if the request has a leaveTypeId) in the same transaction as the
+// status change, mirroring the direct-entry path's atomicity.
+router.patch('/leave/:id/decide', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { decision, note } = req.body || {};
+    if (!['APPROVED', 'REJECTED'].includes(decision)) return res.status(400).json({ error: 'decision must be APPROVED or REJECTED.' });
+
+    const record = await prisma.$transaction(async (tx) => {
+      const existing = await tx.leaveRecord.findUnique({ where: { id: req.params.id } });
+      if (!existing) throw { status: 404, message: 'Leave request not found.' };
+      if (existing.status !== 'PENDING') throw { status: 400, message: `This request is already ${existing.status}.` };
+
+      const updated = await tx.leaveRecord.update({
+        where: { id: req.params.id },
+        data: { status: decision, note: note?.trim() || null },
+        include: { user: { select: { id: true, name: true } }, leaveType: true },
+      });
+      if (decision === 'APPROVED') await writeLeaveLedgerIfNeeded(tx, updated, req.user.id);
+      return updated;
+    });
+
+    await invalidate('attendance:leave*', 'dashboard:hr-summary', 'leave:*');
+    res.json(record);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[leave decide]', err);
+    res.status(500).json({ error: 'Could not decide on leave request.' });
   }
 });
 

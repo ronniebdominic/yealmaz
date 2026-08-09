@@ -13,6 +13,7 @@ import {
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
+import LeaveRequestButton from '../components/LeaveRequestButton';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
@@ -706,7 +707,7 @@ export default function LabDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
             <MdPerson size={13} /> {user?.name?.split(' ')[0]}
           </div>
-          <AttendanceClock />
+          <AttendanceClock /> <LeaveRequestButton />
           <button onClick={() => setShowRequestGoods(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Request Goods"><MdAddBox size={18} /></button>
           <button onClick={() => setShowPerformance(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="My Performance"><MdInsights size={18} /></button>
           <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Logout"><MdLogout size={18} /></button>

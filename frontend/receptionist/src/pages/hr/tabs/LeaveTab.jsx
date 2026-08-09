@@ -2,11 +2,14 @@
 // sections, built on the Phase 1 LeaveType + LeaveLedgerEntry ledger
 // (balance is always sum(days), never a single stored number).
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../../api';
+import toast from 'react-hot-toast';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { MdAdd, MdEventAvailable, MdPending, MdCheckCircle, MdUpcoming } from 'react-icons/md';
 import LeaveTypesPanel from '../components/LeaveTypesPanel';
+
+const STATUS_BADGE = { APPROVED: 'badge-verified', REJECTED: 'badge-rejected', PENDING: '' };
 
 function StatCard({ icon: Icon, label, value }) {
   return (
@@ -21,6 +24,7 @@ function StatCard({ icon: Icon, label, value }) {
 const SECTIONS = ['Requests', 'Balance', 'Types'];
 
 export default function LeaveTab({ employees, onOpenLeaveModal }) {
+  const qc = useQueryClient();
   const [section, setSection] = useState('Requests');
   const [employeeId, setEmployeeId] = useState('');
 
@@ -30,9 +34,18 @@ export default function LeaveTab({ employees, onOpenLeaveModal }) {
   });
 
   const now = new Date();
-  const pending = leaveRecords.filter(r => r.status === 'APPROVED' && isAfter(new Date(r.toDate), now) && isBefore(new Date(r.fromDate), addDays(now, 1))).length;
+  const activeNow = leaveRecords.filter(r => r.status === 'APPROVED' && isAfter(new Date(r.toDate), now) && isBefore(new Date(r.fromDate), addDays(now, 1))).length;
+  const pendingRequests = leaveRecords.filter(r => r.status === 'PENDING').length;
   const approvedThisMonth = leaveRecords.filter(r => r.status === 'APPROVED' && new Date(r.fromDate).getMonth() === now.getMonth() && new Date(r.fromDate).getFullYear() === now.getFullYear()).length;
   const upcoming = leaveRecords.filter(r => r.status === 'APPROVED' && isAfter(new Date(r.fromDate), now)).length;
+
+  const decide = async (id, decision) => {
+    try {
+      await api.patch(`/attendance/leave/${id}/decide`, { decision });
+      toast.success(`Request ${decision === 'APPROVED' ? 'approved' : 'declined'}`);
+      qc.invalidateQueries({ queryKey: ['hr', 'leave-records'] });
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not decide on request'); }
+  };
 
   return (
     <div>
@@ -48,10 +61,10 @@ export default function LeaveTab({ employees, onOpenLeaveModal }) {
       </div>
 
       <div className="stats-grid" style={{ marginBottom: 16 }}>
-        <StatCard icon={MdEventAvailable} label="Approved (Active Now)" value={pending} />
+        <StatCard icon={MdPending} label="Pending Requests" value={pendingRequests} />
+        <StatCard icon={MdEventAvailable} label="Approved (Active Now)" value={activeNow} />
         <StatCard icon={MdCheckCircle} label="Approved This Month" value={approvedThisMonth} />
         <StatCard icon={MdUpcoming} label="Upcoming Leave" value={upcoming} />
-        <StatCard icon={MdPending} label="Total Records" value={leaveRecords.length} />
       </div>
 
       {section === 'Requests' && (
@@ -59,11 +72,11 @@ export default function LeaveTab({ employees, onOpenLeaveModal }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Portion</th><th>Reason</th><th style={{ textAlign: 'center' }}>Status</th></tr>
+                <tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Portion</th><th>Reason</th><th style={{ textAlign: 'center' }}>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
               </thead>
               <tbody>
                 {leaveRecords.length === 0 ? (
-                  <tr><td colSpan={7} className="empty-state">No leave logged yet</td></tr>
+                  <tr><td colSpan={8} className="empty-state">No leave logged yet</td></tr>
                 ) : leaveRecords.map(r => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 600 }}>{r.user?.name}</td>
@@ -73,7 +86,15 @@ export default function LeaveTab({ employees, onOpenLeaveModal }) {
                     <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.dayPortion === 'FULL' ? 'Full Day' : r.dayPortion === 'HALF_AM' ? 'Half (AM)' : 'Half (PM)'}</td>
                     <td style={{ color: 'var(--text-3)' }}>{r.reason || '—'}</td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className={`badge ${r.status === 'APPROVED' ? 'badge-verified' : 'badge-rejected'}`}>{r.status}</span>
+                      <span className={`badge ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {r.status === 'PENDING' && (
+                        <>
+                          <button className="btn btn-ghost btn-sm" onClick={() => decide(r.id, 'APPROVED')} style={{ marginRight: 6 }}>Approve</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => decide(r.id, 'REJECTED')}>Decline</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -20,6 +20,7 @@ import {
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
+import LeaveRequestButton from '../components/LeaveRequestButton';
 
 // Common dental shade options
 const SHADE_OPTIONS = [
@@ -1320,7 +1321,7 @@ export default function Dashboard() {
         </div>
         <NavList close={() => setOpen(false)} />
         <div className="drawer-footer">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /> <LeaveRequestButton /></div>
           <div className="user-info">
             <div className="user-avatar">{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Receptionist</div></div>
@@ -1338,7 +1339,7 @@ export default function Dashboard() {
         </div>
         <NavList />
         <div className="sidebar-footer">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /> <LeaveRequestButton /></div>
           <div className="user-info">
             <div className="user-avatar">{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Receptionist</div></div>
