@@ -327,10 +327,16 @@ router.get('/leave', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) 
 // (PENDING -> MANAGER_APPROVED) before HR ever sees it in the default
 // GET /leave list above. LEADER is the intended role for this, but
 // HR_MANAGER/ADMIN can also act as a fallback approver for any team.
-router.get('/leave/team', protect, restrict('LEADER', 'HR_MANAGER', 'ADMIN'), async (req, res) => {
+// Being a manager isn't tied to holding the LEADER role, though — any
+// account can end up as someone's EmployeeProfile.managerId (e.g. a
+// LAB_TECH designated a team's manager without changing their login
+// role/dashboard) — so this is open to any authenticated user, scoped to
+// their own reports unless they're HR_MANAGER/ADMIN.
+const MANAGER_DECIDE_BROAD_ROLES = ['HR_MANAGER', 'ADMIN'];
+router.get('/leave/team', protect, async (req, res) => {
   try {
     const where = { status: 'PENDING' };
-    if (req.user.role === 'LEADER') {
+    if (!MANAGER_DECIDE_BROAD_ROLES.includes(req.user.role)) {
       where.user = { employeeProfile: { managerId: req.user.id } };
     }
     const records = await prisma.leaveRecord.findMany({
@@ -345,7 +351,7 @@ router.get('/leave/team', protect, restrict('LEADER', 'HR_MANAGER', 'ADMIN'), as
   }
 });
 
-router.patch('/leave/:id/manager-decide', protect, restrict('LEADER', 'HR_MANAGER', 'ADMIN'), async (req, res) => {
+router.patch('/leave/:id/manager-decide', protect, async (req, res) => {
   try {
     const { decision, note } = req.body || {};
     if (!['APPROVED', 'REJECTED'].includes(decision)) return res.status(400).json({ error: 'decision must be APPROVED or REJECTED.' });
@@ -356,7 +362,7 @@ router.patch('/leave/:id/manager-decide', protect, restrict('LEADER', 'HR_MANAGE
     });
     if (!existing) return res.status(404).json({ error: 'Leave request not found.' });
     if (existing.status !== 'PENDING') return res.status(400).json({ error: `This request is already ${existing.status}.` });
-    if (req.user.role === 'LEADER' && existing.user?.employeeProfile?.managerId !== req.user.id) {
+    if (!MANAGER_DECIDE_BROAD_ROLES.includes(req.user.role) && existing.user?.employeeProfile?.managerId !== req.user.id) {
       return res.status(403).json({ error: 'This request is not assigned to you.' });
     }
 

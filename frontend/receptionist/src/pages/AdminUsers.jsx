@@ -24,7 +24,7 @@ const ROLES = [
   { value: 'FINANCE_CASHIER',   label: 'Finance — Cashier',  icon: MdPointOfSale },
   { value: 'INVENTORY_MANAGER', label: 'Inventory Manager',  icon: MdWarehouse },
   { value: 'HR_MANAGER',        label: 'HR Manager',         icon: MdGroups },
-  { value: 'LEADER',            label: 'Team Leader',        icon: MdSupervisorAccount },
+  { value: 'LEADER',            label: 'Operation Manager',  icon: MdSupervisorAccount },
 ];
 
 const ROLE_MAP = Object.fromEntries(ROLES.map(r => [r.value, r]));

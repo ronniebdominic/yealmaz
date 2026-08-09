@@ -14,6 +14,7 @@ import {
 import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
+import TeamLeaveRequests from '../components/TeamLeaveRequests';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
@@ -755,6 +756,10 @@ export default function LabDashboard() {
           </div>
         )}
 
+        {/* ── Team leave requests — only renders anything for accounts
+            designated as someone's manager (EmployeeProfile.managerId),
+            e.g. an Operation Manager who stays logged in as LAB_TECH ── */}
+        <TeamLeaveRequests hideEmpty />
 
         {/* ── SCAN ── */}
         <div>

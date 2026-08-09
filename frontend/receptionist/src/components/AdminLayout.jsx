@@ -18,7 +18,7 @@ const VIEW_AS_ITEMS = [
   { path: '/view/delivery',     label: 'Delivery',      icon: MdTwoWheeler },
   { path: '/view/lab',          label: 'Lab',           icon: MdScience },
   { path: '/view/hr',           label: 'HR Portal',     icon: MdSupervisorAccount },
-  { path: '/view/leader',       label: 'Team Leader',   icon: MdPeopleAlt },
+  { path: '/view/leader',       label: 'Operation Manager', icon: MdPeopleAlt },
   { path: '/view/inventory',    label: 'Inventory',     icon: MdInventory },
 ];
 
