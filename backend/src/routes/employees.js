@@ -60,6 +60,49 @@ router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   }
 });
 
+// ── GET /api/employees/me ──────────────────────────────────
+// The logged-in account's own profile — any authenticated role, not just
+// HR_MANAGER/ADMIN. Inherently self-scoped via req.user.id, so this can't
+// expose anyone else's data; no new permission surface. Registered before
+// GET /:userId so 'me' is never swallowed by that param route.
+router.get('/me', protect, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true, name: true, email: true, role: true, phone: true, isActive: true, departments: true,
+        employeeProfile: { include: { manager: { select: { id: true, name: true, employeeProfile: { select: { position: true } } } } } },
+      },
+    });
+    if (!user) return res.status(404).json({ error: 'Account not found.' });
+    res.json(user);
+  } catch (err) {
+    console.error('[employees me]', err);
+    res.status(500).json({ error: 'Could not load your profile.' });
+  }
+});
+
+// ── POST /api/employees/me/photo ───────────────────────────
+// Self-service photo upload — same Cloudinary path as the admin route
+// below, hardcoded to the caller's own id. Registered before
+// POST /:userId/photo for the same routing reason as GET /me above.
+router.post('/me/photo', protect, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+    const photoUrl = await uploadPhotoToCloudinary(req.file.buffer, req.user.id);
+    const profile = await prisma.employeeProfile.upsert({
+      where: { userId: req.user.id },
+      create: { userId: req.user.id, photoUrl },
+      update: { photoUrl },
+    });
+    await invalidate('employees:all');
+    res.json(profile);
+  } catch (err) {
+    console.error('[employees me photo]', err);
+    res.status(500).json({ error: 'Could not upload photo.' });
+  }
+});
+
 // ── GET /api/employees/:userId ────────────────────────────
 // Single-employee detail for the Employee Profile page's Overview tab —
 // full profile + resolved manager + direct-report count + active shift.

@@ -33,7 +33,8 @@ model User {
   casesAsReceptionist Case[]         @relation("ReceptionistCases")
   payments            Payment[]      @relation("VerifiedPayments")
   deliveries          DeliveryLog[]
-  notifications       Notification[]
+  notifications       Notification[]      @relation("NotificationRecipient")
+  notificationsSent   Notification[]      @relation("NotificationSender")
   assignedDeliveries  Case[]         @relation("AssignedDeliveries")
   pushSubscriptions   PushSubscription[]
 
@@ -435,7 +436,13 @@ model Notification {
   caseId    String?
   case      Case?    @relation(fields: [caseId], references: [id])
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?    @relation("NotificationRecipient", fields: [userId], references: [id])
+  // Free-form for now — "SYSTEM" (default) or "ANNOUNCEMENT" for an admin
+  // broadcast (see POST /notifications/broadcast); room for more values
+  // later without another migration.
+  type      String   @default("SYSTEM")
+  senderId  String?
+  sender    User?    @relation("NotificationSender", fields: [senderId], references: [id])
   title     String
   message   String
   isRead    Boolean  @default(false)
@@ -443,6 +450,7 @@ model Notification {
 
   @@index([userId])
   @@index([caseId])
+  @@index([senderId])
   @@map("notifications")
 }
 

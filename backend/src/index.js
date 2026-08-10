@@ -67,6 +67,13 @@ io.on('connection', (socket) => {
     console.log('Dispatch/Admin joined dispatch_ops room');
   });
 
+  // Generic per-user room — any authenticated client joins their own,
+  // used for direct notification delivery (see notifications.js's
+  // POST /broadcast) without needing a role-specific room.
+  socket.on('join_user', (userId) => {
+    socket.join(`user_${userId}`);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
