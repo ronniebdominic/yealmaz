@@ -1,20 +1,26 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../AuthContext';
-import api from '../api';
+import api, { socket } from '../api';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
 import {
   MdScience, MdContentCut, MdBiotech, MdComputer, MdSettings, MdPrint,
   MdBuild, MdPalette, MdAccountBalance, MdDiamond, MdAutoAwesome,
   MdLocalFireDepartment, MdSearch, MdCheckCircle, MdInventory2, MdPerson,
-  MdPhotoCamera, MdBackHand, MdLightbulb, MdInbox, MdLogout, MdClose,
-  MdInsights, MdCalendarToday, MdAddBox, MdCelebration,
+  MdPhotoCamera, MdBackHand, MdLightbulb, MdInbox, MdLogout,
+  MdInsights, MdCalendarToday, MdAddBox, MdCelebration, MdQrCodeScanner,
+  MdNotifications,
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import TeamLeaveRequests from '../components/TeamLeaveRequests';
+import InstallAppBanner from '../components/InstallAppBanner';
+import NotificationBell from '../components/NotificationBell';
+import MyProfileTab from '../components/MyProfileTab';
+import { useNotifications } from '../hooks/useNotifications';
 
 // ── Department config ─────────────────────────────────────
 const DEPARTMENTS = [
@@ -56,6 +62,8 @@ const STAGE_COLORS = {
   READY_TO_DISPATCH: '#0E7490', OUT_FOR_DELIVERY: '#B45309', DELIVERED: '#0F2044',
   ON_HOLD: '#B71C1C', REMAKE: '#6A1B9A', CANCELLED: '#424242',
 };
+
+const PIE_COLORS = ['#1A56A0', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777', '#0D9488'];
 
 // ── QR Scanner component (native getUserMedia + jsQR) ────────
 function QRScanner({ onScan, onClose }) {
@@ -312,11 +320,12 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
   );
 }
 
-// ── My Performance ─────────────────────────────────────────
+// ── Performance tab ─────────────────────────────────────────
 // A tech's own scan activity — summary stats plus the real scan-by-scan
-// history (unlike "Today's Scans" below, which is just an in-session list
-// that resets on reload). Self-scoped server-side; there's no way for this
-// screen to show anyone else's data.
+// history (unlike "Today's Scans" on the Scan tab, which is just an
+// in-session list that resets on reload). Self-scoped server-side; no way
+// for this screen to show anyone else's data. Was a full-screen modal;
+// now lives in its own bottom-tab slot.
 const RANGE_PRESETS = [
   { id: '7',  label: '7 Days' },
   { id: '30', label: '30 Days' },
@@ -360,7 +369,7 @@ function MiniSparkline({ dailyCounts, from, to }) {
   );
 }
 
-function MyPerformanceModal({ onClose }) {
+function PerformanceTab() {
   const [rangeDays, setRangeDays] = useState('30');
   const [page, setPage] = useState(1);
   const toDate = todayLocal();
@@ -380,121 +389,120 @@ function MyPerformanceModal({ onClose }) {
   const pagination = data?.pagination ?? {};
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--bg)', zIndex: 250, display: 'flex', flexDirection: 'column', maxWidth: 520, margin: '0 auto' }}>
-      <div style={{ background: 'var(--navy)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 700, fontSize: 15 }}>
-          <MdInsights size={19} /> My Performance
-        </div>
-        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <MdClose size={17} />
-        </button>
+    <div>
+      {/* Range presets */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {RANGE_PRESETS.map(p => (
+          <button key={p.id} onClick={() => { setRangeDays(p.id); setPage(1); }}
+            style={{
+              flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+              border: `2px solid ${rangeDays === p.id ? 'var(--accent)' : 'var(--glass-border)'}`,
+              background: rangeDays === p.id ? 'rgba(0,196,180,0.12)' : 'rgba(255,255,255,0.4)',
+              color: rangeDays === p.id ? 'var(--accent)' : 'var(--text-2)',
+            }}>
+            {p.label}
+          </button>
+        ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-        {/* Range presets */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {RANGE_PRESETS.map(p => (
-            <button key={p.id} onClick={() => { setRangeDays(p.id); setPage(1); }}
-              style={{
-                flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-                border: `2px solid ${rangeDays === p.id ? 'var(--accent)' : 'var(--border)'}`,
-                background: rangeDays === p.id ? 'var(--accent-dim, rgba(26,86,160,0.08))' : 'var(--surface)',
-                color: rangeDays === p.id ? 'var(--accent)' : 'var(--text-2)',
-              }}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+      {isLoading ? (
+        <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 40 }}>Loading…</div>
+      ) : isError ? (
+        <div style={{ textAlign: 'center', color: 'var(--red)', padding: 40 }}>Could not load your performance.</div>
+      ) : (
+        <>
+          {/* Summary */}
+          <div className="glass-card" style={{ padding: 16, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: summary?.totalScans ? 14 : 0 }}>
+              {[
+                ['Scans', summary?.totalScans ?? 0],
+                ['Cases', summary?.uniqueCases ?? 0],
+                ['Active Days', summary?.activeDays ?? 0],
+                ['Avg / Day', summary?.avgPerActiveDay ?? 0],
+              ].map(([label, value]) => (
+                <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            {summary?.totalScans > 0 && <MiniSparkline dailyCounts={summary.dailyCounts} from={fromDate} to={toDate} />}
+          </div>
 
-        {isLoading ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 40 }}>Loading…</div>
-        ) : isError ? (
-          <div style={{ textAlign: 'center', color: 'var(--red)', padding: 40 }}>Could not load your performance.</div>
-        ) : (
-          <>
-            {/* Summary */}
-            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: summary?.totalScans ? 14 : 0 }}>
-                {[
-                  ['Scans', summary?.totalScans ?? 0],
-                  ['Cases', summary?.uniqueCases ?? 0],
-                  ['Active Days', summary?.activeDays ?? 0],
-                  ['Avg / Day', summary?.avgPerActiveDay ?? 0],
-                ].map(([label, value]) => (
-                  <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
-                  </div>
+          {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
+          {summary?.shareOfTotalPercent != null && (
+            <div style={{ background: 'var(--accent)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Your Share of the Lab</div>
+              <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>
+                {summary.shareOfTotalPercent}% — {summary.totalScans} of {summary.totalLabScans} lab scans in this range
+              </div>
+            </div>
+          )}
+
+          {/* Department breakdown — pie chart + exact counts */}
+          {summary?.departmentBreakdown?.length > 0 && (
+            <div className="glass-card" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>Department Breakdown</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={summary.departmentBreakdown} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70} label={({ label }) => label}>
+                    {summary.departmentBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <RTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                {summary.departmentBreakdown.map(d => (
+                  <span key={d.code} style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)' }}>
+                    {d.label} · {d.count}
+                  </span>
                 ))}
               </div>
-              {summary?.totalScans > 0 && (
-                <>
-                  <MiniSparkline dailyCounts={summary.dailyCounts} from={fromDate} to={toDate} />
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 12 }}>
-                    {summary.departmentBreakdown.map(d => (
-                      <span key={d.code} style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)' }}>
-                        {d.label} · {d.count}
-                      </span>
-                    ))}
+            </div>
+          )}
+
+          {/* Scan history */}
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <MdCalendarToday size={12} /> Scan History
+          </div>
+          {scans.length === 0 ? (
+            <div className="glass-card" style={{ padding: '28px 16px', textAlign: 'center' }}>
+              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans in this range</div>
+            </div>
+          ) : (
+            scans.map(s => (
+              <div key={s.id} className="glass-card" style={{
+                padding: '11px 14px', marginBottom: 8, borderLeft: `3px solid ${STAGE_COLORS[s.stageName] || 'var(--accent)'}`,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{s.caseNumber || '—'}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-1)' }}>{s.patientName}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>{s.workType} · {s.clinicName}</div>
                   </div>
-                </>
-              )}
-            </div>
-
-            {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
-            {summary?.shareOfTotalPercent != null && (
-              <div style={{ background: 'var(--accent)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Your Share of the Lab</div>
-                <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                  <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  {summary.shareOfTotalPercent}% — {summary.totalScans} of {summary.totalLabScans} lab scans in this range
-                </div>
-              </div>
-            )}
-
-            {/* Scan history */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <MdCalendarToday size={12} /> Scan History
-            </div>
-            {scans.length === 0 ? (
-              <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '28px 16px', textAlign: 'center' }}>
-                <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
-                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans in this range</div>
-              </div>
-            ) : (
-              scans.map(s => (
-                <div key={s.id} style={{
-                  background: 'var(--surface)', borderRadius: 10, padding: '11px 14px', marginBottom: 8,
-                  border: '1px solid var(--border)', borderLeft: `3px solid ${STAGE_COLORS[s.stageName] || 'var(--accent)'}`,
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{s.caseNumber || '—'}</div>
-                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-1)' }}>{s.patientName}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>{s.workType} · {s.clinicName}</div>
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
+                    <div style={{ fontSize: 10.5, background: 'var(--surface-2)', color: 'var(--text-2)', padding: '2px 7px', borderRadius: 20, fontWeight: 700, marginBottom: 4, whiteSpace: 'nowrap' }}>
+                      {STAGE_LABELS[s.stageName] || s.stageName}
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
-                      <div style={{ fontSize: 10.5, background: 'var(--surface-2)', color: 'var(--text-2)', padding: '2px 7px', borderRadius: 20, fontWeight: 700, marginBottom: 4, whiteSpace: 'nowrap' }}>
-                        {STAGE_LABELS[s.stageName] || s.stageName}
-                      </div>
-                      <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'dd MMM, h:mm a')}</div>
-                    </div>
+                    <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'dd MMM, h:mm a')}</div>
                   </div>
                 </div>
-              ))
-            )}
-            {pagination.totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
-                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Page {page} / {pagination.totalPages}</span>
-                <button className="btn btn-ghost btn-sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            ))
+          )}
+          {pagination.totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+              <button className="btn btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Page {page} / {pagination.totalPages}</span>
+              <button className="btn btn-ghost btn-sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -633,13 +641,47 @@ function MillingYieldModal({ onClose }) {
   );
 }
 
+// ── Bottom tab bar ────────────────────────────────────────
+function TabBar({ tab, setTab, unreadCount }) {
+  const TABS = [
+    { id: 'scan', label: 'Scan', icon: MdQrCodeScanner },
+    { id: 'performance', label: 'Performance', icon: MdInsights },
+    { id: 'notifications', label: 'Alerts', icon: MdNotifications, badge: unreadCount },
+    { id: 'profile', label: 'Profile', icon: MdPerson },
+  ];
+  return (
+    <div className="glass-topbar" style={{
+      position: 'sticky', bottom: 0, zIndex: 60, display: 'flex',
+      padding: '8px 6px calc(6px + env(safe-area-inset-bottom))', borderTop: '1px solid var(--glass-border)', borderBottom: 'none',
+    }}>
+      {TABS.map(t => (
+        <button key={t.id} onClick={() => setTab(t.id)} style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 4px',
+          background: 'none', border: 'none', cursor: 'pointer', color: tab === t.id ? 'var(--accent)' : 'var(--text-3)',
+        }}>
+          <div style={{ position: 'relative' }}>
+            <t.icon size={21} />
+            {t.badge > 0 && (
+              <span style={{
+                position: 'absolute', top: -4, right: -7, minWidth: 14, height: 14, borderRadius: 8, background: '#DC2626',
+                color: '#fff', fontSize: 8.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+              }}>{t.badge > 9 ? '9+' : t.badge}</span>
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 700 }}>{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Main Lab Tech Dashboard ───────────────────────────────
 export default function LabDashboard() {
   const { user, logout } = useAuth();
+  const [tab, setTab] = useState('scan');
   const [department, setDepartment] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [showPerformance, setShowPerformance] = useState(false);
   const [showRequestGoods, setShowRequestGoods] = useState(false);
   const [showMillingYield, setShowMillingYield] = useState(false);
   const [scanResult, setScanResult] = useState(null);
@@ -647,6 +689,13 @@ export default function LabDashboard() {
   const [processing, setProcessing] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
   const confirmingRef = useRef(false); // guard: prevents double-submit
+
+  const { unreadCount } = useNotifications(user?.id);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    socket.emit('join_user', user.id);
+  }, [user?.id]);
 
   // Empty list = unrestricted (all 15). One department = auto-locked, no
   // picker needed. Multiple = picker shown, but restricted to just these.
@@ -701,81 +750,81 @@ export default function LabDashboard() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)', maxWidth: 520, margin: '0 auto' }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: 520, margin: '0 auto',
+      background: 'linear-gradient(180deg, #E9F1FB 0%, #F2F6FB 45%, #ECF1F8 100%)',
+    }}>
+      <InstallAppBanner />
 
-      {/* ── Header ── */}
+      {/* ── Header — decluttered to identity + dept badge + AttendanceClock;
+          everything else (Leave, Request Goods, Performance, Notifications,
+          Logout) moved into its own tab below. ── */}
       <div style={{ background: 'var(--navy)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MdInventory2 size={20} color="#fff" />
-          <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <MdInventory2 size={20} color="#fff" style={{ flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>Ye-Almaz Lab</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>Lab Floor Dashboard</div>
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.name?.split(' ')[0]}
+            </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {selectedDept && (
             <div style={{ background: selectedDept.bg, border: `1px solid ${selectedDept.color}40`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: selectedDept.color }}>
               {selectedDept.label}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-            <MdPerson size={13} /> {user?.name?.split(' ')[0]}
-          </div>
-          <AttendanceClock /> <LeaveRequestButton />
-          <button onClick={() => setShowRequestGoods(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Request Goods"><MdAddBox size={18} /></button>
-          <button onClick={() => setShowPerformance(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="My Performance"><MdInsights size={18} /></button>
-          <button onClick={logout} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center' }} title="Logout"><MdLogout size={18} /></button>
+          <AttendanceClock />
         </div>
       </div>
 
       <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
 
-        {/* ── Department — locked from login OR selectable ── */}
-        {lockedDept ? (
-          // Locked: dept comes from this account's login
-          <div className="card" style={{ marginBottom: 16, padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-              Your Department
-            </div>
-            <div style={{
-              background: selectedDept?.bg, border: `2px solid ${selectedDept?.color}40`,
-              borderRadius: 12, padding: '14px 16px',
-            }}>
-              <div style={{ fontWeight: 800, fontSize: 16, color: selectedDept?.color }}>{selectedDept?.label}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Next → {selectedDept?.nextDept}</div>
-            </div>
-          </div>
-        ) : (
-          // Multiple departments (or none/flexible) — show selector, scoped to
-          // this account's assigned departments if any are set.
-          <div className="card" style={{ marginBottom: 16, padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-              {myDepartments.length > 0 ? 'Select Your Department' : 'Select Your Department (unrestricted)'}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {pickableDepartments.map(d => (
-                <button key={d.code} onClick={() => setDepartment(d.code)}
-                  style={{
-                    padding: '10px 8px', borderRadius: 10,
-                    border: `2px solid ${department === d.code ? d.color : 'var(--border)'}`,
-                    background: department === d.code ? d.bg : 'var(--surface)',
-                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: department === d.code ? d.color : 'var(--text-2)', lineHeight: 1.3 }}>{d.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {tab === 'scan' && (
+          <>
+            {/* ── Department — locked from login OR selectable ── */}
+            {lockedDept ? (
+              <div className="glass-card" style={{ marginBottom: 16, padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                  Your Department
+                </div>
+                <div style={{
+                  background: selectedDept?.bg, border: `2px solid ${selectedDept?.color}40`,
+                  borderRadius: 12, padding: '14px 16px',
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: selectedDept?.color }}>{selectedDept?.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Next → {selectedDept?.nextDept}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card" style={{ marginBottom: 16, padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                  {myDepartments.length > 0 ? 'Select Your Department' : 'Select Your Department (unrestricted)'}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  {pickableDepartments.map(d => (
+                    <button key={d.code} onClick={() => setDepartment(d.code)}
+                      style={{
+                        padding: '10px 8px', borderRadius: 10,
+                        border: `2px solid ${department === d.code ? d.color : 'var(--glass-border)'}`,
+                        background: department === d.code ? d.bg : 'rgba(255,255,255,0.4)',
+                        cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                      }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: department === d.code ? d.color : 'var(--text-2)', lineHeight: 1.3 }}>{d.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* ── Team leave requests — only renders anything for accounts
-            designated as someone's manager (EmployeeProfile.managerId),
-            e.g. an Operation Manager who stays logged in as LAB_TECH ── */}
-        <TeamLeaveRequests hideEmpty />
+            {/* ── Team leave requests — only renders anything for accounts
+                designated as someone's manager (EmployeeProfile.managerId),
+                e.g. an Operation Manager who stays logged in as LAB_TECH ── */}
+            <TeamLeaveRequests hideEmpty />
 
-        {/* ── SCAN ── */}
-        <div>
+            {/* ── SCAN ── */}
             {!activeDept ? (
               <div className="empty-state">
                 <div className="empty-icon mi"><MdBackHand size={32} /></div>
@@ -787,7 +836,7 @@ export default function LabDashboard() {
             ) : (
               <>
                 {/* Scan buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <button className="btn btn-primary" style={{ flexDirection: 'column', gap: 6, padding: '20px 12px', height: 'auto' }}
                     onClick={() => setShowScanner(true)}>
                     <MdPhotoCamera size={32} />
@@ -802,16 +851,22 @@ export default function LabDashboard() {
                   </button>
                 </div>
 
-                {/* Milling-only: blank -> crown yield bonus tracking */}
-                {activeDept === 'MILLING' && (
-                  <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center', gap: 8, marginBottom: 16, borderColor: selectedDept.color, color: selectedDept.color }}
-                    onClick={() => setShowMillingYield(true)}>
-                    <MdCelebration size={16} /> Record Blank Yield
+                {/* Quick actions — Milling-only yield tracking + goods request (any dept) */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                  {activeDept === 'MILLING' && (
+                    <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', gap: 8, borderColor: selectedDept.color, color: selectedDept.color }}
+                      onClick={() => setShowMillingYield(true)}>
+                      <MdCelebration size={16} /> Record Yield
+                    </button>
+                  )}
+                  <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center', gap: 8 }}
+                    onClick={() => setShowRequestGoods(true)}>
+                    <MdAddBox size={16} /> Request Goods
                   </button>
-                )}
+                </div>
 
                 {/* Quick tip */}
-                <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 24, display: 'flex', gap: 6 }}>
+                <div className="glass-card" style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 24, display: 'flex', gap: 6 }}>
                   <MdLightbulb size={14} style={{ flexShrink: 0, marginTop: 1 }} /> <span>Scan the QR code attached to the physical case. Each scan advances the case to <strong style={{ color: 'var(--text-2)' }}>{selectedDept.label}</strong> stage and notifies the clinic.</span>
                 </div>
 
@@ -820,15 +875,14 @@ export default function LabDashboard() {
                   Today's Scans
                 </div>
                 {recentScans.length === 0 ? (
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '28px 16px', textAlign: 'center' }}>
+                  <div className="glass-card" style={{ padding: '28px 16px', textAlign: 'center' }}>
                     <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
                     <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans yet this session</div>
                   </div>
                 ) : (
                   recentScans.map((s, i) => (
-                    <div key={i} style={{
-                      background: 'var(--surface)', borderRadius: 10, padding: '12px 14px', marginBottom: 8,
-                      border: '1px solid var(--border)', borderLeft: `3px solid ${STAGE_COLORS[s.newStatus] || 'var(--accent)'}`,
+                    <div key={i} className="glass-card" style={{
+                      padding: '12px 14px', marginBottom: 8, borderLeft: `3px solid ${STAGE_COLORS[s.newStatus] || 'var(--accent)'}`,
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
@@ -846,14 +900,40 @@ export default function LabDashboard() {
                 )}
               </>
             )}
-        </div>
+          </>
+        )}
+
+        {tab === 'performance' && <PerformanceTab />}
+
+        {tab === 'notifications' && (
+          <div className="glass-card" style={{ padding: 16 }}>
+            <NotificationBell variant="full" />
+          </div>
+        )}
+
+        {tab === 'profile' && (
+          <div>
+            <MyProfileTab />
+            <div className="glass-card" style={{ padding: 16, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <LeaveRequestButton />
+              <button onClick={logout} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 12px',
+                borderRadius: 9, border: '1px solid rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.08)',
+                color: '#DC2626', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+              }}>
+                <MdLogout size={16} /> Logout
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
+
+      <TabBar tab={tab} setTab={setTab} unreadCount={unreadCount} />
 
       {/* ── Modals ── */}
       {showScanner && <QRScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
       {showManual && <ManualEntryModal onSubmit={handleScan} onClose={() => setShowManual(false)} />}
-      {showPerformance && <MyPerformanceModal onClose={() => setShowPerformance(false)} />}
       {showRequestGoods && <RequestGoodsModal onClose={() => setShowRequestGoods(false)} />}
       {showMillingYield && <MillingYieldModal onClose={() => setShowMillingYield(false)} />}
       {scanResult && (
