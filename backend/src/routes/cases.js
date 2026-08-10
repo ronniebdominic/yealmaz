@@ -61,10 +61,25 @@ async function createSingleCase(db, fields, actorUser) {
     patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
     toothNumbers, units, shade, notes, remake, redo, remakeReason, dueDate, totalAmount,
     deliveryType, deliveryDate, dropOffAtLab, clinicId, orderGroupId,
+    discountType, discountValue,
   } = fields;
 
   if (!patientName || !workType) {
     throw { status: 400, message: 'Patient name and work type are required.' };
+  }
+
+  // Discount audit trail — totalAmount above is already the final,
+  // post-discount figure (computed client-side, same convention as
+  // POST /:id/accept); these two fields just explain why it's lower than
+  // the standard price, not a second source of truth.
+  if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
+    throw { status: 400, message: 'discountType must be AMOUNT or PERCENT.' };
+  }
+  if (discountType && (discountValue == null || isNaN(parseFloat(discountValue)) || parseFloat(discountValue) < 0)) {
+    throw { status: 400, message: 'discountValue must be a non-negative number when a discount type is set.' };
+  }
+  if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
+    throw { status: 400, message: 'A percentage discount cannot exceed 100.' };
   }
 
   // Shade, doctor name, and doctor contact are mandatory for new orders.
@@ -130,6 +145,8 @@ async function createSingleCase(db, fields, actorUser) {
       receptionistId: actorUser.role === 'RECEPTIONIST' ? actorUser.id : null,
       status: finalStatus,
       orderGroupId: orderGroupId || null,
+      discountType: discountType || null,
+      discountValue: discountType ? parseFloat(discountValue) : null,
     }
   });
 

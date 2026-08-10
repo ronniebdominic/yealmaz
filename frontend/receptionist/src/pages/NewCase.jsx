@@ -109,6 +109,7 @@ const emptyItem = () => ({
   workType: '', shade: '', totalAmount: '', dueDate: '',
   remake: false, redo: false, remakeReason: '',
   selectedTeeth: [], manualUnits: '',
+  discountType: '', discountValue: '',
 });
 
 // ── One work-type item within a (possibly multi-item) order ──────────
@@ -158,22 +159,22 @@ function WorkItemForm({
   }, [item.workType, deliveryType, item.selectedTeeth.length, item.manualUnits, priceMap, expressPriceMap, flatRateMap]);
 
   // Auto-calculate price with remake/redo modifier — includes the arch scan
-  // fee (Br 500/arch) on this item only when it's the one carrying it.
+  // fee (Br 500/arch) on this item only when it's the one carrying it — then
+  // applies any discount on top, same order of operations as Accept Case's
+  // discount (POST /:id/accept). A remake is already free, so a discount on
+  // top of it is moot (clamped at 0); a redo's discount stacks on the 50%.
   useEffect(() => {
     if (basePrice === null) return;
     const fee = applyArchFee ? archFee : 0;
     const combined = basePrice + fee;
-    let amount;
-    if (item.remake) {
-      amount = '0';
-    } else if (item.redo) {
-      amount = String(Math.round(combined * 0.5 * 100) / 100);
-    } else {
-      amount = String(combined);
+    let amount = item.remake ? 0 : item.redo ? Math.round(combined * 0.5 * 100) / 100 : combined;
+    const discountNum = parseFloat(item.discountValue);
+    if (item.discountType && !isNaN(discountNum) && discountNum >= 0) {
+      amount = Math.max(0, item.discountType === 'PERCENT' ? amount * (1 - discountNum / 100) : amount - discountNum);
     }
-    onChange({ totalAmount: amount });
+    onChange({ totalAmount: String(Math.round(amount * 100) / 100) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basePrice, applyArchFee, archFee, item.remake, item.redo]);
+  }, [basePrice, applyArchFee, archFee, item.remake, item.redo, item.discountType, item.discountValue]);
 
   // Auto-set due date
   useEffect(() => {
@@ -220,6 +221,14 @@ function WorkItemForm({
       </span>
     );
   })();
+
+  const discountNum = parseFloat(item.discountValue);
+  const hasDiscount = item.discountType && !isNaN(discountNum) && discountNum >= 0;
+  const discountNote = hasDiscount
+    ? <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)', marginLeft: 6 }}>
+        − {item.discountType === 'PERCENT' ? `${discountNum}%` : `Br ${discountNum.toLocaleString('en-US')}`}
+      </span>
+    : null;
 
   return (
     <div style={{
@@ -364,6 +373,30 @@ function WorkItemForm({
         )}
       </div>
 
+      {item.workType && (
+        <div className="form-group">
+          <label>Discount</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[{ val: '', label: 'None' }, { val: 'AMOUNT', label: 'Br Off' }, { val: 'PERCENT', label: '% Off' }].map(opt => (
+              <button key={opt.val} type="button"
+                onClick={() => onChange({ discountType: opt.val, ...(opt.val ? {} : { discountValue: '' }) })}
+                style={{
+                  flex: 1, padding: '8px 10px', fontSize: 12.5, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
+                  border: `1.5px solid ${item.discountType === opt.val ? 'var(--red)' : 'var(--border)'}`,
+                  background: item.discountType === opt.val ? 'var(--red-dim)' : 'var(--surface)',
+                  color: item.discountType === opt.val ? 'var(--red)' : 'var(--text-2)',
+                }}>{opt.label}</button>
+            ))}
+            {item.discountType && (
+              <input type="number" min="0" max={item.discountType === 'PERCENT' ? 100 : undefined}
+                placeholder={item.discountType === 'PERCENT' ? 'e.g. 10' : 'e.g. 500'}
+                value={item.discountValue} onChange={e => onChange({ discountValue: e.target.value })}
+                style={{ flex: 1.2 }} autoFocus />
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid-2">
         <div className="form-group">
           <label>
@@ -377,7 +410,7 @@ function WorkItemForm({
           <input type="date" value={item.dueDate} onChange={e => onChange({ dueDate: e.target.value })} />
         </div>
         <div className="form-group">
-          <label>Amount (Br) {priceLabel}</label>
+          <label>Amount (Br) {priceLabel}{discountNote}</label>
           <input
             type="number"
             placeholder="Auto-calculated from work type"
@@ -531,6 +564,8 @@ export default function NewCase() {
         const resolvedUnits = item.selectedTeeth.length > 0
           ? item.selectedTeeth.length
           : item.manualUnits ? parseInt(item.manualUnits) : undefined;
+        const discountNum = parseFloat(item.discountValue);
+        const hasDiscount = item.discountType && !isNaN(discountNum) && discountNum >= 0;
         return {
           workType: item.workType,
           shade: item.shade,
@@ -541,6 +576,8 @@ export default function NewCase() {
           remakeReason: item.remakeReason,
           dueDate: item.dueDate,
           totalAmount: item.totalAmount,
+          discountType: hasDiscount ? item.discountType : undefined,
+          discountValue: hasDiscount ? discountNum : undefined,
         };
       };
 
