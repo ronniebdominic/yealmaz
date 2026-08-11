@@ -3,17 +3,19 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../api';
 import { format } from 'date-fns';
 import { MdInsights, MdClose, MdLocalHospital, MdInbox, MdCalendarToday } from 'react-icons/md';
-import { todayLocal, toLocalDateString } from '../utils/date';
+import { todayLocal, toLocalDateString, startOfWeekLocal, startOfMonthLocal } from '../utils/date';
 
 // A delivery agent's own activity — summary stats (incl. their share of the
 // whole lab's deliveries in the same range) plus a real, paginated delivery
-// history. Structural mirror of LabDashboard.jsx's MyPerformanceModal
-// (same range presets / sparkline / layout), backed by
-// GET /delivery/my-performance.
+// history. Structural mirror of LabDashboard.jsx's Performance tab (same
+// range presets / sparkline / layout), backed by GET /delivery/my-performance.
+// Presets are calendar periods (today / this Mon-Sun week / this month to
+// date), not a rolling N-day window — matches the Today/This Month quick
+// filters already used elsewhere (e.g. Analytics Dashboard).
 const RANGE_PRESETS = [
-  { id: '7',  label: '7 Days' },
-  { id: '30', label: '30 Days' },
-  { id: '90', label: '90 Days' },
+  { id: 'daily',   label: 'Daily',   from: () => todayLocal() },
+  { id: 'weekly',  label: 'Weekly',  from: () => startOfWeekLocal() },
+  { id: 'monthly', label: 'Monthly', from: () => startOfMonthLocal() },
 ];
 
 function MiniSparkline({ dailyCounts, from, to }) {
@@ -54,13 +56,10 @@ function MiniSparkline({ dailyCounts, from, to }) {
 }
 
 export default function MyDeliveryPerformanceModal({ onClose }) {
-  const [rangeDays, setRangeDays] = useState('30');
+  const [rangeId, setRangeId] = useState('weekly');
   const [page, setPage] = useState(1);
   const toDate = todayLocal();
-  const fromDate = (() => {
-    const d = new Date(); d.setDate(d.getDate() - (parseInt(rangeDays) - 1));
-    return toLocalDateString(d);
-  })();
+  const fromDate = RANGE_PRESETS.find(p => p.id === rangeId).from();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['delivery', 'my-performance', fromDate, toDate, page],
@@ -87,12 +86,12 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
         {/* Range presets */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           {RANGE_PRESETS.map(p => (
-            <button key={p.id} onClick={() => { setRangeDays(p.id); setPage(1); }}
+            <button key={p.id} onClick={() => { setRangeId(p.id); setPage(1); }}
               style={{
                 flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-                border: `2px solid ${rangeDays === p.id ? '#D97706' : 'var(--border)'}`,
-                background: rangeDays === p.id ? 'rgba(217,119,6,0.08)' : 'var(--surface)',
-                color: rangeDays === p.id ? '#D97706' : 'var(--text-2)',
+                border: `2px solid ${rangeId === p.id ? '#D97706' : 'var(--border)'}`,
+                background: rangeId === p.id ? 'rgba(217,119,6,0.08)' : 'var(--surface)',
+                color: rangeId === p.id ? '#D97706' : 'var(--text-2)',
               }}>
               {p.label}
             </button>

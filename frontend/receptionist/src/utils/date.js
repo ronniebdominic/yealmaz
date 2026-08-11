@@ -15,3 +15,19 @@ export function toLocalDateString(date) {
 export function todayLocal() {
   return toLocalDateString(new Date());
 }
+
+// Monday-start calendar week/month, "to date" — used by the Daily/Weekly/
+// Monthly performance-range presets (My Performance screens). Calendar-
+// period, not a rolling N-day window, matching the app's existing
+// Today/This Month quick filters elsewhere (e.g. Analytics Dashboard).
+export function startOfWeekLocal(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diff = (day === 0 ? -6 : 1) - day; // shift back to Monday
+  d.setDate(d.getDate() + diff);
+  return toLocalDateString(d);
+}
+
+export function startOfMonthLocal(date = new Date()) {
+  return toLocalDateString(new Date(date.getFullYear(), date.getMonth(), 1));
+}
