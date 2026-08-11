@@ -158,6 +158,25 @@ router.post('/:caseId', protect, async (req, res) => {
       });
     }
 
+    // Cross-account guard: once a department's stage has been scanned for
+    // this case, a DIFFERENT tech scanning the same department again would
+    // double-log the same work step and wrongly credit a second person for
+    // work only one of them actually did — corrupting both the production
+    // timeline (looks like two techs did one step) and lab-performance
+    // stats (one case worth of credit going to two accounts). The same
+    // tech re-scanning their own stage is still allowed (e.g. correcting a
+    // mis-scan, or the existing QC-already-dispatched idempotency below).
+    const priorScan = await prisma.caseStage.findFirst({
+      where: { caseId, stageName: newStatus },
+      orderBy: { scannedAt: 'asc' },
+    });
+    if (priorScan && priorScan.scannedBy && priorScan.scannedBy !== scannedBy) {
+      const priorTechName = priorScan.scannedBy.replace(/\s*\([A-Z0-9_]+\)$/, '');
+      return res.status(409).json({
+        error: `This case was already scanned at ${dept.label} by ${priorTechName}. If this needs correcting, contact an admin.`,
+      });
+    }
+
     // After QC passes → advance directly to READY_TO_DISPATCH in one write.
     // Guard: skip if already READY_TO_DISPATCH (re-scan idempotency).
     let finalStatus = newStatus;
