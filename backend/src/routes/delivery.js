@@ -4,7 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
-const { buildAgentNameMaps, matchDeliveryAgent } = require('../utils/deliveryAttribution');
+const { buildAgentNameMaps, matchDeliveryAgent, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { localDayKey } = require('../utils/scanAttribution');
 const liveLocations = require('../state/liveLocations');
@@ -81,76 +81,76 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
 });
 
 // ── GET /api/delivery/history ────────────────────────────
-// A delivery agent's own full delivery archive — GET /assigned only ever
-// shows today's completed deliveries (it's a live working board), so
-// anything from a prior day is otherwise invisible to the person who
-// delivered it. Matched via CaseStage, not DeliveryLog.deliveryById — see
-// utils/deliveryAttribution.js for why. Case.deliveryDate (set on every
-// DELIVERED case regardless of DeliveryLog) is used for the displayed/
-// filtered date rather than the delivery log's own timestamp.
+// A delivery agent's own full archive — GET /assigned only ever shows
+// today's live board, so anything from a prior day is otherwise invisible
+// to the person who handled it. Unlike the old version (DELIVERED cases
+// only), this covers BOTH legs of a driver's work: PICKUP (collecting an
+// impression from a clinic, or collecting a finished case from the lab)
+// and DELIVERY (dropping a finished case off at a clinic) — each is its
+// own event row, since the same case can involve two different trips (and
+// even two different drivers) on its way through the lab. Matched via
+// CaseStage, not DeliveryLog.deliveryById — see deliveryAttribution.js.
 router.get('/history', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
   try {
-    const { page = 1, limit = 20, search, from, to, userId } = req.query;
+    const { page = 1, limit = 20, search, from, to, userId, type } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const isDeliveryExec = req.user.role === 'DELIVERY';
     const targetUserId = isDeliveryExec ? req.user.id : (userId || null);
 
-    // Scoped to one agent (always true for a DELIVERY login; optional for
-    // ADMIN via ?userId=) — resolve which case IDs have a 'DELIVERED'
-    // stage attributable to them. Scanning every historical stage row is
-    // the same cost /lab-performance and /delivery-performance already
-    // pay; scoped by the same from/to the caller applied to the case list
-    // (scannedAt tracks deliveryDate closely — both are written in the
-    // same request) to keep it bounded for a narrow date filter.
-    let attributedCaseIds = null;
-    if (targetUserId) {
-      const stageWhere = { stageName: 'DELIVERED', scannedBy: { not: null } };
-      if (from || to) {
-        stageWhere.scannedAt = {};
-        if (from) stageWhere.scannedAt.gte = new Date(`${from}T00:00:00`);
-        if (to) { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); stageWhere.scannedAt.lte = d; }
-      }
-      const [agents, stages] = await Promise.all([
-        prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
-        prisma.caseStage.findMany({ where: stageWhere, select: { scannedBy: true, notes: true, caseId: true } }),
-      ]);
-      const nameMaps = buildAgentNameMaps(agents);
-      attributedCaseIds = [];
-      for (const s of stages) {
-        const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
-        if (agent && agent.id === targetUserId) attributedCaseIds.push(s.caseId);
-      }
-    }
+    const scannedAtFilter = {};
+    if (from) scannedAtFilter.gte = new Date(`${from}T00:00:00`);
+    if (to) { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); scannedAtFilter.lte = d; }
 
-    const caseWhere = {
-      status: 'DELIVERED',
-      ...(attributedCaseIds ? { id: { in: attributedCaseIds } } : {}),
-      ...(from || to ? {
-        deliveryDate: {
-          ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
-          ...(to ? { lte: (() => { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); return d; })() } : {}),
+    const [agents, stages] = await Promise.all([
+      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+      prisma.caseStage.findMany({
+        where: {
+          OR: DELIVERY_EVENT_STAGE_OR,
+          scannedBy: { not: null },
+          ...(Object.keys(scannedAtFilter).length ? { scannedAt: scannedAtFilter } : {}),
         },
-      } : {}),
-      ...(search ? {
-        OR: [
-          { caseNumber: { contains: search, mode: 'insensitive' } },
-          { patientName: { contains: search, mode: 'insensitive' } },
-          { clinic: { name: { contains: search, mode: 'insensitive' } } },
-        ],
-      } : {}),
-    };
-
-    const [cases, total] = await Promise.all([
-      prisma.case.findMany({
-        where: caseWhere,
-        include: { clinic: { select: { name: true, station: true } } },
-        orderBy: { deliveryDate: 'desc' },
-        skip, take: parseInt(limit),
+        select: {
+          id: true, stageName: true, notes: true, scannedAt: true, scannedBy: true, caseId: true,
+          case: { select: { caseNumber: true, patientName: true, clinic: { select: { name: true } } } },
+        },
+        orderBy: { scannedAt: 'desc' },
       }),
-      prisma.case.count({ where: caseWhere }),
     ]);
 
-    res.json({ cases, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } });
+    const nameMaps = buildAgentNameMaps(agents);
+    const q = search?.trim().toLowerCase();
+    const events = [];
+    for (const s of stages) {
+      const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+      if (!agent) continue;
+      if (targetUserId && agent.id !== targetUserId) continue;
+
+      const classified = classifyDeliveryEvent(s.stageName);
+      if (!classified) continue;
+      if (type && type !== classified.type) continue;
+
+      if (q) {
+        const haystack = `${s.case?.caseNumber || ''} ${s.case?.patientName || ''} ${s.case?.clinic?.name || ''}`.toLowerCase();
+        if (!haystack.includes(q)) continue;
+      }
+
+      events.push({
+        id: s.id,
+        type: classified.type,
+        pickupKind: classified.pickupKind,
+        caseId: s.caseId,
+        caseNumber: s.case?.caseNumber,
+        patientName: s.case?.patientName,
+        clinicName: s.case?.clinic?.name,
+        occurredAt: s.scannedAt,
+        ...(targetUserId ? {} : { agentId: agent.id, agentName: agent.name }),
+      });
+    }
+
+    const total = events.length;
+    const paged = events.slice(skip, skip + parseInt(limit));
+
+    res.json({ events: paged, pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) } });
   } catch (err) {
     console.error('[delivery history]', err);
     res.status(500).json({ error: 'Could not load delivery history.' });
@@ -395,10 +395,11 @@ router.get('/locations', protect, restrict('ADMIN', 'DISPATCH'), async (req, res
 });
 
 // ── GET /api/delivery/my-performance ─────────────────────
-// The logged-in driver's own delivery activity — summary stats (incl. their
-// share of the whole lab's deliveries in the same range) plus a real,
-// paginated delivery history. Self-scoped the same way GET /delivery/history
-// and GET /dashboard/delivery-performance are — CaseStage attribution via
+// The logged-in driver's own activity — summary stats (pickups AND
+// deliveries, separately, plus their combined share of the whole lab's
+// order volume in the same range) plus a real, paginated event history.
+// Self-scoped the same way GET /delivery/history and
+// GET /dashboard/delivery-performance are — CaseStage attribution via
 // utils/deliveryAttribution.js, not DeliveryLog. Mirrors GET /lab/my-performance's
 // shape for the lab tech's equivalent self-view.
 router.get('/my-performance', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
@@ -411,9 +412,9 @@ router.get('/my-performance', protect, restrict('DELIVERY', 'ADMIN'), async (req
     const [agents, stages] = await Promise.all([
       prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
       prisma.caseStage.findMany({
-        where: { stageName: 'DELIVERED', scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
+        where: { OR: DELIVERY_EVENT_STAGE_OR, scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
         select: {
-          scannedBy: true, scannedAt: true, notes: true, caseId: true,
+          stageName: true, scannedBy: true, scannedAt: true, notes: true, caseId: true,
           case: { select: { caseNumber: true, patientName: true, workType: true, clinic: { select: { name: true } } } },
         },
         orderBy: { scannedAt: 'desc' },
@@ -421,50 +422,59 @@ router.get('/my-performance', protect, restrict('DELIVERY', 'ADMIN'), async (req
     ]);
 
     const nameMaps = buildAgentNameMaps(agents);
-    let totalLabDeliveries = 0;
-    const myDeliveries = [];
+    let totalLabOrders = 0;
+    const myEvents = [];
     for (const s of stages) {
       const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
       if (!agent) continue; // same exclusions as dashboard.js — self-pickups/admin edits/unmatched
-      totalLabDeliveries++;
-      if (agent.id === req.user.id) myDeliveries.push(s);
+      const classified = classifyDeliveryEvent(s.stageName);
+      if (!classified) continue;
+      totalLabOrders++;
+      if (agent.id === req.user.id) myEvents.push({ ...s, ...classified });
     }
 
     const clinics = new Set();
     const dailyCounts = {};
     let lastActiveAt = null;
-    for (const s of myDeliveries) {
+    let totalPickups = 0, totalDeliveries = 0;
+    for (const s of myEvents) {
+      if (s.type === 'PICKUP') totalPickups++; else totalDeliveries++;
       if (s.case?.clinic?.name) clinics.add(s.case.clinic.name);
       const day = localDayKey(s.scannedAt);
       dailyCounts[day] = (dailyCounts[day] || 0) + 1;
       if (!lastActiveAt || s.scannedAt > lastActiveAt) lastActiveAt = s.scannedAt;
     }
     const activeDays = Object.keys(dailyCounts).length;
+    const totalOrders = myEvents.length;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     res.json({
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       summary: {
-        totalDeliveries: myDeliveries.length,
+        totalOrders,
+        totalPickups,
+        totalDeliveries,
         uniqueClinics: clinics.size,
         activeDays,
-        avgPerActiveDay: activeDays > 0 ? Math.round((myDeliveries.length / activeDays) * 10) / 10 : 0,
-        totalLabDeliveries,
-        shareOfTotalPercent: totalLabDeliveries > 0 ? Math.round((myDeliveries.length / totalLabDeliveries) * 1000) / 10 : null,
+        avgPerActiveDay: activeDays > 0 ? Math.round((totalOrders / activeDays) * 10) / 10 : 0,
+        totalLabOrders,
+        shareOfTotalPercent: totalLabOrders > 0 ? Math.round((totalOrders / totalLabOrders) * 1000) / 10 : null,
         dailyCounts,
         lastActiveAt,
       },
-      deliveries: myDeliveries.slice(skip, skip + parseInt(limit)).map(s => ({
+      events: myEvents.slice(skip, skip + parseInt(limit)).map(s => ({
         id: s.caseId,
+        type: s.type,
+        pickupKind: s.pickupKind,
         caseNumber: s.case?.caseNumber,
         patientName: s.case?.patientName,
         workType: s.case?.workType,
         clinicName: s.case?.clinic?.name,
-        deliveredAt: s.scannedAt,
+        occurredAt: s.scannedAt,
       })),
       pagination: {
-        total: myDeliveries.length, page: parseInt(page), limit: parseInt(limit),
-        totalPages: Math.ceil(myDeliveries.length / parseInt(limit)),
+        total: totalOrders, page: parseInt(page), limit: parseInt(limit),
+        totalPages: Math.ceil(totalOrders / parseInt(limit)),
       },
     });
   } catch (err) {

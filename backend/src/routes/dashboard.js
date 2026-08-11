@@ -5,7 +5,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
-const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote } = require('../utils/deliveryAttribution');
+const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -661,7 +661,12 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
 // ── GET /api/dashboard/delivery-performance ─────────────
 // Per-delivery-agent stats, same shape/spirit as lab-performance above,
 // attributed via CaseStage instead of the barely-populated DeliveryLog —
-// see utils/deliveryAttribution.js for the full rationale.
+// see utils/deliveryAttribution.js for the full rationale. Covers BOTH
+// legs of a driver's work — pickups (impression from clinic, or finished
+// case from the lab) and deliveries (drop-off at clinic) — tracked
+// separately, with "Lab Share" based on their combined order volume so a
+// driver who does lots of pickups but few deliveries (or vice versa)
+// still gets fair credit for their actual workload.
 router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -675,8 +680,8 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
     const [agents, stages] = await Promise.all([
       prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true, station: true } }),
       prisma.caseStage.findMany({
-        where: { stageName: 'DELIVERED', scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
-        select: { scannedBy: true, scannedAt: true, notes: true, caseId: true, case: { select: { clinic: { select: { name: true } } } } },
+        where: { OR: DELIVERY_EVENT_STAGE_OR, scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
+        select: { stageName: true, scannedBy: true, scannedAt: true, notes: true, caseId: true, case: { select: { clinic: { select: { name: true } } } } },
       }),
     ]);
 
@@ -684,13 +689,15 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
 
     const perAgent = new Map(agents.map(a => [a.id, {
       id: a.id, name: a.name, isActive: a.isActive, station: a.station,
-      totalDeliveries: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
+      totalPickups: 0, totalDeliveries: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
       lastActiveAt: null,
     }]));
-    let unattributedDeliveries = 0;
+    let unattributedOrders = 0;
 
     for (const s of stages) {
       const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+      const classified = classifyDeliveryEvent(s.stageName);
+      if (!classified) continue;
       if (!agent) {
         // Only count it as "unattributed" if it actually looks like a real
         // agent event that just couldn't be matched (e.g. a decommissioned
@@ -698,13 +705,13 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
         // matchDeliveryAgent and shouldn't inflate this count.
         const rawName = (s.scannedBy || '').trim();
         if (rawName && !NON_AGENT_DELIVERY_MARKERS.has(rawName) && !isSelfPickupNote(s.notes)) {
-          unattributedDeliveries++;
+          unattributedOrders++;
         }
         continue;
       }
 
       const agg = perAgent.get(agent.id);
-      agg.totalDeliveries++;
+      if (classified.type === 'PICKUP') agg.totalPickups++; else agg.totalDeliveries++;
       agg.cases.add(s.caseId);
       if (s.case?.clinic?.name) agg.clinics.add(s.case.clinic.name);
       const day = localDayKey(s.scannedAt);
@@ -712,28 +719,32 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
       if (!agg.lastActiveAt || s.scannedAt > agg.lastActiveAt) agg.lastActiveAt = s.scannedAt;
     }
 
-    // "Every delivery the lab did in that filter" — attributed + unattributed —
-    // is the denominator for each agent's share below.
-    const totalLabDeliveries = [...perAgent.values()].reduce((sum, a) => sum + a.totalDeliveries, 0) + unattributedDeliveries;
+    // "Every order (pickup + delivery) the lab handled in that filter" —
+    // attributed + unattributed — is the denominator for each agent's
+    // share below.
+    const totalLabOrders = [...perAgent.values()].reduce((sum, a) => sum + a.totalPickups + a.totalDeliveries, 0) + unattributedOrders;
 
     const result = {
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
-      unattributedDeliveries,
-      totalLabDeliveries,
+      unattributedOrders,
+      totalLabOrders,
       agents: [...perAgent.values()].map(a => {
         const activeDays = Object.keys(a.dailyCounts).length;
+        const totalOrders = a.totalPickups + a.totalDeliveries;
         return {
           id: a.id, name: a.name, isActive: a.isActive, station: a.station,
+          totalPickups: a.totalPickups,
           totalDeliveries: a.totalDeliveries,
+          totalOrders,
           uniqueCases: a.cases.size,
           uniqueClinics: a.clinics.size,
           activeDays,
-          avgPerActiveDay: activeDays > 0 ? Math.round((a.totalDeliveries / activeDays) * 10) / 10 : 0,
-          shareOfTotalPercent: totalLabDeliveries > 0 ? Math.round((a.totalDeliveries / totalLabDeliveries) * 1000) / 10 : null,
+          avgPerActiveDay: activeDays > 0 ? Math.round((totalOrders / activeDays) * 10) / 10 : 0,
+          shareOfTotalPercent: totalLabOrders > 0 ? Math.round((totalOrders / totalLabOrders) * 1000) / 10 : null,
           dailyCounts: a.dailyCounts,
           lastActiveAt: a.lastActiveAt,
         };
-      }).sort((a, b) => b.totalDeliveries - a.totalDeliveries),
+      }).sort((a, b) => b.totalOrders - a.totalOrders),
     };
 
     await appCache.set(cacheKey, result);
