@@ -408,6 +408,17 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
       data: { paymentStatus: 'PAYMENT_REQUESTED', totalAmount: amt }
     });
 
+    // Timeline accountability — who requested it, on the same case-detail
+    // production timeline everything else shows up in. Reuses the case's
+    // current stage (READY_TO_DISPATCH — this only fires once QC has
+    // passed) rather than inventing a new CaseStatus value.
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId, stageName: caseData.status, scannedBy: req.user.name,
+        notes: `Payment requested by ${req.user.name} — Br ${amt.toLocaleString('en-US')}${notes?.trim() ? ` (${notes.trim()})` : ''}`,
+      },
+    });
+
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*');
 
     const io = req.app.get('io');
@@ -492,6 +503,18 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
     if (amount) caseUpdate.totalAmount = parseFloat(amount);
 
     await prisma.case.update({ where: { id: req.params.caseId }, data: caseUpdate });
+
+    // Timeline accountability — this is the only "who actually collected
+    // the money" record for trusted-partner settlements (they skip the
+    // per-case request/verify flow entirely and are collected later in a
+    // batch, case by case, through this same endpoint) as well as any
+    // cash case collected in person rather than via the upload/verify flow.
+    await prisma.caseStage.create({
+      data: {
+        caseId: req.params.caseId, stageName: caseData.status, scannedBy: req.user.name,
+        notes: `Payment collected by ${req.user.name}${resolvedAmount != null ? ` — Br ${resolvedAmount.toLocaleString('en-US')}` : ''}`,
+      },
+    });
 
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 

@@ -128,7 +128,7 @@ router.post('/:caseId', protect, async (req, res) => {
 
     const caseData = await prisma.case.findUnique({
       where: { id: caseId },
-      include: { clinic: { select: { id: true, name: true } } }
+      include: { clinic: { select: { id: true, name: true, isExcluded: true } } }
     });
 
     if (!caseData) {
@@ -188,10 +188,25 @@ router.post('/:caseId', protect, async (req, res) => {
         });
         finalStatus = 'READY_TO_DISPATCH';
       } else {
-        // Write READY_TO_DISPATCH directly — no intermediate QUALITY_CHECK write
+        // Write READY_TO_DISPATCH directly — no intermediate QUALITY_CHECK write.
+        // Case.status/the dispatch queue bucketing is identical either way
+        // (DispatchDashboard.jsx already splits "Ready for Delivery" i.e.
+        // awaiting payment vs "Ready for Dispatch" i.e. paid/trusted purely
+        // from paymentStatus/clinic.isExcluded) — only the TIMELINE note
+        // text differs, so a trusted-partner case still reads as heading
+        // straight to dispatch, while a cash case's timeline is explicit
+        // that it's waiting on Finance next, not literally out the door.
+        const isTrusted = caseData.clinic?.isExcluded;
         await prisma.case.update({ where: { id: caseId }, data: { status: 'READY_TO_DISPATCH' } });
         await prisma.caseStage.create({ data: { caseId, stageName: 'QUALITY_CHECK', scannedBy, location: dept.label, notes: 'QC passed' } });
-        await prisma.caseStage.create({ data: { caseId, stageName: 'READY_TO_DISPATCH', scannedBy: 'System', notes: 'QC passed — moved to dispatch queue' } });
+        await prisma.caseStage.create({
+          data: {
+            caseId, stageName: 'READY_TO_DISPATCH', scannedBy: 'System',
+            notes: isTrusted
+              ? 'QC passed — moved to dispatch queue'
+              : 'QC passed — Ready for Delivery, awaiting payment request',
+          },
+        });
         finalStatus = 'READY_TO_DISPATCH';
       }
     } else {

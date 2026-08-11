@@ -52,10 +52,19 @@ const STATUS_LABELS = {
 // its stage row has the same stageName as the dispatcher's original pickup
 // assignment — same label, two different timeline entries. Disambiguate by
 // the note delivery.js writes for that scan.
-const stageTimelineLabel = (s) =>
-  s.stageName === 'PICKUP_ASSIGNED' && s.notes?.startsWith('Impression arrived at lab')
-    ? 'Picked Up'
-    : STATUS_LABELS[s.stageName] || s.stageName;
+//
+// Similarly, a cash case's QC-passed stage and a trusted/paid case's are
+// both logged as READY_TO_DISPATCH (same Case.status either way — Dispatch
+// already buckets "awaiting payment" vs "ready to go" purely from
+// paymentStatus/clinic.isExcluded, see DispatchDashboard.jsx) but a cash
+// case isn't actually ready to leave yet, so its first READY_TO_DISPATCH
+// row reads as "Ready for Delivery" instead — scan.js writes a distinct
+// note for exactly this row (see its QUALITY_CHECK handler).
+const stageTimelineLabel = (s) => {
+  if (s.stageName === 'PICKUP_ASSIGNED' && s.notes?.startsWith('Impression arrived at lab')) return 'Picked Up';
+  if (s.stageName === 'READY_TO_DISPATCH' && s.notes?.includes('awaiting payment request')) return 'Ready for Delivery';
+  return STATUS_LABELS[s.stageName] || s.stageName;
+};
 
 export default function CaseDetailModal({ caseId, onClose }) {
   const [data, setData] = useState(null);
