@@ -5,6 +5,18 @@ import { format } from 'date-fns';
 import { MdInsights, MdClose, MdLocalHospital, MdInbox, MdCalendarToday } from 'react-icons/md';
 import { todayLocal, toLocalDateString, startOfWeekLocal, startOfMonthLocal } from '../utils/date';
 
+function EventTypeBadge({ type, pickupKind }) {
+  const isPickup = type === 'PICKUP';
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap',
+      background: isPickup ? '#DBEAFE' : '#D1FAE5', color: isPickup ? '#1E40AF' : '#065F46',
+    }}>
+      {isPickup ? (pickupKind === 'IMPRESSION' ? 'Picked Up · Impression' : 'Picked Up · From Lab') : 'Delivered'}
+    </span>
+  );
+}
+
 // A delivery agent's own activity — summary stats (incl. their share of the
 // whole lab's deliveries in the same range) plus a real, paginated delivery
 // history. Structural mirror of LabDashboard.jsx's Performance tab (same
@@ -43,7 +55,7 @@ function MiniSparkline({ dailyCounts, from, to }) {
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 40 }}>
       {buckets.map((b, i) => (
         <div key={i}
-          title={`${fmt(b.from)}${b.to > b.from ? ` – ${fmt(b.to)}` : ''}: ${b.count} delivery${b.count !== 1 ? 'ies' : ''}`}
+          title={`${fmt(b.from)}${b.to > b.from ? ` – ${fmt(b.to)}` : ''}: ${b.count} order${b.count !== 1 ? 's' : ''}`}
           style={{
             flex: 1, minWidth: 4, borderRadius: '3px 3px 0 0',
             height: `${Math.max((b.count / max) * 100, b.count > 0 ? 12 : 4)}%`,
@@ -68,7 +80,7 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
   });
 
   const summary = data?.summary;
-  const deliveries = data?.deliveries ?? [];
+  const events = data?.events ?? [];
   const pagination = data?.pagination ?? {};
 
   return (
@@ -106,12 +118,14 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
           <>
             {/* Summary */}
             <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: summary?.totalDeliveries ? 14 : 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: summary?.totalOrders ? 14 : 0 }}>
                 {[
-                  ['Deliveries', summary?.totalDeliveries ?? 0],
+                  ['Picked Up', summary?.totalPickups ?? 0],
+                  ['Delivered', summary?.totalDeliveries ?? 0],
                   ['Clinics', summary?.uniqueClinics ?? 0],
                   ['Active Days', summary?.activeDays ?? 0],
                   ['Avg / Day', summary?.avgPerActiveDay ?? 0],
+                  ['Total Orders', summary?.totalOrders ?? 0],
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
                     <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
@@ -119,7 +133,7 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
                   </div>
                 ))}
               </div>
-              {summary?.totalDeliveries > 0 && <MiniSparkline dailyCounts={summary.dailyCounts} from={fromDate} to={toDate} />}
+              {summary?.totalOrders > 0 && <MiniSparkline dailyCounts={summary.dailyCounts} from={fromDate} to={toDate} />}
             </div>
 
             {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
@@ -130,36 +144,39 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
                   <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  {summary.shareOfTotalPercent}% — {summary.totalDeliveries} of {summary.totalLabDeliveries} lab deliveries in this range
+                  {summary.shareOfTotalPercent}% — {summary.totalOrders} of {summary.totalLabOrders} lab orders (pickups + deliveries) in this range
                 </div>
               </div>
             )}
 
-            {/* Delivery history */}
+            {/* Activity history */}
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <MdCalendarToday size={12} /> Delivery History
+              <MdCalendarToday size={12} /> Activity History
             </div>
-            {deliveries.length === 0 ? (
+            {events.length === 0 ? (
               <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '28px 16px', textAlign: 'center' }}>
                 <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
-                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No deliveries in this range</div>
+                <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No activity in this range</div>
               </div>
             ) : (
-              deliveries.map(d => (
-                <div key={d.id} style={{
+              events.map(ev => (
+                <div key={ev.id} style={{
                   background: 'var(--surface)', borderRadius: 10, padding: '11px 14px', marginBottom: 8,
-                  border: '1px solid var(--border)', borderLeft: '3px solid #D97706',
+                  border: '1px solid var(--border)', borderLeft: `3px solid ${ev.type === 'PICKUP' ? '#1A56A0' : '#D97706'}`,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{d.caseNumber || '—'}</div>
-                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-1)' }}>{d.patientName}</div>
+                      <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{ev.caseNumber || '—'}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-1)' }}>{ev.patientName}</div>
                       <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <MdLocalHospital size={12} /> {d.clinicName}{d.workType ? ` · ${d.workType}` : ''}
+                        <MdLocalHospital size={12} /> {ev.clinicName}{ev.workType ? ` · ${ev.workType}` : ''}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10, fontSize: 10.5, color: 'var(--text-3)' }}>
-                      {d.deliveredAt ? format(new Date(d.deliveredAt), 'dd MMM, h:mm a') : '—'}
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
+                      <EventTypeBadge type={ev.type} pickupKind={ev.pickupKind} />
+                      <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 4 }}>
+                        {ev.occurredAt ? format(new Date(ev.occurredAt), 'dd MMM, h:mm a') : '—'}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
-// Ye-Almaz — Delivery Performance (per-agent delivery activity)
-// Mirrors AdminLabPerformance.jsx's shape/pattern — attribution here is
-// via DeliveryLog.deliveryById (a real FK), so there's no equivalent of
-// lab-performance's name-matching fragility.
+// Ye-Almaz — Delivery Performance (per-agent pickup + delivery activity)
+// Mirrors AdminLabPerformance.jsx's shape/pattern — attributed via
+// CaseStage name-matching (see backend/src/utils/deliveryAttribution.js),
+// same as lab-performance, not DeliveryLog (barely populated in practice).
 import { useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import api from '../api';
@@ -54,7 +54,7 @@ function ActivitySparkline({ dailyCounts, from, to }) {
       {buckets.map((b, i) => (
         <div
           key={i}
-          title={`${fmt(b.from)}${b.to > b.from ? ` – ${fmt(b.to)}` : ''}: ${b.count} deliver${b.count !== 1 ? 'ies' : 'y'}`}
+          title={`${fmt(b.from)}${b.to > b.from ? ` – ${fmt(b.to)}` : ''}: ${b.count} order${b.count !== 1 ? 's' : ''}`}
           style={{
             flex: 1, minWidth: 3, borderRadius: '2px 2px 0 0',
             height: `${Math.max((b.count / max) * 100, b.count > 0 ? 10 : 3)}%`,
@@ -84,19 +84,21 @@ function AgentCard({ agent, from, to }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
-        <Stat label="Deliveries" value={agent.totalDeliveries.toLocaleString('en-US')} info="Every case they marked Delivered in the selected range." />
-        <Stat label="Clinics" value={agent.uniqueClinics.toLocaleString('en-US')} info="Distinct clinics they delivered to." />
-        <Stat label="Active Days" value={agent.activeDays} info="Calendar days with at least one delivery in the selected range." />
-        <Stat label="Lab Share" value={agent.shareOfTotalPercent != null ? `${agent.shareOfTotalPercent}%` : '—'} info="Their deliveries as a share of every delivery the whole lab made in the selected range." />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 14 }}>
+        <Stat label="Picked Up" value={agent.totalPickups.toLocaleString('en-US')} info="Impressions collected from clinics + finished cases collected from the lab, in the selected range." />
+        <Stat label="Delivered" value={agent.totalDeliveries.toLocaleString('en-US')} info="Every case they marked Delivered in the selected range." />
+        <Stat label="Clinics" value={agent.uniqueClinics.toLocaleString('en-US')} info="Distinct clinics they handled a pickup or delivery for." />
+        <Stat label="Active Days" value={agent.activeDays} info="Calendar days with at least one pickup or delivery in the selected range." />
+        <Stat label="Total Orders" value={agent.totalOrders.toLocaleString('en-US')} info="Pickups + deliveries combined — their overall order volume in the selected range." />
+        <Stat label="Lab Share" value={agent.shareOfTotalPercent != null ? `${agent.shareOfTotalPercent}%` : '—'} info="Their combined pickups + deliveries as a share of every order the whole lab handled in the selected range." />
       </div>
 
-      {agent.totalDeliveries > 0 && <ActivitySparkline dailyCounts={agent.dailyCounts} from={from} to={to} />}
+      {agent.totalOrders > 0 && <ActivitySparkline dailyCounts={agent.dailyCounts} from={from} to={to} />}
 
       <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
         {agent.lastActiveAt
           ? `Last active ${new Date(agent.lastActiveAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
-          : 'No deliveries in this range'}
+          : 'No activity in this range'}
       </div>
     </div>
   );
@@ -123,8 +125,9 @@ export default function AdminDeliveryPerformance() {
       </div>
       <div className="content">
         <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20, maxWidth: 640 }}>
-          Individual delivery activity for every Delivery account — every case marked Delivered is logged here,
-          along with on-time rate against each case's due date.
+          Individual pickup and delivery activity for every Delivery account — both legs of the job are logged
+          here: picking up (an impression from a clinic, or a finished case from the lab) and delivering
+          (dropping a finished case off at a clinic).
         </p>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
@@ -150,18 +153,18 @@ export default function AdminDeliveryPerformance() {
           </div>
         ) : (
           <>
-            {data.totalLabDeliveries > 0 && (
+            {data.totalLabOrders > 0 && (
               <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
-                <strong style={{ color: 'var(--text-1)' }}>{data.totalLabDeliveries.toLocaleString('en-US')}</strong> total lab deliveries in this range — each agent's "Lab Share" below is their portion of that.
+                <strong style={{ color: 'var(--text-1)' }}>{data.totalLabOrders.toLocaleString('en-US')}</strong> total lab orders (pickups + deliveries) in this range — each agent's "Lab Share" below is their portion of that.
               </p>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
               {agents.map(a => <AgentCard key={a.id} agent={a} from={fromDate} to={toDate} />)}
             </div>
-            {data.unattributedDeliveries > 0 && (
+            {data.unattributedOrders > 0 && (
               <p style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 20, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <MdInventory2 size={13} />
-                {data.unattributedDeliveries.toLocaleString('en-US')} deliver{data.unattributedDeliveries !== 1 ? 'ies' : 'y'} in this period couldn't be matched to a current delivery account (removed employee).
+                {data.unattributedOrders.toLocaleString('en-US')} order{data.unattributedOrders !== 1 ? 's' : ''} in this period couldn't be matched to a current delivery account (removed employee).
               </p>
             )}
           </>

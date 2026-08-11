@@ -157,6 +157,24 @@ function SectionHeader({ section, count }) {
 // completed deliveries; anything older is otherwise invisible to the
 // person who delivered it. Independently-paginated fetch so browsing
 // history never disturbs the live board's own polling/state.
+const EVENT_TYPE_FILTERS = [
+  { id: '',         label: 'All' },
+  { id: 'PICKUP',   label: 'Picked Up' },
+  { id: 'DELIVERY', label: 'Delivered' },
+];
+
+function EventTypeBadge({ type, pickupKind }) {
+  const isPickup = type === 'PICKUP';
+  return (
+    <span style={{
+      fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+      background: isPickup ? '#DBEAFE' : '#D1FAE5', color: isPickup ? '#1E40AF' : '#065F46',
+    }}>
+      {isPickup ? (pickupKind === 'IMPRESSION' ? 'Picked Up · Impression' : 'Picked Up · From Lab') : 'Delivered'}
+    </span>
+  );
+}
+
 function DeliveryArchive() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
@@ -165,20 +183,21 @@ function DeliveryArchive() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [type, setType] = useState('');
   const [page, setPage] = useState(1);
 
   const load = useCallback(async (p = 1) => {
     setLoading(true);
     try {
       const res = await api.get('/delivery/history', {
-        params: { page: p, limit: 20, search: search || undefined, from: dateFrom || undefined, to: dateTo || undefined },
+        params: { page: p, limit: 20, search: search || undefined, from: dateFrom || undefined, to: dateTo || undefined, type: type || undefined },
       });
-      setItems(res.data.cases ?? []);
+      setItems(res.data.events ?? []);
       setPagination(res.data.pagination ?? { total: 0, page: 1, totalPages: 1 });
       setPage(p);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [search, dateFrom, dateTo]);
+  }, [search, dateFrom, dateTo, type]);
 
   useEffect(() => { if (open) load(1); }, [open, load]);
 
@@ -198,6 +217,15 @@ function DeliveryArchive() {
                 onKeyDown={e => e.key === 'Enter' && load(1)}
                 style={{ border: 'none', background: 'none', outline: 'none', fontSize: 13, flex: 1 }} />
             </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {EVENT_TYPE_FILTERS.map(f => (
+                <button key={f.id} onClick={() => setType(f.id)} style={{
+                  flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  border: `1.5px solid ${type === f.id ? '#1A56A0' : '#E5E7EB'}`,
+                  background: type === f.id ? '#EFF6FF' : '#fff', color: type === f.id ? '#1A56A0' : '#6B7280',
+                }}>{f.label}</button>
+              ))}
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB' }} />
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB' }} />
@@ -208,17 +236,20 @@ function DeliveryArchive() {
           {loading ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Loading…</div>
           ) : items.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No deliveries found</div>
+            <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>No activity found</div>
           ) : (
-            items.map(c => (
-              <div key={c.id} style={{ borderTop: '1px solid #F3F4F6', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+            items.map(ev => (
+              <div key={ev.id} style={{ borderTop: '1px solid #F3F4F6', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{c.clinic?.name}</div>
-                  <div style={{ fontSize: 12, color: '#6B7280' }}>{c.patientName || '—'}</div>
-                  {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 10.5, color: '#9CA3AF', marginTop: 1 }}>{c.caseNumber}</div>}
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{ev.clinicName}</div>
+                  <div style={{ fontSize: 12, color: '#6B7280' }}>{ev.patientName || '—'}</div>
+                  {ev.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 10.5, color: '#9CA3AF', marginTop: 1 }}>{ev.caseNumber}</div>}
                 </div>
-                <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'right', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy, h:mm a') : '—'}
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <EventTypeBadge type={ev.type} pickupKind={ev.pickupKind} />
+                  <div style={{ fontSize: 11, color: '#6B7280', whiteSpace: 'nowrap', marginTop: 4 }}>
+                    {ev.occurredAt ? format(new Date(ev.occurredAt), 'dd MMM yyyy, h:mm a') : '—'}
+                  </div>
                 </div>
               </div>
             ))
