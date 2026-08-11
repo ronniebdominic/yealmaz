@@ -59,7 +59,7 @@ async function getDueDays(db, workType, isExpress = false) {
 async function createSingleCase(db, fields, actorUser) {
   const {
     patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
-    toothNumbers, units, shade, notes, remake, redo, remakeReason, dueDate, totalAmount,
+    toothNumbers, units, shade, notes, remake, redo, remakeReason, originalCaseId, dueDate, totalAmount,
     deliveryType, deliveryDate, dropOffAtLab, clinicId, orderGroupId,
     discountType, discountValue,
   } = fields;
@@ -68,18 +68,39 @@ async function createSingleCase(db, fields, actorUser) {
     throw { status: 400, message: 'Patient name and work type are required.' };
   }
 
+  // Remake/redo — the price is decided later by the Operation Manager's
+  // review (GET /cases/review/queue, PATCH /:id/review-decide), never by
+  // whoever's creating/accepting the case. Enforced server-side (not just
+  // client-side) so a stale/incorrect client-sent totalAmount can never
+  // stick, and so every remake/redo case is traceable back to the case it
+  // replaces — required for the 50%-of-original Redo calculation.
+  const isRemake = remake === true || remake === 'true';
+  let originalCase = null;
+  if (isRemake) {
+    if (!originalCaseId) {
+      throw { status: 400, message: 'Select the original case this is a remake/redo of.' };
+    }
+    originalCase = await db.case.findUnique({ where: { id: originalCaseId }, select: { id: true } });
+    if (!originalCase) {
+      throw { status: 400, message: 'Referenced original case not found.' };
+    }
+  }
+
   // Discount audit trail — totalAmount above is already the final,
   // post-discount figure (computed client-side, same convention as
   // POST /:id/accept); these two fields just explain why it's lower than
-  // the standard price, not a second source of truth.
-  if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
-    throw { status: 400, message: 'discountType must be AMOUNT or PERCENT.' };
-  }
-  if (discountType && (discountValue == null || isNaN(parseFloat(discountValue)) || parseFloat(discountValue) < 0)) {
-    throw { status: 400, message: 'discountValue must be a non-negative number when a discount type is set.' };
-  }
-  if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
-    throw { status: 400, message: 'A percentage discount cannot exceed 100.' };
+  // the standard price, not a second source of truth. Not applicable to a
+  // remake/redo case — its amount is 0 until reviewed, discount-free.
+  if (!isRemake) {
+    if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
+      throw { status: 400, message: 'discountType must be AMOUNT or PERCENT.' };
+    }
+    if (discountType && (discountValue == null || isNaN(parseFloat(discountValue)) || parseFloat(discountValue) < 0)) {
+      throw { status: 400, message: 'discountValue must be a non-negative number when a discount type is set.' };
+    }
+    if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
+      throw { status: 400, message: 'A percentage discount cannot exceed 100.' };
+    }
   }
 
   // Shade, doctor name, and doctor contact are mandatory for new orders.
@@ -134,19 +155,21 @@ async function createSingleCase(db, fields, actorUser) {
       units: resolvedUnits,
       shade,
       notes,
-      remake:       remake === true || remake === 'true',
-      redo:         redo   === true || redo   === 'true',
-      remakeReason: remakeReason || null,
+      remake:       isRemake,
+      redo:         false, // decided later by review-decide — never set at creation
+      remakeReason: isRemake ? (remakeReason || null) : null,
+      originalCaseId: isRemake ? originalCase.id : null,
+      remakeStatus: isRemake ? 'PENDING_REVIEW' : null,
       dueDate: resolvedDueDate,
-      totalAmount: totalAmount ? parseFloat(totalAmount) : null,
+      totalAmount: isRemake ? 0 : (totalAmount ? parseFloat(totalAmount) : null),
       deliveryType: isExpress ? 'EXPRESS' : 'NORMAL',
       deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
       clinicId,
       receptionistId: actorUser.role === 'RECEPTIONIST' ? actorUser.id : null,
       status: finalStatus,
       orderGroupId: orderGroupId || null,
-      discountType: discountType || null,
-      discountValue: discountType ? parseFloat(discountValue) : null,
+      discountType: isRemake ? null : (discountType || null),
+      discountValue: isRemake ? null : (discountType ? parseFloat(discountValue) : null),
     }
   });
 
@@ -185,7 +208,7 @@ async function createSingleCase(db, fields, actorUser) {
   });
 
   await db.payment.create({
-    data: { caseId: newCase.id, status: 'PENDING', amount: totalAmount ? parseFloat(totalAmount) : null }
+    data: { caseId: newCase.id, status: 'PENDING', amount: isRemake ? 0 : (totalAmount ? parseFloat(totalAmount) : null) }
   });
 
   return updatedCase;
@@ -556,7 +579,7 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       // the same createSingleCase() helper /cases/bulk uses, sharing an
       // orderGroupId with the case being accepted here. Shape matches
       // NewCase.jsx's buildItemPayload: { workType, shade, toothNumbers,
-      // units, totalAmount, dueDate, remake, redo, remakeReason,
+      // units, totalAmount, dueDate, remake, remakeReason, originalCaseId,
       // discountType, discountValue }.
       additionalItems,
     } = req.body;
@@ -591,6 +614,13 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
     // back to the case it's a remake/redo of, like a branch pointing at its
     // parent. Validate the reference so a typo/stale ID doesn't silently 404
     // later when someone tries to follow the link.
+    //
+    // The price itself is decided later by the Operation Manager's review
+    // (GET /cases/review/queue, PATCH /:id/review-decide) — accepting a
+    // remake/redo case always forces totalAmount to 0 and an original case
+    // link is required, since the eventual 50%-of-original Redo calculation
+    // depends on it.
+    const isRemake = remake === true || remake === 'true';
     let originalCase = null;
     if (originalCaseId) {
       if (originalCaseId === req.params.id) {
@@ -598,6 +628,9 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       }
       originalCase = await prisma.case.findUnique({ where: { id: originalCaseId }, select: { id: true, caseNumber: true } });
       if (!originalCase) return res.status(400).json({ error: 'Referenced original case not found.' });
+    }
+    if (isRemake && !originalCase) {
+      return res.status(400).json({ error: 'Select the original case this is a remake/redo of.' });
     }
 
     // Generate scan/case number only if not already assigned
@@ -626,19 +659,27 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ...(patientAge    ? { patientAge: parseInt(patientAge) }     : {}),
       ...(patientGender ? { patientGender }                        : {}),
       ...(deliveryType  != null                  ? { deliveryType }                              : {}),
-      ...(totalAmount   != null && totalAmount !== '' ? { totalAmount: parseFloat(totalAmount) } : {}),
       ...(dueDate       != null && dueDate !== ''     ? { dueDate: new Date(dueDate) }           : {}),
       ...(remake != null ? { remake: Boolean(remake) } : {}),
-      ...(redo   != null ? { redo: Boolean(redo) }     : {}),
       ...(isRedo != null ? { isRedo: Boolean(isRedo) } : {}),
       ...(remake ? { remakeReason: remakeReason?.trim() || null } : {}),
       ...(originalCase ? { originalCaseId: originalCase.id } : {}),
-      // Locked at acceptance time — totalAmount above is already the final,
-      // post-discount figure (computed client-side same as the rest of this
-      // endpoint's pricing); these two fields are the audit trail explaining
-      // why it's lower than the standard price, not a second source of truth.
-      discountType: discountType || null,
-      discountValue: discountType ? parseFloat(discountValue) : null,
+      ...(isRemake
+        // Server-enforced, not just client-side — regardless of whatever
+        // totalAmount/discount/redo the client sent, a remake/redo case is
+        // always Br 0 and unreviewed until the Operation Manager decides.
+        ? { redo: false, totalAmount: 0, discountType: null, discountValue: null, remakeStatus: 'PENDING_REVIEW' }
+        : {
+            ...(totalAmount != null && totalAmount !== '' ? { totalAmount: parseFloat(totalAmount) } : {}),
+            ...(redo != null ? { redo: Boolean(redo) } : {}),
+            // Locked at acceptance time — totalAmount above is already the
+            // final, post-discount figure (computed client-side same as the
+            // rest of this endpoint's pricing); these two fields are the
+            // audit trail explaining why it's lower than the standard
+            // price, not a second source of truth.
+            discountType: discountType || null,
+            discountValue: discountType ? parseFloat(discountValue) : null,
+          }),
       orderGroupId: orderGroupId || null,
     };
 
@@ -664,8 +705,7 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
     }
 
     const lineageFlags = [
-      remake ? `Remake${remakeReason?.trim() ? ' — ' + remakeReason.trim() : ''}` : null,
-      redo ? 'Redo' : null,
+      isRemake ? `Remake/Redo${remakeReason?.trim() ? ' — ' + remakeReason.trim() : ''} (pending Operation Manager review)` : null,
       isRedo ? 'Redo/Replacement (50%)' : null,
     ].filter(Boolean);
     const lineageNote = originalCase
@@ -947,26 +987,55 @@ router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
 
 // ── PATCH /api/cases/:id/remake ──────────────────────────
 // Mark an EXISTING case as remake/redo (or clear it) — reception, not just
-// admin. Only touches these four flag fields; caseNumber is never reassigned,
-// so the case keeps the exact scan number it already has.
+// admin. caseNumber is never reassigned, so the case keeps the exact scan
+// number it already has. Flipping remake on fresh (the case wasn't already
+// mid-review or decided) re-enters it into the same PENDING_REVIEW workflow
+// as accept/create — totalAmount forced to 0 until the Operation Manager
+// decides at PATCH /:id/review-decide — so this manual correction path can't
+// be used to bypass that review.
 router.patch('/:id/remake', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
-    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id }, include: { payment: true } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
 
-    const { remake, remakeReason, redo, isRedo } = req.body;
+    const { remake, remakeReason, redo, isRedo, originalCaseId } = req.body;
+    const isRemake = Boolean(remake);
+
+    let originalCase = null;
+    const resolvedOriginalCaseId = originalCaseId || existing.originalCaseId;
+    if (isRemake) {
+      if (!resolvedOriginalCaseId) {
+        return res.status(400).json({ error: 'Select the original case this is a remake/redo of.' });
+      }
+      if (resolvedOriginalCaseId === req.params.id) {
+        return res.status(400).json({ error: 'A case cannot reference itself as the original case.' });
+      }
+      originalCase = await prisma.case.findUnique({ where: { id: resolvedOriginalCaseId }, select: { id: true } });
+      if (!originalCase) return res.status(400).json({ error: 'Referenced original case not found.' });
+    }
+
+    const enteringWorkflow = isRemake && existing.remakeStatus == null;
+
     const data = {
-      remake:       Boolean(remake),
-      remakeReason: remake ? (remakeReason?.trim() || null) : null,
-      redo:         Boolean(redo),
+      remake:       isRemake,
+      remakeReason: isRemake ? (remakeReason?.trim() || null) : null,
+      redo:         isRemake ? Boolean(redo) : false,
       isRedo:       Boolean(isRedo),
+      remakeStatus: isRemake ? (enteringWorkflow ? 'PENDING_REVIEW' : existing.remakeStatus) : null,
+      ...(originalCase ? { originalCaseId: originalCase.id } : {}),
+      ...(enteringWorkflow ? { totalAmount: 0, discountType: null, discountValue: null } : {}),
     };
 
-    const updated = await prisma.case.update({ where: { id: req.params.id }, data });
+    const updated = await prisma.$transaction(async (tx) => {
+      const c = await tx.case.update({ where: { id: req.params.id }, data });
+      if (enteringWorkflow && existing.payment) {
+        await tx.payment.update({ where: { caseId: req.params.id }, data: { amount: 0 } });
+      }
+      return c;
+    });
 
     const flags = [
-      data.remake ? `Remake${data.remakeReason ? ' — ' + data.remakeReason : ''}` : null,
-      data.redo ? 'Redo' : null,
+      data.remake ? `Remake/Redo${data.remakeReason ? ' — ' + data.remakeReason : ''}${enteringWorkflow ? ' (pending Operation Manager review)' : ''}` : null,
       data.isRedo ? 'Redo/Replacement (50%)' : null,
     ].filter(Boolean);
     await prisma.caseStage.create({
@@ -978,11 +1047,97 @@ router.patch('/:id/remake', protect, restrict('ADMIN', 'RECEPTIONIST'), async (r
       }
     });
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
     res.json(updated);
   } catch (err) {
     console.error('[PATCH /cases/:id/remake]', err);
     res.status(500).json({ error: 'Could not update remake/redo status.' });
+  }
+});
+
+// ── GET /api/cases/review/queue ──────────────────────────
+// Every case still awaiting the Operation Manager's remake/redo decision —
+// lab-wide, not scoped per-manager (unlike leave requests) since there's no
+// "which Operation Manager owns which case" concept, just one queue any
+// LEADER/ADMIN can act on.
+router.get('/review/queue', protect, restrict('LEADER', 'ADMIN'), async (req, res) => {
+  try {
+    const cases = await prisma.case.findMany({
+      where: { remakeStatus: 'PENDING_REVIEW' },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true, caseNumber: true, patientName: true, workType: true,
+        remakeReason: true, createdAt: true,
+        clinic: { select: { name: true } },
+        originalCase: { select: { id: true, caseNumber: true, patientName: true, workType: true, totalAmount: true } },
+      },
+    });
+    res.json(cases);
+  } catch (err) {
+    console.error('[GET /cases/review/queue]', err);
+    res.status(500).json({ error: 'Could not load the review queue.' });
+  }
+});
+
+// ── PATCH /api/cases/:id/review-decide ───────────────────
+// Operation Manager's decision on a pending remake/redo case: REMAKE (free
+// of charge, totalAmount stays 0) or REDO (charged 50% of the ORIGINAL
+// case's totalAmount — not a fresh recalculation of this case's own work
+// type/units). Payment.amount is explicitly re-synced here since nothing
+// keeps it auto-synced with Case.totalAmount on most write paths.
+router.patch('/:id/review-decide', protect, restrict('LEADER', 'ADMIN'), async (req, res) => {
+  try {
+    const { decision } = req.body;
+    if (!['REMAKE', 'REDO'].includes(decision)) {
+      return res.status(400).json({ error: 'decision must be REMAKE or REDO.' });
+    }
+
+    const existing = await prisma.case.findUnique({
+      where: { id: req.params.id },
+      include: { payment: true, originalCase: { select: { id: true, caseNumber: true, totalAmount: true } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'Case not found.' });
+    if (existing.remakeStatus !== 'PENDING_REVIEW') {
+      return res.status(400).json({ error: 'This case is not awaiting review.' });
+    }
+    if (!existing.originalCase) {
+      return res.status(400).json({ error: 'This case has no linked original case — cannot calculate a Redo charge.' });
+    }
+
+    const isRedo = decision === 'REDO';
+    const newAmount = isRedo ? Math.round((existing.originalCase.totalAmount || 0) * 0.5 * 100) / 100 : 0;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const c = await tx.case.update({
+        where: { id: req.params.id },
+        data: {
+          remakeStatus: isRedo ? 'REDO_CHARGED' : 'REMAKE_FREE',
+          redo: isRedo,
+          totalAmount: newAmount,
+        },
+        include: { clinic: { select: { name: true } } },
+      });
+      if (existing.payment) {
+        await tx.payment.update({ where: { caseId: req.params.id }, data: { amount: newAmount } });
+      }
+      await tx.caseStage.create({
+        data: {
+          caseId: req.params.id,
+          stageName: existing.status,
+          scannedBy: req.user.name,
+          notes: isRedo
+            ? `Case review: Redo — charged Br ${newAmount.toLocaleString('en-US')} (50% of original ${existing.originalCase.caseNumber || ''}) — decided by ${req.user.name}`
+            : `Case review: Remake — free of charge — decided by ${req.user.name}`,
+        },
+      });
+      return c;
+    });
+
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*', 'dispatch:queue');
+    res.json(updated);
+  } catch (err) {
+    console.error('[PATCH /cases/:id/review-decide]', err);
+    res.status(500).json({ error: 'Could not record the review decision.' });
   }
 });
 

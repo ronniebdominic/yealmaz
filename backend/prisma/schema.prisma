@@ -205,6 +205,13 @@ model Case {
   discountType    DiscountType? // set + locked at case-acceptance time; null = no discount applied
   discountValue   Float?        // Br amount if discountType=AMOUNT, or percentage points if PERCENT
 
+  // Remake/redo review — null for ordinary cases. Set to PENDING_REVIEW the
+  // moment `remake` is checked at creation/acceptance (totalAmount forced to
+  // 0 at that point too); the Operation Manager's decision at
+  // PATCH /cases/:id/review-decide moves it to REMAKE_FREE (stays 0) or
+  // REDO_CHARGED (totalAmount becomes 50% of originalCase.totalAmount).
+  remakeStatus    RemakeReviewStatus?
+
   // Relations
   clinicId        String
   clinic          Clinic      @relation(fields: [clinicId], references: [id])
@@ -301,6 +308,12 @@ enum CaseStatus {
 enum DeliveryType {
   NORMAL
   EXPRESS
+}
+
+enum RemakeReviewStatus {
+  PENDING_REVIEW  // remake/redo flagged at intake — totalAmount forced to 0, awaiting Operation Manager decision
+  REMAKE_FREE     // decided: remake, free of charge — totalAmount stays 0
+  REDO_CHARGED    // decided: redo, charged 50% of the original case's totalAmount
 }
 
 enum DiscountType {
