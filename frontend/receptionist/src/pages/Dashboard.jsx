@@ -21,6 +21,7 @@ import {
 import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
+import OriginalCasePicker from '../components/OriginalCasePicker';
 
 // Common dental shade options
 const SHADE_OPTIONS = [
@@ -49,79 +50,6 @@ const isPlaceholderName = (name) => !name || PLACEHOLDER_NAME_RE.test(name) || n
 const isAlignerWorkType = (wt) => /aligner/i.test(wt || '');
 const TRAY_COUNT_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
 
-// Debounced search-as-you-type picker for linking a remake/redo to the
-// original case it's branching from (by scan number or patient name).
-function OriginalCasePicker({ selected, onSelect, onClear }) {
-  const [query, setQuery]     = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [open, setOpen]       = useState(false);
-
-  useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
-    setSearching(true);
-    const t = setTimeout(() => {
-      api.get('/cases', { params: { search: query.trim(), limit: 8 } })
-        .then(res => setResults(res.data.cases ?? []))
-        .catch(() => setResults([]))
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  if (selected) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
-        <MdAssignment size={14} style={{ flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span className="case-number">{selected.caseNumber || 'No scan #'}</span>{' '}
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{selected.patientName}{selected.workType ? ` · ${selected.workType}` : ''}</span>
-        </div>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClear} style={{ color: 'var(--red)' }}>✕</button>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        style={{ width: '100%', padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'inherit' }}
-        placeholder="Search scan number or patient name…"
-        value={query}
-        onChange={e => { setQuery(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-      />
-      {open && query.trim() && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-          marginTop: 4, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-        }}>
-          {searching ? (
-            <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>Searching…</div>
-          ) : results.length === 0 ? (
-            <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>No matching cases</div>
-          ) : results.map(rc => (
-            <div key={rc.id}
-              onMouseDown={() => { onSelect(rc); setQuery(''); setOpen(false); }}
-              style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <span className="case-number">{rc.caseNumber || 'No scan #'}</span>{' '}
-              <strong>{rc.patientName}</strong>
-              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                {rc.clinic?.name}{rc.workType ? ` · ${rc.workType}` : ''}{rc.units ? ` · ${rc.units}u` : ''}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Shared amount derivation for a work-type item's Amount field — the same
 // price×units → discount → lock logic AcceptForm's primary item computes
 // inline, factored out so <AdditionalAcceptItem> and AcceptForm's submit()
@@ -146,7 +74,7 @@ const emptyAcceptItem = () => ({
   workType: '', shade: '', selectedTeeth: [], manualUnits: '',
   totalAmount: '', dueDate: '',
   discountType: '', discountValue: '', manualUnlock: false,
-  remake: false, redo: false, remakeReason: '',
+  remake: false, remakeReason: '', originalCase: null,
 });
 
 // One extra work-type item on the Accept Case form — the receptionist is
@@ -254,8 +182,8 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
           </div>
         </>
       )}
-      {/* Discount */}
-      {selWorkType && calcAmt != null && (
+      {/* Discount — n/a for a remake/redo item, its amount is locked to 0 */}
+      {selWorkType && calcAmt != null && !item.remake && (
         <div style={{ marginBottom: 10 }}>
           <label style={lbl}>DISCOUNT</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -281,15 +209,14 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
       {selWorkType && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
-            <label style={lbl}>
-              AMOUNT (BR)
-              {calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
-              {isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {item.discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
+            <label style={lbl}>AMOUNT (BR){item.remake && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 pending review</span>}
+              {!item.remake && calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
+              {!item.remake && isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {item.discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
             </label>
-            <input type="number" style={{ ...inputSt, ...(isLocked ? { background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed' } : {}) }}
-              placeholder="Auto-calculated" value={displayAmount} readOnly={isLocked}
+            <input type="number" style={{ ...inputSt, ...((isLocked || item.remake) ? { background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed' } : {}) }}
+              placeholder="Auto-calculated" value={item.remake ? '0' : displayAmount} readOnly={isLocked || item.remake}
               onChange={e => onChange({ totalAmount: e.target.value })} />
-            {isLocked && (
+            {!item.remake && isLocked && (
               <button type="button" onClick={() => onChange({ manualUnlock: true, totalAmount: String(discountedAmt) })}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', marginTop: 3, padding: 0, textDecoration: 'underline' }}>
                 Unlock to edit manually
@@ -302,19 +229,25 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
           </div>
         </div>
       )}
-      {/* Remake/Redo */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-          <input type="checkbox" checked={item.remake} onChange={e => onChange({ remake: e.target.checked, redo: e.target.checked ? false : item.redo })} /> Remake (free)
+      {/* Remake/Redo lineage — amount locked to 0, decided later at Operation Manager review */}
+      <div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={item.remake}
+            onChange={e => onChange({ remake: e.target.checked, ...(e.target.checked ? {} : { originalCase: null, remakeReason: '' }) })} />
+          This is a Remake / Redo of an earlier case
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-          <input type="checkbox" checked={item.redo} onChange={e => onChange({ redo: e.target.checked, remake: e.target.checked ? false : item.remake })} /> Redo (50%)
-        </label>
+        {item.remake && (
+          <div style={{ marginTop: 8, padding: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginBottom: 8 }}>
+              Amount locked to Br 0 — the Operation Manager decides Remake (free) or Redo (50% of the original) when reviewing this case.
+            </div>
+            <input style={{ ...inputSt, marginBottom: 8 }} placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
+              value={item.remakeReason} onChange={e => onChange({ remakeReason: e.target.value })} />
+            <label style={lbl}>ORIGINAL / REFERENCE CASE *</label>
+            <OriginalCasePicker selected={item.originalCase} onSelect={rc => onChange({ originalCase: rc })} onClear={() => onChange({ originalCase: null })} />
+          </div>
+        )}
       </div>
-      {item.remake && (
-        <input style={{ ...inputSt, marginTop: 8 }} placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
-          value={item.remakeReason} onChange={e => onChange({ remakeReason: e.target.value })} />
-      )}
     </div>
   );
 }
@@ -346,10 +279,10 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   // Remake/redo lineage — set when this newly-accepted case is actually a
   // remake/redo of an earlier (already delivered) case. This case still gets
   // its own new scan number; originalCase just links back to the earlier one.
+  // The toggle itself IS the remake/redo flag — amount is forced to 0 and
+  // the Operation Manager decides Remake (free) vs Redo (50% of the
+  // original) later at review, so there's nothing to choose here.
   const [showLineage,   setShowLineage]   = useState(false);
-  const [remake,        setRemake]        = useState(false);
-  const [redo,          setRedo]          = useState(false);
-  const [isRedo,        setIsRedo]        = useState(false);
   const [remakeReason,  setRemakeReason]  = useState('');
   const [originalCase,  setOriginalCase]  = useState(null);
   // Extra work-type items being split out while accepting — each becomes
@@ -456,12 +389,12 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const submit = () => onAccept({
     shade, patientName, workType: selWorkType, doctorName, doctorPhone, units,
     toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
-    orderType, totalAmount: isLocked ? String(discountedAmt) : totalAmount, dueDate, notes,
-    remake: showLineage && remake, redo: showLineage && redo, isRedo: showLineage && isRedo,
+    orderType, totalAmount: showLineage ? '0' : (isLocked ? String(discountedAmt) : totalAmount), dueDate, notes,
+    remake: showLineage,
     remakeReason: showLineage ? remakeReason : undefined,
     originalCaseId: showLineage ? originalCase?.id : undefined,
-    discountType: hasDiscount ? discountType : undefined,
-    discountValue: hasDiscount ? discountNum : undefined,
+    discountType: showLineage ? undefined : (hasDiscount ? discountType : undefined),
+    discountValue: showLineage ? undefined : (hasDiscount ? discountNum : undefined),
     additionalItems: additionalItems.length > 0 ? additionalItems.map(it => {
       const itUnits = it.selectedTeeth.length > 0 ? String(it.selectedTeeth.length) : it.manualUnits;
       const itDiscountNum = parseFloat(it.discountValue);
@@ -471,15 +404,17 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         shade: it.shade,
         toothNumbers: it.selectedTeeth.length > 0 ? it.selectedTeeth.join(', ') : undefined,
         units: itUnits,
-        totalAmount: computeItemAmount({
+        totalAmount: it.remake ? '0' : computeItemAmount({
           priceMap, expressPriceMap, flatRateMap, orderType,
           workType: it.workType, units: itUnits, totalAmount: it.totalAmount,
           discountType: it.discountType, discountValue: it.discountValue, manualUnlock: it.manualUnlock,
         }),
         dueDate: it.dueDate,
-        remake: it.remake, redo: it.redo, remakeReason: it.remake ? it.remakeReason : undefined,
-        discountType: itHasDiscount ? it.discountType : undefined,
-        discountValue: itHasDiscount ? itDiscountNum : undefined,
+        remake: it.remake,
+        remakeReason: it.remake ? it.remakeReason : undefined,
+        originalCaseId: it.remake ? it.originalCase?.id : undefined,
+        discountType: it.remake ? undefined : (itHasDiscount ? it.discountType : undefined),
+        discountValue: it.remake ? undefined : (itHasDiscount ? itDiscountNum : undefined),
       };
     }) : undefined,
   });
@@ -563,8 +498,9 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         </div>
       </div>
       {/* Discount — locked in as Amount or Percent; once set, the Amount
-          field below becomes a computed/read-only figure. */}
-      {selWorkType && calcAmt != null && (
+          field below becomes a computed/read-only figure. N/A for a
+          remake/redo — its amount is locked to 0 until reviewed. */}
+      {selWorkType && calcAmt != null && !showLineage && (
         <div style={{ marginBottom: 10 }}>
           <label style={lbl}>DISCOUNT</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -592,13 +528,14 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           <div>
             <label style={lbl}>
               AMOUNT (BR)
-              {calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
-              {isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
+              {showLineage && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 pending Operation Manager review</span>}
+              {!showLineage && calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
+              {!showLineage && isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
             </label>
-            <input type="number" style={{ ...inputSt, ...(isLocked ? { background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed' } : {}) }}
-              placeholder="Auto-calculated" value={displayAmount} readOnly={isLocked}
+            <input type="number" style={{ ...inputSt, ...((isLocked || showLineage) ? { background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'not-allowed' } : {}) }}
+              placeholder="Auto-calculated" value={showLineage ? '0' : displayAmount} readOnly={isLocked || showLineage}
               onChange={e => setTotalAmount(e.target.value)} />
-            {isLocked && (
+            {!showLineage && isLocked && (
               <button type="button" onClick={() => { setManualUnlock(true); setTotalAmount(String(discountedAmt)); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-3)', marginTop: 3, padding: 0, textDecoration: 'underline' }}>
                 Unlock to edit manually
@@ -645,36 +582,29 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           placeholder="Additional instructions, observations, shade confirmation…"
           value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
-      {/* Remake/Redo lineage — new scan number, but linked back to the original case */}
+      {/* Remake/Redo lineage — new scan number, but linked back to the
+          original case. Amount is forced to 0 the moment this is checked —
+          the Operation Manager decides Remake (free) vs Redo (50% of the
+          original) later, at case review, not here. */}
       <div style={{ marginBottom: 12 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={showLineage} onChange={e => setShowLineage(e.target.checked)} />
+          <input type="checkbox" checked={showLineage} onChange={e => { setShowLineage(e.target.checked); if (!e.target.checked) { setOriginalCase(null); setRemakeReason(''); } }} />
           <MdAutorenew size={14} /> This is a Remake / Redo of an earlier case
         </label>
         {showLineage && (
           <div style={{ marginTop: 10, padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={remake} onChange={e => setRemake(e.target.checked)} /> Remake (free)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={redo} onChange={e => setRedo(e.target.checked)} /> Redo (50%)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={isRedo} onChange={e => setIsRedo(e.target.checked)} /> Redo / Replacement (50%)
-              </label>
+            <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+              🔒 Amount locked to Br 0 — the Operation Manager will decide Remake (free) or Redo (50% of the original) when reviewing this case.
             </div>
-            {remake && (
-              <input
-                style={{ ...inputSt, marginBottom: 10 }}
-                placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
-                value={remakeReason}
-                onChange={e => setRemakeReason(e.target.value)}
-              />
-            )}
-            <label style={lbl}>ORIGINAL / REFERENCE CASE</label>
+            <input
+              style={{ ...inputSt, marginBottom: 10 }}
+              placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
+              value={remakeReason}
+              onChange={e => setRemakeReason(e.target.value)}
+            />
+            <label style={lbl}>ORIGINAL / REFERENCE CASE *</label>
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
-              Selecting a case fills in patient name, shade, doctor, and teeth/units from it automatically — review before accepting.
+              Selecting a case fills in patient name, shade, doctor, and teeth/units from it automatically — review before accepting. Required — the Redo charge is calculated from this case's amount.
             </div>
             <OriginalCasePicker selected={originalCase} onSelect={handleSelectOriginal} onClear={() => setOriginalCase(null)} />
           </div>
@@ -783,6 +713,10 @@ function AcceptCasesSection({ queryClient }) {
     if (extraItems.some(it => !it.workType))       return toast.error('Select a work type for every added item, or remove it');
     if (extraItems.some(it => !isAlignerWorkType(it.workType) && !it.shade))
                                                     return toast.error('Shade is required for every added work type');
+    if (formData.remake && !formData.originalCaseId)
+                                                    return toast.error('Select the original case this is a remake/redo of');
+    if (extraItems.some(it => it.remake && !it.originalCaseId))
+                                                    return toast.error('Select the original case for every added remake/redo item');
 
     setSubmitting(true);
     removeFromList(c.id);
@@ -802,8 +736,6 @@ function AcceptCasesSection({ queryClient }) {
         dueDate:      formData.dueDate || undefined,
         notes:        formData.notes,
         remake:         formData.remake || undefined,
-        redo:           formData.redo || undefined,
-        isRedo:         formData.isRedo || undefined,
         remakeReason:   formData.remakeReason || undefined,
         originalCaseId: formData.originalCaseId || undefined,
         discountType:   formData.discountType || undefined,

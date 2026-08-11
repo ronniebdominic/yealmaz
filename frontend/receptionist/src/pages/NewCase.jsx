@@ -11,6 +11,7 @@ import {
   MdLocalShipping, MdAdd, MdDeleteOutline,
 } from 'react-icons/md';
 import { toLocalDateString } from '../utils/date';
+import OriginalCasePicker from '../components/OriginalCasePicker';
 
 // ── Visual group ordering for the work-type dropdown ─────
 // Types present in the pricing DB will be slotted into these groups.
@@ -107,7 +108,7 @@ let itemKeySeq = 0;
 const emptyItem = () => ({
   key: `item-${++itemKeySeq}`,
   workType: '', shade: '', totalAmount: '', dueDate: '',
-  remake: false, redo: false, remakeReason: '',
+  remake: false, remakeReason: '', originalCase: null,
   selectedTeeth: [], manualUnits: '',
   discountType: '', discountValue: '',
 });
@@ -137,11 +138,9 @@ function WorkItemForm({
     onChange({ selectedTeeth: next });
   };
 
-  const setCheck = (field) => (e) => {
+  const setRemakeCheck = (e) => {
     const checked = e.target.checked;
-    if (field === 'remake' && checked) return onChange({ remake: true, redo: false });
-    if (field === 'redo'   && checked) return onChange({ redo: true, remake: false });
-    onChange({ [field]: checked });
+    onChange({ remake: checked, ...(checked ? {} : { originalCase: null, remakeReason: '' }) });
   };
 
   // Base price before remake/redo modifier
@@ -158,23 +157,25 @@ function WorkItemForm({
     return unitPrice * count;
   }, [item.workType, deliveryType, item.selectedTeeth.length, item.manualUnits, priceMap, expressPriceMap, flatRateMap]);
 
-  // Auto-calculate price with remake/redo modifier — includes the arch scan
-  // fee (Br 500/arch) on this item only when it's the one carrying it — then
-  // applies any discount on top, same order of operations as Accept Case's
-  // discount (POST /:id/accept). A remake is already free, so a discount on
-  // top of it is moot (clamped at 0); a redo's discount stacks on the 50%.
+  // Auto-calculate price — includes the arch scan fee (Br 500/arch) on this
+  // item only when it's the one carrying it — then applies any discount on
+  // top, same order of operations as Accept Case's discount
+  // (POST /:id/accept). A remake/redo item is forced to 0 instead — the
+  // Operation Manager decides Remake (free) vs Redo (50% of the original
+  // case) later, at review, not here — so no discount applies to it either.
   useEffect(() => {
     if (basePrice === null) return;
+    if (item.remake) { onChange({ totalAmount: '0' }); return; }
     const fee = applyArchFee ? archFee : 0;
     const combined = basePrice + fee;
-    let amount = item.remake ? 0 : item.redo ? Math.round(combined * 0.5 * 100) / 100 : combined;
+    let amount = combined;
     const discountNum = parseFloat(item.discountValue);
     if (item.discountType && !isNaN(discountNum) && discountNum >= 0) {
       amount = Math.max(0, item.discountType === 'PERCENT' ? amount * (1 - discountNum / 100) : amount - discountNum);
     }
     onChange({ totalAmount: String(Math.round(amount * 100) / 100) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basePrice, applyArchFee, archFee, item.remake, item.redo, item.discountType, item.discountValue]);
+  }, [basePrice, applyArchFee, archFee, item.remake, item.discountType, item.discountValue]);
 
   // Auto-set due date
   useEffect(() => {
@@ -204,12 +205,7 @@ function WorkItemForm({
       ? <> + Br {fee.toLocaleString('en-US')} scan fee</>
       : null;
     if (item.remake) {
-      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>Remake — <strong style={{ color: 'var(--red)' }}>Free (Br 0)</strong></span>;
-    }
-    if (item.redo) {
-      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        Redo 50% — <strong style={{ color: 'var(--amber)' }}>Br {(full * 0.5).toLocaleString('en-US')}</strong>
-      </span>;
+      return <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>Remake/Redo — <strong style={{ color: 'var(--red)' }}>Br 0, pending review</strong></span>;
     }
     return flatRateMap[item.workType] ? (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
@@ -322,58 +318,44 @@ function WorkItemForm({
 
       <div className="form-group">
         <label>Item Type</label>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {[
-            {
-              field: 'remake', checked: item.remake,
-              label: 'Remake', icon: MdAutorenew, desc: 'Free — no charge to clinic',
-              color: 'var(--red)', bg: '#FFF1F2', border: '#FECACA',
-            },
-            {
-              field: 'redo', checked: item.redo,
-              label: 'Redo', icon: MdAutorenew, desc: '50% of work-type price',
-              color: 'var(--amber)', bg: 'var(--amber-dim)', border: '#FCD34D',
-            },
-          ].map(opt => (
-            <label
-              key={opt.field}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-                border: `2px solid ${opt.checked ? opt.border : 'var(--border)'}`,
-                background: opt.checked ? opt.bg : 'var(--surface)',
-                transition: 'border-color .15s, background .15s',
-                userSelect: 'none',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={opt.checked}
-                onChange={setCheck(opt.field)}
-                style={{ width: 16, height: 16, accentColor: opt.color, cursor: 'pointer' }}
-              />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: opt.checked ? opt.color : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <opt.icon size={13} /> {opt.label}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{opt.desc}</div>
-              </div>
-            </label>
-          ))}
-        </div>
+        <label
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+            border: `2px solid ${item.remake ? '#FECACA' : 'var(--border)'}`,
+            background: item.remake ? '#FFF1F2' : 'var(--surface)',
+            transition: 'border-color .15s, background .15s',
+            userSelect: 'none',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={item.remake}
+            onChange={setRemakeCheck}
+            style={{ width: 16, height: 16, accentColor: 'var(--red)', cursor: 'pointer' }}
+          />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: item.remake ? 'var(--red)' : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <MdAutorenew size={13} /> Remake / Redo of an earlier case
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Amount locked to Br 0 — Operation Manager decides Remake (free) or Redo (50%) at review</div>
+          </div>
+        </label>
         {item.remake && (
           <div style={{ marginTop: 10 }}>
             <input
               placeholder="Remake reason (optional)"
               value={item.remakeReason}
               onChange={e => onChange({ remakeReason: e.target.value })}
-              style={{ width: '100%' }}
+              style={{ width: '100%', marginBottom: 10 }}
             />
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>ORIGINAL / REFERENCE CASE *</label>
+            <OriginalCasePicker selected={item.originalCase} onSelect={rc => onChange({ originalCase: rc })} onClear={() => onChange({ originalCase: null })} />
           </div>
         )}
       </div>
 
-      {item.workType && (
+      {item.workType && !item.remake && (
         <div className="form-group">
           <label>Discount</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -414,9 +396,10 @@ function WorkItemForm({
           <input
             type="number"
             placeholder="Auto-calculated from work type"
-            value={item.totalAmount}
+            value={item.remake ? '0' : item.totalAmount}
             onChange={e => onChange({ totalAmount: e.target.value })}
-            style={item.remake ? { color: 'var(--text-3)' } : item.redo ? { color: 'var(--amber)', fontWeight: 600 } : {}}
+            readOnly={item.remake}
+            style={item.remake ? { color: 'var(--text-3)', background: 'var(--surface-2)', cursor: 'not-allowed' } : {}}
           />
         </div>
       </div>
@@ -536,6 +519,7 @@ export default function NewCase() {
     if (!form.clinicId)    return toast.error('Please select a clinic');
     if (!form.patientName) return toast.error('Patient name is required');
     if (items.some(it => !it.workType)) return toast.error('Work type is required for every item');
+    if (items.some(it => it.remake && !it.originalCase)) return toast.error('Select the original case for every Remake/Redo item');
     if (form.intakeMethod === 'EMAIL_3D_FILE' && !form.archUpper && !form.archLower) {
       return toast.error('Select at least one arch (Upper/Lower) that was scanned');
     }
@@ -572,12 +556,12 @@ export default function NewCase() {
           toothNumbers: item.selectedTeeth.length > 0 ? item.selectedTeeth.join(', ') : undefined,
           units: resolvedUnits,
           remake: item.remake,
-          redo: item.redo,
-          remakeReason: item.remakeReason,
+          remakeReason: item.remake ? item.remakeReason : undefined,
+          originalCaseId: item.remake ? item.originalCase?.id : undefined,
           dueDate: item.dueDate,
-          totalAmount: item.totalAmount,
-          discountType: hasDiscount ? item.discountType : undefined,
-          discountValue: hasDiscount ? discountNum : undefined,
+          totalAmount: item.remake ? '0' : item.totalAmount,
+          discountType: item.remake ? undefined : (hasDiscount ? item.discountType : undefined),
+          discountValue: item.remake ? undefined : (hasDiscount ? discountNum : undefined),
         };
       };
 
