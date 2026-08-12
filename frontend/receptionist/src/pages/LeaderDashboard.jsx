@@ -5,10 +5,11 @@
 // HRDashboard.jsx (self-service AttendanceClock/LeaveRequestButton, since
 // a Leader is also an employee).
 import { useAuth } from '../AuthContext';
-import { MdLogout, MdGroups } from 'react-icons/md';
+import { MdLogout, MdGroups, MdAutorenew } from 'react-icons/md';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import TeamLeaveRequests from '../components/TeamLeaveRequests';
+import CaseReviewQueue from '../components/CaseReviewQueue';
 
 export default function LeaderDashboard() {
   const { user, logout } = useAuth();
@@ -34,11 +35,18 @@ export default function LeaderDashboard() {
       </div>
 
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 16px' }}>
-        <div className="card">
+        <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdGroups size={16} /> Team Leave Requests</div>
           </div>
           <TeamLeaveRequests />
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdAutorenew size={16} /> Remake/Redo Review</div>
+          </div>
+          <CaseReviewQueue />
         </div>
       </div>
     </div>

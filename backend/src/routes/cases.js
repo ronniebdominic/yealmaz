@@ -1055,13 +1055,28 @@ router.patch('/:id/remake', protect, restrict('ADMIN', 'RECEPTIONIST'), async (r
   }
 });
 
+// Reviewing cases isn't tied to holding the LEADER role, though — the
+// account that plays "Operation Manager" today stays logged in as LAB_TECH
+// (same situation attendance.js's leave approval already handles) — so
+// this is open to any authenticated user who's either LEADER/ADMIN or
+// designated as at least one EmployeeProfile's manager.
+const CASE_REVIEW_BROAD_ROLES = ['LEADER', 'ADMIN'];
+async function canReviewCases(user) {
+  if (CASE_REVIEW_BROAD_ROLES.includes(user.role)) return true;
+  const managesSomeone = await prisma.employeeProfile.findFirst({ where: { managerId: user.id }, select: { id: true } });
+  return !!managesSomeone;
+}
+
 // ── GET /api/cases/review/queue ──────────────────────────
 // Every case still awaiting the Operation Manager's remake/redo decision —
 // lab-wide, not scoped per-manager (unlike leave requests) since there's no
 // "which Operation Manager owns which case" concept, just one queue any
-// LEADER/ADMIN can act on.
-router.get('/review/queue', protect, restrict('LEADER', 'ADMIN'), async (req, res) => {
+// manager account can act on.
+router.get('/review/queue', protect, async (req, res) => {
   try {
+    if (!(await canReviewCases(req.user))) {
+      return res.status(403).json({ error: 'Not authorized to review cases.' });
+    }
     const cases = await prisma.case.findMany({
       where: { remakeStatus: 'PENDING_REVIEW' },
       orderBy: { createdAt: 'asc' },
@@ -1085,8 +1100,11 @@ router.get('/review/queue', protect, restrict('LEADER', 'ADMIN'), async (req, re
 // case's totalAmount — not a fresh recalculation of this case's own work
 // type/units). Payment.amount is explicitly re-synced here since nothing
 // keeps it auto-synced with Case.totalAmount on most write paths.
-router.patch('/:id/review-decide', protect, restrict('LEADER', 'ADMIN'), async (req, res) => {
+router.patch('/:id/review-decide', protect, async (req, res) => {
   try {
+    if (!(await canReviewCases(req.user))) {
+      return res.status(403).json({ error: 'Not authorized to review cases.' });
+    }
     const { decision } = req.body;
     if (!['REMAKE', 'REDO'].includes(decision)) {
       return res.status(400).json({ error: 'decision must be REMAKE or REDO.' });

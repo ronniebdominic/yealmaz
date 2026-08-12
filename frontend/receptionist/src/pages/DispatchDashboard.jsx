@@ -802,12 +802,25 @@ export default function DispatchDashboard() {
   // consolidated cycle, not per case — their cases never get an individual
   // paymentStatus of VERIFIED, so they must skip the payment gate entirely
   // or they'd sit in "Ready for Delivery" forever with no way to dispatch.
-  // Remake cases (c.remake — free, no charge to the clinic) skip it for the
-  // same reason: nothing is owed, so there's nothing to request/verify —
-  // they should land straight in "Ready for Dispatch" once production/QC
-  // finishes. Redo/isRedo cases (50% charge) are NOT included here — they
-  // still owe money and go through the normal payment flow.
-  const isPaymentClear = (c) => c.paymentStatus === 'VERIFIED' || c.clinic?.isExcluded || c.remake === true;
+  // Remake cases decided FREE at Operation Manager review (remakeStatus ===
+  // 'REMAKE_FREE') skip it for the same reason: nothing is owed. A case
+  // still PENDING_REVIEW is deliberately NOT included — its price isn't
+  // final yet, so it shouldn't be dispatched or payment-requested either
+  // (see the disabled Request Payment button below). A REDO_CHARGED case
+  // (remakeStatus === 'REDO_CHARGED') is also NOT included — it owes 50%
+  // of the original and goes through the normal payment flow like any
+  // other case.
+  //
+  // `c.remake === true && c.remakeStatus == null` grandfathers in the ~100
+  // legacy cases flagged remake before this remakeStatus field existed —
+  // they predate the review workflow and were already treated as
+  // payment-clear, so this preserves that instead of retroactively
+  // requiring payment on old, already-completed cases.
+  const isPaymentClear = (c) =>
+    c.paymentStatus === 'VERIFIED' ||
+    c.clinic?.isExcluded ||
+    c.remakeStatus === 'REMAKE_FREE' ||
+    (c.remake === true && c.remakeStatus == null);
 
   // Ready for Delivery  = QC passed → READY_TO_DISPATCH, payment NOT yet verified
   //   These orders just left QC. Finance still needs to request/confirm payment.
@@ -1468,7 +1481,8 @@ export default function DispatchDashboard() {
                     <tbody>
                       {readyDelivery.map(c => {
                         const amount = c.payment?.amount ?? c.totalAmount;
-                        const canRequest = !['PAYMENT_REQUESTED','SCREENSHOT_UPLOADED','VERIFIED'].includes(c.paymentStatus);
+                        const pendingReview = c.remakeStatus === 'PENDING_REVIEW';
+                        const canRequest = !pendingReview && !['PAYMENT_REQUESTED','SCREENSHOT_UPLOADED','VERIFIED'].includes(c.paymentStatus);
                         return (
                           <tr key={c.id}>
                             <Td style={{ fontWeight: 600 }}>
@@ -1482,7 +1496,11 @@ export default function DispatchDashboard() {
                             <Td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(amount)}</Td>
                             <Td><PaymentBadge status={c.paymentStatus} /></Td>
                             <Td>
-                              {canRequest ? (
+                              {pendingReview ? (
+                                <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--red)', whiteSpace: 'nowrap' }} title="Amount isn't final until the Operation Manager decides Remake vs Redo">
+                                  <MdAutorenew className="mi" size={13} style={{ marginRight: 3, verticalAlign: -2 }} /> Awaiting Review
+                                </span>
+                              ) : canRequest ? (
                                 <button
                                   className="btn btn-sm"
                                   style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}

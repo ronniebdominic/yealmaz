@@ -4,6 +4,7 @@ import { StatusBadge, PaymentBadge, STAGE_ICONS } from './StatusBadge';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { printCaseLabel } from '../utils/printLabel';
+import OriginalCasePicker from './OriginalCasePicker';
 import { MdAccountBalance, MdChat, MdPrint, MdCheckCircle, MdAutorenew } from 'react-icons/md';
 
 const STATUSES = [
@@ -80,6 +81,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [remakeReasonInput, setRemakeReasonInput] = useState('');
   const [redoInput, setRedoInput] = useState(false);
   const [isRedoInput, setIsRedoInput] = useState(false);
+  const [originalCaseInput, setOriginalCaseInput] = useState(null);
   const [savingRemake, setSavingRemake] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
@@ -132,6 +134,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
       setRemakeReasonInput(res.data.remakeReason || '');
       setRedoInput(res.data.redo || false);
       setIsRedoInput(res.data.isRedo || false);
+      setOriginalCaseInput(res.data.originalCase || null);
     } catch (err) {
       toast.error('Could not load case');
     } finally {
@@ -140,6 +143,9 @@ export default function CaseDetailModal({ caseId, onClose }) {
   };
 
   const saveRemake = async () => {
+    if (remakeInput && !originalCaseInput) {
+      return toast.error('Select the original case this is a remake/redo of');
+    }
     setSavingRemake(true);
     try {
       await api.patch(`/cases/${caseId}/remake`, {
@@ -147,6 +153,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
         remakeReason: remakeReasonInput,
         redo: redoInput,
         isRedo: isRedoInput,
+        originalCaseId: originalCaseInput?.id,
       });
       toast.success('Remake/Redo status updated — same scan number retained');
       loadCase();
@@ -272,6 +279,21 @@ export default function CaseDetailModal({ caseId, onClose }) {
                   </span>
                 </div>
               )}
+              {data.remakeStatus === 'PENDING_REVIEW' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--red)', fontWeight: 700, marginTop: 6 }}>
+                  <MdAutorenew size={13} /> Pending Operation Manager Review — amount locked to Br 0
+                </div>
+              )}
+              {data.remakeStatus === 'REMAKE_FREE' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--green)', fontWeight: 700, marginTop: 6 }}>
+                  <MdAutorenew size={13} /> Decided: Remake — free of charge
+                </div>
+              )}
+              {data.remakeStatus === 'REDO_CHARGED' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--amber)', fontWeight: 700, marginTop: 6 }}>
+                  <MdAutorenew size={13} /> Decided: Redo — charged 50% of the original
+                </div>
+              )}
             </div>
           )}
 
@@ -288,7 +310,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                   : data.payment?.verifiedAt
                     ? format(new Date(data.payment.verifiedAt), 'dd MMM yyyy')
                     : '—'],
-              ['Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
+              [data.remakeStatus === 'PENDING_REVIEW' ? 'Amount 🔒' : 'Amount', data.totalAmount ? `Br ${data.totalAmount.toLocaleString('en-US')}` : '—'],
               ...(data.discountType ? [['Discount', data.discountType === 'PERCENT' ? `${data.discountValue}% off` : `Br ${data.discountValue?.toLocaleString('en-US')} off`]] : []),
               ...(data.payment?.taxWithheld ? [[<span key="tax-withheld" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><MdAccountBalance size={11} /> Tax Withheld</span>, `Br ${data.payment.taxWithheld.toLocaleString('en-US')} · Net received: Br ${((data.payment.amount ?? data.totalAmount ?? 0) - data.payment.taxWithheld).toLocaleString('en-US')}`]] : []),
               ...(data.deliveryDate ? [['Delivered On', format(new Date(data.deliveryDate), 'dd MMM yyyy, h:mm a')]] : []),
@@ -467,13 +489,19 @@ export default function CaseDetailModal({ caseId, onClose }) {
               </label>
             </div>
             {remakeInput && (
-              <input
-                type="text"
-                placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
-                value={remakeReasonInput}
-                onChange={e => setRemakeReasonInput(e.target.value)}
-                style={{ width: '100%', marginBottom: 10, padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'inherit' }}
-              />
+              <>
+                <input
+                  type="text"
+                  placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
+                  value={remakeReasonInput}
+                  onChange={e => setRemakeReasonInput(e.target.value)}
+                  style={{ width: '100%', marginBottom: 10, padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'inherit' }}
+                />
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>ORIGINAL / REFERENCE CASE *</div>
+                <div style={{ marginBottom: 10 }}>
+                  <OriginalCasePicker selected={originalCaseInput} onSelect={setOriginalCaseInput} onClear={() => setOriginalCaseInput(null)} />
+                </div>
+              </>
             )}
             <button className="btn btn-primary btn-sm" onClick={saveRemake} disabled={savingRemake}>
               {savingRemake ? '…' : 'Save'}

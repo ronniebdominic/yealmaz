@@ -17,6 +17,7 @@ import { todayLocal, toLocalDateString, startOfWeekLocal, startOfMonthLocal } fr
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import TeamLeaveRequests from '../components/TeamLeaveRequests';
+import CaseReviewQueue from '../components/CaseReviewQueue';
 import InstallAppBanner from '../components/InstallAppBanner';
 import NotificationBell from '../components/NotificationBell';
 import MyProfileTab from '../components/MyProfileTab';
@@ -823,6 +824,10 @@ export default function LabDashboard() {
                 designated as someone's manager (EmployeeProfile.managerId),
                 e.g. an Operation Manager who stays logged in as LAB_TECH ── */}
             <TeamLeaveRequests hideEmpty />
+
+            {/* ── Remake/redo review queue — only renders anything for
+                LEADER/ADMIN accounts, same idea as the leave queue above ── */}
+            <CaseReviewQueue hideEmpty />
 
             {/* ── SCAN ── */}
             {!activeDept ? (
