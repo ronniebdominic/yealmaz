@@ -182,10 +182,15 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
           </div>
         </>
       )}
-      {/* Discount — n/a for a remake/redo item, its amount is locked to 0 */}
-      {selWorkType && calcAmt != null && !item.remake && (
+      {/* Discount — independent of remake/redo; on a remake/redo item the
+          amount shown below stays Br 0, but this still applies on top of
+          the Operation Manager's eventual 50% Redo charge. */}
+      {selWorkType && calcAmt != null && (
         <div style={{ marginBottom: 10 }}>
-          <label style={lbl}>DISCOUNT</label>
+          <label style={lbl}>
+            DISCOUNT
+            {item.remake && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--text-3)' }}>— applies on top of the Redo charge, if that's what's decided</span>}
+          </label>
           <div style={{ display: 'flex', gap: 8 }}>
             {[{ val: '', label: 'None' }, { val: 'AMOUNT', label: 'Br Off' }, { val: 'PERCENT', label: '% Off' }].map(opt => (
               <button key={opt.val} type="button"
@@ -209,7 +214,7 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
       {selWorkType && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
           <div>
-            <label style={lbl}>AMOUNT (BR){item.remake && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 pending review</span>}
+            <label style={lbl}>AMOUNT (BR){item.remake && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 Br 0 — pending review</span>}
               {!item.remake && calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
               {!item.remake && isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {item.discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
             </label>
@@ -239,7 +244,7 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
         {item.remake && (
           <div style={{ marginTop: 8, padding: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
             <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginBottom: 8 }}>
-              Amount locked to Br 0 — the Operation Manager decides Remake (free) or Redo (50% of the original) when reviewing this case.
+              Amount locked to Br 0 — the Operation Manager decides Remake (free) or Redo (50% of the original) when reviewing this case. Any discount set above still applies on top of that 50%, if Redo is chosen.
             </div>
             <input style={{ ...inputSt, marginBottom: 8 }} placeholder="Remake reason (e.g. shade mismatch, fit issue)…"
               value={item.remakeReason} onChange={e => onChange({ remakeReason: e.target.value })} />
@@ -393,8 +398,11 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
     remake: showLineage,
     remakeReason: showLineage ? remakeReason : undefined,
     originalCaseId: showLineage ? originalCase?.id : undefined,
-    discountType: showLineage ? undefined : (hasDiscount ? discountType : undefined),
-    discountValue: showLineage ? undefined : (hasDiscount ? discountNum : undefined),
+    // Discount is independent of remake/redo — captured here regardless,
+    // it applies on top of the Operation Manager's eventual 50% Redo
+    // charge (moot for a free Remake); see PATCH /:id/review-decide.
+    discountType: hasDiscount ? discountType : undefined,
+    discountValue: hasDiscount ? discountNum : undefined,
     additionalItems: additionalItems.length > 0 ? additionalItems.map(it => {
       const itUnits = it.selectedTeeth.length > 0 ? String(it.selectedTeeth.length) : it.manualUnits;
       const itDiscountNum = parseFloat(it.discountValue);
@@ -413,8 +421,8 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         remake: it.remake,
         remakeReason: it.remake ? it.remakeReason : undefined,
         originalCaseId: it.remake ? it.originalCase?.id : undefined,
-        discountType: it.remake ? undefined : (itHasDiscount ? it.discountType : undefined),
-        discountValue: it.remake ? undefined : (itHasDiscount ? itDiscountNum : undefined),
+        discountType: itHasDiscount ? it.discountType : undefined,
+        discountValue: itHasDiscount ? itDiscountNum : undefined,
       };
     }) : undefined,
   });
@@ -498,11 +506,17 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         </div>
       </div>
       {/* Discount — locked in as Amount or Percent; once set, the Amount
-          field below becomes a computed/read-only figure. N/A for a
-          remake/redo — its amount is locked to 0 until reviewed. */}
-      {selWorkType && calcAmt != null && !showLineage && (
+          field below becomes a computed/read-only figure. Independent of
+          remake/redo: on a remake/redo case the amount shown here stays
+          Br 0 regardless, but this discount is still captured and applies
+          on top of the Operation Manager's eventual 50% Redo charge (moot
+          if they decide a free Remake instead). */}
+      {selWorkType && calcAmt != null && (
         <div style={{ marginBottom: 10 }}>
-          <label style={lbl}>DISCOUNT</label>
+          <label style={lbl}>
+            DISCOUNT
+            {showLineage && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--text-3)' }}>— applies on top of the Redo charge, if that's what's decided</span>}
+          </label>
           <div style={{ display: 'flex', gap: 8 }}>
             {[{ val: '', label: 'None' }, { val: 'AMOUNT', label: 'Br Off' }, { val: 'PERCENT', label: '% Off' }].map(opt => (
               <button key={opt.val} type="button"
@@ -528,7 +542,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           <div>
             <label style={lbl}>
               AMOUNT (BR)
-              {showLineage && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 pending Operation Manager review</span>}
+              {showLineage && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 Br 0 — pending Operation Manager review</span>}
               {!showLineage && calcAmt != null && !isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: isExpress ? 'var(--amber)' : 'var(--green)' }}>auto: Br {calcAmt.toLocaleString('en-US')}</span>}
               {!showLineage && isLocked && <span style={{ marginLeft: 6, fontWeight: 400, color: 'var(--red)' }}>🔒 locked — {discountType === 'PERCENT' ? `${discountNum}% off` : `Br ${discountNum.toLocaleString('en-US')} off`} Br {calcAmt.toLocaleString('en-US')}</span>}
             </label>
@@ -594,7 +608,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
         {showLineage && (
           <div style={{ marginTop: 10, padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
             <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-              🔒 Amount locked to Br 0 — the Operation Manager will decide Remake (free) or Redo (50% of the original) when reviewing this case.
+              🔒 Amount locked to Br 0 — the Operation Manager will decide Remake (free) or Redo (50% of the original) when reviewing this case. Any discount set above still applies on top of that 50%, if Redo is chosen.
             </div>
             <input
               style={{ ...inputSt, marginBottom: 10 }}

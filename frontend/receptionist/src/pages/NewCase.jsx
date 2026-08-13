@@ -338,7 +338,7 @@ function WorkItemForm({
             <div style={{ fontSize: 13, fontWeight: 700, color: item.remake ? 'var(--red)' : 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <MdAutorenew size={13} /> Remake / Redo of an earlier case
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Amount locked to Br 0 — Operation Manager decides Remake (free) or Redo (50%) at review</div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Amount locked to Br 0 — Operation Manager decides Remake (free) or Redo (50%) at review. Any discount below still applies on top of that 50%, if Redo is chosen.</div>
           </div>
         </label>
         {item.remake && (
@@ -355,9 +355,12 @@ function WorkItemForm({
         )}
       </div>
 
-      {item.workType && !item.remake && (
+      {item.workType && (
         <div className="form-group">
-          <label>Discount</label>
+          <label>
+            Discount
+            {item.remake && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>— applies on top of the Redo charge, if that's what's decided</span>}
+          </label>
           <div style={{ display: 'flex', gap: 8 }}>
             {[{ val: '', label: 'None' }, { val: 'AMOUNT', label: 'Br Off' }, { val: 'PERCENT', label: '% Off' }].map(opt => (
               <button key={opt.val} type="button"
@@ -560,8 +563,11 @@ export default function NewCase() {
           originalCaseId: item.remake ? item.originalCase?.id : undefined,
           dueDate: item.dueDate,
           totalAmount: item.remake ? '0' : item.totalAmount,
-          discountType: item.remake ? undefined : (hasDiscount ? item.discountType : undefined),
-          discountValue: item.remake ? undefined : (hasDiscount ? discountNum : undefined),
+          // Discount is independent of remake/redo — captured regardless,
+          // it applies on top of the Operation Manager's eventual 50% Redo
+          // charge (moot for a free Remake); see PATCH /:id/review-decide.
+          discountType: hasDiscount ? item.discountType : undefined,
+          discountValue: hasDiscount ? discountNum : undefined,
         };
       };
 
