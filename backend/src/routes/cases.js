@@ -86,21 +86,22 @@ async function createSingleCase(db, fields, actorUser) {
     }
   }
 
-  // Discount audit trail — totalAmount above is already the final,
-  // post-discount figure (computed client-side, same convention as
-  // POST /:id/accept); these two fields just explain why it's lower than
-  // the standard price, not a second source of truth. Not applicable to a
-  // remake/redo case — its amount is 0 until reviewed, discount-free.
-  if (!isRemake) {
-    if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
-      throw { status: 400, message: 'discountType must be AMOUNT or PERCENT.' };
-    }
-    if (discountType && (discountValue == null || isNaN(parseFloat(discountValue)) || parseFloat(discountValue) < 0)) {
-      throw { status: 400, message: 'discountValue must be a non-negative number when a discount type is set.' };
-    }
-    if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
-      throw { status: 400, message: 'A percentage discount cannot exceed 100.' };
-    }
+  // Discount — independent of remake/redo (a receptionist can still apply
+  // one at intake even on a remake/redo case; it's unrelated to the
+  // Operation Manager's later free/50% decision). For a normal case, this
+  // is the audit trail explaining why totalAmount is lower than the
+  // standard price. For a remake/redo case, totalAmount is 0 regardless
+  // (nothing to discount yet) — the discount is simply held here and
+  // applied on top of the 50% Redo charge, if that's what gets decided
+  // (moot for a free Remake); see PATCH /:id/review-decide.
+  if (discountType && !['AMOUNT', 'PERCENT'].includes(discountType)) {
+    throw { status: 400, message: 'discountType must be AMOUNT or PERCENT.' };
+  }
+  if (discountType && (discountValue == null || isNaN(parseFloat(discountValue)) || parseFloat(discountValue) < 0)) {
+    throw { status: 400, message: 'discountValue must be a non-negative number when a discount type is set.' };
+  }
+  if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
+    throw { status: 400, message: 'A percentage discount cannot exceed 100.' };
   }
 
   // Shade, doctor name, and doctor contact are mandatory for new orders.
@@ -168,8 +169,8 @@ async function createSingleCase(db, fields, actorUser) {
       receptionistId: actorUser.role === 'RECEPTIONIST' ? actorUser.id : null,
       status: finalStatus,
       orderGroupId: orderGroupId || null,
-      discountType: isRemake ? null : (discountType || null),
-      discountValue: isRemake ? null : (discountType ? parseFloat(discountValue) : null),
+      discountType: discountType || null,
+      discountValue: discountType ? parseFloat(discountValue) : null,
     }
   });
 
@@ -666,20 +667,20 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       ...(originalCase ? { originalCaseId: originalCase.id } : {}),
       ...(isRemake
         // Server-enforced, not just client-side — regardless of whatever
-        // totalAmount/discount/redo the client sent, a remake/redo case is
-        // always Br 0 and unreviewed until the Operation Manager decides.
-        ? { redo: false, totalAmount: 0, discountType: null, discountValue: null, remakeStatus: 'PENDING_REVIEW' }
-        : {
-            ...(totalAmount != null && totalAmount !== '' ? { totalAmount: parseFloat(totalAmount) } : {}),
-            ...(redo != null ? { redo: Boolean(redo) } : {}),
-            // Locked at acceptance time — totalAmount above is already the
-            // final, post-discount figure (computed client-side same as the
-            // rest of this endpoint's pricing); these two fields are the
-            // audit trail explaining why it's lower than the standard
-            // price, not a second source of truth.
-            discountType: discountType || null,
-            discountValue: discountType ? parseFloat(discountValue) : null,
-          }),
+        // totalAmount/redo the client sent, a remake/redo case is always
+        // Br 0 and unreviewed until the Operation Manager decides. A
+        // discount, though, is independent of that decision — it's held
+        // here and applied on top of the eventual 50% Redo charge (moot
+        // for a free Remake); see PATCH /:id/review-decide.
+        ? { redo: false, totalAmount: 0, remakeStatus: 'PENDING_REVIEW' }
+        : { ...(totalAmount != null && totalAmount !== '' ? { totalAmount: parseFloat(totalAmount) } : {}), ...(redo != null ? { redo: Boolean(redo) } : {}) }),
+      // Locked at acceptance time — for a normal case, totalAmount above is
+      // already the final, post-discount figure (computed client-side); for
+      // a remake/redo case it's the discount that'll apply on top of the
+      // Operation Manager's eventual Redo charge instead. Either way these
+      // two fields are the audit trail, not a second source of truth.
+      discountType: discountType || null,
+      discountValue: discountType ? parseFloat(discountValue) : null,
       orderGroupId: orderGroupId || null,
     };
 
@@ -1082,7 +1083,7 @@ router.get('/review/queue', protect, async (req, res) => {
       orderBy: { createdAt: 'asc' },
       select: {
         id: true, caseNumber: true, patientName: true, workType: true,
-        remakeReason: true, createdAt: true,
+        remakeReason: true, createdAt: true, discountType: true, discountValue: true,
         clinic: { select: { name: true } },
         originalCase: { select: { id: true, caseNumber: true, patientName: true, workType: true, totalAmount: true } },
       },
@@ -1094,11 +1095,22 @@ router.get('/review/queue', protect, async (req, res) => {
   }
 });
 
+// Applies a stored discount (AMOUNT off or PERCENT off) on top of a base
+// figure, clamped at 0 — same order of operations used everywhere else a
+// discount is applied (client-side accept/New Case math, mirrored here for
+// the one server-side case: a Redo's 50% charge).
+function applyDiscount(base, discountType, discountValue) {
+  if (!discountType || discountValue == null) return base;
+  const discounted = discountType === 'PERCENT' ? base * (1 - discountValue / 100) : base - discountValue;
+  return Math.max(0, discounted);
+}
+
 // ── PATCH /api/cases/:id/review-decide ───────────────────
 // Operation Manager's decision on a pending remake/redo case: REMAKE (free
-// of charge, totalAmount stays 0) or REDO (charged 50% of the ORIGINAL
-// case's totalAmount — not a fresh recalculation of this case's own work
-// type/units). Payment.amount is explicitly re-synced here since nothing
+// of charge — totalAmount stays 0, any discount is moot) or REDO (50% of
+// the ORIGINAL case's totalAmount, with the receptionist's own discount —
+// set independently at intake, unrelated to this decision — applied on top
+// of that 50%). Payment.amount is explicitly re-synced here since nothing
 // keeps it auto-synced with Case.totalAmount on most write paths.
 router.patch('/:id/review-decide', protect, async (req, res) => {
   try {
@@ -1123,7 +1135,10 @@ router.patch('/:id/review-decide', protect, async (req, res) => {
     }
 
     const isRedo = decision === 'REDO';
-    const newAmount = isRedo ? Math.round((existing.originalCase.totalAmount || 0) * 0.5 * 100) / 100 : 0;
+    const redoBase = (existing.originalCase.totalAmount || 0) * 0.5;
+    const redoDiscounted = applyDiscount(redoBase, existing.discountType, existing.discountValue);
+    const newAmount = isRedo ? Math.round(redoDiscounted * 100) / 100 : 0;
+    const hasDiscount = isRedo && existing.discountType != null;
 
     const updated = await prisma.$transaction(async (tx) => {
       const c = await tx.case.update({
@@ -1138,13 +1153,16 @@ router.patch('/:id/review-decide', protect, async (req, res) => {
       if (existing.payment) {
         await tx.payment.update({ where: { caseId: req.params.id }, data: { amount: newAmount } });
       }
+      const discountNote = hasDiscount
+        ? `, less ${existing.discountType === 'PERCENT' ? `${existing.discountValue}%` : `Br ${existing.discountValue.toLocaleString('en-US')}`} discount`
+        : '';
       await tx.caseStage.create({
         data: {
           caseId: req.params.id,
           stageName: existing.status,
           scannedBy: req.user.name,
           notes: isRedo
-            ? `Case review: Redo — charged Br ${newAmount.toLocaleString('en-US')} (50% of original ${existing.originalCase.caseNumber || ''}) — decided by ${req.user.name}`
+            ? `Case review: Redo — charged Br ${newAmount.toLocaleString('en-US')} (50% of original ${existing.originalCase.caseNumber || ''}${discountNote}) — decided by ${req.user.name}`
             : `Case review: Remake — free of charge — decided by ${req.user.name}`,
         },
       });
