@@ -5,7 +5,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
-const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
+const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isNonAgentDeliveredNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -704,7 +704,7 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
         // account) — self-pickups/admin edits are excluded outright inside
         // matchDeliveryAgent and shouldn't inflate this count.
         const rawName = (s.scannedBy || '').trim();
-        if (rawName && !NON_AGENT_DELIVERY_MARKERS.has(rawName) && !isSelfPickupNote(s.notes)) {
+        if (rawName && !NON_AGENT_DELIVERY_MARKERS.has(rawName) && !isNonAgentDeliveredNote(s.notes)) {
           unattributedOrders++;
         }
         continue;

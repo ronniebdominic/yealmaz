@@ -13,12 +13,28 @@
 //
 // Self-pickups and admin/import edits also write a 'DELIVERED' stage, but
 // under a non-agent name/note — NON_AGENT_DELIVERY_MARKERS and
-// isSelfPickupNote() let callers exclude those outright instead of
-// counting them as "couldn't be matched to an agent."
+// isSelfPickupNote()/isHistoricalRegistrationNote()/isPaymentCollectionNote()
+// let callers exclude those outright instead of counting them as "couldn't
+// be matched to an agent." All three are other, unrelated code paths that
+// happen to write a CaseStage with stageName 'DELIVERED' (a back-dated
+// historical case entry, and a Finance/Finance-AP user logging who
+// collected payment on an already-delivered case) — none of them are a
+// driver's own action, so they must never be attributed to one, and must
+// never inflate the "N orders couldn't be matched" count either (they were
+// never a delivery-agent event to begin with).
 const NON_AGENT_DELIVERY_MARKERS = new Set(['Admin Dashboard', 'Ye-Almaz Admin', 'Ye-Almaz Dispatch', 'Import', 'System']);
 
 function isSelfPickupNote(notes) {
   return /^self pickup/i.test(notes || '');
+}
+function isHistoricalRegistrationNote(notes) {
+  return /^case registered as historical\/delivered/i.test(notes || '');
+}
+function isPaymentCollectionNote(notes) {
+  return /^payment collected by/i.test(notes || '');
+}
+function isNonAgentDeliveredNote(notes) {
+  return isSelfPickupNote(notes) || isHistoricalRegistrationNote(notes) || isPaymentCollectionNote(notes);
 }
 
 // ── Pickup + delivery event classification ───────────────
@@ -56,8 +72,23 @@ const DISPATCHED_TO_PATTERN = /^Dispatched to (.+) for delivery$/i;
 // of a driver's own pickup/delivery actions (confirmed by them directly,
 // or assigned to them by name via dispatch) — pass straight into a
 // `where` alongside any date-range/scannedBy filters.
+//
+// Unlike the PICKUP_ASSIGNED/OUT_FOR_DELIVERY legs (already narrowed to an
+// exact note match), a case reaching DELIVERED has no such single note to
+// match on — a real driver's note is arbitrary free text (default
+// 'Delivered successfully', or whatever they typed). So instead this
+// excludes the specific known non-driver note patterns that also write a
+// DELIVERED stage (self-pickup, back-dated historical registration,
+// Finance logging a payment collection) — see isNonAgentDeliveredNote().
 const DELIVERY_EVENT_STAGE_OR = [
-  { stageName: 'DELIVERED' },
+  {
+    stageName: 'DELIVERED',
+    NOT: [
+      { notes: { startsWith: 'Self pickup', mode: 'insensitive' } },
+      { notes: { startsWith: 'Case registered as historical/delivered', mode: 'insensitive' } },
+      { notes: { startsWith: 'Payment collected by', mode: 'insensitive' } },
+    ],
+  },
   { stageName: 'PICKUP_ASSIGNED', notes: PICKUP_IMPRESSION_NOTE },
   { stageName: 'OUT_FOR_DELIVERY', notes: PICKUP_LAB_NOTE },
   { stageName: 'OUT_FOR_DELIVERY', notes: { startsWith: 'Dispatched to ' } },
@@ -106,12 +137,13 @@ function matchDeliveryAgent(scannedBy, notes, maps) {
   const dispatchedMatch = DISPATCHED_TO_PATTERN.exec((notes || '').trim());
   const rawName = (dispatchedMatch ? dispatchedMatch[1] : scannedBy || '').trim();
 
-  if (!rawName || NON_AGENT_DELIVERY_MARKERS.has(rawName) || isSelfPickupNote(notes)) return null;
+  if (!rawName || NON_AGENT_DELIVERY_MARKERS.has(rawName) || isNonAgentDeliveredNote(notes)) return null;
   const cleanRawName = rawName.toLowerCase();
   return maps.byName.get(cleanRawName) || maps.byFirstName.get(cleanRawName.split(/\s+/)[0]) || null;
 }
 
 module.exports = {
-  NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote, buildAgentNameMaps, matchDeliveryAgent,
+  NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote, isHistoricalRegistrationNote, isPaymentCollectionNote,
+  isNonAgentDeliveredNote, buildAgentNameMaps, matchDeliveryAgent,
   PICKUP_IMPRESSION_NOTE, PICKUP_LAB_NOTE, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent,
 };
