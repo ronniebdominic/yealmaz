@@ -967,9 +967,12 @@ function rangeForPreset(preset, customFrom, customTo) {
 
 function StatementModal({ clinicId, clinic, onClose, onBilled }) {
   const now = new Date();
-  const [preset, setPreset]       = useState(clinic.billingCycle && clinic.billingCycle !== 'NONE'
-    ? ({ WEEKLY: 'week', FORTNIGHTLY: 'fortnight', MONTHLY: 'month', CUSTOM: 'custom' }[clinic.billingCycle] || 'month')
-    : 'month');
+  // Default to "All Outstanding" — a clinic's real owed balance can include
+  // cases from well before their current billing cycle, and defaulting to
+  // that cycle's window silently under-billed anything older. Finance can
+  // still narrow to a specific period via the chips below if that's what
+  // they actually want for this bill.
+  const [preset, setPreset]       = useState('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo]     = useState('');
   const [cases, setCases]           = useState([]);
