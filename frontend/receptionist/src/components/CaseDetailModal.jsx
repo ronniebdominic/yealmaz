@@ -479,13 +479,13 @@ export default function CaseDetailModal({ caseId, onClose }) {
             </div>
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', marginBottom: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={remakeInput} onChange={e => setRemakeInput(e.target.checked)} /> <MdAutorenew size={13} style={{ verticalAlign: 'middle' }} /> Remake
+                <input type="checkbox" checked={remakeInput} style={{ width: 16, height: 16, flexShrink: 0 }} onChange={e => setRemakeInput(e.target.checked)} /> <MdAutorenew size={13} style={{ verticalAlign: 'middle' }} /> Remake
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={redoInput} onChange={e => setRedoInput(e.target.checked)} /> Redo
+                <input type="checkbox" checked={redoInput} style={{ width: 16, height: 16, flexShrink: 0 }} onChange={e => setRedoInput(e.target.checked)} /> Redo
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                <input type="checkbox" checked={isRedoInput} onChange={e => setIsRedoInput(e.target.checked)} /> <MdAutorenew size={13} style={{ verticalAlign: 'middle' }} /> Redo / Replacement (50%)
+                <input type="checkbox" checked={isRedoInput} style={{ width: 16, height: 16, flexShrink: 0 }} onChange={e => setIsRedoInput(e.target.checked)} /> <MdAutorenew size={13} style={{ verticalAlign: 'middle' }} /> Redo / Replacement (50%)
               </label>
             </div>
             {remakeInput && (

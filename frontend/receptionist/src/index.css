@@ -123,6 +123,7 @@ tr:hover td{background:var(--surface-2)}
 label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
 input,select,textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;font-family:var(--font-body);color:var(--text-1);background:var(--surface);transition:border-color .15s;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
 .search-input{position:relative}
 .search-input input{padding-left:36px}
 .search-input .icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-3)}

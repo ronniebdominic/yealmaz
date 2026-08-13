@@ -237,7 +237,7 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
       {/* Remake/Redo lineage — amount locked to 0, decided later at Operation Manager review */}
       <div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={item.remake}
+          <input type="checkbox" checked={item.remake} style={{ width: 16, height: 16, flexShrink: 0 }}
             onChange={e => onChange({ remake: e.target.checked, ...(e.target.checked ? {} : { originalCase: null, remakeReason: '' }) })} />
           This is a Remake / Redo of an earlier case
         </label>
@@ -602,7 +602,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           original) later, at case review, not here. */}
       <div style={{ marginBottom: 12 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={showLineage} onChange={e => { setShowLineage(e.target.checked); if (!e.target.checked) { setOriginalCase(null); setRemakeReason(''); } }} />
+          <input type="checkbox" checked={showLineage} style={{ width: 16, height: 16, flexShrink: 0 }} onChange={e => { setShowLineage(e.target.checked); if (!e.target.checked) { setOriginalCase(null); setRemakeReason(''); } }} />
           <MdAutorenew size={14} /> This is a Remake / Redo of an earlier case
         </label>
         {showLineage && (
