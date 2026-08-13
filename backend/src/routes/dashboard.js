@@ -831,7 +831,7 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE', 'F
         billingCycle: true, billingAnchor: true, lastBilledAt: true,
         cases: {
           select: {
-            id: true, status: true, units: true, createdAt: true,
+            id: true, status: true, units: true, createdAt: true, totalAmount: true,
             payment: { select: { status: true, amount: true, amountReceived: true } }
           }
         }
@@ -869,19 +869,28 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE', 'F
       const totalUnits      = cases.reduce((s, c) => s + (c.units || 0), 0);
       const deliveredOrders = cases.filter(c => c.status === 'DELIVERED').length;
       const inProgress      = cases.filter(c => IN_PROGRESS_STATUSES.has(c.status)).length;
-      const totalRevenue    = cases.reduce((s, c) => s + (c.payment?.amount || 0), 0);
+      // Case.totalAmount, not Payment.amount, is the source of truth for
+      // what a case is billed for — Payment.amount is meant to mirror it
+      // but isn't reliably kept in sync on every write path (confirmed:
+      // some delivered cases have Payment.amount left null, or stale from
+      // before a later price edit, while Case.totalAmount is correct).
+      // Using Payment.amount here silently dropped/undercounted real
+      // outstanding balances that the "Generate Bill" statement (which
+      // already sources from Case.totalAmount) correctly showed.
+      const totalRevenue    = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
       // Paid so far = full amount for VERIFIED cases + any partial amountReceived
       // collected on cases still awaiting the rest of their balance.
       const paymentsReceived = cases.reduce((s, c) => {
         if (c.payment?.status === 'VERIFIED') return s + (c.payment?.amount || 0);
         return s + (c.payment?.amountReceived || 0);
       }, 0);
-      // Only count outstanding where an amount has actually been set — cases
-      // with no payment amount yet would inflate the count with Br 0 entries.
-      // Outstanding = what's still owed (full amount minus any partial collected),
-      // exclusive of in-progress cases — only unpaid balances on DELIVERED cases count.
-      const outstandingCases = cases.filter(c => c.status === 'DELIVERED' && c.payment?.status !== 'VERIFIED' && c.payment?.amount);
-      const outstanding      = outstandingCases.reduce((s, c) => s + (c.payment.amount - (c.payment.amountReceived || 0)), 0);
+      // Only count outstanding where an amount has actually been billed —
+      // cases with no totalAmount yet would inflate the count with Br 0
+      // entries. Outstanding = what's still owed (billed amount minus any
+      // partial collected), exclusive of in-progress cases — only unpaid
+      // balances on DELIVERED cases count.
+      const outstandingCases = cases.filter(c => c.status === 'DELIVERED' && c.payment?.status !== 'VERIFIED' && c.totalAmount);
+      const outstanding      = outstandingCases.reduce((s, c) => s + (c.totalAmount - (c.payment?.amountReceived || 0)), 0);
       const outstandingCount = outstandingCases.length;
 
       // Aging — days since the oldest unpaid case was created

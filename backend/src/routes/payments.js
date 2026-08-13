@@ -893,7 +893,7 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE', 'FINANC
       where,
       include: {
         clinic: { select: { name: true, phone: true, address: true } },
-        payment: { select: { invoiceNumber: true, amount: true, fsNumber: true } },
+        payment: { select: { invoiceNumber: true, amount: true, fsNumber: true, amountReceived: true } },
       },
       orderBy: { createdAt: 'asc' },
     });

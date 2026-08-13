@@ -832,7 +832,10 @@ function BillingTab({ view = 'invoices', onView, scope = 'FULL' }) {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLabel) {
-  const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
+  // Still-owed amount per case, not the gross billed total — subtracts any
+  // partial amountReceived already collected on it.
+  const owed = (c) => (c.totalAmount || 0) - (c.payment?.amountReceived || 0);
+  const total = cases.reduce((s, c) => s + owed(c), 0);
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
   const period = periodLabel || (allOutstanding ? 'All Outstanding' : `${MONTHS[month]} ${year}`);
 
@@ -848,7 +851,7 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
       <td>${fmtDate(c.deliveryDate)}</td>
       <td style="font-family:monospace">${c.payment?.invoiceNumber || '—'}</td>
       <td style="font-family:monospace;font-weight:700">${c.payment?.fsNumber || '—'}</td>
-      <td style="text-align:right;font-weight:700">Br ${(c.totalAmount || 0).toLocaleString('en-US')}</td>
+      <td style="text-align:right;font-weight:700">Br ${owed(c).toLocaleString('en-US')}</td>
     </tr>`).join('');
 
   return `<!DOCTYPE html>
@@ -1020,7 +1023,10 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
     }
   };
 
-  const total = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
+  // Still-owed amount per case, not the gross billed total — subtracts any
+  // partial amountReceived already collected on it.
+  const outstandingAmount = (c) => (c.totalAmount || 0) - (c.payment?.amountReceived || 0);
+  const total = cases.reduce((s, c) => s + outstandingAmount(c), 0);
 
   const print = () => {
     const w = window.open('', '_blank');
@@ -1154,7 +1160,7 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
                         {fsSaving[c.id] && <span style={{ fontSize: 9, color: 'var(--text-3)', marginLeft: 4 }}>saving…</span>}
                       </td>
                       <td style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        {c.totalAmount ? `Br ${c.totalAmount.toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        {c.totalAmount ? `Br ${outstandingAmount(c).toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
                     </tr>
                   ))}
