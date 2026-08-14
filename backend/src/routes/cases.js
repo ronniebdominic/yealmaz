@@ -1323,4 +1323,74 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   }
 });
 
+// ── Bot-facing case lookups ───────────────────────────────
+// Purpose-built for the Telegram bot's tool layer (services/botTools.js) —
+// deliberately NOT the same as GET / (paginated, role-scoped/redacted for
+// the clinic-facing UI) or GET /:id (single case, clinic-redacted). These
+// are admin-scoped, capped, and lightly projected, for narrow lookups only
+// ("what's the status of case YDL26007199") — never for counting or
+// aggregation, which should go through dashboard.js's compute* functions
+// instead so the bot's numbers always agree with the dashboard's.
+async function searchCasesForBot({ search, status, paymentStatus, clinicId, dateFrom, dateTo, remake, redo, limit = 15 } = {}) {
+  const take = Math.min(parseInt(limit, 10) || 15, 20);
+  const where = {};
+  if (search) {
+    where.OR = [
+      { caseNumber:  { contains: search, mode: 'insensitive' } },
+      { patientName: { contains: search, mode: 'insensitive' } },
+      { clinic: { name: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+  if (status) where.status = status;
+  if (paymentStatus) where.paymentStatus = paymentStatus;
+  if (clinicId) where.clinicId = clinicId;
+  if (remake != null) where.remake = remake === true || remake === 'true';
+  if (redo != null) where.redo = redo === true || redo === 'true';
+  if (dateFrom || dateTo) {
+    where.createdAt = {};
+    if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+    if (dateTo) where.createdAt.lte = new Date(dateTo);
+  }
+
+  const cases = await prisma.case.findMany({
+    where,
+    take,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      caseNumber: true, patientName: true, workType: true, status: true,
+      paymentStatus: true, totalAmount: true, dueDate: true, deliveryDate: true, createdAt: true,
+      clinic: { select: { name: true } },
+    },
+  });
+
+  return cases.map(c => ({
+    caseNumber: c.caseNumber, patientName: c.patientName, workType: c.workType,
+    status: c.status, paymentStatus: c.paymentStatus, totalAmount: c.totalAmount,
+    clinicName: c.clinic?.name || null, dueDate: c.dueDate, deliveryDate: c.deliveryDate, createdAt: c.createdAt,
+  }));
+}
+
+// By case number first (e.g. "YDL26007199") — that's how the lab owner
+// will actually refer to a case in chat — falling back to a raw id lookup.
+const CASE_DETAIL_INCLUDE = {
+  clinic: { select: { name: true, phone: true } },
+  payment: { select: { status: true, amount: true, amountReceived: true, verifiedAt: true } },
+  stages: { orderBy: { scannedAt: 'asc' }, select: { stageName: true, scannedBy: true, scannedAt: true, notes: true } },
+  originalCase: { select: { caseNumber: true, patientName: true, totalAmount: true } },
+};
+async function getCaseDetailForBot(identifier) {
+  const trimmed = String(identifier || '').trim();
+  if (!trimmed) return null;
+
+  const byCaseNumber = await prisma.case.findUnique({ where: { caseNumber: trimmed }, include: CASE_DETAIL_INCLUDE });
+  if (byCaseNumber) return byCaseNumber;
+
+  // Not a known case number — try it as a raw id. Prisma throws on a
+  // malformed UUID rather than just returning null, so a bad/free-text
+  // identifier here is "not found," not a 500.
+  return prisma.case.findUnique({ where: { id: trimmed }, include: CASE_DETAIL_INCLUDE }).catch(() => null);
+}
+
+Object.assign(router, { searchCasesForBot, getCaseDetailForBot });
+
 module.exports = router;

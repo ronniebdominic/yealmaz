@@ -24,56 +24,64 @@ const PRODUCTION_STATUSES = [
 ];
 
 // ── GET /api/dashboard/summary ───────────────────────────
-router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
+// Body factored into computeDashboardSummary() so both the route AND the
+// Telegram bot's tool layer (see services/botTools.js) call the exact same
+// function — guarantees the bot can never report a different number than
+// this endpoint does.
+async function computeDashboardSummary() {
   const cacheKey = 'dashboard:summary';
   const cached = await appCache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return cached;
 
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+
+  const [
+    totalCases, pendingCases, completedCases, activeCases, pendingPickups,
+    pendingPayments, thisMonthRevenue, lastMonthRevenue, recentCases,
+    todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch
+  ] = await Promise.all([
+    prisma.case.count(),
+    prisma.case.count({ where: { status: { notIn: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED', 'UNDER_REVIEW', 'REJECTED', 'REMAKE'] } } }),
+    prisma.case.count({ where: { status: 'DELIVERED' } }),
+    prisma.case.count({ where: { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } } }),
+    prisma.case.count({ where: { status: { in: ['PENDING_PICKUP', 'PICKUP_ASSIGNED'] } } }),
+    prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
+    prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfMonth } }, _sum: { amount: true } }),
+    prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
+    prisma.case.findMany({ take: 10, orderBy: { createdAt: 'desc' }, include: { clinic: { select: { name: true } }, payment: true } }),
+    prisma.case.count({ where: { createdAt: { gte: startOfToday } } }),
+    prisma.case.count({ where: { remake: true, createdAt: { gte: startOfToday } } }),
+    prisma.case.count({ where: { redo: true, createdAt: { gte: startOfToday } } }),
+    prisma.case.count({ where: { deliveryDate: { gte: startOfToday } } }),
+    prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
+  ]);
+
+  const thisMonthAmt = thisMonthRevenue._sum.amount || 0;
+  const lastMonthAmt = lastMonthRevenue._sum.amount || 0;
+  const revenueGrowth = lastMonthAmt > 0
+    ? (((thisMonthAmt - lastMonthAmt) / lastMonthAmt) * 100).toFixed(1)
+    : null;
+
+  const result = {
+    stats: {
+      totalCases, pendingCases, completedCases, activeCases, pendingPickups, pendingPayments,
+      thisMonthRevenue: thisMonthAmt, lastMonthRevenue: lastMonthAmt, revenueGrowth,
+      todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch,
+    },
+    recentCases
+  };
+
+  await appCache.set(cacheKey, result);
+  return result;
+}
+
+router.get('/summary', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
   try {
-    const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-
-    const [
-      totalCases, pendingCases, completedCases, activeCases, pendingPickups,
-      pendingPayments, thisMonthRevenue, lastMonthRevenue, recentCases,
-      todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch
-    ] = await Promise.all([
-      prisma.case.count(),
-      prisma.case.count({ where: { status: { notIn: ['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'DELIVERED', 'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'ON_HOLD', 'CANCELLED', 'UNDER_REVIEW', 'REJECTED', 'REMAKE'] } } }),
-      prisma.case.count({ where: { status: 'DELIVERED' } }),
-      prisma.case.count({ where: { status: { in: ['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'] } } }),
-      prisma.case.count({ where: { status: { in: ['PENDING_PICKUP', 'PICKUP_ASSIGNED'] } } }),
-      prisma.payment.count({ where: { status: 'SCREENSHOT_UPLOADED' } }),
-      prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfMonth } }, _sum: { amount: true } }),
-      prisma.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }, _sum: { amount: true } }),
-      prisma.case.findMany({ take: 10, orderBy: { createdAt: 'desc' }, include: { clinic: { select: { name: true } }, payment: true } }),
-      prisma.case.count({ where: { createdAt: { gte: startOfToday } } }),
-      prisma.case.count({ where: { remake: true, createdAt: { gte: startOfToday } } }),
-      prisma.case.count({ where: { redo: true, createdAt: { gte: startOfToday } } }),
-      prisma.case.count({ where: { deliveryDate: { gte: startOfToday } } }),
-      prisma.case.count({ where: { status: 'READY_TO_DISPATCH' } }),
-    ]);
-
-    const thisMonthAmt = thisMonthRevenue._sum.amount || 0;
-    const lastMonthAmt = lastMonthRevenue._sum.amount || 0;
-    const revenueGrowth = lastMonthAmt > 0
-      ? (((thisMonthAmt - lastMonthAmt) / lastMonthAmt) * 100).toFixed(1)
-      : null;
-
-    const result = {
-      stats: {
-        totalCases, pendingCases, completedCases, activeCases, pendingPickups, pendingPayments,
-        thisMonthRevenue: thisMonthAmt, lastMonthRevenue: lastMonthAmt, revenueGrowth,
-        todayCases, remakeCount, redoCases, deliveredToday, readyToDispatch,
-      },
-      recentCases
-    };
-
-    await appCache.set(cacheKey, result);
-    res.json(result);
+    res.json(await computeDashboardSummary());
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load dashboard.' });
@@ -122,9 +130,9 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
 
 // ── GET /api/dashboard/finance-report ───────────────────
 // Returns revenue + pending summaries for Finance dashboard (daily/MTD/YTD)
-router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
-  try {
-    const { from, to, search } = req.query;
+// Body factored into computeFinanceReport() — see computeDashboardSummary()'s
+// comment above for why (shared by the route and the Telegram bot's tools).
+async function computeFinanceReport({ from, to, search } = {}) {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -187,7 +195,7 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       }),
     ]);
 
-    res.json({
+    return {
       revenue: {
         daily:  { amount: revenueDaily._sum.amount || 0, count: revenueDaily._count },
         MTD:    { amount: revenueMTD._sum.amount   || 0, count: revenueMTD._count },
@@ -204,7 +212,12 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
       taxWithheld: { count: taxWithheldAgg._count, amount: taxWithheldAgg._sum.taxWithheld || 0 },
       recentVerified,
       recentPending,
-    });
+    };
+}
+
+router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    res.json(await computeFinanceReport(req.query));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load finance report.' });
@@ -212,45 +225,53 @@ router.get('/finance-report', protect, restrict('ADMIN', 'FINANCE'), async (req,
 });
 
 // ── GET /api/dashboard/cases-by-status ──────────────────
-router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+async function computeCasesByStatus() {
   const cacheKey = 'dashboard:cases-by-status';
   const cached = await appCache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return cached;
 
+  const statuses = [
+    'PENDING_PICKUP', 'PICKUP_ASSIGNED',
+    'CASE_ACCEPTED', 'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
+    'SCANNING', 'DESIGNING',
+    'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING',
+    'METAL_FINISHING', 'OPAQUE_APPLICATION', 'CERAMIC_LAYERING',
+    'ZIRCONIA_FITTING_FINISHING', 'GLAZING', 'THERMO_PRESS', 'TRIMMING',
+    'QUALITY_CHECK', 'PAYMENT_INVOICING',
+    'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED',
+    'ON_HOLD', 'REMAKE', 'CANCELLED'
+  ];
+
+  const counts = await Promise.all(
+    statuses.map(async (status) => ({
+      status,
+      count: await prisma.case.count({ where: { status } })
+    }))
+  );
+
+  await appCache.set(cacheKey, counts);
+  return counts;
+}
+
+router.get('/cases-by-status', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
-    const statuses = [
-      'PENDING_PICKUP', 'PICKUP_ASSIGNED',
-      'CASE_ACCEPTED', 'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT',
-      'SCANNING', 'DESIGNING',
-      'MILLING_SINTERING', 'RESIN_3D_PRINTING', 'METAL_3D_PRINTING',
-      'METAL_FINISHING', 'OPAQUE_APPLICATION', 'CERAMIC_LAYERING',
-      'ZIRCONIA_FITTING_FINISHING', 'GLAZING', 'THERMO_PRESS', 'TRIMMING',
-      'QUALITY_CHECK', 'PAYMENT_INVOICING',
-      'READY_TO_DISPATCH', 'OUT_FOR_DELIVERY', 'DELIVERED',
-      'ON_HOLD', 'REMAKE', 'CANCELLED'
-    ];
-
-    const counts = await Promise.all(
-      statuses.map(async (status) => ({
-        status,
-        count: await prisma.case.count({ where: { status } })
-      }))
-    );
-
-    await appCache.set(cacheKey, counts);
-    res.json(counts);
+    res.json(await computeCasesByStatus());
   } catch (err) {
     res.status(500).json({ error: 'Could not load case stats.' });
   }
 });
 
 // ── GET /api/dashboard/admin-analytics ──────────────────
-router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
-  try {
-    const { from, to, clinicId, search } = req.query;
+// IMPORTANT for callers (incl. the Telegram bot): `deliveredCases` counts
+// cases whose deliveryDate falls in the requested range, regardless of
+// when they were created; `deliveredOfCreated` counts, of the cases
+// CREATED in the range, how many have since been delivered (whenever that
+// happened). These are different cohorts and are not interchangeable —
+// see the caseFilter/deliveredFilter comments below.
+async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
     const cacheKey = `dashboard:analytics:${from || ''}:${to || ''}:${clinicId || ''}:${search || ''}`;
     const cached = await appCache.get(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return cached;
 
     // Free-text filter across clinic name / patient name / case number —
     // applied everywhere caseFilter is used, plus mirrored into the Payment
@@ -522,7 +543,12 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
     };
 
     await appCache.set(cacheKey, result);
-    res.json(result);
+    return result;
+}
+
+router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    res.json(await computeAdminAnalytics(req.query));
   } catch (err) {
     console.error('[admin-analytics]', err);
     res.status(500).json({ error: 'Could not load analytics.' });
@@ -536,12 +562,10 @@ router.get('/admin-analytics', protect, restrict('ADMIN'), async (req, res) => {
 // renamed/removed employee) are counted separately rather than silently
 // dropped. A tech's own self-service equivalent (their own data only, plus
 // an actual scan-by-scan list) is GET /api/lab/my-performance.
-router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
-  try {
-    const { from, to } = req.query;
+async function computeLabPerformance({ from, to } = {}) {
     const cacheKey = `dashboard:lab-performance:${from || ''}:${to || ''}`;
     const cached = await appCache.get(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return cached;
 
     const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
     const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
@@ -651,7 +675,12 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
     };
 
     await appCache.set(cacheKey, result);
-    res.json(result);
+    return result;
+}
+
+router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    res.json(await computeLabPerformance(req.query));
   } catch (err) {
     console.error('[lab-performance]', err);
     res.status(500).json({ error: 'Could not load lab performance.' });
@@ -667,12 +696,10 @@ router.get('/lab-performance', protect, restrict('ADMIN'), async (req, res) => {
 // separately, with "Lab Share" based on their combined order volume so a
 // driver who does lots of pickups but few deliveries (or vice versa)
 // still gets fair credit for their actual workload.
-router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res) => {
-  try {
-    const { from, to } = req.query;
+async function computeDeliveryPerformance({ from, to } = {}) {
     const cacheKey = `dashboard:delivery-performance:${from || ''}:${to || ''}`;
     const cached = await appCache.get(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return cached;
 
     const dateTo = to ? endOfDay(to) : (() => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; })();
     const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
@@ -748,7 +775,12 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
     };
 
     await appCache.set(cacheKey, result);
-    res.json(result);
+    return result;
+}
+
+router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    res.json(await computeDeliveryPerformance(req.query));
   } catch (err) {
     console.error('[delivery-performance]', err);
     res.status(500).json({ error: 'Could not load delivery performance.' });
@@ -757,59 +789,63 @@ router.get('/delivery-performance', protect, restrict('ADMIN'), async (req, res)
 
 // ── GET /api/dashboard/clinic-balances ──────────────────
 // Per-clinic outstanding payment totals for Finance dashboard
-router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+async function computeClinicBalances() {
   const cacheKey = 'payments:clinic-balances';
   const cached = await appCache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return cached;
 
-  try {
-    const payments = await prisma.payment.findMany({
-      where: {
-        status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
-        amount: { gt: 0 },   // only include cases where a non-zero amount is set
-        // Outstanding excludes in-progress cases — only unpaid balances on
-        // DELIVERED cases count as outstanding.
-        case: { status: 'DELIVERED' },
-      },
-      select: {
-        id: true, status: true, amount: true, amountReceived: true, updatedAt: true,
-        case: {
-          select: {
-            id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true, deliveryDate: true, createdAt: true,
-            clinic: { select: { id: true, name: true, isExcluded: true } },
-          }
+  const payments = await prisma.payment.findMany({
+    where: {
+      status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
+      amount: { gt: 0 },   // only include cases where a non-zero amount is set
+      // Outstanding excludes in-progress cases — only unpaid balances on
+      // DELIVERED cases count as outstanding.
+      case: { status: 'DELIVERED' },
+    },
+    select: {
+      id: true, status: true, amount: true, amountReceived: true, updatedAt: true,
+      case: {
+        select: {
+          id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true, deliveryDate: true, createdAt: true,
+          clinic: { select: { id: true, name: true, isExcluded: true } },
         }
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-
-    const clinicMap = {};
-    for (const p of payments) {
-      const clinic = p.case?.clinic;
-      if (!clinic) continue;
-      const remaining = (p.amount || 0) - (p.amountReceived || 0); // still owed, after any partial collection
-      if (!clinicMap[clinic.id]) {
-        clinicMap[clinic.id] = {
-          id: clinic.id, name: clinic.name, isExcluded: clinic.isExcluded,
-          pendingCount: 0, pendingAmount: 0, cases: [],
-        };
       }
-      clinicMap[clinic.id].pendingCount++;
-      clinicMap[clinic.id].pendingAmount += remaining;
-      clinicMap[clinic.id].cases.push({
-        caseId: p.case.id, caseNumber: p.case.caseNumber,
-        patientName: p.case.patientName, workType: p.case.workType,
-        units: p.case.units, dueDate: p.case.dueDate,
-        deliveryDate: p.case.deliveryDate, createdAt: p.case.createdAt,
-        paymentStatus: p.status, amount: remaining, amountReceived: p.amountReceived || 0, updatedAt: p.updatedAt,
-      });
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  const clinicMap = {};
+  for (const p of payments) {
+    const clinic = p.case?.clinic;
+    if (!clinic) continue;
+    const remaining = (p.amount || 0) - (p.amountReceived || 0); // still owed, after any partial collection
+    if (!clinicMap[clinic.id]) {
+      clinicMap[clinic.id] = {
+        id: clinic.id, name: clinic.name, isExcluded: clinic.isExcluded,
+        pendingCount: 0, pendingAmount: 0, cases: [],
+      };
     }
+    clinicMap[clinic.id].pendingCount++;
+    clinicMap[clinic.id].pendingAmount += remaining;
+    clinicMap[clinic.id].cases.push({
+      caseId: p.case.id, caseNumber: p.case.caseNumber,
+      patientName: p.case.patientName, workType: p.case.workType,
+      units: p.case.units, dueDate: p.case.dueDate,
+      deliveryDate: p.case.deliveryDate, createdAt: p.case.createdAt,
+      paymentStatus: p.status, amount: remaining, amountReceived: p.amountReceived || 0, updatedAt: p.updatedAt,
+    });
+  }
 
-    const balances = Object.values(clinicMap)
-      .sort((a, b) => b.pendingAmount - a.pendingAmount);
+  const balances = Object.values(clinicMap)
+    .sort((a, b) => b.pendingAmount - a.pendingAmount);
 
-    await appCache.set(cacheKey, balances);
-    res.json(balances);
+  await appCache.set(cacheKey, balances);
+  return balances;
+}
+
+router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
+  try {
+    res.json(await computeClinicBalances());
   } catch (err) {
     console.error('[clinic-balances]', err);
     res.status(500).json({ error: 'Could not load clinic balances.' });
@@ -818,13 +854,12 @@ router.get('/clinic-balances', protect, restrict('ADMIN', 'FINANCE'), async (req
 
 // ── GET /api/dashboard/trusted-partners-summary ──────────
 // Per-clinic aggregated stats for trusted partner (isExcluded) clinics
-router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
+async function computeTrustedPartnersSummary() {
   const cacheKey = 'payments:trusted-summary';
   const cached = await appCache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return cached;
 
-  try {
-    const clinics = await prisma.clinic.findMany({
+  const clinics = await prisma.clinic.findMany({
       where: { isExcluded: true, isActive: true },
       select: {
         id: true, name: true, phone: true, address: true,
@@ -914,7 +949,12 @@ router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE', 'F
       .sort((a, b) => b.outstanding - a.outstanding);
 
     await appCache.set(cacheKey, summary);
-    res.json(summary);
+    return summary;
+}
+
+router.get('/trusted-partners-summary', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
+  try {
+    res.json(await computeTrustedPartnersSummary());
   } catch (err) {
     console.error('[trusted-partners-summary]', err);
     res.status(500).json({ error: 'Could not load trusted partners summary.' });
@@ -1141,5 +1181,21 @@ function format(date, fmt) {
     .replace('HH',   pad(d.getHours()))
     .replace('mm',   pad(d.getMinutes()));
 }
+
+// Attached onto the router object (harmless — Router() is just a function/
+// object) so the Telegram bot's tool layer (services/botTools.js) can
+// import the exact same query logic every route above uses, in-process —
+// no HTTP hop, no duplicated Prisma queries, and the bot can never report a
+// number that disagrees with what these endpoints themselves return.
+Object.assign(router, {
+  computeDashboardSummary,
+  computeFinanceReport,
+  computeCasesByStatus,
+  computeAdminAnalytics,
+  computeLabPerformance,
+  computeDeliveryPerformance,
+  computeClinicBalances,
+  computeTrustedPartnersSummary,
+});
 
 module.exports = router;

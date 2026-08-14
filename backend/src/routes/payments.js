@@ -865,40 +865,42 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), asyn
 
 // ── GET /api/payments/statement/:clinicId ────────────────
 // All outstanding (PENDING) cases for a trusted clinic, optionally filtered by month
+// Body factored into getClinicStatement() so both the route and the
+// Telegram bot's tool layer (services/botTools.js) call the exact same
+// query — same convention as dashboard.js's compute* functions.
+async function getClinicStatement(clinicId, { dateFrom, dateTo } = {}) {
+  const where = {
+    clinicId,
+    clinic: { isExcluded: true },
+    paymentStatus: 'PENDING',
+    // A bill only covers work that's actually done — cases still in
+    // production (accepted yesterday, in progress, etc.) aren't billable
+    // yet and must not appear here, even though their paymentStatus is
+    // also PENDING. Matches the same rule already enforced in /trusted.
+    status: 'DELIVERED',
+  };
+
+  // Filtered by deliveryDate, not createdAt — this bill is "what did we
+  // deliver (and are owed for) in this period," not "what was ordered."
+  if (dateFrom || dateTo) {
+    where.deliveryDate = {};
+    if (dateFrom) where.deliveryDate.gte = startOfDay(dateFrom);
+    if (dateTo) where.deliveryDate.lte = endOfDay(dateTo);
+  }
+
+  return prisma.case.findMany({
+    where,
+    include: {
+      clinic: { select: { name: true, phone: true, address: true } },
+      payment: { select: { invoiceNumber: true, amount: true, fsNumber: true, amountReceived: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
 router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
-  const { clinicId } = req.params;
-  const { dateFrom, dateTo } = req.query;
-
   try {
-    const where = {
-      clinicId,
-      clinic: { isExcluded: true },
-      paymentStatus: 'PENDING',
-      // A bill only covers work that's actually done — cases still in
-      // production (accepted yesterday, in progress, etc.) aren't billable
-      // yet and must not appear here, even though their paymentStatus is
-      // also PENDING. Matches the same rule already enforced in /trusted.
-      status: 'DELIVERED',
-    };
-
-    // Filtered by deliveryDate, not createdAt — this bill is "what did we
-    // deliver (and are owed for) in this period," not "what was ordered."
-    if (dateFrom || dateTo) {
-      where.deliveryDate = {};
-      if (dateFrom) where.deliveryDate.gte = startOfDay(dateFrom);
-      if (dateTo) where.deliveryDate.lte = endOfDay(dateTo);
-    }
-
-    const cases = await prisma.case.findMany({
-      where,
-      include: {
-        clinic: { select: { name: true, phone: true, address: true } },
-        payment: { select: { invoiceNumber: true, amount: true, fsNumber: true, amountReceived: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    res.json(cases);
+    res.json(await getClinicStatement(req.params.clinicId, req.query));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not fetch statement.' });
@@ -976,5 +978,7 @@ router.get('/export', protect, restrict('ADMIN', 'FINANCE', 'RECEPTIONIST'), asy
     res.status(500).json({ error: 'Could not export payments.' });
   }
 });
+
+Object.assign(router, { getClinicStatement });
 
 module.exports = router;
