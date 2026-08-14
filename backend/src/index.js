@@ -140,6 +140,7 @@ app.use('/api/offboarding',   require('./routes/offboarding'));
 app.use('/api/recruitment',   require('./routes/recruitment'));
 app.use('/api/hr-analytics',  require('./routes/hr-analytics'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
+app.use('/api/telegram-webhook', require('./routes/telegramWebhook'));  // Public: Telegram bot callbacks (own secret auth)
 
 // ── Cache management (admin only) ───────────────────────
 const { appCache, invalidate } = require('./cache');
@@ -181,6 +182,11 @@ server.listen(PORT, async () => {
   // Clear all caches on startup so stale data never survives a redeploy
   await invalidate('dashboard:*', 'cases:*', 'case:*', 'payments:*', 'prices', 'clinics');
   console.log(`🧹 Cache flushed on startup\n`);
+
+  // Telegram bot's daily business-summary push — the first scheduled job
+  // in this codebase. No-ops (with a log line) if TELEGRAM_BOT_TOKEN isn't
+  // configured, same conditional pattern as every other integration here.
+  require('./services/dailySummaryJob').schedule();
 });
 
 module.exports = { app, io, prisma };
