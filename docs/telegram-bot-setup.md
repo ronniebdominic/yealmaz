@@ -240,3 +240,25 @@ live backend.
 - There's no monitoring/alerting on any of this in v1 — a silent outage
   (e.g. the lab machine losing power overnight) will just mean the bot
   doesn't reply until someone notices and checks the chain above.
+- **The bot deliberately cannot see payroll, salary, advances, expense
+  claims, performance reviews or employee documents.** Its entire access
+  boundary is the Telegram chat-ID allowlist — a much weaker credential
+  than an ADMIN login — so people-data access stops at attendance and
+  leave. Widening it means accepting that anyone holding a listed chat ID
+  (or `TELEGRAM_WEBHOOK_SECRET`) can read whatever is added.
+- **Application/server error logs are not exposed to the bot**, and
+  shouldn't be: they exist only in Railway's stdout, and raw errors here
+  routinely embed infrastructure detail (a Prisma failure during testing
+  printed the full Supabase pooler hostname). `get_activity_log` covers
+  the business audit trail instead — who scanned, delivered, clocked in,
+  or moved stock.
+- **Analysis is computed in code, not by the model** (`botInsights.js`).
+  Every finding has a named threshold and a `basis` string explaining how
+  it was derived, and the model may only repeat findings it is handed. If
+  a number in an insight is ever questioned, trace it through that `basis`
+  field. Adding a new insight means adding a rule there — never loosening
+  the prompt to let the model reason freely, which it does badly.
+- `OLLAMA_NUM_CTX` defaults to 16384, sized to an RTX 4060 8GB (~4.7GB of
+  Q4_0 weights plus ~128KB/token of KV cache). If replies ever become
+  drastically slower, check whether the KV cache is spilling into system
+  RAM and lower it back to 8192.
