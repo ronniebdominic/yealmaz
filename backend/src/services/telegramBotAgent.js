@@ -107,32 +107,38 @@ function clearHistory(chatId) {
   conversationHistory.delete(chatId);
 }
 
-// Guards against a specific, repeatedly-observed failure mode: asked for
-// a date-range tool with no period named ("who's the best lab worker"),
-// Hermes-3-8B sometimes invents an arbitrary, wrong year for from/to (seen
-// live: 2022, out of nowhere, on this 2026 system) instead of naming the
-// real current year or omitting the args — silently returning all-zero
-// data for the wrong period. This held even after the system prompt was
-// given the exact real dates to use, so it's corrected here instead of
-// re-prompted for: if a tool call's from/to year doesn't match the
-// current year and the user's own message never mentioned that year (or
-// any year), the args are dropped so the tool's own "defaults to start of
-// this year" behavior (see botTools.js's parameter descriptions) kicks in
-// instead of the model's guess.
+// Guards against a specific, repeatedly-observed failure mode: asked a
+// date-range question, Hermes-3-8B sometimes invents an arbitrary, wrong
+// year for from/to (seen live: 2022, out of nowhere, on this 2026 system)
+// instead of the real current year — even when the user's own message
+// named the correct year explicitly. This held even after the system
+// prompt was given the exact real dates to use, so it's corrected here
+// instead of re-prompted for. Corrects the year in place (rather than
+// dropping the args outright, an earlier, worse version of this fix) so a
+// specific day/month the model got right — e.g. "August 14th" — survives
+// the correction instead of silently widening into a whole-year default
+// that no longer answers what was actually asked.
 function sanitizeDateArgs(args, userText) {
   if (!args || typeof args !== 'object') return args;
   const isYMD = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
   if (!isYMD(args.from) && !isYMD(args.to)) return args;
 
   const currentYear = new Date().getFullYear(); // lab timezone via TZ env
-  const years = [args.from, args.to].filter(isYMD).map(v => parseInt(v.slice(0, 4), 10));
   const mentionedYears = (userText.match(/\b(19|20)\d{2}\b/g) || []).map(Number);
-  const suspicious = years.some(y => y !== currentYear && !mentionedYears.includes(y));
-  if (!suspicious) return args;
 
-  console.warn(`[TelegramBot] Dropping suspicious date args ${JSON.stringify({ from: args.from, to: args.to })} for user text "${userText}" — not the current year and not mentioned by the user.`);
-  const { from, to, ...rest } = args;
-  return rest;
+  const fixYear = (dateStr) => {
+    if (!isYMD(dateStr)) return dateStr;
+    const year = parseInt(dateStr.slice(0, 4), 10);
+    if (year === currentYear || mentionedYears.includes(year)) return dateStr;
+    return `${currentYear}${dateStr.slice(4)}`; // keep month/day, fix only the year
+  };
+
+  const fixedFrom = fixYear(args.from);
+  const fixedTo = fixYear(args.to);
+  if (fixedFrom === args.from && fixedTo === args.to) return args;
+
+  console.warn(`[TelegramBot] Corrected suspicious date args ${JSON.stringify({ from: args.from, to: args.to })} -> ${JSON.stringify({ from: fixedFrom, to: fixedTo })} for user text "${userText}"`);
+  return { ...args, from: fixedFrom, to: fixedTo };
 }
 
 // Even after sanitizeDateArgs corrects what's actually SENT to a tool
@@ -162,14 +168,31 @@ function correctDateMentions(text, realRange, userText) {
   if (!text || !realRange) return text;
   const currentYear = new Date().getFullYear();
   const mentionedYears = (userText.match(/\b(19|20)\d{2}\b/g) || []).map(Number);
+
   let matchIndex = 0;
-  return text.replace(/\b(19|20)\d{2}-\d{2}-\d{2}\b/g, (match) => {
+  let corrected = text.replace(/\b(19|20)\d{2}-\d{2}-\d{2}\b/g, (match) => {
     const year = parseInt(match.slice(0, 4), 10);
     if (year === currentYear || mentionedYears.includes(year)) return match; // plausibly legit, leave it
     const replacement = matchIndex === 0 ? realRange.from : realRange.to;
     matchIndex++;
     return replacement;
   });
+
+  // The model doesn't only get dates wrong in YYYY-MM-DD form — it just as
+  // often narrates a wrong bare year in natural language (observed live:
+  // "On August 14th, 2022..." for a question that named 2026 explicitly).
+  // Any remaining standalone wrong year gets swapped for the real range's
+  // year; the month/day around it is the model's own prose and is left
+  // alone. Word-boundary matching means this can't corrupt a case number
+  // like YDL26007410 — digits and letters share no boundary mid-token.
+  const realYear = realRange.from.slice(0, 4);
+  corrected = corrected.replace(/\b(19|20)\d{2}\b/g, (match) => {
+    const year = parseInt(match, 10);
+    if (year === currentYear || mentionedYears.includes(year)) return match;
+    return realYear;
+  });
+
+  return corrected;
 }
 
 async function executeToolCall(toolCall, userText) {
