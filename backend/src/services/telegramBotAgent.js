@@ -38,8 +38,39 @@ function todayInLabTimezone() {
   return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 }
 
+function toYMD(date) {
+  return date.toLocaleDateString('en-CA');
+}
+
+// Concrete date-range anchors for the system prompt, computed in code
+// rather than left for the model to derive. Empirically, an 8B local
+// model asked to resolve "this week" / "no period given" on its own will
+// sometimes invent an arbitrary, wrong year for the tool's from/to args
+// (observed: 2022, out of nowhere, on a live 2026 system) instead of
+// leaving them unset or using the real current year — silently returning
+// all-zero data for a totally different period. Handing it pre-computed
+// YYYY-MM-DD values removes the date arithmetic (and the guessing) from
+// the model's job entirely.
+function dateAnchors() {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun..6=Sat, already lab-timezone via TZ env
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  return {
+    today: toYMD(now),
+    startOfWeek: toYMD(monday),
+    startOfMonth: toYMD(startOfMonth),
+    startOfYear: toYMD(startOfYear),
+  };
+}
+
 function buildSystemPrompt() {
-  return `${SYSTEM_PROMPT_BASE}\n\nToday's date is ${todayInLabTimezone()}.`;
+  const a = dateAnchors();
+  return `${SYSTEM_PROMPT_BASE}
+
+Today's date is ${a.today}. When a tool needs a date range, resolve it using these exact anchors — never guess or invent a year: "today" = ${a.today} to ${a.today}; "this week" = ${a.startOfWeek} to ${a.today}; "this month" = ${a.startOfMonth} to ${a.today}; "this year" or no period mentioned = ${a.startOfYear} to ${a.today}. Only use a different year or date than these if the user explicitly names one (e.g. "in 2024," "since March 3rd"). When you write your answer, if you mention the date range at all, quote it from the "range" field actually returned in the tool's JSON result — never restate the from/to you originally asked for, since a tool may adjust it.`;
 }
 
 // Single-flight guard — a lab PC (likely one consumer GPU, maybe
@@ -76,9 +107,74 @@ function clearHistory(chatId) {
   conversationHistory.delete(chatId);
 }
 
-async function executeToolCall(toolCall) {
-  const { id, name, arguments: args } = toolCall;
-  if (args === null) {
+// Guards against a specific, repeatedly-observed failure mode: asked for
+// a date-range tool with no period named ("who's the best lab worker"),
+// Hermes-3-8B sometimes invents an arbitrary, wrong year for from/to (seen
+// live: 2022, out of nowhere, on this 2026 system) instead of naming the
+// real current year or omitting the args — silently returning all-zero
+// data for the wrong period. This held even after the system prompt was
+// given the exact real dates to use, so it's corrected here instead of
+// re-prompted for: if a tool call's from/to year doesn't match the
+// current year and the user's own message never mentioned that year (or
+// any year), the args are dropped so the tool's own "defaults to start of
+// this year" behavior (see botTools.js's parameter descriptions) kicks in
+// instead of the model's guess.
+function sanitizeDateArgs(args, userText) {
+  if (!args || typeof args !== 'object') return args;
+  const isYMD = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  if (!isYMD(args.from) && !isYMD(args.to)) return args;
+
+  const currentYear = new Date().getFullYear(); // lab timezone via TZ env
+  const years = [args.from, args.to].filter(isYMD).map(v => parseInt(v.slice(0, 4), 10));
+  const mentionedYears = (userText.match(/\b(19|20)\d{2}\b/g) || []).map(Number);
+  const suspicious = years.some(y => y !== currentYear && !mentionedYears.includes(y));
+  if (!suspicious) return args;
+
+  console.warn(`[TelegramBot] Dropping suspicious date args ${JSON.stringify({ from: args.from, to: args.to })} for user text "${userText}" — not the current year and not mentioned by the user.`);
+  const { from, to, ...rest } = args;
+  return rest;
+}
+
+// Even after sanitizeDateArgs corrects what's actually SENT to a tool
+// (so the numbers come back for the right period), Hermes-3-8B has been
+// observed to still narrate a wrong, invented date range in its final
+// prose (e.g. citing "2022-05-23 to 2022-05-29" in the reply even though
+// the tool it called was, after sanitization, given no from/to at all and
+// returned this year's real range) — an explicit "quote the tool's own
+// range field" instruction did not fix this either. So the last real
+// range a tool actually returned this turn is tracked and used to
+// deterministically correct any suspicious-year date the model still
+// writes into its reply, rather than trusting the model to get this right.
+function extractRange(toolResultContent) {
+  try {
+    const parsed = JSON.parse(toolResultContent);
+    const from = parsed?.range?.from;
+    if (typeof from === 'string') {
+      return { from: from.slice(0, 10), to: (parsed.range.to || from).slice(0, 10) };
+    }
+  } catch {
+    // not JSON or no range field — nothing to extract
+  }
+  return null;
+}
+
+function correctDateMentions(text, realRange, userText) {
+  if (!text || !realRange) return text;
+  const currentYear = new Date().getFullYear();
+  const mentionedYears = (userText.match(/\b(19|20)\d{2}\b/g) || []).map(Number);
+  let matchIndex = 0;
+  return text.replace(/\b(19|20)\d{2}-\d{2}-\d{2}\b/g, (match) => {
+    const year = parseInt(match.slice(0, 4), 10);
+    if (year === currentYear || mentionedYears.includes(year)) return match; // plausibly legit, leave it
+    const replacement = matchIndex === 0 ? realRange.from : realRange.to;
+    matchIndex++;
+    return replacement;
+  });
+}
+
+async function executeToolCall(toolCall, userText) {
+  const { id, name, arguments: rawArgs } = toolCall;
+  if (rawArgs === null) {
     // Local models are meaningfully less reliable at strict tool-call JSON
     // than a frontier cloud model — hand the parse error back as a tool
     // result (not a crash) so the model can see it and retry properly on
@@ -89,6 +185,7 @@ async function executeToolCall(toolCall) {
   if (!handler) {
     return { id, content: JSON.stringify({ error: `Unknown tool: "${name}".` }) };
   }
+  const args = sanitizeDateArgs(rawArgs, userText);
   try {
     const result = await handler(args || {});
     return { id, content: JSON.stringify(result) };
@@ -119,6 +216,7 @@ async function runAgentLoop(chatId, userText) {
   // turn only and never gets persisted (see appendToHistory).
   const messages = [...getHistory(chatId), { role: 'user', content: userText }];
   let toolCalledThisTurn = false;
+  let lastRealRange = null;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     let response;
@@ -144,9 +242,11 @@ async function runAgentLoop(chatId, userText) {
       // All tool calls in a round run concurrently — matches how a
       // frontier model's parallel tool-use is normally handled, and these
       // are all independent read-only lookups anyway.
-      const results = await Promise.all(response.toolCalls.map(executeToolCall));
+      const results = await Promise.all(response.toolCalls.map(tc => executeToolCall(tc, userText)));
       for (const r of results) {
         messages.push({ role: 'tool', tool_call_id: r.id, content: r.content });
+        const range = extractRange(r.content);
+        if (range) lastRealRange = range; // most recent date-range tool result wins
       }
       continue;
     }
@@ -157,7 +257,7 @@ async function runAgentLoop(chatId, userText) {
       if (!toolCalledThisTurn) {
         return GROUNDING_FALLBACK; // not persisted — nothing real to follow up on
       }
-      const replyText = response.text.trim();
+      const replyText = correctDateMentions(response.text.trim(), lastRealRange, userText);
       appendToHistory(chatId, userText, replyText);
       return replyText;
     }
@@ -175,8 +275,8 @@ async function runAgentLoop(chatId, userText) {
   // of silently truncating the conversation.
   try {
     const final = await runLocalLlm({ system, messages, maxTokens: 1500 });
-    const replyText = final.text?.trim();
-    if (replyText) {
+    if (final.text?.trim()) {
+      const replyText = correctDateMentions(final.text.trim(), lastRealRange, userText);
       appendToHistory(chatId, userText, replyText);
       return replyText;
     }
