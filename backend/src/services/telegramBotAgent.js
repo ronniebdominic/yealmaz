@@ -240,6 +240,7 @@ async function runAgentLoop(chatId, userText) {
   const messages = [...getHistory(chatId), { role: 'user', content: userText }];
   let toolCalledThisTurn = false;
   let lastRealRange = null;
+  let groundingRetried = false;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     let response;
@@ -278,6 +279,21 @@ async function runAgentLoop(chatId, userText) {
     // if a tool actually backed it up this turn (see GROUNDING_FALLBACK).
     if (response.text?.trim()) {
       if (!toolCalledThisTurn) {
+        // Before giving up: this specific failure — a real, in-scope
+        // question (e.g. "where is scan no X") answered without ever
+        // calling a tool — has been observed to be genuinely
+        // non-deterministic on this 8B model, not a consistent refusal;
+        // the same question asked fresh often does call the right tool.
+        // So one corrective nudge is given before falling back to a
+        // decline, rather than declining on the model's first miss. The
+        // ungrounded attempt itself is deliberately NOT added to
+        // `messages` — only the reminder is — so the retry is a clean
+        // second attempt, not the model doubling down on what it just said.
+        if (!groundingRetried) {
+          groundingRetried = true;
+          messages.push({ role: 'system', content: 'You answered without calling a tool. If this question can be answered with your tools (cases, payments, staff/lab/delivery performance), call the right tool now instead of answering from memory. If it genuinely cannot, say plainly you don\'t have data for it.' });
+          continue;
+        }
         return GROUNDING_FALLBACK; // not persisted — nothing real to follow up on
       }
       const replyText = correctDateMentions(response.text.trim(), lastRealRange, userText);
@@ -285,9 +301,18 @@ async function runAgentLoop(chatId, userText) {
       return replyText;
     }
 
-    // No tool call and no text — treat as a soft failure rather than
-    // sending an empty Telegram message. Not persisted to history — it's
-    // not a real exchange worth a follow-up referring back to.
+    // No tool call and no text at all — give the same one-time retry
+    // budget as the ungrounded-prose case above before giving up (shares
+    // groundingRetried rather than its own flag: one corrective nudge per
+    // turn total is enough, and a second consecutive miss of either kind
+    // means asking again isn't likely to help).
+    if (!groundingRetried) {
+      groundingRetried = true;
+      messages.push({ role: 'system', content: 'That produced no usable response. If this question can be answered with your tools (cases, payments, staff/lab/delivery performance), call the right tool now. If it genuinely cannot, say plainly you don\'t have data for it.' });
+      continue;
+    }
+    // Not persisted to history — it's not a real exchange worth a
+    // follow-up referring back to.
     return "I couldn't come up with an answer to that — could you rephrase the question?";
   }
 
