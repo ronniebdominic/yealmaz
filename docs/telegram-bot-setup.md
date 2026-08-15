@@ -227,6 +227,16 @@ live backend.
   message is still being answered (local inference is slow, especially
   the first request after Ollama's been idle); just wait for a reply
   before sending the next message.
+- The bot only ever states a business figure it just fetched with a tool
+  call — this is enforced in code
+  (`GROUNDING_FALLBACK`/`toolCalledThisTurn` in `telegramBotAgent.js`), not
+  just prompted for, because an 8B local model isn't reliable enough at
+  following "don't invent an answer" as a plain instruction (verified
+  empirically — it ignored that rule outright in testing). So a reply of
+  "I don't have data for that..." or "I couldn't come up with an answer,
+  could you rephrase?" on a real, in-scope question is the model failing
+  to call the right tool that turn, not a bug — just rephrase or ask
+  again. It should never reply with a fabricated number instead.
 - There's no monitoring/alerting on any of this in v1 — a silent outage
   (e.g. the lab machine losing power overnight) will just mean the bot
   doesn't reply until someone notices and checks the chain above.

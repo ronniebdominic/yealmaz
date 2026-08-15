@@ -6,7 +6,7 @@
 // fast; the real work (LLM call, tool execution, reply) happens after.
 const express = require('express');
 const { sendMessage, sendChatAction } = require('../utils/telegramClient');
-const { answerQuestion } = require('../services/telegramBotAgent');
+const { answerQuestion, clearHistory } = require('../services/telegramBotAgent');
 
 const router = express.Router();
 
@@ -62,7 +62,13 @@ router.post('/', async (req, res) => {
     }
 
     if (text.trim() === '/start') {
-      await sendMessage(chatId, "Hi — I'm the Ye-Almaz business assistant. Ask me anything about cases, payments, or performance, e.g. \"how much is outstanding from Trusted Partners?\" or \"how many cases were delivered today?\"");
+      await sendMessage(chatId, "Hi — I'm the Ye-Almaz business assistant. Ask me anything about cases, payments, or performance, e.g. \"how much is outstanding from Trusted Partners?\" or \"how many cases were delivered today?\" Send /reset any time to clear our conversation and start fresh.");
+      return;
+    }
+
+    if (text.trim() === '/reset') {
+      clearHistory(chatId);
+      await sendMessage(chatId, "Conversation cleared — ask me anything.");
       return;
     }
 
@@ -72,7 +78,7 @@ router.post('/', async (req, res) => {
     }
 
     await sendChatAction(chatId, 'typing');
-    const reply = await answerQuestion(text);
+    const reply = await answerQuestion(chatId, text);
     await sendMessage(chatId, reply);
   } catch (err) {
     console.error('[telegram-webhook]', err.message);

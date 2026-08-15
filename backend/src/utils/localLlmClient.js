@@ -1,15 +1,15 @@
 // Ye-Almaz — Local LLM Client (Ollama, running on a machine at the lab)
 //
 // Talks to Ollama's OpenAI-compatible endpoint (/v1/chat/completions),
-// reached over a Cloudflare Tunnel + auth proxy sitting on the lab
-// machine — see docs/telegram-bot-setup.md for the full infra runbook.
-// Plain `fetch`, no SDK — Ollama (and effectively every local-inference
-// server: vLLM, LM Studio, text-generation-webui) speaks the same
-// OpenAI-shaped tool-calling format, so there's nothing vendor-specific
-// to wrap here. This module is the one place that knows that; the agent
-// loop (services/telegramBotAgent.js) only ever sees the normalized
-// { text, toolCalls, stopReason } shape below, so swapping the backing
-// model/provider later only ever touches this file.
+// reached over a tunnel + auth proxy sitting on the lab machine (ngrok or
+// Cloudflare Tunnel — see docs/telegram-bot-setup.md for the full infra
+// runbook). Plain `fetch`, no SDK — Ollama (and effectively every
+// local-inference server: vLLM, LM Studio, text-generation-webui) speaks
+// the same OpenAI-shaped tool-calling format, so there's nothing
+// vendor-specific to wrap here. This module is the one place that knows
+// that; the agent loop (services/telegramBotAgent.js) only ever sees the
+// normalized { text, toolCalls, stopReason } shape below, so swapping the
+// backing model/provider later only ever touches this file.
 if (!process.env.OLLAMA_BASE_URL) {
   console.warn('[LocalLLM] OLLAMA_BASE_URL not set — Telegram bot Q&A disabled.');
 }
@@ -19,6 +19,12 @@ const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'hermes3:8b';
 // bot's system prompt + full tool set + multi-round tool-result history —
 // left unset, the model silently loses earlier context mid-conversation.
 const NUM_CTX = parseInt(process.env.OLLAMA_NUM_CTX, 10) || 8192;
+// Low but non-zero — this is a business-data reporting bot, not a
+// creative-writing one, so favor the model picking the same, most-likely
+// tool calls and phrasing for the same question every time over
+// conversational variety. Not 0: a little headroom avoids the model
+// getting stuck in a degenerate repeat-itself loop on edge cases.
+const TEMPERATURE = process.env.OLLAMA_TEMPERATURE != null ? parseFloat(process.env.OLLAMA_TEMPERATURE) : 0.2;
 
 function isConfigured() {
   return !!process.env.OLLAMA_BASE_URL;
@@ -73,7 +79,8 @@ async function runLocalLlm({ system, messages, tools, toolChoice, maxTokens } = 
   const body = {
     model: DEFAULT_MODEL,
     messages: [{ role: 'system', content: system }, ...messages],
-    options: { num_ctx: NUM_CTX },
+    temperature: TEMPERATURE,
+    options: { num_ctx: NUM_CTX, temperature: TEMPERATURE },
     stream: false,
   };
   if (tools?.length) body.tools = tools;
