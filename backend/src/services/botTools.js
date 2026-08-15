@@ -13,6 +13,8 @@
 const dashboard = require('../routes/dashboard');
 const cases = require('../routes/cases');
 const payments = require('../routes/payments');
+const operations = require('./botOperations');
+const insights = require('./botInsights');
 
 // Trimming helpers — the underlying compute functions return the exact
 // same NUMBERS the dashboard shows (never altered here), but some of them
@@ -289,6 +291,126 @@ const TOOLS = [
       },
     },
     handler: async (args) => trimClinicStatement(await payments.getClinicStatement(args?.clinicId, args)),
+  },
+
+  // ── Operations, people, audit trail and analysis ────────
+  // These are deliberately CONSOLIDATED (an `area` enum rather than one
+  // tool per domain). Tool definitions are always resident in the model's
+  // context, and an 8B model's tool-selection accuracy degrades as the list
+  // grows — a dozen extra narrow tools would cost accuracy on the existing
+  // ones as well as context budget. One tool per question-shape, with the
+  // domain as a parameter, keeps both manageable.
+  {
+    def: {
+      type: 'function',
+      function: {
+        name: 'get_operations_report',
+        description: 'Lab operations data outside the case pipeline. Use for questions about stock/supplies ("what are we low on"), milling blank-to-crown yield, staff goods requests waiting for approval, or staff reward points.',
+        parameters: {
+          type: 'object',
+          properties: {
+            area: { type: 'string', description: 'Which area: "inventory" (stock levels, low stock), "milling" (blanks used vs crowns produced, per technician), "goods_requests" (staff supply requests and what is pending), or "staff_rewards" (staff points leaderboard).' },
+            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
+            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+          },
+          required: ['area'],
+        },
+      },
+    },
+    handler: async (args) => operations.getOperationsReport(args || {}),
+  },
+  {
+    def: {
+      type: 'function',
+      function: {
+        name: 'get_staff_attendance',
+        description: 'Staff attendance and leave over a date range: days present per person, clock event counts, and any leave overlapping the range. Use for "who was in on [date]", "how many days has [name] worked", "who is on leave". Salary, payroll and performance reviews are NOT available.',
+        parameters: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
+            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            name: { type: 'string', description: 'Optional — restrict to one employee by (partial) name.' },
+          },
+        },
+      },
+    },
+    handler: async (args) => operations.getStaffAttendance(args || {}),
+  },
+  {
+    def: {
+      type: 'function',
+      function: {
+        name: 'get_case_history',
+        description: 'The full audit trail for ONE case: every production stage scan in order, who scanned it, how long it sat at each step, delivery pickup/drop-off records, and staff comments. Use for "what happened to case X", "where did case X get stuck", "who handled case X". For the current status only, get_case_detail is lighter.',
+        parameters: {
+          type: 'object',
+          properties: {
+            identifier: { type: 'string', description: 'Case number (e.g. "YDL26007410") or internal id.' },
+          },
+          required: ['identifier'],
+        },
+      },
+    },
+    handler: async (args) => operations.getCaseHistory(args || {}),
+  },
+  {
+    def: {
+      type: 'function',
+      function: {
+        name: 'get_activity_log',
+        description: 'Recent lab-wide activity log — what has been happening across the lab lately, newest first. Use for "what happened today", "recent activity", "who has been scanning". This is the business audit trail; application error/server logs are not available to this bot.',
+        parameters: {
+          type: 'object',
+          properties: {
+            area: { type: 'string', description: '"case_scans" (production stage scans, the default), "deliveries", "attendance", or "inventory".' },
+            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
+            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            limit: { type: 'number', description: 'Max events to return, default 25, capped at 50.' },
+          },
+        },
+      },
+    },
+    handler: async (args) => operations.getActivityLog(args || {}),
+  },
+  {
+    def: {
+      type: 'function',
+      function: {
+        name: 'count_cases',
+        description: 'The COMPLETE count of cases matching a filter, across the whole database with no row cap, optionally broken down by status, payment status or work type. Use this — not search_cases — whenever the question is "how many", "all", "every", or "total". search_cases only returns a limited page and must never be used to count.',
+        parameters: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', description: 'Exact case status, e.g. DELIVERED, SCANNING, READY_TO_DISPATCH.' },
+            paymentStatus: { type: 'string', description: 'PENDING, PAYMENT_REQUESTED, SCREENSHOT_UPLOADED, VERIFIED or REJECTED.' },
+            clinicName: { type: 'string', description: 'Partial clinic name match.' },
+            workType: { type: 'string', description: 'Partial work-type match, e.g. "Zirconia".' },
+            dateFrom: { type: 'string', description: 'Only cases created on/after this date, YYYY-MM-DD.' },
+            dateTo: { type: 'string', description: 'Only cases created on/before this date, YYYY-MM-DD.' },
+            groupBy: { type: 'string', description: 'Optional breakdown: "status", "paymentStatus" or "workType".' },
+          },
+        },
+      },
+    },
+    handler: async (args) => operations.countCases(args || {}),
+  },
+  {
+    def: {
+      type: 'function',
+      function: {
+        name: 'get_business_insights',
+        description: 'Pre-computed analysis of what needs attention: money at risk, ageing receivables, clinic/revenue concentration, remake rate, stalled cases, low stock, capacity concentration and revenue trend. Use for open-ended questions like "how is the business doing", "what should I worry about", "where are the opportunities", "any problems". Every finding is calculated in code — report the findings exactly as given and never add your own analysis, causes or recommendations on top.',
+        parameters: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
+            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+          },
+        },
+      },
+    },
+    handler: async (args) => insights.computeBusinessInsights(args || {}),
   },
 ];
 

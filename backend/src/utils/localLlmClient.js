@@ -18,7 +18,16 @@ const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'hermes3:8b';
 // Ollama's default context window (2k-4k tokens) is too small for this
 // bot's system prompt + full tool set + multi-round tool-result history —
 // left unset, the model silently loses earlier context mid-conversation.
-const NUM_CTX = parseInt(process.env.OLLAMA_NUM_CTX, 10) || 8192;
+// 16384, not the old 8192: the tool registry grew to cover operations,
+// attendance and audit-trail data, and tool definitions are resident in
+// context on every single call alongside the system prompt, conversation
+// history and (often large) tool results. Hermes-3 is Llama-3.1-based and
+// supports 131072, so the real limit is the lab GPU's VRAM, not the model:
+// on the RTX 4060 8GB, Q4_0 weights take ~4.7GB and this model's KV cache
+// costs ~128KB/token, so 16k (~2GB of cache) fits with headroom while 32k
+// (~4GB) would overflow into system RAM and make replies drastically
+// slower. Raise only alongside more VRAM.
+const NUM_CTX = parseInt(process.env.OLLAMA_NUM_CTX, 10) || 16384;
 // Low but non-zero — this is a business-data reporting bot, not a
 // creative-writing one, so favor the model picking the same, most-likely
 // tool calls and phrasing for the same question every time over

@@ -25,7 +25,13 @@ IMPORTANT — when using get_admin_analytics: "deliveredCases" counts cases whos
 
 Always call a tool to get real numbers before answering anything about the business — never guess or estimate, and never answer a follow-up (e.g. "and last month?", "how many cases is that") using a number already stated earlier in this conversation without calling the tool again this turn, since the underlying data can change between messages.
 
-STAY GROUNDED IN YOUR TOOLS. Your tools cover cases, payments, and staff/lab/delivery performance — nothing else. If a question isn't something your tools can answer (open-ended strategy, "how do I fix X," opinions, HR/morale/marketing advice, anything outside that data), don't answer it, even partially or with general knowledge — just say you don't have data for that.
+STAY GROUNDED IN YOUR TOOLS. Your tools cover cases and the production pipeline, payments and receivables, clinics, lab/delivery/staff performance, attendance and leave, inventory and supplies, milling yield, goods requests, staff reward points, per-case audit history, lab-wide activity logs, and pre-computed business insights. If a question isn't something your tools can answer, don't answer it, even partially or with general knowledge — just say you don't have data for that.
+
+COUNTING: if the question is "how many", "all", "every", or "total", use count_cases — it counts the entire database. search_cases only returns a limited page, so never count its rows or describe them as the total.
+
+ANALYSIS: when asked how the business is doing, what to worry about, or where the opportunities are, call get_business_insights and report the findings it returns, as they are. Those findings are calculated in code and are the only analysis you may give. Never add your own causes, predictions, recommendations or opinions on top of them, and never invent a finding — if the tool returns none, say nothing was flagged for that period.
+
+SENSITIVE DATA: you have no access to payroll, salary, advances, expense claims, performance reviews or employee documents. If asked, say plainly that this bot doesn't have access to pay or HR-record data — don't guess at it from anything else.
 
 BE BRIEF. This is a text message, not a report — lead with the number(s) actually asked for, in one or two short sentences or a tight "-" bulleted list. Skip preamble ("Here is the information you requested..."), skip restating the question, skip closing filler ("let me know if you need anything else"). No markdown formatting (no headers, no bold/italic markers, no tables) — plain text only, since the reply is sent as-is.
 
@@ -118,12 +124,78 @@ function clearHistory(chatId) {
 // specific day/month the model got right — e.g. "August 14th" — survives
 // the correction instead of silently widening into a whole-year default
 // that no longer answers what was actually asked.
+// When the user names a period in plain words ("this month", "today",
+// "last week"), the correct range is fully determined — there is nothing
+// for the model to decide, and letting it decide has been the single
+// largest source of wrong answers. Observed live: "who was present at work
+// this month?" produced a request for 2022-01-01..2022-01-31 — wrong year
+// AND wrong month — which after year-correction still pointed at January,
+// a month with no attendance data at all, and the model then filled the
+// empty result with invented staff names. So these phrases are resolved in
+// code and override whatever the model asked for. Explicit user-named dates
+// ("August 14th 2026", "in 2024") are deliberately NOT overridden.
+function relativePeriodRange(userText) {
+  const t = String(userText || '').toLowerCase();
+  const now = new Date(); // lab timezone via TZ env
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const mk = (d) => toYMD(d);
+  const today = mk(now);
+
+  // Longest/most specific phrases first — "last month" must win over "month".
+  if (/\blast month\b/.test(t)) {
+    return { from: mk(new Date(y, m - 1, 1)), to: mk(new Date(y, m, 0)), label: 'last month' };
+  }
+  if (/\blast year\b/.test(t)) {
+    return { from: mk(new Date(y - 1, 0, 1)), to: mk(new Date(y - 1, 11, 31)), label: 'last year' };
+  }
+  if (/\blast week\b/.test(t)) {
+    const dow = now.getDay();
+    const thisMon = new Date(now);
+    thisMon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+    const lastMon = new Date(thisMon); lastMon.setDate(thisMon.getDate() - 7);
+    const lastSun = new Date(thisMon); lastSun.setDate(thisMon.getDate() - 1);
+    return { from: mk(lastMon), to: mk(lastSun), label: 'last week' };
+  }
+  if (/\byesterday\b/.test(t)) {
+    const d = new Date(now); d.setDate(now.getDate() - 1);
+    return { from: mk(d), to: mk(d), label: 'yesterday' };
+  }
+  if (/\bthis month\b|\bthe month\b/.test(t)) {
+    return { from: mk(new Date(y, m, 1)), to: today, label: 'this month' };
+  }
+  if (/\bthis week\b|\bthe week\b/.test(t)) {
+    const dow = now.getDay();
+    const mon = new Date(now); mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1));
+    return { from: mk(mon), to: today, label: 'this week' };
+  }
+  if (/\bthis year\b/.test(t)) {
+    return { from: mk(new Date(y, 0, 1)), to: today, label: 'this year' };
+  }
+  if (/\btoday\b/.test(t)) {
+    return { from: today, to: today, label: 'today' };
+  }
+  return null;
+}
+
 function sanitizeDateArgs(args, userText) {
   if (!args || typeof args !== 'object') return args;
   const isYMD = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+  // 1. A plainly-named relative period wins outright over the model's guess.
+  const relative = relativePeriodRange(userText);
+  if (relative && (isYMD(args.from) || isYMD(args.to))) {
+    if (args.from !== relative.from || args.to !== relative.to) {
+      console.warn(`[TelegramBot] Overrode date args ${JSON.stringify({ from: args.from, to: args.to })} -> ${JSON.stringify({ from: relative.from, to: relative.to })} ("${relative.label}" resolved in code)`);
+      return { ...args, from: relative.from, to: relative.to };
+    }
+    return args;
+  }
+
   if (!isYMD(args.from) && !isYMD(args.to)) return args;
 
-  const currentYear = new Date().getFullYear(); // lab timezone via TZ env
+  // 2. Otherwise fall back to correcting only an implausible year.
+  const currentYear = new Date().getFullYear();
   const mentionedYears = (userText.match(/\b(19|20)\d{2}\b/g) || []).map(Number);
 
   const fixYear = (dateStr) => {
@@ -193,6 +265,21 @@ function correctDateMentions(text, realRange, userText) {
   });
 
   return corrected;
+}
+
+// The lab bills exclusively in Ethiopian Birr and no tool ever returns a
+// currency symbol, but the model still renders amounts as "$157,585,215"
+// some of the time — presumably a pull from its training data. Labelling
+// Birr figures as dollars in a financial answer is a serious enough
+// misread (roughly a 100x error if taken at face value) that it gets the
+// same deterministic treatment as the wrong-year bug rather than another
+// prompt line the model may ignore.
+function correctCurrencySymbols(text) {
+  if (!text) return text;
+  // "$ 1,234" / "$1,234" / "USD 1,234" -> "Br 1,234"
+  return text
+    .replace(/\$\s?(?=\d)/g, 'Br ')
+    .replace(/\bUSD\s?(?=\d)/g, 'Br ');
 }
 
 async function executeToolCall(toolCall, userText) {
@@ -296,7 +383,7 @@ async function runAgentLoop(chatId, userText) {
         }
         return GROUNDING_FALLBACK; // not persisted — nothing real to follow up on
       }
-      const replyText = correctDateMentions(response.text.trim(), lastRealRange, userText);
+      const replyText = correctCurrencySymbols(correctDateMentions(response.text.trim(), lastRealRange, userText));
       appendToHistory(chatId, userText, replyText);
       return replyText;
     }
@@ -324,7 +411,7 @@ async function runAgentLoop(chatId, userText) {
   try {
     const final = await runLocalLlm({ system, messages, maxTokens: 1500 });
     if (final.text?.trim()) {
-      const replyText = correctDateMentions(final.text.trim(), lastRealRange, userText);
+      const replyText = correctCurrencySymbols(correctDateMentions(final.text.trim(), lastRealRange, userText));
       appendToHistory(chatId, userText, replyText);
       return replyText;
     }
