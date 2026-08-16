@@ -45,31 +45,52 @@ function trimFinanceReport(data) {
   };
 }
 
+// Only technicians who actually did something, ranked, capped.
+//
+// This previously returned every technician on the books — 35 rows, 17 of
+// them all-zero — at ~1,725 tokens. At that size the model stopped reading
+// the data and started confabulating it: asked for performance on a
+// specific day it produced ten plausible-looking Ethiopian names with a
+// smooth 47/45/42/41/40 scan sequence, none of which were real (the actual
+// top three were Ashish Arun Sale 56, Dems Yisma Mengesha 33, Shewaye Guche
+// Abreham 30). Padding a small model's context with irrelevant rows is not
+// a neutral cost — it actively degrades fidelity to the rows that matter.
 function trimLabPerformance(data) {
+  const active = (data.techs || [])
+    .filter(t => (t.totalScans || 0) > 0)
+    .sort((a, b) => (b.totalScans || 0) - (a.totalScans || 0));
+
   return {
     range: data.range,
-    unattributedScans: data.unattributedScans,
     totalLabScans: data.totalLabScans,
-    techs: (data.techs || []).map(t => ({
-      name: t.name, isActive: t.isActive, totalScans: t.totalScans,
-      uniqueCases: t.uniqueCases, busiestDept: t.busiestDept,
-      activeDays: t.activeDays, avgPerActiveDay: t.avgPerActiveDay,
-      shareOfTotalPercent: t.shareOfTotalPercent, lastActiveAt: t.lastActiveAt,
+    unattributedScans: data.unattributedScans,
+    techniciansWithActivity: active.length,
+    techniciansWithNoActivity: (data.techs || []).length - active.length,
+    // Ranked, so "who is best/most active" is the first row — no sorting or
+    // comparing left for the model to get wrong.
+    techs: active.slice(0, 15).map(t => ({
+      name: t.name, totalScans: t.totalScans, uniqueCases: t.uniqueCases,
+      busiestDept: t.busiestDept, activeDays: t.activeDays,
+      avgPerActiveDay: t.avgPerActiveDay, shareOfTotalPercent: t.shareOfTotalPercent,
     })),
   };
 }
 
+// Same treatment as trimLabPerformance above — active agents only, ranked.
 function trimDeliveryPerformance(data) {
+  const active = (data.agents || [])
+    .filter(a => (a.totalOrders || 0) > 0)
+    .sort((a, b) => (b.totalOrders || 0) - (a.totalOrders || 0));
+
   return {
     range: data.range,
-    unattributedOrders: data.unattributedOrders,
     totalLabOrders: data.totalLabOrders,
-    agents: (data.agents || []).map(a => ({
-      name: a.name, isActive: a.isActive, totalPickups: a.totalPickups,
-      totalDeliveries: a.totalDeliveries, totalOrders: a.totalOrders,
-      uniqueClinics: a.uniqueClinics, activeDays: a.activeDays,
-      avgPerActiveDay: a.avgPerActiveDay, shareOfTotalPercent: a.shareOfTotalPercent,
-      lastActiveAt: a.lastActiveAt,
+    unattributedOrders: data.unattributedOrders,
+    agentsWithActivity: active.length,
+    agents: active.slice(0, 15).map(a => ({
+      name: a.name, totalPickups: a.totalPickups, totalDeliveries: a.totalDeliveries,
+      totalOrders: a.totalOrders, uniqueClinics: a.uniqueClinics,
+      activeDays: a.activeDays, shareOfTotalPercent: a.shareOfTotalPercent,
     })),
   };
 }
@@ -82,13 +103,36 @@ function trimClinicBalances(data) {
 }
 
 function trimTrustedPartnersSummary(data) {
-  // Already sorted by outstanding desc at the source.
-  return (data || []).slice(0, 25).map(c => ({
-    name: c.name, totalOrders: c.totalOrders, deliveredOrders: c.deliveredOrders,
-    inProgress: c.inProgress, totalRevenue: c.totalRevenue, paymentsReceived: c.paymentsReceived,
-    outstanding: c.outstanding, outstandingCount: c.outstandingCount, oldestAgeDays: c.oldestAgeDays,
-    billingCycle: c.billingCycle, nextBillDate: c.nextBillDate, billOverdue: c.billOverdue,
-  }));
+  const rows = data || []; // already sorted by outstanding desc at the source
+  const withOutstanding = rows.filter(c => (c.outstanding || 0) > 0);
+
+  // Totals are computed HERE, not left to the model. "How much is
+  // outstanding from Trusted Partners" is the single most-asked question,
+  // and when this returned 25 rows of raw figures the model had to add
+  // them up itself — which it did differently every time, returning
+  // Br 10,075,000 / 12,115,000 / 11,570,000 / 10,045,000 across four runs
+  // of the identical question. A headline total the model only has to read
+  // out removes that entire class of error. It also cut this payload from
+  // ~1,640 tokens to a few hundred: at full size, both models tested took
+  // 140-200s on this question and then returned an EMPTY reply.
+  const totals = {
+    totalOutstanding: Math.round(withOutstanding.reduce((s, c) => s + (c.outstanding || 0), 0)),
+    clinicsWithOutstanding: withOutstanding.length,
+    totalOutstandingCases: withOutstanding.reduce((s, c) => s + (c.outstandingCount || 0), 0),
+    totalPartners: rows.length,
+    overdueBillCount: rows.filter(c => c.billOverdue && (c.outstanding || 0) > 0).length,
+  };
+
+  return {
+    totals,
+    // Top 10 by outstanding is enough to name who owes most; the total
+    // above already covers "how much in total" without needing every row.
+    topByOutstanding: withOutstanding.slice(0, 10).map(c => ({
+      name: c.name, outstanding: Math.round(c.outstanding || 0),
+      outstandingCount: c.outstandingCount, oldestAgeDays: c.oldestAgeDays,
+      billOverdue: c.billOverdue || false,
+    })),
+  };
 }
 
 function trimClinicStatement(caseList) {
@@ -172,7 +216,7 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_lab_performance',
-        description: 'Per-lab-technician scan activity over a date range: total scans, unique cases, busiest department, active days, and each tech\'s share of the lab\'s total scan volume. Use for "who\'s the most active tech" / "how is [name] doing" style questions.',
+        description: 'STAFF/EMPLOYEE PERFORMANCE AND PRODUCTIVITY. Per-lab-technician scan activity over a date range: total scans, unique cases, busiest department, active days, and each tech\'s share of the lab\'s total scan volume. Use for any question about how employees/technicians/staff are PERFORMING or how productive they are — "employee performance", "who is the best worker", "who is the most active tech", "how is [name] doing". For whether someone was merely PRESENT (attendance/leave), use get_staff_attendance instead.',
         parameters: {
           type: 'object',
           properties: {
@@ -217,7 +261,7 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_trusted_partners_summary',
-        description: 'Per trusted-partner clinic: total orders, delivered/in-progress counts, total billed revenue, amount paid so far, outstanding amount + case count, how many days the oldest unpaid case has been outstanding, and their billing cycle/next bill date. This is the source for "how much is outstanding from Trusted Partners" style questions. Sorted by outstanding amount, highest first.',
+        description: 'Trusted-partner receivables. Returns a "totals" object (total outstanding across ALL partner clinics, how many clinics owe, total unpaid cases, overdue bill count) plus the top 10 clinics by amount owed. This is the source for "how much is outstanding from Trusted Partners" style questions — read the answer straight out of totals.totalOutstanding, which is already summed; never add the listed rows together yourself, and never present the top-10 list as if it were the full set.',
         parameters: { type: 'object', properties: {} },
       },
     },
@@ -324,7 +368,7 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_staff_attendance',
-        description: 'Staff attendance and leave over a date range: days present per person, clock event counts, and any leave overlapping the range. Use for "who was in on [date]", "how many days has [name] worked", "who is on leave". Salary, payroll and performance reviews are NOT available.',
+        description: 'ATTENDANCE AND LEAVE ONLY — who was physically present, not how well they worked. Days present per person, clock event counts, and any leave overlapping the range. Use for "who was in on [date]", "how many days has [name] worked", "who is on leave", "who is absent". Do NOT use this for performance or productivity questions — use get_lab_performance for those. Salary, payroll and performance reviews are NOT available.',
         parameters: {
           type: 'object',
           properties: {

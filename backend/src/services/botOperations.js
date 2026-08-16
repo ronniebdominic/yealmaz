@@ -242,7 +242,7 @@ async function getStaffAttendance({ from, to, name } = {}) {
       noDataInRange: true,
       staff: [],
       leaveInRange: [],
-      message: `No attendance or leave records exist for ${range.from} to ${range.to}${name ? ` matching "${name}"` : ''}. Report exactly this — there is no data for this period, so do not list any names.`,
+      message: `No attendance or leave records exist for ${range.from} to ${range.to}${name ? ` matching "${name}"` : ''}. No staff were recorded as present, and no names can be listed for this period.`,
       note: PEOPLE_DATA_BOUNDARY_NOTE,
     };
   }
@@ -417,7 +417,6 @@ async function countCases({ status, paymentStatus, clinicName, workType, dateFro
     filters: { status: status || null, paymentStatus: paymentStatus || null, clinicName: clinicName || null, workType: workType || null, dateFrom: dateFrom || null, dateTo: dateTo || null },
     totalMatchingCases: total,
     totalAmount: amount._sum.totalAmount || 0,
-    note: 'This is a complete count over all matching cases, not a capped sample.',
   };
 
   const validGroupBy = ['status', 'paymentStatus', 'workType'];

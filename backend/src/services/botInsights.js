@@ -278,7 +278,6 @@ async function computeBusinessInsights({ from, to } = {}) {
     noFindingsMeans: findings.length === 0
       ? 'No rule crossed its threshold for this period — this means nothing was flagged, not that the business has no issues.'
       : undefined,
-    instruction: 'Report ONLY these findings. Do not add observations, causes, predictions or recommendations that are not stated here.',
   };
 }
 
