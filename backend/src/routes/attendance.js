@@ -585,6 +585,186 @@ router.get('/summary/range', protect, restrict('HR_MANAGER', 'ADMIN'), async (re
   }
 });
 
+// ── GET /api/attendance/overview?from=&to=&department= ─────
+// EVERY employee across a date range — the one combination the other two
+// summary endpoints don't cover (/summary is everyone x one day,
+// /summary/range is one employee x a range). Powers the workforce
+// attendance dashboard.
+//
+// Deliberately reuses computeDaySummary per employee-day rather than
+// writing its own aggregation: attendance status is genuinely subtle here
+// (shifts, holidays, half-day leave, corrections, open segments), and a
+// second implementation would inevitably drift from what the day view and
+// the employee profile already show for the same person on the same day.
+// Every row is fetched once and grouped in memory, so this stays a fixed
+// handful of queries regardless of employee count or range length.
+router.get('/overview', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { from, to, department } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from and to are required.' });
+    const fromDate = startOfDay(from), toDate = endOfDay(to);
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return res.status(400).json({ error: 'Invalid from/to.' });
+    if (toDate < fromDate) return res.status(400).json({ error: 'to must be on or after from.' });
+
+    // Bounded so a mistyped year cannot fan out into tens of thousands of
+    // employee-day computations.
+    const dayCount = Math.floor((toDate - fromDate) / 86400000) + 1;
+    if (dayCount > 92) return res.status(400).json({ error: 'Range is too long - please select 92 days or fewer.' });
+
+    const where = { isSharedAccount: false, isActive: true };
+    if (department) where.departments = { has: department };
+
+    const employees = await prisma.user.findMany({
+      where, orderBy: { name: 'asc' },
+      select: { id: true, name: true, departments: true, role: true },
+    });
+    const userIds = employees.map(e => e.id);
+
+    const [events, leaveRecords, holidays, corrections, assignments] = await Promise.all([
+      prisma.attendanceEvent.findMany({ where: { userId: { in: userIds }, timestamp: { gte: fromDate, lte: toDate } } }),
+      prisma.leaveRecord.findMany({ where: { userId: { in: userIds }, status: 'APPROVED', fromDate: { lte: toDate }, toDate: { gte: fromDate } } }),
+      prisma.holiday.findMany({ where: { date: { gte: fromDate, lte: toDate } } }),
+      prisma.attendanceCorrection.findMany({ where: { userId: { in: userIds }, date: { gte: fromDate, lte: toDate } } }),
+      prisma.shiftAssignment.findMany({
+        where: { userId: { in: userIds }, effectiveFrom: { lte: toDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: fromDate } }] },
+        include: { shift: true }, orderBy: { effectiveFrom: 'asc' },
+      }),
+    ]);
+
+    const holidayByDay = new Map(holidays.map(h => [localDayKey(h.date), h]));
+    const eventsByUser = new Map();
+    for (const e of events) {
+      if (!eventsByUser.has(e.userId)) eventsByUser.set(e.userId, []);
+      eventsByUser.get(e.userId).push(e);
+    }
+    const leaveByUser = new Map();
+    for (const l of leaveRecords) {
+      if (!leaveByUser.has(l.userId)) leaveByUser.set(l.userId, []);
+      leaveByUser.get(l.userId).push(l);
+    }
+    const correctionByUserDay = new Map();
+    for (const c of corrections) correctionByUserDay.set(`${c.userId}|${localDayKey(c.date)}`, c);
+    const assignmentsByUser = new Map();
+    for (const a of assignments) {
+      if (!assignmentsByUser.has(a.userId)) assignmentsByUser.set(a.userId, []);
+      assignmentsByUser.get(a.userId).push(a);
+    }
+
+    // Day boundaries computed once and reused for every employee.
+    const days = [];
+    for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+      const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
+      days.push({ dayStart, dayEnd, key: localDayKey(dayStart) });
+    }
+
+    const rows = employees.map(emp => {
+      const empEvents = eventsByUser.get(emp.id) || [];
+      const empLeave = leaveByUser.get(emp.id) || [];
+      // Reversed so the latest assignment effective on a given day wins,
+      // matching how /summary picks a shift (effectiveFrom desc, first hit).
+      const empAssignments = (assignmentsByUser.get(emp.id) || []).slice().reverse();
+
+      const agg = {
+        daysPresent: 0, daysAbsent: 0, daysOnLeave: 0, daysHalfDayLeave: 0,
+        daysMissingPunch: 0, daysHoliday: 0, daysOff: 0, daysInProgress: 0,
+        lateCount: 0, totalLateMinutes: 0, earlyDepartureCount: 0,
+        totalWorkingHours: 0, totalOvertimeHours: 0, correctionCount: 0,
+        // Days with at least one raw clock event. This is a DATA-COVERAGE
+        // measure, not an attendance one: no biometric device is connected
+        // (see POST /events), so a day with no events means nothing was
+        // recorded, which is not the same as the person not being there.
+        daysWithClockData: 0,
+      };
+
+      for (const { dayStart, dayEnd, key } of days) {
+        const dayEvents = empEvents.filter(e => e.timestamp >= dayStart && e.timestamp <= dayEnd);
+        const shiftForDay = empAssignments.find(a => a.effectiveFrom <= dayEnd && (!a.effectiveTo || a.effectiveTo >= dayStart))?.shift || null;
+        const leaveForDay = empLeave.find(l => l.fromDate <= dayEnd && l.toDate >= dayStart) || null;
+
+        const s = computeDaySummary({
+          date: dayStart,
+          events: dayEvents,
+          shift: shiftForDay,
+          holiday: holidayByDay.get(key) || null,
+          leaveRecord: leaveForDay,
+          correction: correctionByUserDay.get(`${emp.id}|${key}`) || null,
+        });
+
+        if (s.status === 'PRESENT') agg.daysPresent++;
+        else if (s.status === 'IN_PROGRESS') agg.daysInProgress++;
+        else if (s.status === 'ABSENT') agg.daysAbsent++;
+        else if (s.status === 'ON_LEAVE') agg.daysOnLeave++;
+        else if (s.status === 'HALF_DAY_LEAVE') agg.daysHalfDayLeave++;
+        else if (s.status === 'MISSING_PUNCH') agg.daysMissingPunch++;
+        else if (s.status === 'HOLIDAY') agg.daysHoliday++;
+        else if (s.status === 'OFF') agg.daysOff++;
+
+        if (dayEvents.length > 0) agg.daysWithClockData++;
+        if (s.late) { agg.lateCount++; agg.totalLateMinutes += s.lateMinutes || 0; }
+        if (s.earlyDepartureMinutes > 0) agg.earlyDepartureCount++;
+        agg.totalWorkingHours += s.workingHours || 0;
+        agg.totalOvertimeHours += s.overtimeHours || 0;
+        if (s.hasCorrection) agg.correctionCount++;
+      }
+
+      // "Expected" excludes holidays and rostered off-days — counting those
+      // as missed would penalise people for days they were never due in.
+      const expectedDays = agg.daysPresent + agg.daysInProgress + agg.daysAbsent
+        + agg.daysOnLeave + agg.daysHalfDayLeave + agg.daysMissingPunch;
+      // Half-days count as half attended. Approved leave is NOT counted as
+      // attended, and neither is MISSING_PUNCH — an unclosed day is not
+      // evidence of a full day worked.
+      const attendedDays = agg.daysPresent + agg.daysInProgress + (agg.daysHalfDayLeave * 0.5);
+
+      return {
+        id: emp.id, name: emp.name, departments: emp.departments, role: emp.role,
+        ...agg,
+        totalWorkingHours: Math.round(agg.totalWorkingHours * 10) / 10,
+        totalOvertimeHours: Math.round(agg.totalOvertimeHours * 10) / 10,
+        expectedDays,
+        attendanceRatePct: expectedDays > 0 ? Math.round((attendedDays / expectedDays) * 1000) / 10 : null,
+      };
+    });
+
+    const sum = (k) => rows.reduce((s, r) => s + (r[k] || 0), 0);
+    const totalExpected = sum('expectedDays');
+    const totalAttended = sum('daysPresent') + sum('daysInProgress') + (sum('daysHalfDayLeave') * 0.5);
+
+    res.json({
+      range: { from: localDayKey(fromDate), to: localDayKey(toDate), days: dayCount },
+      totals: {
+        employees: rows.length,
+        daysPresent: sum('daysPresent'),
+        daysInProgress: sum('daysInProgress'),
+        daysAbsent: sum('daysAbsent'),
+        daysOnLeave: sum('daysOnLeave'),
+        daysHalfDayLeave: sum('daysHalfDayLeave'),
+        daysMissingPunch: sum('daysMissingPunch'),
+        lateCount: sum('lateCount'),
+        totalLateMinutes: sum('totalLateMinutes'),
+        earlyDepartureCount: sum('earlyDepartureCount'),
+        totalWorkingHours: Math.round(sum('totalWorkingHours') * 10) / 10,
+        totalOvertimeHours: Math.round(sum('totalOvertimeHours') * 10) / 10,
+        attendanceRatePct: totalExpected > 0 ? Math.round((totalAttended / totalExpected) * 1000) / 10 : null,
+      },
+      // Surfaced so the UI can say plainly when "absent" mostly means "not
+      // recorded". Without this a sparse clock-event log reads as mass
+      // absenteeism, which would be an accusation the data cannot support.
+      dataQuality: {
+        daysWithClockData: sum('daysWithClockData'),
+        expectedDays: totalExpected,
+        clockCoveragePct: totalExpected > 0 ? Math.round((sum('daysWithClockData') / totalExpected) * 1000) / 10 : null,
+        lowCoverage: totalExpected > 0 && (sum('daysWithClockData') / totalExpected) < 0.5,
+      },
+      employees: rows,
+    });
+  } catch (err) {
+    console.error('[attendance overview]', err);
+    res.status(500).json({ error: 'Could not load attendance overview.' });
+  }
+});
+
 // ── Attendance corrections ──────────────────────────────────
 // Additive audit record only — AttendanceEvent rows are never edited or
 // deleted. original* is captured from the current raw-derived summary at

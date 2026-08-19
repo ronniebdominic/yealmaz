@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { MdAdd, MdCheckCircle, MdCancel, MdEventBusy, MdSchedule, MdLogout, MdWarning, MdTimer } from 'react-icons/md';
 import { inputStyle } from '../../../utils/adminForms';
 import AttendanceCorrectionModal from '../components/AttendanceCorrectionModal';
+import AttendanceOverview from './AttendanceOverview';
 
 const STATUS_LABELS = {
   PRESENT: 'Present', IN_PROGRESS: 'In Progress', ABSENT: 'Absent', ON_LEAVE: 'On Leave',
@@ -30,6 +31,10 @@ function StatCard({ icon: Icon, label, value }) {
 }
 
 export default function AttendanceTab({ employees, onOpenClockEvent }) {
+  // Two lenses on the same server-side day summaries: a single day across
+  // everyone, or a date range across everyone. Kept in one tab because they
+  // answer the same question at different zoom levels.
+  const [view, setView] = useState('day');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [department, setDepartment] = useState('');
   const [employeeId, setEmployeeId] = useState('');
@@ -45,8 +50,31 @@ export default function AttendanceTab({ employees, onOpenClockEvent }) {
   const counts = data?.counts || { present: 0, absent: 0, onLeave: 0, late: 0, earlyDeparture: 0, missingPunch: 0, overtime: 0 };
   const rows = (data?.employees || []).filter(e => !employeeId || e.id === employeeId);
 
+  const viewToggle = (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+      <button
+        className={`btn btn-sm ${view === 'day' ? 'btn-primary' : 'btn-ghost'}`}
+        onClick={() => setView('day')}
+      >Day View</button>
+      <button
+        className={`btn btn-sm ${view === 'period' ? 'btn-primary' : 'btn-ghost'}`}
+        onClick={() => setView('period')}
+      >Period Overview</button>
+    </div>
+  );
+
+  if (view === 'period') {
+    return (
+      <div>
+        {viewToggle}
+        <AttendanceOverview employees={employees} />
+      </div>
+    );
+  }
+
   return (
     <div>
+      {viewToggle}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>DATE</div>
