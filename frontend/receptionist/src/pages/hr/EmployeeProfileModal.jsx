@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api';
 import { format } from 'date-fns';
-import { MdEdit, MdEventBusy } from 'react-icons/md';
+import { MdEdit, MdEventBusy, MdDialpad } from 'react-icons/md';
 import ProfileModal from './components/ProfileModal';
 import LeaveModal from './components/LeaveModal';
 
@@ -81,7 +81,7 @@ export default function EmployeeProfileModal({ employeeId, employees, onClose, r
 
         <div className="modal-body" style={{ maxHeight: '62vh', overflowY: 'auto' }}>
           {tab === 'Overview' && <OverviewTab employee={employee} profile={p} />}
-          {tab === 'Attendance' && <AttendanceTabInner employeeId={employeeId} />}
+          {tab === 'Attendance' && <AttendanceTabInner employeeId={employeeId} hasPin={!!p.hasPin} onPinChanged={() => { refetch(); refresh?.(); }} />}
           {tab === 'Timesheets' && <TimesheetsTabInner employeeId={employeeId} role={employee.role} />}
           {tab === 'Leave' && <LeaveTabInner employeeId={employeeId} />}
           {tab === 'Overtime' && <OvertimeTabInner employeeId={employeeId} />}
@@ -133,7 +133,56 @@ function OverviewTab({ employee, profile: p }) {
 }
 
 // ── Attendance ──────────────────────────────────────────
-function AttendanceTabInner({ employeeId }) {
+
+// Kiosk PIN — for staff with no smartphone, who clock in on the shared
+// reception tablet instead of the geofenced self-service flow. The PIN is
+// hashed server-side and can never be read back, so a forgotten PIN is
+// reset rather than looked up.
+function KioskPinControl({ employeeId, hasPin, onChanged }) {
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const save = async (value) => {
+    setBusy(true); setMsg(null);
+    try {
+      await api.post('/attendance/pin', { userId: employeeId, pin: value });
+      setPin('');
+      setMsg({ ok: true, text: value === null ? 'Kiosk PIN removed.' : 'PIN set. Give it to the employee directly — it cannot be viewed again.' });
+      onChanged?.();
+    } catch (err) {
+      setMsg({ ok: false, text: err.response?.data?.error || 'Could not save the PIN.' });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="card" style={{ padding: 14, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+        <MdDialpad size={16} />
+        <strong style={{ fontSize: 13 }}>Reception kiosk PIN</strong>
+        <span className="badge" style={{ marginLeft: 'auto' }}>{hasPin ? 'Set' : 'Not set'}</span>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, lineHeight: 1.5 }}>
+        For staff without a smartphone, so they can clock in on the reception tablet.
+        4&ndash;6 digits, no repeated digits or runs like 1234.
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="New PIN" inputMode="numeric"
+          style={{ width: 120, fontSize: 13, padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }}
+        />
+        <button className="btn btn-primary btn-sm" disabled={busy || pin.length < 4} onClick={() => save(pin)}>
+          {hasPin ? 'Replace PIN' : 'Set PIN'}
+        </button>
+        {hasPin && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => save(null)}>Remove</button>}
+      </div>
+      {msg && <div style={{ marginTop: 8, fontSize: 12, color: msg.ok ? 'var(--green)' : 'var(--red)' }}>{msg.text}</div>}
+    </div>
+  );
+}
+
+function AttendanceTabInner({ employeeId, hasPin, onPinChanged }) {
   const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 13); return d.toISOString().slice(0, 10); });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const { data } = useQuery({
@@ -143,6 +192,7 @@ function AttendanceTabInner({ employeeId }) {
   const days = data?.days || [];
   return (
     <div>
+      <KioskPinControl employeeId={employeeId} hasPin={hasPin} onChanged={onPinChanged} />
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <input type="date" value={from} onChange={e => setFrom(e.target.value)} style={{ fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)' }} />
         <input type="date" value={to} onChange={e => setTo(e.target.value)} style={{ fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)' }} />

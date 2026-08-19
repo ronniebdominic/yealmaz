@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './AuthContext';
 import Login from './pages/Login';
+import AttendanceKiosk from './pages/AttendanceKiosk';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPricing from './pages/AdminPricing';
@@ -80,6 +81,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      {/* Shared reception tablet. Deliberately outside ProtectedRoute: there is no
+          user session on that device - see pages/AttendanceKiosk.jsx. */}
+      <Route path="/kiosk" element={<AttendanceKiosk />} />
       <Route path="/" element={<ProtectedRoute><RoleHome /></ProtectedRoute>} />
       <Route path="/cases" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Cases /></ProtectedRoute>} />
       <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST','DISPATCH']}><NewCase /></ProtectedRoute>} />

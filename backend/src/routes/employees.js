@@ -14,6 +14,28 @@ const { appCache, invalidate } = require('../cache');
 const router = express.Router();
 const prisma = new PrismaClient();
 
+
+// The kiosk PIN hash must never leave the server. bcrypt over a 4-6 digit
+// PIN is only 10,000-1,000,000 candidates, so an exposed hash is a
+// recoverable PIN — and a recovered PIN lets someone clock in as that
+// person on the reception tablet. Responses carry a `hasPin` boolean
+// instead, which is all any UI needs.
+function stripPinFields(entity) {
+  if (!entity || typeof entity !== 'object') return entity;
+  const profile = entity.employeeProfile;
+  if (!profile) return entity;
+  const { attendancePin, pinFailedAttempts, pinLockedUntil, ...safeProfile } = profile;
+  return {
+    ...entity,
+    employeeProfile: {
+      ...safeProfile,
+      hasPin: !!attendancePin,
+      pinLockedUntil: pinLockedUntil || null,
+    },
+  };
+}
+
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -52,8 +74,9 @@ router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
       },
       orderBy: { name: 'asc' },
     });
-    await appCache.set(cacheKey, users);
-    res.json(users);
+    const safe = users.map(stripPinFields);
+    await appCache.set(cacheKey, safe);
+    res.json(safe);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not load employees.' });
@@ -75,7 +98,7 @@ router.get('/me', protect, async (req, res) => {
       },
     });
     if (!user) return res.status(404).json({ error: 'Account not found.' });
-    res.json(user);
+    res.json(stripPinFields(user));
   } catch (err) {
     console.error('[employees me]', err);
     res.status(500).json({ error: 'Could not load your profile.' });
@@ -126,7 +149,7 @@ router.get('/:userId', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
     ]);
 
     res.json({
-      ...user,
+      ...stripPinFields(user),
       directReportCount,
       activeShift: activeShiftAssignment?.shift || null,
     });

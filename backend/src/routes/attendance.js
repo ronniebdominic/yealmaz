@@ -5,6 +5,7 @@
 // up yet; every row today comes from HR's manual entry via POST /manual.
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
@@ -582,6 +583,211 @@ router.get('/summary/range', protect, restrict('HR_MANAGER', 'ADMIN'), async (re
   } catch (err) {
     console.error('[attendance summary/range]', err);
     res.status(500).json({ error: 'Could not load attendance range.' });
+  }
+});
+
+// ── Reception PIN kiosk ─────────────────────────────────────
+// A shared tablet at reception, for the staff who have no smartphone and
+// therefore cannot use the geofenced self-service flow above (janitors,
+// kitchen, and anyone else without a device). Without this they have no
+// way to record attendance at all.
+//
+// AUTH IS TWO-PART, deliberately:
+//   1. the tablet holds ATTENDANCE_KIOSK_SECRET, proving the request came
+//      from the provisioned kiosk rather than anywhere on the internet;
+//   2. the employee enters their own PIN.
+// A kiosk secret is used rather than logging the tablet in as a shared
+// user account, because a permanently signed-in RECEPTIONIST session on an
+// unattended tablet in a public area would also grant case intake and
+// everything else that role can reach. A leaked kiosk secret can only ever
+// submit clock events, and only for someone whose PIN is also known.
+function kioskAuthorized(req) {
+  const secret = req.headers['x-attendance-kiosk-secret'];
+  return !!process.env.ATTENDANCE_KIOSK_SECRET && secret === process.env.ATTENDANCE_KIOSK_SECRET;
+}
+
+const PIN_MIN = 4;
+const PIN_MAX = 6;
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_LOCK_MINUTES = 15;
+
+// ── GET /api/attendance/kiosk/roster ────────────────────────
+// Names for the kiosk's picker. Deliberately returns no PII beyond name,
+// code and department: this list renders on an unattended screen.
+router.get('/kiosk/roster', async (req, res) => {
+  try {
+    if (!kioskAuthorized(req)) return res.status(401).end();
+    const profiles = await prisma.employeeProfile.findMany({
+      where: { user: { isActive: true, isSharedAccount: false } },
+      select: {
+        employeeCode: true, attendancePin: true, position: true,
+        user: { select: { name: true, departments: true } },
+      },
+    });
+    const staff = profiles
+      .filter(p => p.employeeCode)
+      .map(p => ({
+        employeeCode: p.employeeCode,
+        name: p.user.name,
+        position: p.position || null,
+        departments: p.user.departments || [],
+        hasPin: !!p.attendancePin,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ staff });
+  } catch (err) {
+    console.error('[attendance kiosk roster]', err);
+    res.status(500).json({ error: 'Could not load the staff list.' });
+  }
+});
+
+// ── POST /api/attendance/kiosk/clock ────────────────────────
+router.post('/kiosk/clock', async (req, res) => {
+  try {
+    if (!kioskAuthorized(req)) return res.status(401).end();
+    const { employeeCode, pin, type } = req.body || {};
+    if (!employeeCode || !pin || !SHIFT_BOUNDARY_TYPES.includes(type)) {
+      return res.status(400).json({ error: 'employeeCode, pin and type (CLOCK_IN/CLOCK_OUT) are required.' });
+    }
+
+    const profile = await prisma.employeeProfile.findUnique({
+      where: { employeeCode },
+      select: {
+        id: true, userId: true, attendancePin: true, pinFailedAttempts: true, pinLockedUntil: true,
+        user: { select: { name: true, isActive: true, isSharedAccount: true } },
+      },
+    });
+    // Same generic message whether the code is unknown, the account is
+    // inactive, or no PIN is set — the kiosk screen is visible to everyone
+    // in the lobby and shouldn't confirm who does or doesn't have a PIN.
+    const unusable = !profile || !profile.user.isActive || profile.user.isSharedAccount || !profile.attendancePin;
+    if (unusable) return res.status(401).json({ error: 'Incorrect PIN.' });
+
+    if (profile.pinLockedUntil && profile.pinLockedUntil > new Date()) {
+      const mins = Math.ceil((profile.pinLockedUntil - Date.now()) / 60000);
+      return res.status(429).json({ error: `Too many incorrect attempts. Try again in ${mins} minute${mins === 1 ? '' : 's'}, or ask HR.` });
+    }
+
+    const ok = await bcrypt.compare(String(pin), profile.attendancePin);
+    if (!ok) {
+      // A 4-digit PIN is only 10,000 combinations, so throttling is what
+      // actually protects it, not the secret itself.
+      const attempts = (profile.pinFailedAttempts || 0) + 1;
+      const lock = attempts >= PIN_MAX_ATTEMPTS;
+      await prisma.employeeProfile.update({
+        where: { id: profile.id },
+        data: {
+          pinFailedAttempts: lock ? 0 : attempts,
+          pinLockedUntil: lock ? new Date(Date.now() + PIN_LOCK_MINUTES * 60000) : null,
+        },
+      });
+      console.warn(`[attendance kiosk] failed PIN for ${employeeCode} (attempt ${attempts}${lock ? ' — locked' : ''})`);
+      return res.status(401).json({ error: lock ? `Too many incorrect attempts. Locked for ${PIN_LOCK_MINUTES} minutes.` : 'Incorrect PIN.' });
+    }
+
+    if (profile.pinFailedAttempts || profile.pinLockedUntil) {
+      await prisma.employeeProfile.update({
+        where: { id: profile.id },
+        data: { pinFailedAttempts: 0, pinLockedUntil: null },
+      });
+    }
+
+    const event = await recordEvent({
+      userId: profile.userId,
+      timestamp: new Date().toISOString(),
+      type,
+      source: 'KIOSK',
+      deviceId: req.headers['x-attendance-kiosk-id'] || 'reception-kiosk',
+    });
+    await invalidate('attendance:events*', 'dashboard:hr-summary');
+
+    // eventId goes back so the tablet can file its locally-stored photo
+    // against this exact punch.
+    res.status(201).json({
+      eventId: event.id,
+      employeeCode,
+      name: profile.user.name,
+      type: event.type,
+      timestamp: event.timestamp,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[attendance kiosk clock]', err);
+    res.status(500).json({ error: 'Could not record attendance event.' });
+  }
+});
+
+// ── GET /api/attendance/kiosk/status/:employeeCode ──────────
+// Whether to offer Clock In or Clock Out, so the kiosk doesn't ask someone
+// to guess which they need.
+router.get('/kiosk/status/:employeeCode', async (req, res) => {
+  try {
+    if (!kioskAuthorized(req)) return res.status(401).end();
+    const profile = await prisma.employeeProfile.findUnique({
+      where: { employeeCode: req.params.employeeCode },
+      select: { userId: true },
+    });
+    if (!profile) return res.status(404).json({ error: 'Unknown employee code.' });
+
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const events = await prisma.attendanceEvent.findMany({
+      where: { userId: profile.userId, timestamp: { gte: dayStart } },
+      orderBy: { timestamp: 'asc' },
+      select: { type: true, timestamp: true },
+    });
+    const last = events[events.length - 1] || null;
+    res.json({
+      suggested: last?.type === 'CLOCK_IN' ? 'CLOCK_OUT' : 'CLOCK_IN',
+      lastEvent: last,
+      todayEventCount: events.length,
+    });
+  } catch (err) {
+    console.error('[attendance kiosk status]', err);
+    res.status(500).json({ error: 'Could not load status.' });
+  }
+});
+
+// ── POST /api/attendance/pin ────────────────────────────────
+// HR sets or clears a staff member's kiosk PIN. The PIN is hashed
+// immediately and never stored or returned in plain text, so a lost PIN is
+// reset, never looked up.
+router.post('/pin', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const { userId, pin } = req.body || {};
+    if (!userId) return res.status(400).json({ error: 'userId is required.' });
+
+    const profile = await prisma.employeeProfile.findUnique({ where: { userId }, select: { id: true } });
+    if (!profile) return res.status(404).json({ error: 'That employee has no HR profile yet.' });
+
+    // Explicit null/empty clears the PIN, which is how you revoke kiosk
+    // access for someone who has left.
+    if (pin === null || pin === '') {
+      await prisma.employeeProfile.update({
+        where: { id: profile.id },
+        data: { attendancePin: null, pinFailedAttempts: 0, pinLockedUntil: null },
+      });
+      return res.json({ ok: true, cleared: true });
+    }
+
+    const str = String(pin);
+    if (!new RegExp(`^\\d{${PIN_MIN},${PIN_MAX}}$`).test(str)) {
+      return res.status(400).json({ error: `PIN must be ${PIN_MIN}-${PIN_MAX} digits.` });
+    }
+    // Rejects 0000/1111 and 1234/4321-style runs — on a shared terminal
+    // these get guessed by whoever is standing behind you.
+    if (/^(\d)\1+$/.test(str)) return res.status(400).json({ error: 'PIN cannot be the same digit repeated.' });
+    const asc = str.split('').every((d, i, a) => i === 0 || +d === +a[i - 1] + 1);
+    const desc = str.split('').every((d, i, a) => i === 0 || +d === +a[i - 1] - 1);
+    if (asc || desc) return res.status(400).json({ error: 'PIN cannot be a run of consecutive digits.' });
+
+    await prisma.employeeProfile.update({
+      where: { id: profile.id },
+      data: { attendancePin: await bcrypt.hash(str, 10), pinFailedAttempts: 0, pinLockedUntil: null },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[attendance pin]', err);
+    res.status(500).json({ error: 'Could not set the PIN.' });
   }
 });
 
