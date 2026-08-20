@@ -10,7 +10,7 @@ import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
   MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
-  MdHandshake, MdPointOfSale, MdSupervisorAccount,
+  MdHandshake, MdPointOfSale, MdSupervisorAccount, MdDialpad,
 } from 'react-icons/md';
 
 // ── Constants ─────────────────────────────────────────────
@@ -312,6 +312,104 @@ function UserFormModal({ initial, onSaved, onClose }) {
 }
 
 // ── Credentials Card ──────────────────────────────────────
+// ── Kiosk PIN ──────────────────────────────────────────────
+// Lets an admin set the reception-tablet PIN from here, next to the
+// password controls, rather than only from HR > Employees > profile. Same
+// POST /attendance/pin endpoint either way, so the two places can't drift.
+//
+// The PIN is hashed server-side and never returned, so this can show
+// whether one exists but never what it is — a forgotten PIN is replaced,
+// not looked up.
+function KioskPinModal({ user, onClose }) {
+  const [pin, setPin] = useState('');
+  const [busy, setBusy] = useState(false);
+  const { data: employee, isLoading, refetch } = useQuery({
+    queryKey: ['admin', 'employee-pin', user.id],
+    queryFn: () => api.get(`/employees/${user.id}`).then(r => r.data).catch(() => null),
+  });
+
+  const hasPin = !!employee?.employeeProfile?.hasPin;
+  // Shared/department logins have no EmployeeProfile, and nobody clocks in
+  // as one, so there is nothing to give a PIN to.
+  const noProfile = !isLoading && !employee?.employeeProfile;
+
+  const save = async (value) => {
+    setBusy(true);
+    try {
+      await api.post('/attendance/pin', { userId: user.id, pin: value });
+      toast.success(value === null ? 'Kiosk PIN removed' : 'Kiosk PIN set');
+      setPin('');
+      refetch();
+      if (value !== null) onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not save the PIN');
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <MdDialpad size={18} /> Reception kiosk PIN
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div style={{ padding: 20 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700 }}>{user.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{user.email}</div>
+          </div>
+
+          {isLoading ? (
+            <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Loading…</div>
+          ) : noProfile ? (
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
+              This account has no HR profile, so it can't have a kiosk PIN.
+              Shared/department logins don't clock in.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+                  background: hasPin ? 'rgba(22,163,74,0.1)' : 'var(--surface-2)',
+                  color: hasPin ? 'var(--green)' : 'var(--text-3)',
+                }}>{hasPin ? 'PIN set' : 'No PIN'}</span>
+                {employee?.employeeProfile?.employeeCode && (
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{employee.employeeProfile.employeeCode}</span>
+                )}
+              </div>
+
+              <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 14 }}>
+                For staff with no smartphone, who clock in on the reception tablet instead of
+                the app. 4–6 digits. Repeated digits and runs like 1234 are rejected — those
+                get read over your shoulder. Give the PIN to the employee directly; it can't
+                be viewed again afterwards.
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  autoFocus value={pin} inputMode="numeric" placeholder="New PIN"
+                  onChange={e => setPin(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  style={{ ...inputStyle, width: 130, letterSpacing: 3, fontSize: 15 }}
+                />
+                <button className="btn btn-primary" disabled={busy || pin.length < 4} onClick={() => save(pin)}>
+                  {hasPin ? 'Replace PIN' : 'Set PIN'}
+                </button>
+                {hasPin && (
+                  <button className="btn btn-ghost" disabled={busy} onClick={() => save(null)}>Remove</button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CredsCard({ user, password, onClose }) {
   const copy = (text, label) =>
     navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied`));
@@ -372,6 +470,7 @@ export default function AdminUsers() {
   const [showForm,     setShowForm]     = useState(false);
   const [editTarget,   setEditTarget]   = useState(null);
   const [newCreds,     setNewCreds]     = useState(null);
+  const [pinTarget,    setPinTarget]    = useState(null);
   const [roleFilter,   setRoleFilter]   = useState('');
   const [search,       setSearch]       = useState('');
 
@@ -526,6 +625,9 @@ export default function AdminUsers() {
                         <td style={{ padding: '8px 16px' }}>
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(u)}><MdEdit className="mi" size={14} /> Edit</button>
+                            {!u.isSharedAccount && (
+                              <button className="btn btn-ghost btn-sm" title="Reception kiosk PIN" onClick={() => setPinTarget(u)}><MdDialpad className="mi" size={14} /> PIN</button>
+                            )}
                             <button
                               onClick={() => {
                                 api.patch(`/users/${u.id}`, { isActive: !u.isActive })
@@ -549,6 +651,7 @@ export default function AdminUsers() {
       </div>
 
       {showForm    && <UserFormModal onSaved={handleSaved} onClose={() => setShowForm(false)} />}
+      {pinTarget   && <KioskPinModal user={pinTarget} onClose={() => setPinTarget(null)} />}
       {editTarget  && <UserFormModal initial={editTarget} onSaved={handleSaved} onClose={() => setEditTarget(null)} />}
 
       {newCreds && (
