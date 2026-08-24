@@ -1,21 +1,26 @@
 #!/usr/bin/env node
 // Ye-Almaz — Hikvision attendance bridge
 //
-// Runs on Server02 (the always-on lab machine, alongside Ollama). Receives
-// real-time event pushes from the DS-K1T321MFWX face terminal on the LAN
-// and forwards them to the Ye-Almaz API as attendance punches.
+// Runs on the Windows PC that shares a LAN with the DS-K1T321MFWX face
+// terminal (the machine running iVMS-4200). It receives real-time event
+// pushes from the terminal and forwards them to the Ye-Almaz API.
+//
+// It must live on the terminal's own network - the terminal pushes to a
+// private address and cannot reach anything off that LAN. Server02, the
+// always-on machine running Ollama, is at a different site and therefore
+// cannot host this.
 //
 //   DS-K1T321 (192.168.0.198) --HTTP--> this bridge --HTTPS--> Railway
 //
 // WHY A BRIDGE AND NOT A DIRECT PUSH: the terminal sends Hikvision's own
 // payload shape and cannot attach the x-attendance-device-secret header the
 // API requires, so something has to translate and authenticate. Keeping it
-// on Server02 also means the secret lives on a machine in a locked room
-// rather than on a wall-mounted device, and punches survive an internet
-// outage in a local queue instead of being lost.
+// this on a PC rather than the terminal also keeps the API secret off a
+// wall-mounted device, and punches survive an internet outage in a local
+// queue instead of being lost.
 //
 // ZERO npm DEPENDENCIES on purpose - Node built-ins only, so it can be
-// copied to Server02 and run without an install step or a lockfile.
+// copied to that PC and run without an install step or a lockfile.
 //
 //   node hikvision-bridge.js
 //
@@ -243,6 +248,169 @@ async function drain() {
   }
 }
 
+
+// ── ISAPI polling backstop ──────────────────────────────────
+// Push alone has no recovery path: if this bridge is down when someone
+// badges in - a reboot, a power cut, a crash - the terminal sends that
+// event once and moves on, and the punch is gone. The terminal does keep
+// its own event log, so polling can recover anything push missed.
+//
+// Re-sending an event that push already delivered is safe: we always send
+// the ORIGINAL event timestamp, so the API's duplicate guard matches it
+// and returns 409, which this bridge already treats as success. That makes
+// overlap harmless and lets the poll window be generous.
+//
+// Disabled unless DEVICE_IP/DEVICE_USER/DEVICE_PASSWORD are set.
+const crypto = require('crypto');
+
+const POLL = {
+  enabled: !!(process.env.DEVICE_IP && process.env.DEVICE_USER && process.env.DEVICE_PASSWORD),
+  ip: process.env.DEVICE_IP,
+  user: process.env.DEVICE_USER,
+  password: process.env.DEVICE_PASSWORD,
+  intervalMs: parseInt(process.env.POLL_INTERVAL_MS, 10) || 10 * 60 * 1000,
+  // How far back each poll looks. Generous on purpose - duplicates cost
+  // nothing (409) but a gap loses someone's attendance.
+  lookbackMs: parseInt(process.env.POLL_LOOKBACK_MS, 10) || 60 * 60 * 1000,
+  // The FIRST poll after start looks much further back. This bridge runs on
+  // a PC that may be switched off overnight or over a weekend, and every
+  // push sent while it was off is gone - the terminal does not retry. The
+  // terminal's own event log is the only copy, so the run after a boot has
+  // to reach back far enough to recover it. Duplicates are free (409).
+  catchupMs: parseInt(process.env.POLL_CATCHUP_MS, 10) || 72 * 60 * 60 * 1000,
+  maxResults: 200,
+};
+
+const md5 = (s) => crypto.createHash('md5').update(s).digest('hex');
+
+// Minimal HTTP Digest auth. Hikvision requires it and Node's fetch has no
+// built-in support, so the challenge/response is done by hand rather than
+// pulling in a dependency this bridge otherwise does not need.
+function digestHeader({ username, password, method, uri, challenge }) {
+  const get = (k) => (challenge.match(new RegExp(`${k}="?([^",]+)"?`)) || [])[1];
+  const realm = get('realm'), nonce = get('nonce'), qop = get('qop'), opaque = get('opaque');
+  const algorithm = get('algorithm') || 'MD5';
+  const nc = '00000001';
+  const cnonce = crypto.randomBytes(8).toString('hex');
+
+  const ha1 = md5(`${username}:${realm}:${password}`);
+  const ha2 = md5(`${method}:${uri}`);
+  const response = qop
+    ? md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+    : md5(`${ha1}:${nonce}:${ha2}`);
+
+  let h = `Digest username="${username}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}", algorithm=${algorithm}`;
+  if (qop) h += `, qop=${qop}, nc=${nc}, cnonce="${cnonce}"`;
+  if (opaque) h += `, opaque="${opaque}"`;
+  return h;
+}
+
+async function isapi(pathname, body) {
+  const url = `http://${POLL.ip}${pathname}`;
+  const method = body ? 'POST' : 'GET';
+  const init = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) init.body = JSON.stringify(body);
+
+  let res = await fetch(url, init);
+  if (res.status === 401) {
+    const challenge = res.headers.get('www-authenticate') || '';
+    init.headers.Authorization = digestHeader({
+      username: POLL.user, password: POLL.password, method, uri: pathname, challenge,
+    });
+    res = await fetch(url, init);
+  }
+  if (!res.ok) throw new Error(`ISAPI ${pathname} -> HTTP ${res.status}`);
+  return res.json();
+}
+
+// Hikvision wants local time with an offset, not UTC Z.
+function isapiTime(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const oh = pad(Math.floor(Math.abs(off) / 60)), om = pad(Math.abs(off) % 60);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${oh}:${om}`;
+}
+
+let firstPollDone = false;
+
+async function pollOnce() {
+  const end = new Date();
+  const window = firstPollDone ? POLL.lookbackMs : POLL.catchupMs;
+  const start = new Date(Date.now() - window);
+  let position = 0, fetched = 0, queued = 0;
+
+  for (;;) {
+    const data = await isapi('/ISAPI/AccessControl/AcsEvent?format=json', {
+      AcsEventCond: {
+        searchID: 'yealmaz-bridge',
+        searchResultPosition: position,
+        maxResults: POLL.maxResults,
+        major: 5,
+        minor: 0,
+        startTime: isapiTime(start),
+        endTime: isapiTime(end),
+      },
+    });
+
+    const result = data.AcsEvent || {};
+    const list = result.InfoList || [];
+    fetched += list.length;
+
+    for (const row of list) {
+      const ev = parseEvent(row);
+      if (!isAuthenticatedEntry({ ...ev, major: 5 })) continue;
+
+      const key = `${ev.employeeNo}|${new Date(ev.dateTime).toISOString()}`;
+      if (state.seenEvents && state.seenEvents[key]) continue;
+
+      const type = deriveType(ev);
+      state.lastPunch[`${ev.employeeNo}|${dayKey(ev.dateTime)}`] = type;
+      state.seenEvents = state.seenEvents || {};
+      state.seenEvents[key] = Date.now();
+
+      enqueue({
+        employeeCode: ev.employeeNo,
+        timestamp: new Date(ev.dateTime).toISOString(),
+        type,
+        name: ev.name,
+        receivedAt: new Date().toISOString(),
+        viaPoll: true,
+      });
+      queued++;
+    }
+
+    position += list.length;
+    if (list.length < POLL.maxResults || result.responseStatusStrg === 'OK') break;
+    if (position > 5000) break; // sanity stop
+  }
+
+  // Keep the seen-event map from growing without bound.
+  if (state.seenEvents) {
+    const cutoff = Date.now() - 7 * 86400000;
+    for (const [k, t] of Object.entries(state.seenEvents)) if (t < cutoff) delete state.seenEvents[k];
+  }
+  saveState();
+
+  if (!firstPollDone) {
+    log(`catch-up poll covered the last ${Math.round(window / 3600000)}h`);
+    firstPollDone = true;
+  }
+  if (queued) { log(`poll recovered ${queued} punch(es) push had missed (of ${fetched} events)`); drain(); }
+  else log(`poll: ${fetched} event(s), nothing new`);
+}
+
+function startPolling() {
+  if (!POLL.enabled) {
+    log('ISAPI polling disabled (set DEVICE_IP, DEVICE_USER, DEVICE_PASSWORD to enable the backstop)');
+    return;
+  }
+  log(`ISAPI polling every ${Math.round(POLL.intervalMs / 60000)}min against ${POLL.ip} (backstop for missed pushes)`);
+  const run = () => pollOnce().catch(e => log('poll failed (will retry):', e.message));
+  setTimeout(run, 10000);
+  setInterval(run, POLL.intervalMs);
+}
+
 // ── HTTP server the terminal posts to ───────────────────────
 const recentReads = new Map(); // employeeNo -> timestamp
 
@@ -318,4 +486,5 @@ server.listen(CONFIG.PORT, () => {
   log(`  queue        -> ${QUEUE_FILE}`);
   const pending = readQueue().length;
   if (pending) { log(`  ${pending} punch(es) queued from a previous run — draining`); drain(); }
+  startPolling();
 });
