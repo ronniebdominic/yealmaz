@@ -452,6 +452,35 @@ router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (
 });
 
 // ── GET /api/cases/:id ───────────────────────────────────
+// Declared before GET /:id, which would otherwise match "trash" as a
+// case id and return 404 instead of the archive list.
+// ── GET /api/cases/trash ────────────────────────────────────
+router.get('/trash', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const { search } = req.query;
+    const where = search
+      ? {
+          OR: [
+            { caseNumber: { contains: search, mode: 'insensitive' } },
+            { patientName: { contains: search, mode: 'insensitive' } },
+            { clinicName: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+    const rows = await prisma.deletedCase.findMany({
+      where, orderBy: { deletedAt: 'desc' }, take: 200,
+      select: {
+        id: true, caseNumber: true, patientName: true, clinicName: true, workType: true,
+        status: true, totalAmount: true, deletedAt: true, deletedByName: true, pointsClawedBack: true,
+      },
+    });
+    res.json(rows);
+  } catch (err) {
+    console.error('[cases trash]', err);
+    res.status(500).json({ error: 'Could not load the trash.' });
+  }
+});
+
 router.get('/:id', protect, async (req, res) => {
   try {
     // Stage `notes` are internal LMS-staff comments, and `scannedBy` names
@@ -802,6 +831,112 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
 // CANCELLED) — e.g. an order the clinic cancelled before it was ever picked
 // up, so it doesn't pile up as a dead row after cancel-pickup already
 // removed it from the active pipeline.
+// ── Trash (deleted-case archive) ────────────────────────────
+// Deleting a case archives a full snapshot in `deleted_cases` and removes
+// the live rows. See the DeletedCase model for why an archive is used
+// rather than a deletedAt flag. These routes are declared before /:id so
+// "trash" is never captured as a case id.
+
+// Everything that gets rebuilt on restore. Keep this list in step with the
+// cascade in DELETE /:id - anything deleted there but not snapshotted here
+// is silently unrecoverable.
+async function snapshotCase(caseId) {
+  const [kase, stages, comments, deliveryLogs, payment, sheetRows, rewardTxns] = await Promise.all([
+    prisma.case.findUnique({ where: { id: caseId }, include: { clinic: { select: { name: true } } } }),
+    prisma.caseStage.findMany({ where: { caseId } }),
+    prisma.caseComment.findMany({ where: { caseId } }),
+    prisma.deliveryLog.findMany({ where: { caseId } }),
+    prisma.payment.findFirst({ where: { caseId } }),
+    prisma.sheetSyncRow.findMany({ where: { caseId } }),
+    prisma.rewardTransaction.findMany({ where: { caseId, type: 'EARN' } }),
+  ]);
+  if (!kase) return null;
+  const { clinic, ...caseRow } = kase;
+  return {
+    kase: caseRow,
+    clinicName: clinic?.name || null,
+    stages, comments, deliveryLogs,
+    payment: payment || null,
+    sheetRows,
+    pointsClawedBack: rewardTxns.reduce((s, t) => s + (t.points || 0), 0),
+  };
+}
+
+// ── POST /api/cases/trash/:id/restore ───────────────────────
+router.post('/trash/:id/restore', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const archived = await prisma.deletedCase.findUnique({ where: { id: req.params.id } });
+    if (!archived) return res.status(404).json({ error: 'Not found in trash.' });
+
+    const snap = archived.snapshot || {};
+    const kase = snap.kase;
+    if (!kase) return res.status(422).json({ error: 'This archived case has no usable snapshot and cannot be restored.' });
+
+    // The original id is reused, so a case restored twice would collide.
+    const live = await prisma.case.findUnique({ where: { id: archived.id }, select: { id: true } });
+    if (live) {
+      await prisma.deletedCase.delete({ where: { id: archived.id } });
+      return res.status(409).json({ error: 'That case already exists again — removing the stale trash entry.' });
+    }
+
+    // The case number is never released back to the sequence while a case
+    // sits in trash (see DELETE /:id), so this should be free. Check anyway:
+    // a manual edit elsewhere could have taken it, and restoring onto a
+    // duplicate number would be worse than refusing.
+    if (kase.caseNumber) {
+      const clash = await prisma.case.findFirst({ where: { caseNumber: kase.caseNumber }, select: { id: true } });
+      if (clash) {
+        return res.status(409).json({ error: `Case number ${kase.caseNumber} is now used by another case. Restore aborted.` });
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.case.create({ data: kase });
+      if (snap.stages?.length) await tx.caseStage.createMany({ data: snap.stages });
+      if (snap.comments?.length) await tx.caseComment.createMany({ data: snap.comments });
+      if (snap.deliveryLogs?.length) await tx.deliveryLog.createMany({ data: snap.deliveryLogs });
+      if (snap.payment) await tx.payment.create({ data: snap.payment });
+      if (snap.sheetRows?.length) await tx.sheetSyncRow.createMany({ data: snap.sheetRows });
+      await tx.deletedCase.delete({ where: { id: archived.id } });
+    });
+
+    await invalidate(`case:${archived.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
+
+    res.json({
+      success: true,
+      caseNumber: kase.caseNumber,
+      // Reward points are NOT re-awarded automatically: they were reversed
+      // when the case was deleted, and silently re-crediting them on
+      // restore could double-count if the clinic's balance was adjusted in
+      // the meantime. Surfaced so an admin can decide.
+      pointsNotRestored: archived.pointsClawedBack || 0,
+      message: `Case ${kase.caseNumber || archived.id} restored.`,
+    });
+  } catch (err) {
+    console.error('[cases trash restore]', err);
+    // A clinic or user referenced by the snapshot may have been deleted
+    // while the case sat in trash, which surfaces as a foreign-key error.
+    if (err.code === 'P2003') {
+      return res.status(409).json({ error: 'Restore failed: something this case referenced (clinic or user) no longer exists.' });
+    }
+    res.status(500).json({ error: 'Could not restore the case.' });
+  }
+});
+
+// ── DELETE /api/cases/trash/:id ─────────────────────────────
+// Permanent. Nothing recovers a case after this.
+router.delete('/trash/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const archived = await prisma.deletedCase.findUnique({ where: { id: req.params.id }, select: { caseNumber: true } });
+    if (!archived) return res.status(404).json({ error: 'Not found in trash.' });
+    await prisma.deletedCase.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: `Case ${archived.caseNumber || req.params.id} permanently deleted.` });
+  } catch (err) {
+    console.error('[cases trash purge]', err);
+    res.status(500).json({ error: 'Could not permanently delete.' });
+  }
+});
+
 router.delete('/:id', protect, restrict('ADMIN', 'DISPATCH'), async (req, res) => {
   try {
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
@@ -816,8 +951,36 @@ router.delete('/:id', protect, restrict('ADMIN', 'DISPATCH'), async (req, res) =
     // reward points for an order that never actually happened.
     await clawBackCasePoints(prisma, existing.id, existing.clinicId);
 
-    // Cascade delete in dependency order
+    // Snapshot everything BEFORE the cascade below destroys it - this is
+    // what makes the delete reversible from Admin > Trash.
+    const snap = await snapshotCase(req.params.id);
+
+    // The archive write and the cascade delete MUST be one transaction.
+    // Archiving after the delete (an earlier version of this) meant any
+    // failure writing the archive - a foreign key, a disconnect - left the
+    // case already destroyed with nothing to restore from. Atomic here, so
+    // either the case is recoverable or it is untouched.
+    const deletedById = req.user?.id
+      ? (await prisma.user.findUnique({ where: { id: req.user.id }, select: { id: true } }))?.id || null
+      : null;
+
     await prisma.$transaction([
+      ...(snap ? [prisma.deletedCase.create({
+        data: {
+          id: existing.id,
+          caseNumber: existing.caseNumber,
+          patientName: existing.patientName,
+          clinicName: snap.clinicName,
+          workType: existing.workType,
+          status: existing.status,
+          totalAmount: existing.totalAmount,
+          snapshot: snap,
+          deletedById,
+          deletedByName: req.user?.name || null,
+          pointsClawedBack: snap.pointsClawedBack || 0,
+        },
+      })] : []),
+      // Cascade delete in dependency order
       prisma.caseStage.deleteMany({ where: { caseId: req.params.id } }),
       prisma.caseComment.deleteMany({ where: { caseId: req.params.id } }),
       prisma.deliveryLog.deleteMany({ where: { caseId: req.params.id } }),
@@ -831,7 +994,12 @@ router.delete('/:id', protect, restrict('ADMIN', 'DISPATCH'), async (req, res) =
     // case doesn't leave a permanent gap — the next new case reuses it instead of
     // the sequence skipping ahead. Only safe when it's exactly the last number
     // issued (nothing has been generated after it).
-    const numMatch = existing.caseNumber && existing.caseNumber.match(/^YDL(\d+)$/);
+    //
+    // NOT done when the case was archived: the number stays reserved for as
+    // long as the case is recoverable, because handing it to a new case
+    // would make the restore collide on caseNumber. Purging from trash is
+    // what finally releases it.
+    const numMatch = !snap && existing.caseNumber && existing.caseNumber.match(/^YDL(\d+)$/);
     if (numMatch) {
       const deletedNum = BigInt(numMatch[1]);
       const [seqRow] = await prisma.$queryRawUnsafe(`SELECT last_value, is_called FROM case_number_seq`);
@@ -845,7 +1013,7 @@ router.delete('/:id', protect, restrict('ADMIN', 'DISPATCH'), async (req, res) =
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_deleted', { caseId: req.params.id, caseNumber: existing.caseNumber });
 
-    res.json({ success: true, message: `Case ${existing.caseNumber} deleted.` });
+    res.json({ success: true, message: `Case ${existing.caseNumber} moved to trash.`, recoverable: !!snap });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not delete case.' });

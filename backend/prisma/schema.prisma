@@ -35,6 +35,7 @@ model User {
   deliveries          DeliveryLog[]
   notifications       Notification[]      @relation("NotificationRecipient")
   notificationsSent   Notification[]      @relation("NotificationSender")
+  deletedCases        DeletedCase[]       @relation("DeletedCasesBy")
   assignedDeliveries  Case[]         @relation("AssignedDeliveries")
   pushSubscriptions   PushSubscription[]
 
@@ -342,6 +343,41 @@ model CaseStage {
 
   @@index([caseId])
   @@map("case_stages")
+}
+
+// ── DELETED CASE ARCHIVE (trash / recycle bin) ─────────────
+// Deleting a case removes it from `cases` outright and stores a full
+// snapshot here instead, from which it can be restored.
+//
+// WHY AN ARCHIVE RATHER THAN A deletedAt FLAG: a soft-delete column would
+// have to be honoured by every query that lists, counts or sums cases -
+// over a hundred call sites across eleven files, each with its own
+// PrismaClient, so there is no single place to enforce it. One missed
+// filter and a deleted case keeps counting toward revenue or turnaround
+// with nothing to indicate it. Removing the row makes exclusion automatic
+// and total; the snapshot is what makes it reversible.
+//
+// `snapshot` holds the case plus its stages, comments, delivery logs,
+// payment and sheet-sync rows, so a restore rebuilds the whole record and
+// not just the header.
+model DeletedCase {
+  id           String   @id            // the ORIGINAL case id, so a restore recreates it unchanged
+  caseNumber   String?
+  patientName  String?
+  clinicName   String?
+  workType     String?
+  status       String?
+  totalAmount  Float?
+  snapshot     Json                    // full case + related rows
+  deletedAt    DateTime @default(now())
+  deletedById  String?
+  deletedBy    User?    @relation("DeletedCasesBy", fields: [deletedById], references: [id])
+  deletedByName String?
+  pointsClawedBack Int  @default(0)    // reward points reversed at delete time; surfaced on restore so it is not silently lost
+
+  @@index([deletedAt])
+  @@index([caseNumber])
+  @@map("deleted_cases")
 }
 
 // ── CASE COMMENTS (receptionist / staff notes thread) ──

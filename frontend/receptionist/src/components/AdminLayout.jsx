@@ -5,7 +5,7 @@ import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
   MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge, MdWarehouse, MdGroups,
   MdDesk, MdPointOfSale, MdLocalShipping, MdTwoWheeler, MdScience, MdSupervisorAccount, MdInventory,
-  MdPeopleAlt,
+  MdPeopleAlt, MdDelete,
 } from 'react-icons/md';
 
 // Dashboards each staff role normally logs into directly — the admin
@@ -42,6 +42,9 @@ function NavItems({ active, onNav }) {
       <div className="nav-section-label">Management</div>
       <button className={active('/admin/cases')} onClick={() => onNav('/admin/cases')}>
         <MdAssignment className="mi" size={17} /> Case Management
+      </button>
+      <button className={active('/admin/trash')} onClick={() => onNav('/admin/trash')}>
+        <MdDelete className="mi" size={17} /> Trash
       </button>
       <button className={active('/admin/clinics')} onClick={() => onNav('/admin/clinics')}>
         <MdLocalHospital className="mi" size={17} /> Clinics
