@@ -1243,7 +1243,7 @@ function ReadyOrdersSection() {
 // days), not the case's live status — techs often scan a case through
 // several stages within minutes, so filtering on "current status" would
 // make it disappear from this list before reception ever sees it.
-const FINISHING_LABELS = { METAL_FINISHING: 'Metal Finishing', ZIRCONIA_FITTING_FINISHING: 'Zirconia Fitting & Finishing' };
+const FINISHING_LABELS = { METAL_FINISHING: 'Metal Finishing', ZIRCONIA_FITTING_FINISHING: 'Zirconia Fitting & Finishing', GLAZING: 'Glazing' };
 
 function FinishingSection() {
   const [search, setSearch]     = useState('');
@@ -1287,7 +1287,7 @@ function FinishingSection() {
       </div>
 
       <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <MdAutoAwesome size={14} /> These cases have <strong>reached a finishing stage</strong> (Metal Finishing or Zirconia Fitting & Finishing) in the last 3 days — informational only. They stay listed here even after moving on to Ceramic/Glazing/QC, so you don't miss one that moved through quickly.
+        <MdAutoAwesome size={14} /> These cases have <strong>reached a finishing stage</strong> (Metal Finishing, Zirconia Fitting &amp; Finishing, or Glazing) in the last 3 days — informational only. They stay listed for the full 3 days even after moving on, and even once delivered, so you don't miss one that moved through quickly. Already-delivered cases are dimmed and sorted to the bottom.
       </div>
 
       <div className="card">
@@ -1334,7 +1334,10 @@ function FinishingSection() {
               </thead>
               <tbody>
                 {filtered.map(c => (
-                  <tr key={c.id}>
+                  // Delivered cases stay listed so the log is complete, but are
+                  // dimmed and sorted below so they don't compete for attention
+                  // with cases still moving through the lab.
+                  <tr key={c.id} style={c.status === 'DELIVERED' ? { opacity: 0.5 } : undefined}>
                     <td>{c.caseNumber ? <span className="case-number">{c.caseNumber}</span> : '—'}</td>
                     <td style={{ fontWeight: 600 }}>{c.clinic?.name}</td>
                     <td><span className="patient-name">{c.patientName}</span></td>
@@ -1553,7 +1556,10 @@ export default function Dashboard() {
     staleTime: 20_000,
     refetchInterval: 30_000,
   });
-  const finishingBadge = finishingLog.length;
+  // Delivered cases are in the log for completeness but are not pending
+  // work, so the badge counts only the ones still in progress - otherwise
+  // it reads as a permanent high number and stops meaning anything.
+  const finishingBadge = finishingLog.filter(c => c.status !== 'DELIVERED').length;
 
   const { stats } = summary || {};
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'RX';

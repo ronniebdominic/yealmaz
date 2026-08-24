@@ -381,7 +381,11 @@ router.get('/export', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DIS
 // cases currently parked there. Lab techs often scan a case through several
 // stages within minutes, so a "current status" filter would miss it by the
 // time reception checks. Defined before /:id so it isn't captured as an id.
-const FINISHING_STAGES = ['METAL_FINISHING', 'ZIRCONIA_FITTING_FINISHING'];
+// Glazing is included because a meaningful share of cases reach it without
+// ever being scanned into Metal Finishing or Zirconia Fitting (measured on
+// live data: it is in fact the most-scanned finishing stage), so tracking
+// only the other two silently missed those cases entirely.
+const FINISHING_STAGES = ['METAL_FINISHING', 'ZIRCONIA_FITTING_FINISHING', 'GLAZING'];
 router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   const cacheKey = 'cases:finishing-log';
   const cached = await appCache.get(cacheKey);
@@ -406,7 +410,12 @@ router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (
     }
 
     const cases = await prisma.case.findMany({
-      where: { id: { in: latestPerCase.map(s => s.caseId) }, status: { notIn: ['DELIVERED', 'CANCELLED'] } },
+      // DELIVERED is deliberately NOT excluded. This is a rolling log of what
+      // reached finishing, and with same-day turnaround most cases were
+      // delivered before reception ever opened the list - excluding them hid
+      // the majority of the feed (58 of 88 cases over one 3-day window).
+      // Cancelled cases are still dropped: nothing is pending on them.
+      where: { id: { in: latestPerCase.map(s => s.caseId) }, status: { not: 'CANCELLED' } },
       include: {
         clinic: { select: { name: true, zone: { select: { id: true, name: true } } } },
         payment: { select: { amount: true, status: true } },
@@ -424,7 +433,15 @@ router.get('/finishing-log', protect, restrict('ADMIN', 'RECEPTIONIST'), async (
         finishingStage:     s.stageName,
         finishingScannedAt: s.scannedAt,
         finishingScannedBy: s.scannedBy,
-      }));
+      }))
+      // Cases still in progress first, already-delivered ones below - the
+      // list stays complete without delivered cases pushing the ones that
+      // still need attention out of view.
+      .sort((a, b) => {
+        const aDone = a.status === 'DELIVERED', bDone = b.status === 'DELIVERED';
+        if (aDone !== bDone) return aDone ? 1 : -1;
+        return new Date(b.finishingScannedAt) - new Date(a.finishingScannedAt);
+      });
 
     await appCache.set(cacheKey, result, 20);
     res.json(result);
