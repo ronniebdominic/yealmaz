@@ -10,7 +10,7 @@ const cron = require('node-cron');
 const dashboard = require('../routes/dashboard');
 const { sendMessage } = require('../utils/telegramClient');
 
-const DEFAULT_CRON = '0 8 * * *'; // 08:00 daily
+const DEFAULT_CRON = '30 20 * * *'; // 20:30 (8:30 PM) daily, Addis Ababa time — see the timezone passed to cron.schedule below
 // A clinic's oldest unpaid case crossing this many days gets called out by
 // name in the digest instead of just folding into the total.
 const STALE_OUTSTANDING_DAYS = 30;
