@@ -17,7 +17,7 @@ import {
   MdInventory2, MdLocalHospital, MdLightbulb, MdBolt, MdSend, MdPrint,
   MdWarning, MdCheckCircle, MdCancel, MdSearch, MdSchedule, MdPendingActions,
   MdCreditCard, MdCameraAlt, MdEdit, MdPaid, MdImage, MdDescription,
-  MdReceipt, MdInbox, MdEventNote, MdHandshake, MdAccountBalance,
+  MdReceipt, MdReceiptLong, MdInbox, MdEventNote, MdHandshake, MdAccountBalance,
   MdAssignment, MdTrendingUp, MdAccountBalanceWallet, MdMoneyOff,
   MdCalendarToday, MdDashboard, MdCelebration, MdCheck, MdClose, MdFileDownload,
   MdLogout,
@@ -25,6 +25,7 @@ import {
 import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
+import DailyReconciliationTab from './finance/DailyReconciliationTab';
 
 const PAGE_SIZE = 15;
 const HIST_SIZE = 20;
@@ -2582,6 +2583,7 @@ const NAV_GROUPS = [
     { id: 'ready',      label: 'Ready for Delivery', icon: MdInventory2 },
     { id: 'billing',    label: 'Billing & Invoicing',icon: MdDescription, badge: 'payments' },
     { id: 'trusted',    label: 'Trusted Partners',   icon: MdHandshake, badge: 'trusted' },
+    { id: 'reconciliation', label: 'Daily Reconciliation', icon: MdReceiptLong },
   ]},
   { group: 'Analytics', items: [
     { id: 'report',     label: 'Report',             icon: MdTrendingUp },
@@ -2672,7 +2674,7 @@ export default function FinanceDashboard() {
   // trim the nav (and thus the only tabs reachable) to match what the backend
   // actually grants each role.
   const navGroups = scope === 'AP'
-    ? NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => i.id === 'trusted') })).filter(g => g.items.length)
+    ? NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => ['trusted', 'reconciliation'].includes(i.id)) })).filter(g => g.items.length)
     : scope === 'CASHIER'
     ? NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => i.id === 'billing') })).filter(g => g.items.length)
     : NAV_GROUPS;
@@ -2856,6 +2858,7 @@ export default function FinanceDashboard() {
           {tab === 'ready'    && <ReadyForDeliveryTab />}
           {tab === 'billing'  && <BillingTab view={billingView} onView={setBillingView} scope={scope} />}
           {tab === 'trusted'  && <TrustedPartnersTab queryClient={queryClient} />}
+          {tab === 'reconciliation' && <DailyReconciliationTab />}
           {tab === 'report'   && <ReportTab view={reportView} onView={setReportView} />}
         </div>
       </main>

@@ -380,6 +380,106 @@ router.get('/billing', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'FI
   }
 });
 
+// ── GET /api/payments/daily-reconciliation ──────────────────
+// End-of-day cash/credit reconciliation: every case DELIVERED in the
+// selected range, split into Cash Sales (clinic.isExcluded === false — pays
+// per case, verified via screenshot/gateway/manual before or at dispatch)
+// and Credit Sales / Trusted Partners (isExcluded === true — billed later
+// on a schedule via the Trusted Partners flow). Same isExcluded meaning
+// used everywhere else in this codebase (billing queue above, the
+// dispatch-clearance check, the bot's trusted-partners tools) — this is
+// not a new categorisation, just the existing one applied to a single
+// day's deliveries for finance to close out against physical cash/bank
+// records.
+//
+// Remake/redo cases are DELIBERATELY INCLUDED here, unlike the Total Case
+// Value KPI on the admin dashboard (which excludes them to avoid
+// double-counting projected business). This is a different question: what
+// money actually needs to be reconciled today. A REDO_CHARGED case
+// delivered today is real money owed today regardless of whether its
+// value was "new business" — omitting it would make the reconciliation
+// not balance against what was actually collected or is actually owed.
+router.get('/daily-reconciliation', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP', 'FINANCE_CASHIER'), async (req, res) => {
+  try {
+    const { date, from, to, clinicId, caseNumber } = req.query;
+
+    // Single `date` is the common case (today's close-out); from/to lets
+    // finance reconcile a past day or a range. `date` wins if both given.
+    let dateFrom, dateTo;
+    if (date) {
+      dateFrom = new Date(`${date}T00:00:00`);
+      dateTo = new Date(`${date}T23:59:59.999`);
+    } else {
+      dateFrom = from ? new Date(`${from}T00:00:00`) : new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+      dateTo = to ? new Date(`${to}T23:59:59.999`) : new Date();
+    }
+    if (isNaN(dateFrom.getTime()) || isNaN(dateTo.getTime())) {
+      return res.status(400).json({ error: 'Invalid date/from/to.' });
+    }
+
+    const where = {
+      status: 'DELIVERED',
+      deliveryDate: { gte: dateFrom, lte: dateTo },
+      ...(clinicId ? { clinicId } : {}),
+      ...(caseNumber ? { caseNumber: { contains: caseNumber, mode: 'insensitive' } } : {}),
+    };
+
+    const cases = await prisma.case.findMany({
+      where,
+      select: {
+        id: true, caseNumber: true, patientName: true, workType: true, totalAmount: true,
+        deliveryDate: true, remake: true,
+        clinic: { select: { id: true, name: true, isExcluded: true } },
+        payment: { select: { status: true, amount: true, amountReceived: true } },
+      },
+      orderBy: { deliveryDate: 'desc' },
+    });
+
+    const UNPAID_STATUSES = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'REJECTED'];
+    const emptyBucket = () => ({ count: 0, billedTotal: 0, collectedTotal: 0, outstandingTotal: 0 });
+    const cashSales = emptyBucket();
+    const creditSales = emptyBucket();
+
+    const rows = cases.map(c => {
+      const billed = c.payment?.amount ?? c.totalAmount ?? 0;
+      const payStatus = c.payment?.status || 'PENDING';
+      const isCredit = !!c.clinic?.isExcluded;
+      const collected = payStatus === 'VERIFIED' ? billed : (c.payment?.amountReceived || 0);
+      const outstanding = UNPAID_STATUSES.includes(payStatus) ? billed - (c.payment?.amountReceived || 0) : 0;
+
+      const bucket = isCredit ? creditSales : cashSales;
+      bucket.count += 1;
+      bucket.billedTotal += billed;
+      bucket.collectedTotal += collected;
+      bucket.outstandingTotal += outstanding;
+
+      return {
+        id: c.id, caseNumber: c.caseNumber, patientName: c.patientName,
+        clinicId: c.clinic?.id || null, clinicName: c.clinic?.name || null,
+        salesType: isCredit ? 'CREDIT' : 'CASH',
+        workType: c.workType, deliveryDate: c.deliveryDate, remake: c.remake,
+        billedAmount: billed, paymentStatus: payStatus, amountCollected: collected, amountOutstanding: outstanding,
+      };
+    });
+
+    res.json({
+      range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      cashSales,
+      creditSales,
+      grandTotal: {
+        count: cashSales.count + creditSales.count,
+        billedTotal: cashSales.billedTotal + creditSales.billedTotal,
+        collectedTotal: cashSales.collectedTotal + creditSales.collectedTotal,
+        outstandingTotal: cashSales.outstandingTotal + creditSales.outstandingTotal,
+      },
+      cases: rows,
+    });
+  } catch (err) {
+    console.error('[payments daily-reconciliation]', err);
+    res.status(500).json({ error: 'Could not load the daily reconciliation.' });
+  }
+});
+
 // ── POST /api/payments/:caseId/request ──────────────────
 // Finance sends payment request (with amount) to clinic app — no invoice yet
 router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE', 'DISPATCH'), async (req, res) => {
