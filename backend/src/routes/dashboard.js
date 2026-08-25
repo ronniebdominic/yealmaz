@@ -398,7 +398,7 @@ async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
       prisma.case.groupBy({ by: ['clinicId'], where: caseFilter, _count: { id: true } }),
       prisma.case.findMany({
         where: caseFilter,
-        select: { workType: true, units: true, clinicId: true, totalAmount: true, payment: { select: { status: true, amount: true } } },
+        select: { workType: true, units: true, clinicId: true, totalAmount: true, remake: true, payment: { select: { status: true, amount: true } } },
       }),
       // Scoped to the same date/clinic/search filters as the rest of this
       // endpoint's KPIs, so it moves with the filters like everything else
@@ -427,7 +427,7 @@ async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
       // or those two KPIs silently exclude cases nobody has invoiced yet.
       prisma.case.findMany({
         where: deliveredFilter,
-        select: { totalAmount: true, payment: { select: { status: true, amount: true, amountReceived: true } } },
+        select: { totalAmount: true, remake: true, payment: { select: { status: true, amount: true, amountReceived: true } } },
       }),
       // Units delivered — distinct from totalUnits (all cases in range regardless
       // of status); this is specifically the "Revenue vs Volume" delivered figure.
@@ -445,6 +445,11 @@ async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
     let outstandingNetAmount = 0;
     let outstandingCount = 0;
     for (const c of deliveredCohortCases) {
+      // Same reasoning as totalCaseValue above: a remake/redo's value would
+      // double-count work whose original case was already billed. Skipped
+      // entirely here (not just left out of the sum) so deliveredCaseValue
+      // and outstanding stay the same cohort and can't drift apart.
+      if (c.remake) continue;
       const billed = c.payment?.amount ?? c.totalAmount ?? 0;
       deliveredCaseValue += billed;
       const payStatus = c.payment?.status || 'PENDING';
@@ -499,7 +504,15 @@ async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
       if (c.payment?.status === 'VERIFIED' && c.payment?.amount) {
         workTypeMap[wt].revenue += c.payment.amount;
       }
-      totalCaseValue += c.payment?.amount ?? c.totalAmount ?? 0;
+      // Remake/redo cases are excluded from the Financial Projection total.
+      // A remake bills at Br 0 (free) or 50% of the ORIGINAL case's amount
+      // (see the RemakeReviewStatus workflow) — the original case's full
+      // value was already counted here when IT was created, so also adding
+      // the redo's value would double-count a single piece of work as two
+      // pieces of "projected business." Remake volume/units still show up
+      // in Total Cases/Total Units above and in the remake-rate insight
+      // elsewhere — only the money is left out of this specific total.
+      if (!c.remake) totalCaseValue += c.payment?.amount ?? c.totalAmount ?? 0;
     }
     const revenueByWorkType = Object.entries(workTypeMap)
       .map(([workType, d]) => ({ workType, count: d.count, revenue: d.revenue, units: d.units }))

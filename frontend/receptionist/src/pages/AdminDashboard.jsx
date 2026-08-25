@@ -501,7 +501,7 @@ export default function AdminDashboard() {
               <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.totalCaseValue)}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')}
-                info="What all of those cases are expected to bill for in total — added together whether the clinic has paid yet or not, and whether the case has been delivered yet or not." />
+                info="What all of those cases are expected to bill for in total — added together whether the clinic has paid yet or not, and whether the case has been delivered yet or not. Remake/redo cases are excluded, since their original case's value is already counted here — adding the redo on top would double-count the same piece of work." />
             </div>
 
             {/* ── Section 2: Revenue Vs Volume ── */}
@@ -518,7 +518,7 @@ export default function AdminDashboard() {
               <ColorTile icon={MdBarChart} label="Total Case Value" value={fmtBr(kpi?.deliveredCaseValue)}
                 sub="Delivered cases only" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
-                info="What those delivered-in-range cases are billed for in total — whether it's been paid yet or not. (The 'Total Case Value' above in Financial Projection is a different cohort — cases ordered in this range, not delivered in it.)" />
+                info="What those delivered-in-range cases are billed for in total — whether it's been paid yet or not. Remake/redo cases are excluded here too, for the same reason as the Financial Projection tile above. (This is a different cohort from that tile — cases delivered in this range, not ordered in it.)" />
               <ColorTile icon={MdPaid} label="Verified Payments" value={ETB(kpi?.totalRevenue)}
                 sub="Received" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')}
