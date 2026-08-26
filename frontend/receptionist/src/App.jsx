@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import Login from './pages/Login';
 import AttendanceKiosk from './pages/AttendanceKiosk';
 import AdminTrash from './pages/AdminTrash';
+import AdminAIChat from './pages/AdminAIChat';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminPricing from './pages/AdminPricing';
@@ -98,6 +99,7 @@ function AppRoutes() {
       <Route path="/admin/clinics" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminClinics /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminUsers /></ProtectedRoute>} />
       <Route path="/admin/trash" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminTrash /></ProtectedRoute>} />
+      <Route path="/admin/ai-chat" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminAIChat /></ProtectedRoute>} />
       <Route path="/admin/zones" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminZones /></ProtectedRoute>} />
       <Route path="/admin/rewards" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminRewards /></ProtectedRoute>} />
       <Route path="/admin/inventory" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminInventory /></ProtectedRoute>} />

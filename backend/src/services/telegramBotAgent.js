@@ -1,4 +1,4 @@
-// Ye-Almaz — Telegram Bot Agent Loop
+// Ye-Almaz — Local-Model Agent Loop
 //
 // Manual tool-use loop over the local Ollama model — there's no vendor
 // SDK/tool-runner for a local endpoint, so this owns the round-by-round
@@ -6,6 +6,14 @@
 // SDK would otherwise take care of: retrying a malformed tool-call once,
 // and forcing a plain-text final answer if the round cap is hit instead
 // of silently truncating.
+//
+// Two channels share this exact loop/prompt/history mechanism: the
+// Telegram bot (telegramWebhook.js) and the admin dashboard's AI Assistant
+// (routes/aiChat.js). Sharing it is deliberate — the same question must
+// never get a different answer depending on which channel asked it. Both
+// pass their own conversation key into answerQuestion()/clearHistory()
+// (a numeric Telegram chat id vs an "admin-web:<userId>" string), so the
+// per-conversation history in-memory Map below never mixes the two up.
 const { runLocalLlm } = require('../utils/localLlmClient');
 const { toolDefinitions, toolHandlers } = require('./botTools');
 
@@ -17,7 +25,7 @@ const MAX_ROUNDS = 6;
 // into if it only sees the field names. Today's date is appended fresh on
 // every call (see buildSystemPrompt) since "today"/"this month" are
 // relative and this string is otherwise reused across requests.
-const SYSTEM_PROMPT_BASE = `You are a read-only business assistant for Ye-Almaz Dental Lab, answering the lab owner's questions in Telegram using the tools provided. You can ONLY read data — you have no way to change anything, and you must never claim to have changed, approved, or updated anything.
+const SYSTEM_PROMPT_BASE = `You are a read-only business assistant for Ye-Almaz Dental Lab, answering the lab owner's questions in chat (Telegram or the admin dashboard's AI Assistant) using the tools provided. You can ONLY read data — you have no way to change anything, and you must never claim to have changed, approved, or updated anything.
 
 The lab operates in Ethiopia (Africa/Addis_Ababa timezone). All amounts are in Ethiopian Birr (Br).
 
@@ -33,7 +41,7 @@ ANALYSIS: when asked how the business is doing, what to worry about, or where th
 
 SENSITIVE DATA: you have no access to payroll, salary, advances, expense claims, performance reviews or employee documents. If asked, say plainly that this bot doesn't have access to pay or HR-record data — don't guess at it from anything else.
 
-BE BRIEF. This is a text message, not a report — lead with the number(s) actually asked for, in one or two short sentences or a tight "-" bulleted list. Skip preamble ("Here is the information you requested..."), skip restating the question, skip closing filler ("let me know if you need anything else"). No markdown formatting (no headers, no bold/italic markers, no tables) — plain text only, since the reply is sent as-is.
+BE BRIEF. This is a chat message, not a report — lead with the number(s) actually asked for, in one or two short sentences or a tight "-" bulleted list. Skip preamble ("Here is the information you requested..."), skip restating the question, skip closing filler ("let me know if you need anything else"). No markdown formatting (no headers, no bold/italic markers, no tables) — plain text only, since the reply is sent as-is, and may also be read aloud.
 
 You may see earlier turns of this same conversation above — use them for context on follow-up questions (e.g. "and last month?" after a revenue question means the same metric, different period), but always re-call the relevant tool for fresh numbers rather than reusing one from earlier.`;
 

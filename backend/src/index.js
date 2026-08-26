@@ -141,6 +141,7 @@ app.use('/api/recruitment',   require('./routes/recruitment'));
 app.use('/api/hr-analytics',  require('./routes/hr-analytics'));
 app.use('/api/webhooks',      require('./routes/webhooks'));  // Public: DB-trigger callbacks (own secret auth)
 app.use('/api/telegram-webhook', require('./routes/telegramWebhook'));  // Public: Telegram bot callbacks (own secret auth)
+app.use('/api/ai-chat',       require('./routes/aiChat'));  // Admin dashboard's AI Assistant — same agent loop as the Telegram bot above
 
 // ── Cache management (admin only) ───────────────────────
 const { appCache, invalidate } = require('./cache');
