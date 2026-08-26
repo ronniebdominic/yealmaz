@@ -19,7 +19,7 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import {
   MdSmartToy, MdSend, MdMic, MdMicOff, MdVolumeUp, MdVolumeOff,
-  MdRestartAlt, MdPerson, MdErrorOutline, MdInfoOutline,
+  MdRestartAlt, MdPerson, MdErrorOutline,
 } from 'react-icons/md';
 
 // A response can genuinely take a while: the agent loop may run several
@@ -194,23 +194,17 @@ export default function AdminAIChat() {
       </div>
 
       <div className="content" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', maxWidth: 900, margin: '0 auto', width: '100%' }}>
-        <div className="card" style={{ padding: 12, marginBottom: 12, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5 }}>
-            <MdInfoOutline size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              Read-only, same local model and data as the Telegram bot — it can look up cases, payments, performance
-              and business insights, but never changes anything. It has no access to payroll or HR-record data.
-              {!sttSupported && ' Voice input isn’t supported in this browser — try Chrome or Edge.'}
-            </div>
-          </div>
-        </div>
-
         <div ref={listRef} className="card" style={{ flex: 1, overflowY: 'auto', padding: 16, marginBottom: 12 }}>
           {messages.length === 0 ? (
             <div className="empty-state" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
               <div style={{ textAlign: 'center' }}>
                 <MdSmartToy size={32} style={{ color: 'var(--text-3)', marginBottom: 8 }} />
                 <div>Ask about cases, payments, clinic balances, lab performance, or business insights.</div>
+                {!sttSupported && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)' }}>
+                    Voice input isn’t supported in this browser — try Chrome or Edge.
+                  </div>
+                )}
               </div>
             </div>
           ) : messages.map(m => <Message key={m.id} {...m} />)}
