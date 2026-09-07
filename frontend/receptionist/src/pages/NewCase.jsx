@@ -8,10 +8,10 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   MdEmail, MdBolt, MdWarning, MdAutorenew, MdTwoWheeler, MdMoveToInbox,
-  MdLocalShipping, MdAdd, MdDeleteOutline,
+  MdLocalShipping, MdAdd, MdDeleteOutline, MdAssignment, MdSearch,
 } from 'react-icons/md';
 import { toLocalDateString } from '../utils/date';
-import OriginalCasePicker from '../components/OriginalCasePicker';
+import OriginalCasePickerModal from '../components/OriginalCasePickerModal';
 
 // ── Visual group ordering for the work-type dropdown ─────
 // Types present in the pricing DB will be slotted into these groups.
@@ -122,8 +122,32 @@ function WorkItemForm({
   item, index, onChange, onRemove, canRemove,
   priceMap, expressPriceMap, flatRateMap, durationMap, expressDurationMap,
   workTypeGroups, deliveryType, archFee, applyArchFee, error, clearError,
+  onFillFromOriginal,
 }) {
   const isAligner = isAlignerWorkType(item.workType);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Picking the original/reference case pulls its work type, shade, and
+  // tooth selection/units straight into this item — a redo/replacement is
+  // almost always the same work, so there's no reason to re-type it. Price
+  // and due date are left to the item's own auto-calc effects below (a
+  // remake/redo is priced at review, not copied from the old case).
+  const handleSelectOriginal = (rc) => {
+    const wt = rc.workType && rc.workType !== 'TBD' ? rc.workType : item.workType;
+    const aligner = isAlignerWorkType(wt);
+    const teeth = (!aligner && rc.toothNumbers)
+      ? rc.toothNumbers.split(',').map(t => parseInt(t.trim(), 10)).filter(n => !isNaN(n)).sort((a, b) => a - b)
+      : [];
+    onChange({
+      originalCase: rc,
+      workType: wt,
+      shade: aligner ? '' : (rc.shade || item.shade),
+      selectedTeeth: teeth,
+      manualUnits: teeth.length === 0 && rc.units != null ? String(rc.units) : item.manualUnits,
+    });
+    onFillFromOriginal?.(rc);
+    setPickerOpen(false);
+  };
 
   const handleWorkTypeChange = (e) => {
     const wt = e.target.value;
@@ -141,6 +165,8 @@ function WorkItemForm({
   const setRemakeCheck = (e) => {
     const checked = e.target.checked;
     onChange({ remake: checked, ...(checked ? {} : { originalCase: null, remakeReason: '' }) });
+    // Pop the search up immediately — no separate field to notice.
+    if (checked) setPickerOpen(true);
   };
 
   // Base price before remake/redo modifier
@@ -350,7 +376,31 @@ function WorkItemForm({
               style={{ width: '100%', marginBottom: 10 }}
             />
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', display: 'block', marginBottom: 4 }}>ORIGINAL / REFERENCE CASE *</label>
-            <OriginalCasePicker selected={item.originalCase} onSelect={rc => onChange({ originalCase: rc })} onClear={() => onChange({ originalCase: null })} />
+            {item.originalCase ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <MdAssignment size={14} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setPickerOpen(true)}>
+                  <span className="case-number">{item.originalCase.caseNumber || 'No scan #'}</span>{' '}
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    {item.originalCase.patientName}{item.originalCase.workType ? ` · ${item.originalCase.workType}` : ''}
+                  </span>
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange({ originalCase: null })} style={{ color: 'var(--red)' }}>✕</button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '9px 10px', fontSize: 13, fontWeight: 700, color: 'var(--red)',
+                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer',
+                }}
+              >
+                <MdSearch className="mi" size={15} /> Search for the original case…
+              </button>
+            )}
+            <OriginalCasePickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectOriginal} />
           </div>
         )}
       </div>
@@ -698,6 +748,14 @@ export default function NewCase() {
                     applyArchFee={i === 0}
                     error={itemErrors[i]}
                     clearError={() => setItemErrors(prev => ({ ...prev, [i]: '' }))}
+                    onFillFromOriginal={rc => setForm(prev => ({
+                      ...prev,
+                      patientName:   rc.patientName || prev.patientName,
+                      patientAge:    rc.patientAge != null ? String(rc.patientAge) : prev.patientAge,
+                      patientGender: rc.patientGender || prev.patientGender,
+                      doctorName:    rc.doctorName || prev.doctorName,
+                      doctorPhone:   rc.doctorPhone || prev.doctorPhone,
+                    }))}
                   />
                 ))}
                 <button type="button" onClick={addItem} className="btn btn-ghost"
