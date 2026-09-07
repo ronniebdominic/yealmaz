@@ -1,4 +1,17 @@
-# Telegram + Local AI Agent — Lab Machine Setup
+# Telegram + Local AI Agent — Lab Machine Setup (RETIRED)
+
+**As of September 2026 the bot runs on Groq's hosted API instead of a
+local Ollama model — none of the lab-machine/tunnel infra below is
+required anymore.** Setup is now just two env vars in `backend/.env.example`
+(`GROQ_API_KEY`, `GROQ_MODEL`) — get a key at https://console.groq.com,
+set it on Railway, done. The client code lives in
+`backend/src/utils/groqClient.js`.
+
+This doc is kept for reference in case the lab machine setup is ever
+needed again (e.g. reverting for cost or data-residency reasons) — the
+steps below were accurate for that setup, not the current one.
+
+---
 
 This is the infrastructure half of the Telegram business-Q&A bot — the
 part that happens on the physical PC/server at the lab, outside this

@@ -1,11 +1,11 @@
-// Ye-Almaz — Local-Model Agent Loop
+// Ye-Almaz — Groq Agent Loop
 //
-// Manual tool-use loop over the local Ollama model — there's no vendor
-// SDK/tool-runner for a local endpoint, so this owns the round-by-round
-// tool execution itself, plus the local-model-specific handling a cloud
-// SDK would otherwise take care of: retrying a malformed tool-call once,
-// and forcing a plain-text final answer if the round cap is hit instead
-// of silently truncating.
+// Manual tool-use loop over Groq's hosted API — there's no vendor
+// SDK/tool-runner wired up for this yet, so this owns the round-by-round
+// tool execution itself: retrying a malformed tool-call once, and forcing
+// a plain-text final answer if the round cap is hit instead of silently
+// truncating. (Previously ran against a local Ollama model on a lab
+// machine, reached over a tunnel — see git history for that.)
 //
 // Two channels share this exact loop/prompt/history mechanism: the
 // Telegram bot (telegramWebhook.js) and the admin dashboard's AI Assistant
@@ -14,7 +14,7 @@
 // pass their own conversation key into answerQuestion()/clearHistory()
 // (a numeric Telegram chat id vs an "admin-web:<userId>" string), so the
 // per-conversation history in-memory Map below never mixes the two up.
-const { runLocalLlm } = require('../utils/localLlmClient');
+const { runGroqLlm } = require('../utils/groqClient');
 const { toolDefinitions, toolHandlers } = require('./botTools');
 
 const MAX_ROUNDS = 6;
@@ -86,13 +86,6 @@ function buildSystemPrompt() {
 
 Today's date is ${a.today}. When a tool needs a date range, resolve it using these exact anchors — never guess or invent a year: "today" = ${a.today} to ${a.today}; "this week" = ${a.startOfWeek} to ${a.today}; "this month" = ${a.startOfMonth} to ${a.today}; "this year" or no period mentioned = ${a.startOfYear} to ${a.today}. Only use a different year or date than these if the user explicitly names one (e.g. "in 2024," "since March 3rd"). When you write your answer, if you mention the date range at all, quote it from the "range" field actually returned in the tool's JSON result — never restate the from/to you originally asked for, since a tool may adjust it.`;
 }
-
-// Single-flight guard — a lab PC (likely one consumer GPU, maybe
-// CPU-only) can't usefully serve concurrent generations. A second message
-// arriving mid-answer gets an immediate reply instead of queuing silently
-// behind the first (which could make the second question wait minutes) or
-// running both at once and starving each other.
-let inFlight = false;
 
 // Short-term per-chat memory, so a follow-up like "and last month?" has
 // something to refer back to. In-memory only (resets on redeploy) — same
@@ -340,7 +333,7 @@ async function runAgentLoop(chatId, userText) {
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     let response;
     try {
-      response = await runLocalLlm({ system, messages, tools: toolDefinitions });
+      response = await runGroqLlm({ system, messages, tools: toolDefinitions });
     } catch (err) {
       console.error('[TelegramBot] LLM call failed:', err.message);
       return "Sorry, I couldn't reach the AI model just now — it may be offline. Please try again in a moment.";
@@ -417,7 +410,7 @@ async function runAgentLoop(chatId, userText) {
   // serving stacks than relying on a tool_choice:"none" override) instead
   // of silently truncating the conversation.
   try {
-    const final = await runLocalLlm({ system, messages, maxTokens: 1500 });
+    const final = await runGroqLlm({ system, messages, maxTokens: 1500 });
     if (final.text?.trim()) {
       const replyText = correctCurrencySymbols(correctDateMentions(final.text.trim(), lastRealRange, userText));
       appendToHistory(chatId, userText, replyText);
@@ -431,15 +424,7 @@ async function runAgentLoop(chatId, userText) {
 }
 
 async function answerQuestion(chatId, userText) {
-  if (inFlight) {
-    return "I'm still working on your last question — give me a moment and ask again.";
-  }
-  inFlight = true;
-  try {
-    return await runAgentLoop(chatId, userText);
-  } finally {
-    inFlight = false;
-  }
+  return runAgentLoop(chatId, userText);
 }
 
 module.exports = { answerQuestion, clearHistory };

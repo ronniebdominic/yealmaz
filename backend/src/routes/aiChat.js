@@ -2,10 +2,9 @@
 //
 // A second channel into the exact same agent loop the Telegram bot uses
 // (telegramBotAgent.js) — same tools, same grounding guardrails, same
-// system prompt, same single-flight guard against the lab machine's one
-// local-model generation at a time. Reusing it rather than building a
-// parallel implementation is what guarantees this can never give a
-// different answer than the Telegram bot for the same question.
+// system prompt. Reusing it rather than building a parallel implementation
+// is what guarantees this can never give a different answer than the
+// Telegram bot for the same question.
 //
 // Voice is entirely a FRONTEND concern (the browser's own Web Speech API
 // for mic-to-text and text-to-speech) — this endpoint only ever sees and
@@ -14,7 +13,7 @@
 const express = require('express');
 const { protect, restrict } = require('../middleware/auth');
 const { answerQuestion, clearHistory } = require('../services/telegramBotAgent');
-const { isConfigured } = require('../utils/localLlmClient');
+const { isConfigured } = require('../utils/groqClient');
 
 const router = express.Router();
 
@@ -30,7 +29,7 @@ const conversationKey = (userId) => `admin-web:${userId}`;
 router.post('/ask', protect, restrict('ADMIN'), async (req, res) => {
   try {
     if (!isConfigured()) {
-      return res.status(503).json({ error: 'The local AI model is not configured right now (OLLAMA_BASE_URL missing) — ask whoever manages the lab machine to check it.' });
+      return res.status(503).json({ error: 'The AI assistant is not configured right now (GROQ_API_KEY missing).' });
     }
     const text = (req.body?.text || '').trim();
     if (!text) return res.status(400).json({ error: 'Message text is required.' });
