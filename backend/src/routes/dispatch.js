@@ -610,4 +610,84 @@ router.post('/:caseId/self-pickup', protect, restrict('DISPATCH', 'ADMIN'), asyn
   }
 });
 
+// ── GET /api/dispatch/model-requests ──────────────────────
+// SCHEDULED requests are what Dispatch actually needs to act on — a
+// clinic scheduling a pickup is what surfaces it here (see
+// PATCH /model-requests/:id/schedule); REQUESTED ones are still waiting
+// on the clinic, ASSIGNED/COLLECTED/CANCELLED are done with. Also
+// includes ASSIGNED so a dispatcher can see/undo what they just assigned.
+router.get('/model-requests', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  try {
+    const requests = await prisma.modelRequest.findMany({
+      where: { status: { in: ['SCHEDULED', 'ASSIGNED'] } },
+      include: {
+        case: { select: { id: true, caseNumber: true, patientName: true, workType: true, clinic: { select: { id: true, name: true, station: true, zoneId: true } } } },
+        requestedBy: { select: { id: true, name: true } },
+        assignedDelivery: { select: { id: true, name: true, station: true } },
+      },
+      orderBy: { scheduledPickupAt: 'asc' },
+    });
+    res.json(requests);
+  } catch (err) {
+    console.error('[GET /dispatch/model-requests]', err);
+    res.status(500).json({ error: 'Could not load model pickup requests.' });
+  }
+});
+
+// ── POST /api/dispatch/model-requests/:id/assign ──────────
+// Mirrors /:caseId/assign-pickup — same driver-notification shape, just
+// against a ModelRequest instead of a Case.
+router.post('/model-requests/:id/assign', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
+  const { executiveId } = req.body;
+  if (!executiveId) return res.status(400).json({ error: 'executiveId is required.' });
+
+  try {
+    const executive = await prisma.user.findUnique({ where: { id: executiveId } });
+    if (!executive || executive.role !== 'DELIVERY') {
+      return res.status(400).json({ error: 'Invalid delivery executive.' });
+    }
+
+    const request = await prisma.modelRequest.findUnique({
+      where: { id: req.params.id },
+      include: { case: { select: { id: true, caseNumber: true, clinic: { select: { name: true } } } } },
+    });
+    if (!request) return res.status(404).json({ error: 'Model request not found.' });
+    if (request.status !== 'SCHEDULED') {
+      return res.status(400).json({ error: `Cannot assign a request that is ${request.status.toLowerCase()}.` });
+    }
+
+    const updated = await prisma.modelRequest.update({
+      where: { id: req.params.id },
+      data: { assignedDeliveryId: executiveId, status: 'ASSIGNED' },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: request.caseId,
+        stageName: request.case.status,
+        scannedBy: req.user.name,
+        notes: `Model pickup assigned to ${executive.name} by dispatch`,
+      },
+    });
+
+    await invalidate('model-requests:*', 'dispatch:model-requests', 'delivery:*', `case:${request.caseId}`);
+
+    const io = req.app.get('io');
+    const message = `Model pickup assigned: ${request.case.caseNumber || 'case'} — collect new model from ${request.case.clinic?.name}`;
+    io.to(`delivery_${executiveId}`).emit('case_assigned', { modelRequestId: updated.id, caseId: request.caseId, message });
+
+    sendPushToUser(prisma, executiveId, {
+      title: '📦 Model Pickup Assigned',
+      body: message,
+      icon: '/logo.png',
+      data: { modelRequestId: updated.id, caseId: request.caseId },
+    });
+
+    res.json({ success: true, modelRequest: updated });
+  } catch (err) {
+    console.error('[POST /dispatch/model-requests/:id/assign]', err);
+    res.status(500).json({ error: 'Could not assign model pickup.' });
+  }
+});
+
 module.exports = router;

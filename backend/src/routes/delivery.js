@@ -483,4 +483,76 @@ router.get('/my-performance', protect, restrict('DELIVERY', 'ADMIN'), async (req
   }
 });
 
+// ── GET /api/delivery/model-requests/assigned ─────────────
+// A driver's ASSIGNED model pickups — kept separate from GET /assigned
+// (which is Case-shaped and feeds the existing driver-performance
+// attribution) rather than folding these in, since a ModelRequest isn't a
+// Case and has no CaseStage of its own to attribute against.
+router.get('/model-requests/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const isDeliveryExec = req.user.role === 'DELIVERY';
+    const requests = await prisma.modelRequest.findMany({
+      where: {
+        status: 'ASSIGNED',
+        ...(isDeliveryExec ? { assignedDeliveryId: req.user.id } : {}),
+      },
+      include: {
+        case: { select: { id: true, caseNumber: true, patientName: true, workType: true, clinic: { select: { name: true, station: true, address: true, phone: true } } } },
+      },
+      orderBy: { scheduledPickupAt: 'asc' },
+    });
+    res.json(requests);
+  } catch (err) {
+    console.error('[GET /delivery/model-requests/assigned]', err);
+    res.status(500).json({ error: 'Could not load assigned model pickups.' });
+  }
+});
+
+// ── POST /api/delivery/model-requests/:id/collect ─────────
+// Driver confirms the new model was collected from the clinic — terminal
+// state, unlike a case's collect-impression (which still needs
+// receptionist acceptance). Lab staff are notified it's on its way in.
+router.post('/model-requests/:id/collect', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
+  try {
+    const request = await prisma.modelRequest.findUnique({
+      where: { id: req.params.id },
+      include: { case: { select: { id: true, caseNumber: true, patientName: true, workType: true, status: true, clinic: { select: { name: true } } } } },
+    });
+    if (!request) return res.status(404).json({ error: 'Model request not found.' });
+    if (request.status !== 'ASSIGNED') {
+      return res.status(400).json({ error: `Cannot collect a request that is ${request.status.toLowerCase()}.` });
+    }
+    if (req.user.role === 'DELIVERY' && request.assignedDeliveryId !== req.user.id) {
+      return res.status(403).json({ error: 'This pickup is not assigned to you.' });
+    }
+
+    const updated = await prisma.modelRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'COLLECTED', collectedAt: new Date() },
+    });
+
+    await prisma.caseStage.create({
+      data: {
+        caseId: request.caseId,
+        stageName: request.case.status,
+        scannedBy: req.user.name,
+        notes: `New model collected from ${request.case.clinic?.name || 'clinic'} — on its way in`,
+      },
+    });
+
+    await invalidate('model-requests:*', 'dispatch:model-requests', 'delivery:*', `case:${request.caseId}`);
+
+    const io = req.app.get('io');
+    io.to('lab_staff').emit('model_request_collected', {
+      modelRequestId: updated.id, caseId: request.caseId, caseNumber: request.case.caseNumber,
+      message: `New model for ${request.case.caseNumber || request.case.patientName} collected from ${request.case.clinic?.name} — on its way in`,
+    });
+
+    res.json({ success: true, modelRequest: updated });
+  } catch (err) {
+    console.error('[POST /delivery/model-requests/:id/collect]', err);
+    res.status(500).json({ error: 'Could not confirm collection.' });
+  }
+});
+
 module.exports = router;

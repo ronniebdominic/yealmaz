@@ -116,6 +116,7 @@ app.use('/api/prices',        require('./routes/prices'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/rewards',       require('./routes/rewards'));
 app.use('/api/inventory',     require('./routes/inventory'));
+app.use('/api/model-requests', require('./routes/modelRequests'));
 app.use('/api/milling',       require('./routes/milling'));
 app.use('/api/employees',     require('./routes/employees'));
 app.use('/api/attendance',    require('./routes/attendance'));  // POST /events is public: biometric-device callback (own secret auth)
