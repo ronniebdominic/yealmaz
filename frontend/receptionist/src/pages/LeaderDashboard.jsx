@@ -21,7 +21,7 @@ export default function LeaderDashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/logo.png" alt="logo" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
           <div>
-            <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text-1)', letterSpacing: 0.2 }}>Ye-Almaz Dental Lab</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)', letterSpacing: 0.2 }}>Ye-Almaz Dental Lab</div>
             <span style={{ fontSize: 11, background: 'rgba(219,39,119,0.1)', color: '#DB2777', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>Operation Manager</span>
           </div>
         </div>

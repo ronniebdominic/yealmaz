@@ -66,13 +66,13 @@ function buildInvoiceHTML(c) {
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:40px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:24px;border-bottom:3px solid #1565C0}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:24px;border-bottom:3px solid var(--brand)}
   .lab-brand{display:flex;align-items:center;gap:10px}
   .lab-logo{width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0}
-  .lab-name{font-size:22px;font-weight:800;color:#1565C0;margin-bottom:4px}
+  .lab-name{font-size:22px;font-weight:700;color:var(--brand);margin-bottom:4px}
   .lab-sub{font-size:12px;color:#666}
   .inv-title{text-align:right}
-  .inv-title h1{font-size:28px;font-weight:800;color:#1565C0;letter-spacing:2px}
+  .inv-title h1{font-size:28px;font-weight:700;color:var(--brand);letter-spacing:2px}
   .inv-num{font-size:13px;color:#444;margin-top:4px}
   .dates-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px}
   .section-title{font-size:10px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
@@ -80,13 +80,13 @@ function buildInvoiceHTML(c) {
   .bill-sub{font-size:13px;color:#555;line-height:1.6}
   .date-item{font-size:13px;font-weight:600}
   table{width:100%;border-collapse:collapse;margin-bottom:24px}
-  thead tr{background:#1565C0;color:#fff}
+  thead tr{background:var(--brand);color:#fff}
   th{padding:10px 14px;text-align:left;font-size:12px;font-weight:700;letter-spacing:0.5px}
   td{padding:12px 14px;font-size:13px;border-bottom:1px solid #eee}
   tbody tr:last-child td{border-bottom:none}
   .total-row{background:#F8FAFF;font-weight:700;font-size:15px}
   .status-pill{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700}
-  .status-pending{background:#FEF3C7;color:#92400E}
+  .status-pending{background:var(--amber-dim);color:var(--amber)}
   .status-verified{background:#D1FAE5;color:#065F46}
   .notes{background:#F8FAFF;border-radius:8px;padding:14px;margin-bottom:24px;font-size:13px;color:#555;line-height:1.6}
   .footer{margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#999;text-align:center}
@@ -104,7 +104,7 @@ function buildInvoiceHTML(c) {
   <div class="inv-title">
     <h1>INVOICE</h1>
     <div class="inv-num">${inv?.invoiceNumber || '—'}</div>
-    <div class="inv-num" style="margin-top:4px;color:#1565C0;font-weight:700">
+    <div class="inv-num" style="margin-top:4px;color:var(--brand);font-weight:700">
       <span class="status-pill ${c.paymentStatus === 'VERIFIED' ? 'status-verified' : 'status-pending'}">
         ${c.paymentStatus === 'VERIFIED' ? 'PAID' : 'PAYMENT PENDING'}
       </span>
@@ -140,7 +140,7 @@ function buildInvoiceHTML(c) {
     </tr>
     <tr class="total-row">
       <td colspan="2" style="text-align:right;font-size:14px">Total Amount</td>
-      <td style="text-align:right;color:#1565C0;font-size:18px">Br ${amount.toLocaleString('en-US')}</td>
+      <td style="text-align:right;color:var(--brand);font-size:18px">Br ${amount.toLocaleString('en-US')}</td>
     </tr>
   </tbody>
 </table>
@@ -291,7 +291,7 @@ function InvoiceViewModal({ caseData, onClose }) {
           <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ background: 'var(--navy)', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6 }}><MdInventory2 size={16} /> {LAB.name}</div>
+                <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6 }}><MdInventory2 size={16} /> {LAB.name}</div>
                 <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{LAB.address} · {LAB.phone}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -339,7 +339,7 @@ function InvoiceViewModal({ caseData, onClose }) {
                 </tr>
                 <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
                   <td colSpan={2} style={{ padding: '12px 20px', fontWeight: 700, textAlign: 'right' }}>Total</td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 800, fontSize: 18, color: 'var(--blue)' }}>Br {amount.toLocaleString('en-US')}</td>
+                  <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 700, fontSize: 18, color: 'var(--blue)' }}>Br {amount.toLocaleString('en-US')}</td>
                 </tr>
               </tbody>
             </table>
@@ -384,15 +384,15 @@ function ErrorState({ message, onRetry }) {
 // reject the ones still awaiting review.
 const OUTCOME_META = {
   SUCCESS:          { label: 'Success',  icon: MdCheckCircle, color: 'var(--green)', bg: 'var(--green-dim)' },
-  FAILED:           { label: 'Failed',   icon: MdCancel, color: 'var(--red)',   bg: '#FFF1F2' },
+  FAILED:           { label: 'Failed',   icon: MdCancel, color: 'var(--red)',   bg: 'var(--red-dim)' },
   PENDING_REVIEW:   { label: 'Awaiting Review', icon: MdSearch, color: 'var(--amber)', bg: 'var(--amber-dim)' },
-  AWAITING_PAYMENT: { label: 'Request Sent',    icon: MdSchedule, color: 'var(--blue)',  bg: '#EFF6FF' },
-  PENDING_GATEWAY:  { label: 'In Progress',     icon: MdPendingActions, color: 'var(--blue)',  bg: '#EFF6FF' },
+  AWAITING_PAYMENT: { label: 'Request Sent',    icon: MdSchedule, color: 'var(--blue)',  bg: 'var(--brand-tint)' },
+  PENDING_GATEWAY:  { label: 'In Progress',     icon: MdPendingActions, color: 'var(--blue)',  bg: 'var(--brand-tint)' },
   PENDING:          { label: 'Pending',  icon: MdPendingActions, color: 'var(--text-3)', bg: 'var(--surface-2)' },
 };
 const METHOD_META = {
   GATEWAY:    { label: 'Online', icon: MdCreditCard, color: 'var(--blue)' },
-  SCREENSHOT: { label: 'Screenshot', icon: MdCameraAlt, color: '#6D28D9' },
+  SCREENSHOT: { label: 'Screenshot', icon: MdCameraAlt, color: 'var(--purple)' },
   REQUESTED:  { label: 'Requested', icon: MdSchedule, color: 'var(--text-3)' },
   MANUAL:     { label: 'Manual', icon: MdEdit, color: 'var(--text-3)' },
 };
@@ -469,7 +469,7 @@ function ScreenshotsTab({ queryClient }) {
           <div className="stat-sub">Request sent · awaiting payment / review</div>
         </div>
         <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilter('failed')}>
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdCancel size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdCancel size={18} /></div>
           <div className="stat-label">Failed</div>
           <div className="stat-value" style={{ color: 'var(--red)' }}>{counts.failed}</div>
           <div className="stat-sub">Rejected / unsuccessful</div>
@@ -667,7 +667,7 @@ function InvoicesPanel() {
       {/* Summary */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: 16 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdDescription size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdDescription size={18} /></div>
           <div className="stat-label">Invoices Issued</div>
           <div className="stat-value" style={{ color: 'var(--blue)' }}>{pagination.total ?? invoices.length}</div>
           <div className="stat-sub">Generated after payment</div>
@@ -860,15 +860,15 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:40px;font-size:13px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #1565C0}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid var(--brand)}
   .lab-brand{display:flex;align-items:center;gap:10px}
   .lab-logo{width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0}
-  .lab-name{font-size:20px;font-weight:800;color:#1565C0;margin-bottom:4px}
+  .lab-name{font-size:20px;font-weight:700;color:var(--brand);margin-bottom:4px}
   .lab-sub{font-size:11px;color:#666;line-height:1.7}
   .doc-title{text-align:right}
-  .doc-title h1{font-size:22px;font-weight:800;color:#1565C0;letter-spacing:2px}
+  .doc-title h1{font-size:22px;font-weight:700;color:var(--brand);letter-spacing:2px}
   .doc-title .period{font-size:13px;color:#444;margin-top:4px;font-weight:600}
-  .badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;background:#FEF3C7;color:#92400E;margin-top:6px}
+  .badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;background:var(--amber-dim);color:var(--amber);margin-top:6px}
   .meta{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}
   .section-label{font-size:9px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
   .clinic-name{font-size:15px;font-weight:700;margin-bottom:3px}
@@ -877,12 +877,12 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
   .mi-label{font-size:9px;font-weight:700;color:#999;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
   .mi-value{font-size:12px;font-weight:600}
   table{width:100%;border-collapse:collapse;margin-bottom:20px}
-  thead tr{background:#1565C0;color:#fff}
+  thead tr{background:var(--brand);color:#fff}
   th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.5px}
   td{padding:10px 12px;border-bottom:1px solid #eee;font-size:12px}
-  tbody tr:last-child td{border-bottom:2px solid #1565C0}
+  tbody tr:last-child td{border-bottom:2px solid var(--brand)}
   .total-row td{padding:13px 12px;font-weight:700;font-size:14px;background:#F0F7FF}
-  .total-amount{color:#1565C0;font-size:19px;font-weight:800;text-align:right}
+  .total-amount{color:var(--brand);font-size:19px;font-weight:700;text-align:right}
   .footer{margin-top:32px;padding-top:14px;border-top:1px solid #eee;font-size:10px;color:#999;text-align:center;line-height:1.8}
   @media print{body{padding:20px}button{display:none}}
 </style></head>
@@ -915,7 +915,7 @@ function buildStatementHTML(clinic, cases, month, year, allOutstanding, periodLa
     <div><div class="mi-label">Statement Date</div><div class="mi-value">${today}</div></div>
     <div><div class="mi-label">Period</div><div class="mi-value">${period}</div></div>
     <div><div class="mi-label">Cases</div><div class="mi-value">${cases.length}</div></div>
-    <div><div class="mi-label">Total Due</div><div class="mi-value" style="color:#1565C0;font-size:14px">Br ${total.toLocaleString('en-US')}</div></div>
+    <div><div class="mi-label">Total Due</div><div class="mi-value" style="color:var(--brand);font-size:14px">Br ${total.toLocaleString('en-US')}</div></div>
   </div>
 </div>
 
@@ -1100,11 +1100,11 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 14, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', textTransform: 'uppercase' }}>Cases</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-1)' }}>{cases.length}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)' }}>{cases.length}</div>
             </div>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.05em', textTransform: 'uppercase' }}>Total Outstanding</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--blue)' }}>Br {total.toLocaleString('en-US')}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--blue)' }}>Br {total.toLocaleString('en-US')}</div>
             </div>
             <div style={{ marginLeft: 'auto', alignSelf: 'center', textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{periodLabel}</div>
@@ -1169,7 +1169,7 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
                 <tfoot>
                   <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
                     <td colSpan={7} style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', fontSize: 13 }}>Total</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 800, fontSize: 15, color: 'var(--blue)', textAlign: 'right' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 700, fontSize: 15, color: 'var(--blue)', textAlign: 'right' }}>
                       Br {total.toLocaleString('en-US')}
                     </td>
                   </tr>
@@ -1236,7 +1236,7 @@ function BillingCycleModal({ clinic, onClose, onSaved }) {
               <label key={opt.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
                 border: `2px solid ${cycle === opt.id ? 'var(--blue)' : 'var(--border)'}`,
-                background: cycle === opt.id ? 'var(--blue-dim,#EEF2FF)' : 'var(--surface)',
+                background: cycle === opt.id ? 'var(--blue-dim,var(--brand-tint))' : 'var(--surface)',
               }}>
                 <input type="radio" checked={cycle === opt.id} onChange={() => setCycle(opt.id)} style={{ width: 16, height: 16 }} />
                 <div>
@@ -1317,7 +1317,7 @@ function CollectModal({ caseData, onDone, onClose }) {
         </div>
         <div className="modal-body">
           <div style={{
-            background: isTrusted ? '#F5F3FF' : 'var(--surface-2)',
+            background: isTrusted ? 'var(--purple-dim)' : 'var(--surface-2)',
             border: `1px solid ${isTrusted ? '#DDD6FE' : 'var(--border)'}`,
             borderRadius: 10, padding: '12px 14px', marginBottom: 20,
           }}>
@@ -1328,7 +1328,7 @@ function CollectModal({ caseData, onDone, onClose }) {
             </div>
             <div style={{ fontSize: 12, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocalHospital size={12} /> {caseData.clinic?.name}</div>
             {isTrusted && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9' }}><MdHandshake size={11} /> Trusted Partner</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#EDE9FE', color: 'var(--purple)' }}><MdHandshake size={11} /> Trusted Partner</span>
             )}
           </div>
 
@@ -1431,7 +1431,7 @@ function TrustedPartnersTab({ queryClient }) {
 
   const cycleBadge = (cyc) => {
     if (!cyc || cyc === 'NONE') return null;
-    const map = { WEEKLY: '#0EA5E9', FORTNIGHTLY: '#6366F1', MONTHLY: '#16A34A', CUSTOM: '#9333EA' };
+    const map = { WEEKLY: '#0EA5E9', FORTNIGHTLY: '#6366F1', MONTHLY: 'var(--green)', CUSTOM: '#9333EA' };
     return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: `${map[cyc]}22`, color: map[cyc] }}>{cyc.toLowerCase()}</span>;
   };
 
@@ -1496,13 +1496,13 @@ function TrustedPartnersTab({ queryClient }) {
       {/* Summary KPIs */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 20 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#F5F3FF' }}><MdHandshake size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--purple-dim)' }}><MdHandshake size={18} /></div>
           <div className="stat-label">Trusted Partners</div>
-          <div className="stat-value" style={{ color: '#6D28D9' }}>{summary.length}</div>
+          <div className="stat-value" style={{ color: 'var(--purple)' }}>{summary.length}</div>
           <div className="stat-sub">{scheduled} on a billing schedule</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdAssignment size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdAssignment size={18} /></div>
           <div className="stat-label">Total Orders</div>
           <div className="stat-value" style={{ color: 'var(--blue)' }}>{numFmt(totals.totalOrders)}</div>
           <div className="stat-sub">{numFmt(totals.deliveredOrders)} delivered · {numFmt(totals.inProgress)} in progress</div>
@@ -1514,13 +1514,13 @@ function TrustedPartnersTab({ queryClient }) {
           <div className="stat-sub">Verified</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdPendingActions size={18} /></div>
           <div className="stat-label">Outstanding</div>
           <div className="stat-value" style={{ color: 'var(--red)', fontSize: totals.outstanding >= 1000000 ? 16 : 22 }}>{ETB(totals.outstanding)}</div>
           <div className="stat-sub">Pending collection</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: billsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}><MdEventNote size={18} /></div>
+          <div className="stat-icon" style={{ background: billsDue > 0 ? 'var(--red-dim)' : 'var(--green-dim)' }}><MdEventNote size={18} /></div>
           <div className="stat-label">Bills Due</div>
           <div className="stat-value" style={{ color: billsDue > 0 ? 'var(--red)' : 'var(--green)' }}>{billsDue}</div>
           <div className="stat-sub">{billsDue > 0 ? 'Scheduled bills overdue' : 'All schedules up to date'}</div>
@@ -1590,7 +1590,7 @@ function TrustedPartnersTab({ queryClient }) {
                   <tr style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--purple)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                           {c.name[0]?.toUpperCase()}
                         </div>
                         <div>
@@ -1677,7 +1677,7 @@ function TrustedPartnersTab({ queryClient }) {
                                         <MdPaid size={12} /> Collected
                                       </button>
                                       <button onClick={() => setStatement({ clinicId: cas.clinicId, clinic: cas.clinic })}
-                                        style={{ background: '#EFF6FF', color: 'var(--blue)', border: '1px solid rgba(37,99,235,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        style={{ background: 'var(--brand-tint)', color: 'var(--blue)', border: '1px solid rgba(37,99,235,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                         <MdDescription size={12} /> Statement
                                       </button>
                                     </div>
@@ -2034,7 +2034,7 @@ function ClinicBalancesTab() {
       {/* Summary KPI */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdPendingActions size={18} /></div>
           <div className="stat-label">Total Outstanding</div>
           <div className="stat-value" style={{ color: 'var(--red)', fontSize: totalOutstanding >= 100000 ? 17 : 22 }}>
             Br {totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2048,7 +2048,7 @@ function ClinicBalancesTab() {
           <div className="stat-sub">Have unpaid cases</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdAssignment size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdAssignment size={18} /></div>
           <div className="stat-label">Total Unpaid Cases</div>
           <div className="stat-value" style={{ color: 'var(--blue)' }}>
             {balances.reduce((s, b) => s + b.pendingCount, 0)}
@@ -2109,7 +2109,7 @@ function ClinicBalancesTab() {
                             {b.name[0]?.toUpperCase()}
                           </div>
                           <span style={{ fontWeight: 600 }}>{b.name}</span>
-                          {b.isExcluded && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}>TRUSTED</span>}
+                          {b.isExcluded && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--purple-dim)', color: 'var(--purple)', fontWeight: 700 }}>TRUSTED</span>}
                         </div>
                       </td>
                       <td style={{ color: 'var(--amber)', fontWeight: 600 }}>{b.pendingCount}</td>
@@ -2275,7 +2275,7 @@ function RevenueOverviewPanel() {
             </div>
             {(applied.from || applied.to) ? (
               <div className="stat-card">
-                <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdSearch size={18} /></div>
+                <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdSearch size={18} /></div>
                 <div className="stat-label">Selected Range</div>
                 <div className="stat-value" style={{ color: 'var(--blue)', fontSize: (r.range?.amount || 0) >= 100000 ? 17 : 22 }}>
                   {fmtBr(r.range?.amount)}
@@ -2284,7 +2284,7 @@ function RevenueOverviewPanel() {
               </div>
             ) : (
               <div className="stat-card">
-                <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
+                <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdPendingActions size={18} /></div>
                 <div className="stat-label">Pending</div>
                 <div className="stat-value" style={{ color: 'var(--red)', fontSize: (pend.amount || 0) >= 100000 ? 17 : 22 }}>
                   {fmtBr(pend.amount)}
@@ -2293,15 +2293,15 @@ function RevenueOverviewPanel() {
               </div>
             )}
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdInventory2 size={18} /></div>
+              <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdInventory2 size={18} /></div>
               <div className="stat-label">Units Delivered Today</div>
               <div className="stat-value">{u.daily || 0}</div>
               <div className="stat-sub">units</div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon" style={{ background: '#F5F3FF' }}><MdAccountBalance size={18} /></div>
+              <div className="stat-icon" style={{ background: 'var(--purple-dim)' }}><MdAccountBalance size={18} /></div>
               <div className="stat-label">Tax Withheld{applied.from || applied.to ? ' (Range)' : ' (YTD)'}</div>
-              <div className="stat-value" style={{ color: '#6D28D9', fontSize: (tax.amount || 0) >= 100000 ? 17 : 22 }}>
+              <div className="stat-value" style={{ color: 'var(--purple)', fontSize: (tax.amount || 0) >= 100000 ? 17 : 22 }}>
                 {fmtBr(tax.amount)}
               </div>
               <div className="stat-sub">{tax.count || 0} payment{tax.count !== 1 ? 's' : ''} · deducted by clinics for tax filing</div>
@@ -2480,7 +2480,7 @@ function ReadyForDeliveryTab() {
           <div className="stat-sub">Cleared to dispatch</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPaid size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdPaid size={18} /></div>
           <div className="stat-label">Total Value</div>
           <div className="stat-value" style={{ color: 'var(--text-1)', fontSize: total >= 1000000 ? 16 : 22 }}>{ETB(total)}</div>
           <div className="stat-sub">Across {cases.length} cases</div>
@@ -2720,13 +2720,13 @@ export default function FinanceDashboard() {
         <div className="drawer-logo">
           <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>{roleLabel}</span>
+          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: 'var(--green)' }}>{roleLabel}</span>
         </div>
         <NavList onNav={setTabAndClose} />
         <div className="drawer-footer">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /> <LeaveRequestButton /></div>
           <div className="user-info">
-            <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
+            <div className="user-avatar" style={{ background: 'var(--green)', color: '#fff' }}>{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
               <div className="user-role">{roleLabel}</div>
@@ -2744,7 +2744,7 @@ export default function FinanceDashboard() {
             style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }}
           />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: '#16A34A' }}>{roleLabel}</span>
+          <span className="role-badge" style={{ background: 'rgba(22,163,74,0.15)', color: 'var(--green)' }}>{roleLabel}</span>
         </div>
 
         <NavList onNav={setTab} />
@@ -2752,7 +2752,7 @@ export default function FinanceDashboard() {
         <div className="sidebar-footer">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /> <LeaveRequestButton /></div>
           <div className="user-info">
-            <div className="user-avatar" style={{ background: '#16A34A', color: '#fff' }}>{initials}</div>
+            <div className="user-avatar" style={{ background: 'var(--green)', color: '#fff' }}>{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
               <div className="user-role">{roleLabel}</div>
@@ -2811,7 +2811,7 @@ export default function FinanceDashboard() {
                   <div className="stat-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>View history ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setReportView('balances'); setTab('report'); }}>
-                  <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdPendingActions size={18} /></div>
+                  <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdPendingActions size={18} /></div>
                   <div className="stat-label">Pending</div>
                   <div className="stat-value" style={{ color: 'var(--red)', fontSize: (quickReport?.pending?.amount || 0) >= 100000 ? 15 : 20 }}>
                     Br {(quickReport?.pending?.amount || 0).toLocaleString('en-US')}
@@ -2831,19 +2831,19 @@ export default function FinanceDashboard() {
                   <div className="stat-sub" style={{ color: 'var(--amber)', fontWeight: 600 }}>Gateway payments ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => { setBillingView('invoices'); setTab('billing'); }}>
-                  <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdDescription size={18} /></div>
+                  <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdDescription size={18} /></div>
                   <div className="stat-label">Invoices Today</div>
                   <div className="stat-value" style={{ color: 'var(--blue)' }}>{quickReport?.paid?.today ?? 0}</div>
                   <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View invoices ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
-                  <div className="stat-icon" style={{ background: '#F5F3FF' }}><MdHandshake size={18} /></div>
+                  <div className="stat-icon" style={{ background: 'var(--purple-dim)' }}><MdHandshake size={18} /></div>
                   <div className="stat-label">Trusted — Outstanding</div>
-                  <div className="stat-value" style={{ color: '#6D28D9' }}>{trustedOutstanding}</div>
-                  <div className="stat-sub" style={{ color: '#6D28D9', fontWeight: 600 }}>Clinics to bill ↗</div>
+                  <div className="stat-value" style={{ color: 'var(--purple)' }}>{trustedOutstanding}</div>
+                  <div className="stat-sub" style={{ color: 'var(--purple)', fontWeight: 600 }}>Clinics to bill ↗</div>
                 </div>
                 <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setTab('trusted')}>
-                  <div className="stat-icon" style={{ background: trustedBillsDue > 0 ? '#FFF1F2' : 'var(--green-dim)' }}><MdEventNote size={18} /></div>
+                  <div className="stat-icon" style={{ background: trustedBillsDue > 0 ? 'var(--red-dim)' : 'var(--green-dim)' }}><MdEventNote size={18} /></div>
                   <div className="stat-label">Bills Due</div>
                   <div className="stat-value" style={{ color: trustedBillsDue > 0 ? 'var(--red)' : 'var(--green)' }}>{trustedBillsDue}</div>
                   <div className="stat-sub" style={{ color: trustedBillsDue > 0 ? 'var(--red)' : 'var(--green)', fontWeight: 600 }}>

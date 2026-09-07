@@ -59,7 +59,7 @@ function Message({ role, text, pending }) {
         <div style={{
           width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginRight: 8,
           display: 'grid', placeItems: 'center',
-          background: isError ? '#FFF1F2' : 'var(--accent-dim)',
+          background: isError ? 'var(--red-dim)' : 'var(--accent-dim)',
           color: isError ? 'var(--red)' : 'var(--accent)',
         }}>
           {isError ? <MdErrorOutline size={16} /> : <MdSmartToy size={16} />}
@@ -68,7 +68,7 @@ function Message({ role, text, pending }) {
       <div style={{
         maxWidth: '72%', padding: '10px 14px', borderRadius: 14,
         borderTopLeftRadius: isUser ? 14 : 4, borderTopRightRadius: isUser ? 4 : 14,
-        background: isUser ? 'var(--accent)' : isError ? '#FFF1F2' : 'var(--bg-2)',
+        background: isUser ? 'var(--accent)' : isError ? 'var(--red-dim)' : 'var(--bg-2)',
         color: isUser ? '#fff' : isError ? 'var(--red)' : 'var(--text-1)',
         border: isUser ? 'none' : `1px solid ${isError ? 'rgba(229,62,62,0.25)' : 'var(--border)'}`,
         fontSize: 14, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',

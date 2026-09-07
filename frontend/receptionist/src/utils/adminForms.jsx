@@ -21,7 +21,7 @@ export const inputStyle = {
   width: '100%', padding: '9px 12px',
   border: '1.5px solid var(--border)', borderRadius: 8,
   fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)',
-  fontFamily: 'Sora, sans-serif', outline: 'none', boxSizing: 'border-box',
+  fontFamily: 'Manrope, sans-serif', outline: 'none', boxSizing: 'border-box',
 };
 
 export const labelStyle = {

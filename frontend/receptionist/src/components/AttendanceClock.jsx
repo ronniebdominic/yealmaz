@@ -87,11 +87,11 @@ export default function AttendanceClock() {
   return (
     <>
       {isClockedIn && (
-        <button onClick={() => handleClock('BREAK_START')} disabled={clocking} style={btnStyle('#D97706')}>
+        <button onClick={() => handleClock('BREAK_START')} disabled={clocking} style={btnStyle('var(--amber)')}>
           <MdFreeBreakfast size={14} /> Start Break
         </button>
       )}
-      <button onClick={() => handleClock(isClockedIn ? 'CLOCK_OUT' : 'CLOCK_IN')} disabled={clocking} style={btnStyle(isClockedIn ? '#DC2626' : '#16A34A')}>
+      <button onClick={() => handleClock(isClockedIn ? 'CLOCK_OUT' : 'CLOCK_IN')} disabled={clocking} style={btnStyle(isClockedIn ? 'var(--red)' : 'var(--green)')}>
         <MdAccessTime size={14} />
         {clocking ? 'Locating…' : isClockedIn
           ? `Clock Out${clockInEvent ? ` (in ${format(new Date(clockInEvent.timestamp), 'HH:mm')})` : ''}`

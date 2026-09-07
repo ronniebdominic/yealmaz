@@ -16,7 +16,7 @@ const MODEL_REQUEST_STATUS_LABEL = {
   CANCELLED: 'Cancelled',
 };
 const MODEL_REQUEST_STATUS_COLOR = {
-  REQUESTED: 'var(--amber, #B45309)',
+  REQUESTED: 'var(--amber, var(--amber))',
   SCHEDULED: 'var(--blue)',
   ASSIGNED:  'var(--blue)',
   COLLECTED: 'var(--green)',
@@ -299,7 +299,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
         <div className="modal-body">
           {/* Multi-item order — other work-type items ordered together for this patient visit */}
           {siblings.length > 0 && (
-            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
+            <div style={{ background: 'var(--brand-tint)', border: '1px solid #BFDBFE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
               <div style={{ fontWeight: 700, color: 'var(--blue)', marginBottom: 4 }}>
                 Part of a {siblings.length + 1}-item order for {data.patientName}
               </div>
@@ -315,15 +315,15 @@ export default function CaseDetailModal({ caseId, onClose }) {
 
           {/* Remake/redo lineage — this case's own scan number, branched from an earlier one */}
           {(data.originalCase || data.remakes?.length > 0) && (
-            <div style={{ background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
+            <div style={{ background: 'var(--purple-dim)', border: '1px solid #DDD6FE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
               {data.originalCase && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#6D28D9', fontWeight: 600 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--purple)', fontWeight: 600 }}>
                   <MdAutorenew size={13} /> Remake/Redo of <span className="case-number" style={{ marginLeft: 2 }}>{data.originalCase.caseNumber || '—'}</span>
                   <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>({data.originalCase.patientName} · {data.originalCase.workType})</span>
                 </div>
               )}
               {data.remakes?.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, color: '#6D28D9', fontWeight: 600, marginTop: data.originalCase ? 6 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, color: 'var(--purple)', fontWeight: 600, marginTop: data.originalCase ? 6 : 0 }}>
                   <MdAutorenew size={13} style={{ marginTop: 2, flexShrink: 0 }} />
                   <span>
                     Remade as: {data.remakes.map((r, i) => (
@@ -468,7 +468,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                 type="date"
                 value={deliveryDateInput}
                 onChange={e => setDeliveryDateInput(e.target.value)}
-                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'Sora, sans-serif' }}
+                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'Manrope, sans-serif' }}
               />
               <button
                 className="btn btn-primary btn-sm"

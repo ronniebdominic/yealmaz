@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MdLocalShipping, MdTwoWheeler, MdInventory2, MdSchedule } from 'react-icons/md';
 import { todayLocal, toLocalDateString } from '../utils/date';
 
-const DELIVERY_AMBER = '#D97706';
+const DELIVERY_AMBER = 'var(--amber)';
 const DELIVERY_AMBER_DIM = 'rgba(217,119,6,0.1)';
 
 const Stat = ({ label, value, info }) => (
@@ -23,7 +23,7 @@ const Stat = ({ label, value, info }) => (
         </span>
       )}
     </div>
-    <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+    <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
   </div>
 );
 

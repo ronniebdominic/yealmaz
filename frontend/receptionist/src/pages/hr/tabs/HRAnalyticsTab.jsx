@@ -13,7 +13,8 @@ import {
   MdPendingActions, MdPaid, MdWarning, MdCardMembership, MdHourglassEmpty, MdDescription,
 } from 'react-icons/md';
 
-const PIE_COLORS = ['#1D4ED8', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777'];
+// Literal hex, not tokens — chart libs can't resolve var(). Mirrors index.css.
+const PIE_COLORS = ['#2D5BD6', '#17864C', '#B4690E', '#C9414B', '#6355C7', '#2A7FA8', '#B84A6A'];
 
 function StatCard({ icon: Icon, label, value, warn }) {
   return (

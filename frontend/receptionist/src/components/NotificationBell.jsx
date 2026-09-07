@@ -15,11 +15,11 @@ function NotificationRow({ n, onRead }) {
         marginBottom: 8, cursor: n.isRead ? 'default' : 'pointer', position: 'relative',
       }}
     >
-      {!n.isRead && <span style={{ position: 'absolute', top: 14, right: 12, width: 7, height: 7, borderRadius: '50%', background: '#D97706' }} />}
+      {!n.isRead && <span style={{ position: 'absolute', top: 14, right: 12, width: 7, height: 7, borderRadius: '50%', background: 'var(--amber)' }} />}
       <div style={{
         width: 32, height: 32, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: n.type === 'ANNOUNCEMENT' ? 'rgba(217,119,6,0.15)' : 'rgba(0,196,180,0.15)',
-        color: n.type === 'ANNOUNCEMENT' ? '#D97706' : 'var(--accent)',
+        color: n.type === 'ANNOUNCEMENT' ? 'var(--amber)' : 'var(--accent)',
       }}>
         <MdCampaign size={16} />
       </div>
@@ -81,8 +81,8 @@ export default function NotificationBell({ variant = 'dropdown' }) {
         {unreadCount > 0 ? <MdNotifications size={18} /> : <MdNotificationsNone size={18} />}
         {unreadCount > 0 && (
           <span style={{
-            position: 'absolute', top: 2, right: 2, minWidth: 15, height: 15, borderRadius: 8, background: '#DC2626',
-            color: '#fff', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+            position: 'absolute', top: 2, right: 2, minWidth: 15, height: 15, borderRadius: 8, background: 'var(--red)',
+            color: '#fff', fontSize: 9.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
           }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
         )}
       </button>
@@ -93,7 +93,7 @@ export default function NotificationBell({ variant = 'dropdown' }) {
             position: 'absolute', top: 42, right: 0, width: 320, maxHeight: 420, overflowY: 'auto',
             padding: 14, zIndex: 201,
           }}>
-            <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text-1)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
               <MdNotifications size={15} /> Notifications
             </div>
             <NotificationList notifications={notifications} isLoading={isLoading} markRead={markRead} markAllRead={markAllRead} unreadCount={unreadCount} />

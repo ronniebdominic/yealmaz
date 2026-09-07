@@ -49,13 +49,13 @@ const DEPARTMENTS = [
 
 const ROLE_COLORS = {
   RECEPTIONIST:      { bg: 'rgba(29,78,216,0.1)',   color: 'var(--blue)' },
-  LAB_TECH:          { bg: 'rgba(124,58,237,0.1)',  color: '#7C3AED'     },
-  DELIVERY:          { bg: 'rgba(217,119,6,0.1)',   color: '#D97706'     },
+  LAB_TECH:          { bg: 'rgba(124,58,237,0.1)',  color: 'var(--purple)'     },
+  DELIVERY:          { bg: 'rgba(217,119,6,0.1)',   color: 'var(--amber)'     },
   DISPATCH:          { bg: 'rgba(14,165,233,0.1)',  color: '#0EA5E9'     },
   FINANCE:           { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
-  FINANCE_AP:        { bg: 'rgba(109,40,217,0.1)',  color: '#6D28D9'     },
+  FINANCE_AP:        { bg: 'rgba(109,40,217,0.1)',  color: 'var(--purple)'     },
   FINANCE_CASHIER:   { bg: 'rgba(22,163,74,0.1)',   color: 'var(--green)'},
-  INVENTORY_MANAGER: { bg: 'rgba(180,83,9,0.1)',    color: '#B45309'     },
+  INVENTORY_MANAGER: { bg: 'rgba(180,83,9,0.1)',    color: 'var(--amber)'     },
   HR_MANAGER:        { bg: 'rgba(14,116,144,0.1)',  color: '#0E7490'     },
   LEADER:            { bg: 'rgba(219,39,119,0.1)',  color: '#DB2777'     },
 };

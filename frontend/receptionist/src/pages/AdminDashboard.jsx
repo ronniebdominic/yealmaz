@@ -24,9 +24,12 @@ import {
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
 const fmtBr = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// Chart palettes must stay literal hex — chart libs pass these straight to
+// SVG/JS contexts where a CSS var() string won't resolve. Values mirror the
+// design tokens in index.css; keep the two in step by hand.
 const WORK_TYPE_COLORS = [
-  '#1D4ED8', '#00C4B4', '#F0A500', '#16A34A', '#E53E3E',
-  '#7C3AED', '#D97706', '#0EA5E9', '#EC4899', '#6B7280',
+  '#2D5BD6', '#0E93A0', '#C98A12', '#17864C', '#C9414B',
+  '#6355C7', '#B4690E', '#2A7FA8', '#B84A6A', '#64748B',
 ];
 
 // All in-production statuses (excludes terminal states)
@@ -205,7 +208,7 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
 // ── Section header (matches the 3-block mockup: Financial Projection /
 // Revenue Vs Volume / Operation) ──────────────────────────
 function SectionHeader({ children }) {
-  return <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-1)', margin: '4px 0 12px' }}>{children}</div>;
+  return <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: '4px 0 12px' }}>{children}</div>;
 }
 
 // ── Colored KPI tile (mockup uses flat green/red/yellow/blue blocks) ─────
@@ -235,7 +238,7 @@ function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active, 
           </span>
         )}
       </div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.2 }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{sub}</div>}
     </div>
   );
@@ -368,12 +371,12 @@ export default function AdminDashboard() {
         <div className="topbar-title">Analytics Dashboard</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={exportToExcel} disabled={loading || !data}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: loading || !data ? 'var(--border)' : '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: loading || !data ? 'not-allowed' : 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: loading || !data ? 'var(--border)' : 'var(--green)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: loading || !data ? 'not-allowed' : 'pointer' }}>
             <MdBarChart className="mi" size={16} /> Export Excel
           </button>
           <button onClick={runWorkflowTest} disabled={testRunning}
             title="Run end-to-end workflow test through all lab stages"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: testRunning ? 'var(--border)' : '#0F2044', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: testRunning ? 'not-allowed' : 'pointer' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: testRunning ? 'var(--border)' : 'var(--navy)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: testRunning ? 'not-allowed' : 'pointer' }}>
             {testRunning ? <><MdPendingActions className="mi" size={16} /> Testing…</> : <><MdScience className="mi" size={16} /> Run Test</>}
           </button>
           <ExportMenu
@@ -453,12 +456,12 @@ export default function AdminDashboard() {
           const passed = testResult.result?.startsWith('✅');
           const resultText = testResult.result?.replace(/^[✅❌]\s*/, '');
           return (
-            <div style={{ marginBottom: 20, borderRadius: 12, overflow: 'hidden', border: `2px solid ${passed ? '#16A34A' : '#DC2626'}` }}>
-              <div style={{ background: passed ? '#16A34A' : '#DC2626', color: '#fff', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ marginBottom: 20, borderRadius: 12, overflow: 'hidden', border: `2px solid ${passed ? 'var(--green)' : 'var(--red)'}` }}>
+              <div style={{ background: passed ? 'var(--green)' : 'var(--red)', color: '#fff', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {passed ? <MdCheckCircle className="mi" size={22} /> : <MdCancel className="mi" size={22} />}
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 15 }}>{resultText}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{resultText}</div>
                     <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>{testResult.summary}</div>
                   </div>
                 </div>
@@ -466,15 +469,15 @@ export default function AdminDashboard() {
                   <MdClose className="mi" size={16} />
                 </button>
               </div>
-              <div style={{ background: '#F9FAFB', padding: '12px 18px' }}>
+              <div style={{ background: 'var(--bg)', padding: '12px 18px' }}>
                 {testResult.steps?.map((s, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '5px 0', borderBottom: '1px solid #E5E7EB' }}>
-                    <span className="mi" style={{ color: s.status === 'PASS' ? '#16A34A' : '#DC2626', minWidth: 16 }}>
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span className="mi" style={{ color: s.status === 'PASS' ? 'var(--green)' : 'var(--red)', minWidth: 16 }}>
                       {s.status === 'PASS' ? <MdCheck size={16} /> : <MdClose size={16} />}
                     </span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1F2937' }}>{s.step}</div>
-                      {s.detail && <div style={{ fontSize: 12, color: s.status === 'PASS' ? '#6B7280' : '#DC2626', marginTop: 2 }}>{s.detail}</div>}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{s.step}</div>
+                      {s.detail && <div style={{ fontSize: 12, color: s.status === 'PASS' ? 'var(--text-3)' : 'var(--red)', marginTop: 2 }}>{s.detail}</div>}
                     </div>
                   </div>
                 ))}
@@ -524,7 +527,7 @@ export default function AdminDashboard() {
                 active={drillKey === 'paymentsReceived'} onClick={() => handleDrill('paymentsReceived')}
                 info="Money Finance has checked and confirmed as paid, for cases delivered within this range — regardless of exactly when that payment was verified." />
               <ColorTile icon={MdPendingActions} label="Outstanding Payment" value={ETB(kpi?.outstandingAmount)}
-                sub={`${kpi?.outstandingCount ?? 0} unpaid cases`} color="var(--red)" bg="#FFF1F2"
+                sub={`${kpi?.outstandingCount ?? 0} unpaid cases`} color="var(--red)" bg="var(--red-dim)"
                 active={drillKey === 'outstanding'} onClick={() => handleDrill('outstanding')}
                 info="Money still owed on cases DELIVERED within this range that haven't been fully paid. A case still in production isn't counted as 'outstanding' — nothing's owed until it ships." />
             </div>
@@ -545,14 +548,14 @@ export default function AdminDashboard() {
               return (
                 <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: 'var(--radius-lg)', background: 'linear-gradient(90deg, #F0A500, #F59E0B)', border: '1px solid rgba(255,255,255,.35)', boxShadow: '0 8px 28px rgba(217,119,6,.25), inset 0 1px 0 rgba(255,255,255,.4)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
                       Collection Rate
                       <span className="info-icon-wrap" tabIndex={0}>
                         <MdInfoOutline size={13} style={{ opacity: 0.75 }} />
                         <span className="info-tooltip">Of the money billed on delivered cases in this range (Total Case Value, delivered only), what share has actually been collected vs. is still owed. Not paid-for cases still in production — this is purely about delivered work.</span>
                       </span>
                     </div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{collectionRate}%</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{collectionRate}%</div>
                   </div>
                   <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.35)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${receivedPct}%`, background: '#fff', borderRadius: 6, transition: 'width .6s ease' }} />
@@ -584,7 +587,7 @@ export default function AdminDashboard() {
                 active={drillKey === 'deliveredOfCreated'} onClick={() => handleDrill('deliveredOfCreated')}
                 info="Of the cases ORDERED in this date range, how many have since been delivered — no matter when the delivery itself happened. This is NOT the same figure as 'Total Cases Delivered' in Revenue vs Volume above, which counts by delivery date instead of order date — the two are different questions and won't always match." />
               <ColorTile icon={MdHelpOutline} label="Other / Exception Cases" value={kpi?.otherCases ?? '—'}
-                sub="Not in the buckets above" color="var(--gray, #6B7280)" bg="rgba(107,114,128,0.12)"
+                sub="Not in the buckets above" color="var(--gray, var(--text-3))" bg="rgba(107,114,128,0.12)"
                 active={drillKey === 'otherCases'} onClick={() => handleDrill('otherCases')}
                 info="Cases created in this range that don't fall into any bucket above — still awaiting pickup, out for delivery, on hold, flagged with REMAKE status, cancelled, under review, or rejected." />
             </div>
@@ -596,16 +599,16 @@ export default function AdminDashboard() {
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
               <ColorTile icon={MdAutorenew} label="Total Remake" value={kpi?.totalRemakes ?? '—'}
                 sub={kpi?.mostCommonRemakeReason ? `Top reason: ${kpi.mostCommonRemakeReason}` : 'In selected range'}
-                color="var(--red)" bg="#FFF1F2"
+                color="var(--red)" bg="var(--red-dim)"
                 active={drillKey === 'totalRemakes'} onClick={() => handleDrill('totalRemakes')}
                 info="Cases created in this range that were flagged as a remake — redone for the clinic at no extra charge (e.g. shade mismatch, fit issue). This is a flag on a case, not a status — a remake-flagged case can be in ANY of the buckets above (in progress, delivered, etc), so don't add this into the breakdown above." />
               <ColorTile icon={MdSchedule} label="Turn Around Time"
                 value={kpi?.avgTurnaroundDays != null ? `${kpi.avgTurnaroundDays}d` : '—'}
-                sub="Avg. days to delivery" color="var(--blue)" bg="#EEF2FF"
+                sub="Avg. days to delivery" color="var(--blue)" bg="var(--brand-tint)"
                 info="On average, how many days passed between order and delivery, measured on cases that were DELIVERED within this range (regardless of when they were originally created)." />
               <ColorTile icon={MdTrackChanges} label="% On Time Delivery"
                 value={kpi?.onTimeDeliveryPct != null ? `${kpi.onTimeDeliveryPct}%` : '—'}
-                sub="Within due date" color="var(--blue)" bg="#EEF2FF"
+                sub="Within due date" color="var(--blue)" bg="var(--brand-tint)"
                 info="Of the delivered cases in this range that had a due date set, what percentage were delivered on or before that due date." />
             </div>
 
@@ -754,7 +757,7 @@ export default function AdminDashboard() {
                               <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{row.workType}</span>
                             </div>
                           </td>
-                          <td><span style={{ background: '#EEF2FF', color: 'var(--blue)', padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{row.count}</span></td>
+                          <td><span style={{ background: 'var(--brand-tint)', color: 'var(--blue)', padding: '2px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{row.count}</span></td>
                           <td style={{ fontWeight: 600, color: 'var(--accent)' }}>{row.units > 0 ? row.units : '—'}</td>
                           <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(row.revenue)}</td>
                           <td>
@@ -912,14 +915,14 @@ function TrustedPartnersSummary() {
                 <tr style={{ cursor: 'pointer' }} onClick={() => toggleClinic(c.id)}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: '#6D28D9', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--purple)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                         {c.name[0]?.toUpperCase()}
                       </div>
                       <div>
                         <div style={{ fontWeight: 700 }}>{c.name}</div>
                         {c.phone && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.phone}</div>}
                       </div>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: '#F5F3FF', color: '#6D28D9', fontWeight: 700 }}><MdHandshake size={11} /> Trusted</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '2px 6px', borderRadius: 10, background: 'var(--purple-dim)', color: 'var(--purple)', fontWeight: 700 }}><MdHandshake size={11} /> Trusted</span>
                     </div>
                   </td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--blue)' }}>{n(c.totalOrders)}</td>
@@ -993,5 +996,5 @@ function TrustedPartnersSummary() {
 const inputStyle = {
   border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px',
   fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)',
-  outline: 'none', fontFamily: 'Sora, sans-serif',
+  outline: 'none', fontFamily: 'Manrope, sans-serif',
 };

@@ -214,7 +214,7 @@ function AdjustStockModal({ item, onSaved, onClose }) {
                   style={{
                     flex: 1, padding: '8px 10px', fontSize: 12.5, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
                     border: `1.5px solid ${type === opt.val ? 'var(--blue)' : 'var(--border)'}`,
-                    background: type === opt.val ? 'var(--blue-dim, #EEF2FF)' : 'var(--surface)',
+                    background: type === opt.val ? 'var(--blue-dim, var(--brand-tint))' : 'var(--surface)',
                     color: type === opt.val ? 'var(--blue)' : 'var(--text-2)',
                   }}>{opt.label}</button>
               ))}
@@ -453,7 +453,7 @@ export default function AdminInventory() {
                     <tr><td colSpan={3} className="empty-state">No bonus points earned yet</td></tr>
                   ) : leaderboard.map((p, idx) => (
                     <tr key={p.id}>
-                      <td>{idx === 0 ? <MdEmojiEvents size={16} color="#D97706" /> : idx + 1}</td>
+                      <td>{idx === 0 ? <MdEmojiEvents size={16} color="var(--amber)" /> : idx + 1}</td>
                       <td style={{ fontWeight: 600 }}>{p.user?.name}</td>
                       <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--green)' }}>{p.totalEarned}</td>
                     </tr>

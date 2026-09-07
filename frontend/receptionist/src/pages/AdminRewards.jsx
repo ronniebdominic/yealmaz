@@ -128,7 +128,7 @@ export default function AdminRewards() {
             </p>
             <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '16px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>Current setting</span>
-              <span style={{ fontSize: 28, fontWeight: 800, color: 'var(--blue)' }}>
+              <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--blue)' }}>
                 {settings?.pointsPerCase ?? '—'} pts
               </span>
             </div>
@@ -259,7 +259,7 @@ export default function AdminRewards() {
                         <td style={{ textAlign: 'right', color: 'var(--green)', fontWeight: 700 }}>+{row.totalEarned}</td>
                         <td style={{ textAlign: 'right', color: 'var(--red)', fontWeight: 600 }}>-{row.totalRedeemed}</td>
                         <td style={{ textAlign: 'right' }}>
-                          <span style={{ fontWeight: 800, fontSize: 15, color: available > 0 ? 'var(--blue)' : 'var(--text-3)' }}>
+                          <span style={{ fontWeight: 700, fontSize: 15, color: available > 0 ? 'var(--blue)' : 'var(--text-3)' }}>
                             {available} pts
                           </span>
                         </td>

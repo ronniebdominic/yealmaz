@@ -149,9 +149,9 @@ export default function App() {
           <Toaster
             position="top-right"
             toastOptions={{
-              style: { fontFamily: 'Sora, sans-serif', fontSize: '13px', borderRadius: '10px' },
-              success: { iconTheme: { primary: '#16A34A', secondary: '#fff' } },
-              error: { iconTheme: { primary: '#E53E3E', secondary: '#fff' } }
+              style: { fontFamily: 'Manrope, sans-serif', fontSize: '13px', borderRadius: '10px' },
+              success: { iconTheme: { primary: 'var(--green)', secondary: '#fff' } },
+              error: { iconTheme: { primary: 'var(--red)', secondary: '#fff' } }
             }}
           />
           <AppSplash />

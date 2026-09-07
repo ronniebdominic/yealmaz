@@ -27,7 +27,7 @@ import { useNotifications } from '../hooks/useNotifications';
 const DEPARTMENTS = [
   { code: 'PLASTER',      label: 'Plaster Department',   short: 'PLS', color: '#6A1B9A', bg: '#6A1B9A18', icon: MdScience,  nextDept: 'Margin Department' },
   { code: 'MARGIN',       label: 'Margin Department',    short: 'MRG', color: '#7B1FA2', bg: '#7B1FA218', icon: MdContentCut,  nextDept: 'Scanning' },
-  { code: 'SCANNING',     label: 'Scanning',             short: 'SCN', color: '#1565C0', bg: '#1565C018', icon: MdBiotech,  nextDept: 'Designing' },
+  { code: 'SCANNING',     label: 'Scanning',             short: 'SCN', color: 'var(--brand)', bg: 'var(--brand)18', icon: MdBiotech,  nextDept: 'Designing' },
   { code: 'DESIGNING',    label: 'Designing',            short: 'DES', color: '#0277BD', bg: '#0277BD18', icon: MdComputer,  nextDept: 'Milling / Printing' },
   { code: 'MILLING',      label: 'Milling / Sintering',  short: 'MIL', color: '#E65100', bg: '#E6510018', icon: MdSettings,  nextDept: 'Metal Finishing' },
   { code: 'RESIN_PRINT',  label: 'Resin 3D Printing',    short: 'R3D', color: '#BF360C', bg: '#BF360C18', icon: MdPrint,  nextDept: 'Trimming' },
@@ -39,7 +39,7 @@ const DEPARTMENTS = [
   { code: 'GLAZING',      label: 'Glazing',              short: 'GLZ', color: '#00838F', bg: '#00838F18', icon: MdAutoAwesome,  nextDept: 'Quality Control' },
   { code: 'THERMO',       label: 'Thermo Press',         short: 'THP', color: '#C62828', bg: '#C6282818', icon: MdLocalFireDepartment,  nextDept: 'Quality Control' },
   { code: 'TRIMMING',     label: 'Trimming',             short: 'TRM', color: '#558B2F', bg: '#558B2F18', icon: MdContentCut,  nextDept: 'Quality Control' },
-  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: '#15803D', bg: '#15803D18', icon: MdSearch,  nextDept: 'Ready to Dispatch' },
+  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: 'var(--green)', bg: 'var(--green)18', icon: MdSearch,  nextDept: 'Ready to Dispatch' },
 ];
 
 const STAGE_LABELS = {
@@ -55,16 +55,17 @@ const STAGE_LABELS = {
 
 const STAGE_COLORS = {
   CASE_ACCEPTED: '#3949AB', PLASTER_DEPARTMENT: '#6A1B9A', MARGIN_DEPARTMENT: '#7B1FA2',
-  SCANNING: '#1565C0', DESIGNING: '#0277BD',
+  SCANNING: '#2D5BD6', DESIGNING: '#0277BD',
   MILLING_SINTERING: '#E65100', RESIN_3D_PRINTING: '#BF360C', METAL_3D_PRINTING: '#4E342E',
   METAL_FINISHING: '#795548', OPAQUE_APPLICATION: '#F57F17', CERAMIC_LAYERING: '#D84315',
   ZIRCONIA_FITTING_FINISHING: '#00695C', GLAZING: '#00838F', THERMO_PRESS: '#C62828', TRIMMING: '#558B2F',
-  QUALITY_CHECK: '#15803D', PAYMENT_INVOICING: '#00695C',
-  READY_TO_DISPATCH: '#0E7490', OUT_FOR_DELIVERY: '#B45309', DELIVERED: '#0F2044',
+  QUALITY_CHECK: '#17864C', PAYMENT_INVOICING: '#00695C',
+  READY_TO_DISPATCH: '#0E7490', OUT_FOR_DELIVERY: '#B4690E', DELIVERED: '#101C36',
   ON_HOLD: '#B71C1C', REMAKE: '#6A1B9A', CANCELLED: '#424242',
 };
 
-const PIE_COLORS = ['#1D4ED8', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777', '#0D9488'];
+// Literal hex, not tokens — chart libs can't resolve var(). Mirrors index.css.
+const PIE_COLORS = ['#2D5BD6', '#17864C', '#B4690E', '#C9414B', '#6355C7', '#2A7FA8', '#B84A6A', '#0E93A0'];
 
 // ── QR Scanner component (native getUserMedia + jsQR) ────────
 function QRScanner({ onScan, onClose }) {
@@ -258,13 +259,13 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
       <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 40px', animation: 'slideUp 0.2s ease' }}>
         <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
 
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle size={19} color="var(--green)" /> Case Found</div>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle size={19} color="var(--green)" /> Case Found</div>
         <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>Confirm scan at {dept?.label}</div>
 
         {/* Case card */}
         <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '16px', marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', marginBottom: 4 }}>{result.caseNumber}</div>
-          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{result.patientName}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{result.patientName}</div>
           <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>{result.workType} · {result.clinic?.name}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 12, background: STAGE_COLORS[result.status] + '20', color: STAGE_COLORS[result.status], padding: '3px 10px', borderRadius: 20, fontWeight: 600 }}>
@@ -423,7 +424,7 @@ function PerformanceTab() {
               ].map(([label, value]) => (
                 <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
                 </div>
               ))}
             </div>
@@ -664,8 +665,8 @@ function TabBar({ tab, setTab, unreadCount }) {
             <t.icon size={21} />
             {t.badge > 0 && (
               <span style={{
-                position: 'absolute', top: -4, right: -7, minWidth: 14, height: 14, borderRadius: 8, background: '#DC2626',
-                color: '#fff', fontSize: 8.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+                position: 'absolute', top: -4, right: -7, minWidth: 14, height: 14, borderRadius: 8, background: 'var(--red)',
+                color: '#fff', fontSize: 8.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
               }}>{t.badge > 9 ? '9+' : t.badge}</span>
             )}
           </div>
@@ -794,7 +795,7 @@ export default function LabDashboard() {
                   background: selectedDept?.bg, border: `2px solid ${selectedDept?.color}40`,
                   borderRadius: 12, padding: '14px 16px',
                 }}>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: selectedDept?.color }}>{selectedDept?.label}</div>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: selectedDept?.color }}>{selectedDept?.label}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Next → {selectedDept?.nextDept}</div>
                 </div>
               </div>
@@ -924,7 +925,7 @@ export default function LabDashboard() {
               <button onClick={logout} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 12px',
                 borderRadius: 9, border: '1px solid rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.08)',
-                color: '#DC2626', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+                color: 'var(--red)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
               }}>
                 <MdLogout size={16} /> Logout
               </button>

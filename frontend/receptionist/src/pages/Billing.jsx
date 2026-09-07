@@ -30,13 +30,13 @@ function buildInvoiceHTML(c) {
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:Arial,sans-serif;color:#1a1a2e;background:#fff;padding:40px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:24px;border-bottom:3px solid #1565C0}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:24px;border-bottom:3px solid var(--brand)}
   .lab-brand{display:flex;align-items:center;gap:10px}
   .lab-logo{width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0}
-  .lab-name{font-size:22px;font-weight:800;color:#1565C0;margin-bottom:4px}
+  .lab-name{font-size:22px;font-weight:700;color:var(--brand);margin-bottom:4px}
   .lab-sub{font-size:12px;color:#666}
   .inv-title{text-align:right}
-  .inv-title h1{font-size:28px;font-weight:800;color:#1565C0;letter-spacing:2px}
+  .inv-title h1{font-size:28px;font-weight:700;color:var(--brand);letter-spacing:2px}
   .inv-num{font-size:13px;color:#444;margin-top:4px}
   .dates-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px}
   .section-title{font-size:10px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
@@ -44,13 +44,13 @@ function buildInvoiceHTML(c) {
   .bill-sub{font-size:13px;color:#555;line-height:1.6}
   .date-item{font-size:13px;font-weight:600}
   table{width:100%;border-collapse:collapse;margin-bottom:24px}
-  thead tr{background:#1565C0;color:#fff}
+  thead tr{background:var(--brand);color:#fff}
   th{padding:10px 14px;text-align:left;font-size:12px;font-weight:700;letter-spacing:0.5px}
   td{padding:12px 14px;font-size:13px;border-bottom:1px solid #eee}
   tbody tr:last-child td{border-bottom:none}
   .total-row{background:#F8FAFF;font-weight:700;font-size:15px}
   .status-pill{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700}
-  .status-pending{background:#FEF3C7;color:#92400E}
+  .status-pending{background:var(--amber-dim);color:var(--amber)}
   .status-verified{background:#D1FAE5;color:#065F46}
   .notes{background:#F8FAFF;border-radius:8px;padding:14px;margin-bottom:24px;font-size:13px;color:#555;line-height:1.6}
   .footer{margin-top:40px;padding-top:16px;border-top:1px solid #eee;font-size:11px;color:#999;text-align:center}
@@ -68,7 +68,7 @@ function buildInvoiceHTML(c) {
   <div class="inv-title">
     <h1>INVOICE</h1>
     <div class="inv-num">${inv?.invoiceNumber || '—'}</div>
-    <div class="inv-num" style="margin-top:4px;color:#1565C0;font-weight:700">
+    <div class="inv-num" style="margin-top:4px;color:var(--brand);font-weight:700">
       <span class="status-pill ${c.paymentStatus === 'VERIFIED' ? 'status-verified' : 'status-pending'}">
         ${c.paymentStatus === 'VERIFIED' ? 'PAID' : 'PAYMENT PENDING'}
       </span>
@@ -126,7 +126,7 @@ function buildInvoiceHTML(c) {
     </tr>
     <tr class="total-row">
       <td colspan="2" style="text-align:right;font-size:14px">Total Amount</td>
-      <td style="text-align:right;color:#1565C0;font-size:18px">Br ${amount.toLocaleString('en-US')}</td>
+      <td style="text-align:right;color:var(--brand);font-size:18px">Br ${amount.toLocaleString('en-US')}</td>
     </tr>
   </tbody>
 </table>
@@ -259,7 +259,7 @@ function InvoiceViewModal({ caseData, onClose }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <img src="/logo.png" alt="Ye-Almaz" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: 16 }}>{LAB.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{LAB.name}</div>
                   <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>{LAB.address} · {LAB.phone}</div>
                 </div>
               </div>
@@ -311,7 +311,7 @@ function InvoiceViewModal({ caseData, onClose }) {
                 </tr>
                 <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
                   <td colSpan={2} style={{ padding: '12px 20px', fontWeight: 700, textAlign: 'right' }}>Total</td>
-                  <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 800, fontSize: 18, color: 'var(--blue)' }}>Br {amount.toLocaleString('en-US')}</td>
+                  <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 700, fontSize: 18, color: 'var(--blue)' }}>Br {amount.toLocaleString('en-US')}</td>
                 </tr>
               </tbody>
             </table>

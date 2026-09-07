@@ -86,7 +86,7 @@ function DeleteConfirmModal({ caseData, onConfirm, onClose, deleting }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
-          <CaseInfoCard caseData={caseData} accent="#E53E3E" />
+          <CaseInfoCard caseData={caseData} accent="var(--red)" />
           <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20 }}>
             This will permanently delete the case and <strong style={{ color: 'var(--text-1)' }}>all associated records</strong> —
             stages, delivery logs, payment history, and invoice data.
@@ -99,7 +99,7 @@ function DeleteConfirmModal({ caseData, onConfirm, onClose, deleting }) {
               disabled={deleting}
               style={{
                 flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: deleting ? 'var(--border)' : '#E53E3E',
+                background: deleting ? 'var(--border)' : 'var(--red)',
                 color: '#fff', border: 'none', borderRadius: 8,
                 padding: '9px 18px', fontSize: 13, fontWeight: 700,
                 cursor: deleting ? 'not-allowed' : 'pointer',
@@ -244,7 +244,7 @@ const OVERRIDE_OPTIONS = [
     value: 'VERIFIED',
     label: 'Verified / Paid',
     desc:  'Force-mark as paid regardless of screenshot status',
-    color: '#16A34A',
+    color: 'var(--green)',
     bg:    'rgba(22,163,74,0.08)',
     icon:  MdCheckCircle,
   },
@@ -252,7 +252,7 @@ const OVERRIDE_OPTIONS = [
     value: 'PENDING',
     label: 'Reset to Pending',
     desc:  'Clear any screenshot / approval and reset to awaiting payment',
-    color: '#D97706',
+    color: 'var(--amber)',
     bg:    'rgba(217,119,6,0.08)',
     icon:  MdPendingActions,
   },
@@ -260,7 +260,7 @@ const OVERRIDE_OPTIONS = [
     value: 'REJECTED',
     label: 'Rejected',
     desc:  'Mark payment as rejected (clinic must re-submit)',
-    color: '#E53E3E',
+    color: 'var(--red)',
     bg:    'rgba(229,62,62,0.08)',
     icon:  MdClose,
   },
@@ -299,8 +299,8 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
           <div>
             <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{
-                background: 'rgba(240,165,0,0.15)', color: '#D97706',
-                fontSize: 10, fontWeight: 800, padding: '2px 8px',
+                background: 'rgba(240,165,0,0.15)', color: 'var(--amber)',
+                fontSize: 10, fontWeight: 700, padding: '2px 8px',
                 borderRadius: 4, letterSpacing: 1, textTransform: 'uppercase',
               }}>Admin Override</span>
               Override Payment
@@ -313,7 +313,7 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
         </div>
 
         <div className="modal-body">
-          <CaseInfoCard caseData={caseData} accent="#D97706" />
+          <CaseInfoCard caseData={caseData} accent="var(--amber)" />
 
           {/* New status picker */}
           <div style={{ marginBottom: 20 }}>
@@ -398,7 +398,7 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
                 border: `1.5px solid ${reason.trim() ? 'var(--border)' : 'rgba(229,62,62,0.4)'}`,
                 borderRadius: 8, fontSize: 13, resize: 'vertical',
                 background: 'var(--surface)', color: 'var(--text-1)',
-                fontFamily: 'Sora, sans-serif',
+                fontFamily: 'Manrope, sans-serif',
               }}
             />
           </div>
@@ -430,11 +430,11 @@ const selectStyle = {
   border: '1px solid var(--border)', borderRadius: 8,
   padding: '7px 12px', fontSize: 13, color: 'var(--text-1)',
   background: 'var(--surface)', outline: 'none',
-  fontFamily: 'Sora, sans-serif', cursor: 'pointer',
+  fontFamily: 'Manrope, sans-serif', cursor: 'pointer',
 };
 
 const fieldLabel = { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 };
-const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)', fontFamily: 'Sora, sans-serif' };
+const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)', fontFamily: 'Manrope, sans-serif' };
 
 // ── Edit Case Modal ────────────────────────────────────────
 // Admin-only — edits core case details. Status/payment are changed via their
@@ -986,7 +986,7 @@ export default function AdminCases() {
                             onClick={() => setOverrideTarget(c)}
                             style={{
                               display: 'flex', alignItems: 'center', gap: 3,
-                              background: 'rgba(217,119,6,0.08)', color: '#D97706',
+                              background: 'rgba(217,119,6,0.08)', color: 'var(--amber)',
                               border: '1px solid rgba(217,119,6,0.25)',
                               borderRadius: 6, padding: '4px 9px',
                               fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
@@ -1000,7 +1000,7 @@ export default function AdminCases() {
                             onClick={() => setDeleteTarget(c)}
                             style={{
                               display: 'flex', alignItems: 'center', gap: 3,
-                              background: 'rgba(229,62,62,0.07)', color: '#E53E3E',
+                              background: 'rgba(229,62,62,0.07)', color: 'var(--red)',
                               border: '1px solid rgba(229,62,62,0.2)',
                               borderRadius: 6, padding: '4px 9px',
                               fontSize: 12, fontWeight: 700, cursor: 'pointer',

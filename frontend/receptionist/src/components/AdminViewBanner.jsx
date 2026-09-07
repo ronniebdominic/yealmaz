@@ -10,10 +10,10 @@ export default function AdminViewBanner({ label }) {
   return (
     <div style={{
       position: 'sticky', top: 0, zIndex: 1000,
-      background: '#F0A500', color: '#0F2044',
+      background: '#F0A500', color: 'var(--navy)',
       padding: '6px 16px', fontSize: 12, fontWeight: 700,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      fontFamily: 'Sora, sans-serif',
+      fontFamily: 'Manrope, sans-serif',
     }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <MdVisibility size={14} /> Admin view mode — viewing as {label}
@@ -21,7 +21,7 @@ export default function AdminViewBanner({ label }) {
       <button
         onClick={() => navigate('/admin')}
         style={{
-          background: 'rgba(15,32,68,0.15)', border: 'none', color: '#0F2044',
+          background: 'rgba(15,32,68,0.15)', border: 'none', color: 'var(--navy)',
           borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700,
           cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
         }}

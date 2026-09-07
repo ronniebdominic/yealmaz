@@ -74,7 +74,7 @@ export default function MyProfileTab() {
           ) : (
             <div style={{
               width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700,
               border: '3px solid rgba(255,255,255,0.6)',
             }}>{initials}</div>
           )}
@@ -87,9 +87,9 @@ export default function MyProfileTab() {
           </button>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
         </div>
-        <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-1)' }}>{profile?.preferredName || data?.name}</div>
+        <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-1)' }}>{profile?.preferredName || data?.name}</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>{profile?.position || 'Lab Technician'}</div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: data?.isActive ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)', color: data?.isActive ? '#16A34A' : '#DC2626' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: data?.isActive ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)', color: data?.isActive ? 'var(--green)' : 'var(--red)' }}>
           {data?.isActive ? <MdVerified size={12} /> : <MdBlock size={12} />} {data?.isActive ? 'Active' : 'Inactive'}
         </div>
       </div>

@@ -59,7 +59,7 @@ function MiniSparkline({ dailyCounts, from, to }) {
           style={{
             flex: 1, minWidth: 4, borderRadius: '3px 3px 0 0',
             height: `${Math.max((b.count / max) * 100, b.count > 0 ? 12 : 4)}%`,
-            background: i === buckets.length - 1 ? '#D97706' : '#D9770666',
+            background: i === buckets.length - 1 ? 'var(--amber)' : 'var(--amber)66',
           }}
         />
       ))}
@@ -101,9 +101,9 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
             <button key={p.id} onClick={() => { setRangeId(p.id); setPage(1); }}
               style={{
                 flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-                border: `2px solid ${rangeId === p.id ? '#D97706' : 'var(--border)'}`,
+                border: `2px solid ${rangeId === p.id ? 'var(--amber)' : 'var(--border)'}`,
                 background: rangeId === p.id ? 'rgba(217,119,6,0.08)' : 'var(--surface)',
-                color: rangeId === p.id ? '#D97706' : 'var(--text-2)',
+                color: rangeId === p.id ? 'var(--amber)' : 'var(--text-2)',
               }}>
               {p.label}
             </button>
@@ -129,7 +129,7 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
                     <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
                   </div>
                 ))}
               </div>
@@ -138,7 +138,7 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
 
             {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
             {summary?.shareOfTotalPercent != null && (
-              <div style={{ background: '#D97706', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
+              <div style={{ background: 'var(--amber)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Your Share of the Lab</div>
                 <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
                   <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
@@ -162,7 +162,7 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
               events.map(ev => (
                 <div key={ev.id} style={{
                   background: 'var(--surface)', borderRadius: 10, padding: '11px 14px', marginBottom: 8,
-                  border: '1px solid var(--border)', borderLeft: `3px solid ${ev.type === 'PICKUP' ? '#1D4ED8' : '#D97706'}`,
+                  border: '1px solid var(--border)', borderLeft: `3px solid ${ev.type === 'PICKUP' ? 'var(--brand)' : 'var(--amber)'}`,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ minWidth: 0 }}>

@@ -194,7 +194,7 @@ function DeleteOrderConfirmModal({ caseData, onConfirm, onClose, deleting }) {
               disabled={deleting}
               style={{
                 flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: deleting ? 'var(--border)' : '#E53E3E',
+                background: deleting ? 'var(--border)' : 'var(--red)',
                 color: '#fff', border: 'none', borderRadius: 8,
                 padding: '9px 18px', fontSize: 13, fontWeight: 700,
                 cursor: deleting ? 'not-allowed' : 'pointer',
@@ -456,7 +456,7 @@ function PhoneOrderModal({ executives, onClose, onSuccess }) {
                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     padding: '9px 14px', borderRadius: 8, cursor: 'pointer',
                     border: `2px solid ${form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
-                    background: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'rgba(240,165,0,0.08)' : 'var(--blue-dim, #EEF2FF)') : 'var(--surface)',
+                    background: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'rgba(240,165,0,0.08)' : 'var(--blue-dim, var(--brand-tint))') : 'var(--surface)',
                   }}>
                   <opt.icon size={16} color={form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-2)'} />
                   <span style={{ fontSize: 13, fontWeight: 700, color: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-1)' }}>
@@ -982,13 +982,13 @@ export default function DispatchDashboard() {
 
   // ── KPI pipeline — one card per stage, in workflow order, colour-coded ──────
   const PIPELINE = [
-    { tab: 'place-order',     label: 'Pending Pickup',     icon: MdAssignment,    count: placeOrder.length,      hint: 'Needs driver',     color: '#DC2626', bg: '#FEF2F2' },
-    { tab: 'pickup-progress', label: 'Pickup In Progress', icon: MdTwoWheeler,    count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: '#EFF6FF' },
+    { tab: 'place-order',     label: 'Pending Pickup',     icon: MdAssignment,    count: placeOrder.length,      hint: 'Needs driver',     color: 'var(--red)', bg: '#FEF2F2' },
+    { tab: 'pickup-progress', label: 'Pickup In Progress', icon: MdTwoWheeler,    count: pickupInProgress.length, hint: 'Driver en route',  color: '#2563EB', bg: 'var(--brand-tint)' },
     { tab: 'in-milling',      label: 'In Milling',         icon: MdSettings,      count: milling.length,           hint: 'In production',    color: '#0891B2', bg: '#ECFEFF' },
-    { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: MdInventory2,    count: readyDelivery.length,    hint: 'Awaiting payment', color: '#D97706', bg: '#FFFBEB' },
-    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: MdLocalShipping, count: readyDispatch.length,    hint: 'Payment cleared', color: '#16A34A', bg: '#F0FDF4' },
-    { tab: 'en-route',        label: 'En Route',           icon: MdDirectionsBike,count: enRoute.length,          hint: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF' },
-    { tab: 'delivered',       label: 'Delivered',          icon: MdCheckCircle,   count: delivered.length,        hint: 'Completed',        color: '#16A34A', bg: '#F0FDF4' },
+    { tab: 'ready-delivery',  label: 'Ready for Delivery', icon: MdInventory2,    count: readyDelivery.length,    hint: 'Awaiting payment', color: 'var(--amber)', bg: '#FFFBEB' },
+    { tab: 'ready-dispatch',  label: 'Ready for Dispatch', icon: MdLocalShipping, count: readyDispatch.length,    hint: 'Payment cleared', color: 'var(--green)', bg: '#F0FDF4' },
+    { tab: 'en-route',        label: 'En Route',           icon: MdDirectionsBike,count: enRoute.length,          hint: 'Out for delivery', color: 'var(--purple)', bg: 'var(--purple-dim)' },
+    { tab: 'delivered',       label: 'Delivered',          icon: MdCheckCircle,   count: delivered.length,        hint: 'Completed',        color: 'var(--green)', bg: '#F0FDF4' },
   ];
 
   return (
@@ -1217,7 +1217,7 @@ export default function DispatchDashboard() {
                               </button>
                               <button
                                 className="btn btn-sm"
-                                style={{ background: '#EFF6FF', color: 'var(--accent)', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
+                                style={{ background: 'var(--brand-tint)', color: 'var(--accent)', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
                                 onClick={() => handleSelfDropOff(c)}
                                 disabled={selfDropOffId === c.id}
                                 title="Clinic is bringing the case in themselves"
@@ -1433,7 +1433,7 @@ export default function DispatchDashboard() {
           {tab === 'ready-delivery' && (
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: 'var(--amber-dim)', borderRadius: '10px 10px 0 0' }}>
-                <div style={{ fontSize: 12, color: '#92400E', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <MdInventory2 className="mi" size={14} /> These cases <strong>passed QC and are complete</strong> — payment has not yet been requested or verified. Use "Request Payment" to notify the clinic.
                 </div>
               </div>
@@ -1503,7 +1503,7 @@ export default function DispatchDashboard() {
                               ) : canRequest ? (
                                 <button
                                   className="btn btn-sm"
-                                  style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
+                                  style={{ background: 'var(--brand-tint)', color: 'var(--brand)', border: '1px solid #BFDBFE', whiteSpace: 'nowrap' }}
                                   onClick={() => setPayModal(c)}
                                 >
                                   <MdCreditCard className="mi" size={14} /> Request

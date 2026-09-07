@@ -30,7 +30,7 @@ const DEPARTMENTS = [
 ];
 const DEPT_LABEL = Object.fromEntries(DEPARTMENTS.map(d => [d.code, d.label]));
 
-const LAB_PURPLE = '#7C3AED';
+const LAB_PURPLE = 'var(--purple)';
 const LAB_PURPLE_DIM = 'rgba(124,58,237,0.1)';
 
 const Stat = ({ label, value, info }) => (
@@ -44,7 +44,7 @@ const Stat = ({ label, value, info }) => (
         </span>
       )}
     </div>
-    <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+    <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
   </div>
 );
 
@@ -177,7 +177,7 @@ function BroadcastPanel({ techs }) {
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px',
         background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, color: 'var(--text-1)',
       }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MdCampaign size={17} color="#D97706" /> Send Notification to Lab Techs</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MdCampaign size={17} color="var(--amber)" /> Send Notification to Lab Techs</span>
         {open ? <MdExpandLess size={18} /> : <MdExpandMore size={18} />}
       </button>
       {open && (
@@ -202,7 +202,7 @@ function BroadcastPanel({ techs }) {
             disabled={send.isPending || !title.trim() || !message.trim()}
             style={{
               alignSelf: 'flex-end', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px',
-              borderRadius: 8, border: 'none', background: '#D97706', color: '#fff', fontSize: 13, fontWeight: 700,
+              borderRadius: 8, border: 'none', background: 'var(--amber)', color: '#fff', fontSize: 13, fontWeight: 700,
               cursor: send.isPending ? 'not-allowed' : 'pointer', opacity: (!title.trim() || !message.trim()) ? 0.6 : 1,
             }}>
             <MdSend size={14} /> {send.isPending ? 'Sending…' : 'Send'}

@@ -126,7 +126,7 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
           {!isEdit && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--blue-dim, #EEF2FF)', border: '1px solid rgba(29,78,216,0.15)',
+              background: 'var(--blue-dim, var(--brand-tint))', border: '1px solid rgba(29,78,216,0.15)',
               borderRadius: 8, padding: '10px 14px', marginBottom: 18, gap: 12,
             }}>
               <div style={{ fontSize: 13, color: 'var(--text-2)' }}>

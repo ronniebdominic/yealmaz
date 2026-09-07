@@ -98,7 +98,7 @@ export default function AdminLayout({ children }) {
       <div className="mobile-topbar">
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>
         <span className="mobile-topbar-title">Ye-Almaz Dental Lab</span>
-        <div className="user-avatar" style={{ width: 30, height: 30, fontSize: 12, background: '#F0A500', color: '#0F2044', flexShrink: 0 }}>{initials}</div>
+        <div className="user-avatar" style={{ width: 30, height: 30, fontSize: 12, flexShrink: 0 }}>{initials}</div>
       </div>
 
       {/* ── Drawer overlay ──────────────────────────────── */}
@@ -107,16 +107,16 @@ export default function AdminLayout({ children }) {
       {/* ── Drawer ──────────────────────────────────────── */}
       <div className={`drawer glass-sidebar${open ? ' open' : ''}`}>
         <div className="drawer-logo">
-          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, border: '1px solid rgba(255,255,255,0.14)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(240,165,0,0.15)', color: '#F0A500' }}>Admin</span>
+          <span className="role-badge">Admin</span>
         </div>
         <nav className="sidebar-nav">
           <NavItems active={active} onNav={nav} />
         </nav>
         <div className="drawer-footer">
           <div className="user-info">
-            <div className="user-avatar" style={{ background: '#F0A500', color: '#0F2044' }}>{initials}</div>
+            <div className="user-avatar">{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Administrator</div>
@@ -129,16 +129,16 @@ export default function AdminLayout({ children }) {
       {/* ── Sidebar (desktop only) ───────────────────────── */}
       <aside className="sidebar glass-sidebar">
         <div className="sidebar-logo">
-          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, border: '1px solid rgba(255,255,255,0.14)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
-          <span className="role-badge" style={{ background: 'rgba(240,165,0,0.15)', color: '#F0A500' }}>Admin</span>
+          <span className="role-badge">Admin</span>
         </div>
         <nav className="sidebar-nav">
           <NavItems active={active} onNav={(path) => navigate(path)} />
         </nav>
         <div className="sidebar-footer">
           <div className="user-info">
-            <div className="user-avatar" style={{ background: '#F0A500', color: '#0F2044' }}>{initials}</div>
+            <div className="user-avatar">{initials}</div>
             <div>
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Administrator</div>

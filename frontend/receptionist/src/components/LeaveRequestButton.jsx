@@ -39,14 +39,14 @@ function RequestModal({ onClose, onSubmitted }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 420, overflow: 'hidden' }}>
-        <div style={{ background: 'var(--blue, #1D4ED8)', color: '#fff', padding: '14px 18px', fontWeight: 800, fontSize: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'var(--blue, var(--brand))', color: '#fff', padding: '14px 18px', fontWeight: 700, fontSize: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           Request Leave
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><MdClose size={18} /></button>
         </div>
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {leaveTypes.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', marginBottom: 4 }}>TYPE</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>TYPE</div>
               <select value={leaveTypeId} onChange={e => setLeaveTypeId(e.target.value)} style={inputStyle}>
                 <option value="">— None —</option>
                 {leaveTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -55,11 +55,11 @@ function RequestModal({ onClose, onSubmitted }) {
           )}
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', marginBottom: 4 }}>FROM</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>FROM</div>
               <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={inputStyle} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', marginBottom: 4 }}>TO</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>TO</div>
               <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={inputStyle} />
             </div>
           </div>
@@ -68,18 +68,18 @@ function RequestModal({ onClose, onSubmitted }) {
               <button key={v} type="button"
                 onClick={() => setDayPortion(v)}
                 style={{ flex: 1, padding: '7px 8px', fontSize: 12, fontWeight: 700, borderRadius: 7, cursor: 'pointer',
-                  border: dayPortion === v ? '1.5px solid var(--blue, #1D4ED8)' : '1px solid #E5E7EB',
-                  background: dayPortion === v ? 'rgba(29,78,216,0.08)' : '#fff', color: dayPortion === v ? 'var(--blue, #1D4ED8)' : '#6B7280' }}>
+                  border: dayPortion === v ? '1.5px solid var(--blue, var(--brand))' : '1px solid var(--border)',
+                  background: dayPortion === v ? 'rgba(29,78,216,0.08)' : '#fff', color: dayPortion === v ? 'var(--blue, var(--brand))' : 'var(--text-3)' }}>
                 {l}
               </button>
             ))}
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', marginBottom: 4 }}>REASON</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>REASON</div>
             <input value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} />
           </div>
           <button onClick={submit} disabled={saving}
-            style={{ marginTop: 6, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--blue, #1D4ED8)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer' }}>
+            style={{ marginTop: 6, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--blue, var(--brand))', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer' }}>
             {saving ? 'Submitting…' : 'Submit Request'}
           </button>
         </div>
@@ -104,7 +104,7 @@ export default function LeaveRequestButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} title="Request Leave"
-        style={{ background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)', color: '#D97706', borderRadius: 7,
+        style={{ background: 'rgba(217,119,6,0.12)', border: '1px solid rgba(217,119,6,0.3)', color: 'var(--amber)', borderRadius: 7,
           padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
         <MdEventBusy size={14} /> Request Leave{pendingCount > 0 ? ` (${pendingCount} pending)` : ''}
       </button>

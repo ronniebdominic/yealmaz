@@ -137,7 +137,7 @@ export default function QRScanner({ onScan, onClose }) {
           <div style={{ fontWeight: 700, fontSize: 18 }}>Camera Unavailable</div>
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, maxWidth: 280, lineHeight: 1.6 }}>{error}</div>
           <button onClick={onClose} style={{
-            marginTop: 8, background: '#1D4ED8', border: 'none', color: '#fff',
+            marginTop: 8, background: 'var(--brand)', border: 'none', color: '#fff',
             borderRadius: 10, padding: '12px 28px', cursor: 'pointer', fontSize: 15, fontWeight: 600
           }}>
             Go Back
@@ -158,10 +158,10 @@ export default function QRScanner({ onScan, onClose }) {
             }}>
               {/* Corner marks */}
               {[
-                { top: 0, left: 0, borderTop: '3px solid #00C4B4', borderLeft: '3px solid #00C4B4' },
-                { top: 0, right: 0, borderTop: '3px solid #00C4B4', borderRight: '3px solid #00C4B4' },
-                { bottom: 0, left: 0, borderBottom: '3px solid #00C4B4', borderLeft: '3px solid #00C4B4' },
-                { bottom: 0, right: 0, borderBottom: '3px solid #00C4B4', borderRight: '3px solid #00C4B4' },
+                { top: 0, left: 0, borderTop: '3px solid var(--accent)', borderLeft: '3px solid var(--accent)' },
+                { top: 0, right: 0, borderTop: '3px solid var(--accent)', borderRight: '3px solid var(--accent)' },
+                { bottom: 0, left: 0, borderBottom: '3px solid var(--accent)', borderLeft: '3px solid var(--accent)' },
+                { bottom: 0, right: 0, borderBottom: '3px solid var(--accent)', borderRight: '3px solid var(--accent)' },
               ].map((s, i) => (
                 <div key={i} style={{ position: 'absolute', width: 28, height: 28, borderRadius: 3, ...s }} />
               ))}

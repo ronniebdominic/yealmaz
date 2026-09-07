@@ -150,13 +150,13 @@ export default function DailyReconciliationTab() {
           title={salesTypeFilter === 'CREDIT' ? 'Click to show all cases' : 'Click to show only credit cases'}
           style={{
             cursor: 'pointer',
-            outline: salesTypeFilter === 'CREDIT' ? '2px solid var(--blue, #1565C0)' : 'none',
+            outline: salesTypeFilter === 'CREDIT' ? '2px solid var(--blue, var(--brand))' : 'none',
             outlineOffset: -2,
           }}
         >
-          <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdHandshake size={18} /></div>
+          <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdHandshake size={18} /></div>
           <div className="stat-label">Credit Sales · Trusted Partners</div>
-          <div className="stat-value" style={{ color: 'var(--blue, #1565C0)' }}>{fmtBr(credit.billedTotal)}</div>
+          <div className="stat-value" style={{ color: 'var(--blue, var(--brand))' }}>{fmtBr(credit.billedTotal)}</div>
           <div className="stat-sub">
             {credit.count} case{credit.count === 1 ? '' : 's'} · {fmtBr(credit.collectedTotal)} collected
             {credit.outstandingTotal > 0 && <> · <span style={{ color: 'var(--red)' }}>{fmtBr(credit.outstandingTotal)} outstanding</span></>}
@@ -198,7 +198,7 @@ export default function DailyReconciliationTab() {
                   <td>
                     <span className="badge" style={c.salesType === 'CASH'
                       ? { background: 'var(--green-dim)', color: 'var(--green)' }
-                      : { background: '#EFF6FF', color: 'var(--blue, #1565C0)' }}>
+                      : { background: 'var(--brand-tint)', color: 'var(--blue, var(--brand))' }}>
                       {c.salesType === 'CASH' ? 'Cash' : 'Credit'}
                     </span>
                   </td>

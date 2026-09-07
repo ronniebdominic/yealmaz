@@ -239,7 +239,7 @@ function WorkItemForm({
       </span>
     ) : (
       <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? '#92400E' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
+        {useExpress ? <MdBolt className="mi" size={11} style={{ marginRight: 2 }} /> : ''}Br {unitPrice.toLocaleString('en-US')} × {count}{archNote} = <strong style={{ color: useExpress ? 'var(--amber)' : 'var(--green)' }}>Br {full.toLocaleString('en-US')}</strong>
       </span>
     );
   })();
@@ -258,7 +258,7 @@ function WorkItemForm({
       background: 'var(--surface-2)', position: 'relative',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
           Item {index + 1}
         </div>
         {canRemove && (
@@ -349,7 +349,7 @@ function WorkItemForm({
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
             border: `2px solid ${item.remake ? '#FECACA' : 'var(--border)'}`,
-            background: item.remake ? '#FFF1F2' : 'var(--surface)',
+            background: item.remake ? 'var(--red-dim)' : 'var(--surface)',
             transition: 'border-color .15s, background .15s',
             userSelect: 'none',
           }}
@@ -781,7 +781,7 @@ export default function NewCase() {
                         flex: '1 1 200px', display: 'flex', alignItems: 'center', gap: 10,
                         padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                         border: `2px solid ${form.intakeMethod === opt.value ? 'var(--blue)' : 'var(--border)'}`,
-                        background: form.intakeMethod === opt.value ? 'var(--blue-dim, #EEF2FF)' : 'var(--surface)',
+                        background: form.intakeMethod === opt.value ? 'var(--blue-dim, var(--brand-tint))' : 'var(--surface)',
                         transition: 'border-color .15s, background .15s',
                       }}
                     >
@@ -797,7 +797,7 @@ export default function NewCase() {
                 </div>
 
                 {form.intakeMethod === 'EMAIL_3D_FILE' && (
-                  <div style={{ marginTop: 10, padding: '12px 14px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 8 }}>
+                  <div style={{ marginTop: 10, padding: '12px 14px', background: 'var(--brand-tint)', border: '1px solid #BFDBFE', borderRadius: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', marginBottom: 8 }}>
                       Arch(es) Scanned — Br {ARCH_FEE.toLocaleString('en-US')} per arch
                     </div>
@@ -847,7 +847,7 @@ export default function NewCase() {
                         flex: 1, display: 'flex', alignItems: 'center', gap: 10,
                         padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                         border: `2px solid ${form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
-                        background: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'rgba(240,165,0,0.08)' : 'var(--blue-dim, #EEF2FF)') : 'var(--surface)',
+                        background: form.deliveryType === opt.value ? (opt.value === 'EXPRESS' ? 'rgba(240,165,0,0.08)' : 'var(--blue-dim, var(--brand-tint))') : 'var(--surface)',
                         transition: 'border-color .15s, background .15s',
                       }}
                     >

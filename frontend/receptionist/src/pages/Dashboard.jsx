@@ -498,7 +498,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
                 flex: 1, padding: '7px 10px', fontSize: 12, fontWeight: 700, borderRadius: 8, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                 border: `2px solid ${orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--border)'}`,
-                background: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'rgba(240,165,0,0.1)' : 'var(--blue-dim,#EEF2FF)') : 'var(--surface)',
+                background: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'rgba(240,165,0,0.1)' : 'var(--blue-dim,var(--brand-tint))') : 'var(--surface)',
                 color: orderType === opt.val ? (opt.val === 'EXPRESS' ? 'var(--amber)' : 'var(--blue)') : 'var(--text-2)',
               }}><opt.icon size={14} /> {opt.label}</button>
             ))}
@@ -818,7 +818,7 @@ function AcceptCasesSection({ queryClient }) {
 
   const CaseCard = ({ c, canAct }) => {
     const isOpen  = openId === c.id;
-    const accentColor = c.status === 'UNDER_REVIEW' ? '#1D4ED8'
+    const accentColor = c.status === 'UNDER_REVIEW' ? 'var(--brand)'
       : c.status === 'PICKUP_ASSIGNED' ? 'var(--accent)' : 'var(--text-3)';
 
     return (
@@ -833,7 +833,7 @@ function AcceptCasesSection({ queryClient }) {
               }
               <StatusBadge status={c.status} />
               {c.deliveryType === 'EXPRESS' && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(240,165,0,0.12)', color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdBolt size={12} /> Express</span>}
-              {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#FFF1F2', color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdAutorenew size={12} /> Remake</span>}
+              {c.remake && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--red-dim)', color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdAutorenew size={12} /> Remake</span>}
               {c.redo   && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--amber-dim)', color: 'var(--amber)', display: 'inline-flex', alignItems: 'center', gap: 3 }}><MdAutorenew size={12} /> Redo</span>}
             </div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>
@@ -871,7 +871,7 @@ function AcceptCasesSection({ queryClient }) {
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => open(c.id, 'review')}
-                style={{ color: '#1D4ED8', whiteSpace: 'nowrap' }}
+                style={{ color: 'var(--brand)', whiteSpace: 'nowrap' }}
               >
                 <MdSearch className="mi" size={14} /> Under Review
               </button>
@@ -913,7 +913,7 @@ function AcceptCasesSection({ queryClient }) {
         {/* ── Under Review form ── */}
         {isOpen && action === 'review' && (
           <SimpleNoteForm
-            color="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
+            color="var(--brand)" bg="var(--brand-tint)" border="#BFDBFE"
             title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><MdSearch size={14} /> Under Review — What information is needed from the dentist?</span>}
             placeholder="e.g. Shade not specified. Need confirmation of tooth 14 preparation type."
             confirmLabel="Mark Under Review"
@@ -926,7 +926,7 @@ function AcceptCasesSection({ queryClient }) {
         {/* ── Reject form ── */}
         {isOpen && action === 'reject' && (
           <SimpleNoteForm
-            color="var(--red)" bg="#FFF1F2" border="#FECACA"
+            color="var(--red)" bg="var(--red-dim)" border="#FECACA"
             title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><MdBlock size={14} /> Reject Case — Please enter the reason</span>}
             placeholder="e.g. Impression quality too poor to work with. Please retake."
             confirmLabel="Confirm Rejection"
@@ -980,8 +980,8 @@ function AcceptCasesSection({ queryClient }) {
               />
             </div>
           </div>
-          <div style={{ background: '#EFF6FF', padding: '8px 16px', fontSize: 12, color: '#1D4ED8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <MdInventory2 size={14} /> The delivery driver has brought these impressions to the lab. Please review and Accept, reject, or put Under Review.
+          <div style={{ background: 'var(--brand-tint)', padding: '8px 16px', fontSize: 12, color: 'var(--brand)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MdInventory2 size={14} /> These impressions are at the lab — delivered by driver, dropped off directly, or submitted as a 3D file. Please review and Accept, reject, or put Under Review.
           </div>
           <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
             <div className="search-input" style={{ margin: 0, maxWidth: 320 }}>
@@ -1286,13 +1286,13 @@ function FinishingSection() {
         </div>
       </div>
 
-      <div style={{ padding: '10px 18px', background: '#F5F3FF', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ padding: '10px 18px', background: 'var(--purple-dim)', borderRadius: 10, marginBottom: 14, fontSize: 12, color: '#5B21B6', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
         <MdAutoAwesome size={14} /> These cases have <strong>reached a finishing stage</strong> (Metal Finishing, Zirconia Fitting &amp; Finishing, or Glazing) in the last 3 days — informational only. They stay listed for the full 3 days even after moving on, and even once delivered, so you don't miss one that moved through quickly. Already-delivered cases are dimmed and sorted to the bottom.
       </div>
 
       <div className="card">
         <div className="card-header">
-          <div className="card-title" style={{ color: '#7C3AED', display: 'flex', alignItems: 'center', gap: 6 }}><MdAutoAwesome className="mi" size={15} /> In Finishing</div>
+          <div className="card-title" style={{ color: 'var(--purple)', display: 'flex', alignItems: 'center', gap: 6 }}><MdAutoAwesome className="mi" size={15} /> In Finishing</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{filtered.length} case{filtered.length !== 1 ? 's' : ''}</span>
             <ExportMenu
@@ -1675,7 +1675,7 @@ export default function Dashboard() {
                   const today = todayLocal();
                   navigate(`/cases?dateFrom=${today}&dateTo=${today}&label=Orders+Today`);
                 }}>
-                  <div className="stat-icon" style={{ background: '#EEF2FF' }}><MdAssignment size={18} /></div>
+                  <div className="stat-icon" style={{ background: 'var(--brand-tint)' }}><MdAssignment size={18} /></div>
                   <div className="stat-label">Orders Today</div>
                   <div className="stat-value">{stats?.todayCases ?? '—'}</div>
                   <div className="stat-sub" style={{ color: 'var(--blue)', fontWeight: 600 }}>View today's orders ↗</div>
@@ -1684,7 +1684,7 @@ export default function Dashboard() {
                   const today = todayLocal();
                   navigate(`/cases?remake=true&dateFrom=${today}&dateTo=${today}&label=Remakes+Today`);
                 }}>
-                  <div className="stat-icon" style={{ background: '#FFF1F2' }}><MdAutorenew size={18} /></div>
+                  <div className="stat-icon" style={{ background: 'var(--red-dim)' }}><MdAutorenew size={18} /></div>
                   <div className="stat-label">Remake Today</div>
                   <div className="stat-value" style={{ color: stats?.remakeCount > 0 ? 'var(--red)' : 'var(--text-1)' }}>
                     {stats?.remakeCount ?? '—'}

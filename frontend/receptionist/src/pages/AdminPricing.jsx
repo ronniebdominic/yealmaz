@@ -276,7 +276,7 @@ export default function AdminPricing() {
                 />
               </div>
               <div style={{ flex: 1, minWidth: 130 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
                   <MdBolt size={12} /> EXPRESS PRICE (Br)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -294,7 +294,7 @@ export default function AdminPricing() {
                 </div>
               </div>
               <div style={{ flex: 0, minWidth: 100 }}>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#92400E', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
                   <MdBolt size={12} /> EXPRESS DAYS
                 </label>
                 <input
@@ -558,7 +558,7 @@ export default function AdminPricing() {
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                           {dirty && (
                             <span style={{
-                              background: 'rgba(240,165,0,0.15)', color: '#d97706',
+                              background: 'rgba(240,165,0,0.15)', color: 'var(--amber)',
                               padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                             }}>
                               •
@@ -608,7 +608,7 @@ const inputStyle = {
   color: 'var(--text-1)',
   background: 'var(--surface)',
   outline: 'none',
-  fontFamily: 'Sora, sans-serif',
+  fontFamily: 'Manrope, sans-serif',
   width: '100%',
   maxWidth: 320,
 };

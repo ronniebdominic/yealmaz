@@ -66,7 +66,7 @@ function DeptCard({ icon: Icon, label, count, active, onClick }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 20, display: 'flex' }}>{Icon && <Icon size={20} />}</span>
-        <span style={{ fontSize: 22, fontWeight: 800, color: active ? '#fff' : 'var(--text-1)' }}>{count}</span>
+        <span style={{ fontSize: 22, fontWeight: 700, color: active ? '#fff' : 'var(--text-1)' }}>{count}</span>
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: active ? 'rgba(255,255,255,0.9)' : 'var(--text-2)' }}>
         {label}

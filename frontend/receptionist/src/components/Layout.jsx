@@ -63,7 +63,7 @@ export default function Layout({ children }) {
       {/* ── Drawer ──────────────────────────────────────── */}
       <div className={`drawer${open ? ' open' : ''}`}>
         <div className="drawer-logo">
-          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, border: '1px solid rgba(255,255,255,0.14)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
           <span className="role-badge">Receptionist</span>
         </div>
@@ -85,7 +85,7 @@ export default function Layout({ children }) {
       {/* ── Sidebar (desktop only) ───────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
+          <img src="/logo.png" alt="Ye-Almaz" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, border: '1px solid rgba(255,255,255,0.14)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
           <span className="role-badge">Receptionist</span>
         </div>

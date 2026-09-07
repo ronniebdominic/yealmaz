@@ -14,7 +14,7 @@ import { MdTwoWheeler, MdInfoOutline } from 'react-icons/md';
 // A custom divIcon avoids Leaflet's default marker image entirely, which
 // sidesteps the classic bundler-breaks-the-default-icon-path problem.
 const ADDIS_ABABA = [9.03, 38.74];
-const AMBER = '#D97706';
+const AMBER = 'var(--amber)';
 
 function agentIcon(name) {
   const initials = (name || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -22,7 +22,7 @@ function agentIcon(name) {
     className: '',
     html: `<div style="
       width:32px;height:32px;border-radius:50%;background:${AMBER};color:#fff;
-      display:flex;align-items:center;justify-content:center;font:700 12px/1 'Sora',sans-serif;
+      display:flex;align-items:center;justify-content:center;font:700 12px/1 'Manrope',sans-serif;
       border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);
     ">${initials}</div>`,
     iconSize: [32, 32],
@@ -84,11 +84,11 @@ export default function LiveTrackingMap() {
         {agents.map(a => (
           <Marker key={a.userId} position={[a.latitude, a.longitude]} icon={agentIcon(a.name)}>
             <Popup>
-              <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 13, minWidth: 140 }}>
+              <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 13, minWidth: 140 }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>{a.name}</div>
-                {a.station && <div style={{ color: '#6B7280', fontSize: 12, marginBottom: 4 }}>{a.station}</div>}
-                <div style={{ color: '#9CA3AF', fontSize: 11 }}>Updated {timeAgo(a.updatedAt)}</div>
-                {a.speed != null && <div style={{ color: '#9CA3AF', fontSize: 11 }}>{Math.round(a.speed * 3.6)} km/h</div>}
+                {a.station && <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 4 }}>{a.station}</div>}
+                <div style={{ color: 'var(--text-4)', fontSize: 11 }}>Updated {timeAgo(a.updatedAt)}</div>
+                {a.speed != null && <div style={{ color: 'var(--text-4)', fontSize: 11 }}>{Math.round(a.speed * 3.6)} km/h</div>}
               </div>
             </Popup>
           </Marker>
@@ -102,8 +102,8 @@ export default function LiveTrackingMap() {
         }}>
           <div style={{ background: '#fff', borderRadius: 10, padding: '14px 20px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', textAlign: 'center', maxWidth: 260 }}>
             <MdTwoWheeler size={26} color={AMBER} style={{ marginBottom: 6 }} />
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#1F2937', marginBottom: 3 }}>No one sharing location right now</div>
-            <div style={{ fontSize: 12, color: '#6B7280', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)', marginBottom: 3 }}>No one sharing location right now</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
               <MdInfoOutline size={13} /> Drivers opt in from their own portal
             </div>
           </div>

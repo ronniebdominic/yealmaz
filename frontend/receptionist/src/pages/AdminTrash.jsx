@@ -97,7 +97,7 @@ export default function AdminTrash() {
       </div>
 
       <div className="content">
-        <div className="card" style={{ padding: 12, marginBottom: 14, borderLeft: '3px solid var(--blue, #1565C0)' }}>
+        <div className="card" style={{ padding: 12, marginBottom: 14, borderLeft: '3px solid var(--blue, var(--brand))' }}>
           <div style={{ fontSize: 13, lineHeight: 1.6 }}>
             Deleted cases are kept here with their full history and can be restored.
             While in the trash they are excluded from every dashboard, report and revenue
