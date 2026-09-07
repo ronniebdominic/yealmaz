@@ -315,7 +315,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
 
           {/* Remake/redo lineage — this case's own scan number, branched from an earlier one */}
           {(data.originalCase || data.remakes?.length > 0) && (
-            <div style={{ background: 'var(--purple-dim)', border: '1px solid #DDD6FE', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
+            <div style={{ background: 'var(--purple-dim)', border: '1px solid rgba(167,139,250,.30)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
               {data.originalCase && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--purple)', fontWeight: 600 }}>
                   <MdAutorenew size={13} /> Remake/Redo of <span className="case-number" style={{ marginLeft: 2 }}>{data.originalCase.caseNumber || '—'}</span>
@@ -383,7 +383,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
           </div>
 
           {data.notes && (
-            <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '13px' }}>
+            <div style={{ background: 'var(--amber-dim)', border: '1px solid var(--amber-line)', color: 'var(--text-1)', borderRadius: '8px', padding: '12px', marginBottom: '20px', fontSize: '13px' }}>
               <strong>Notes:</strong> {data.notes}
             </div>
           )}

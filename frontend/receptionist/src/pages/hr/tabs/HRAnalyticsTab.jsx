@@ -14,7 +14,7 @@ import {
 } from 'react-icons/md';
 
 // Literal hex, not tokens — chart libs can't resolve var(). Mirrors index.css.
-const PIE_COLORS = ['#2D5BD6', '#17864C', '#B4690E', '#C9414B', '#6355C7', '#2A7FA8', '#B84A6A'];
+const PIE_COLORS = ['#4C82F7', '#34D399', '#F5B23F', '#F26D6D', '#A78BFA', '#5BA8D8', '#EC7FA0'];
 
 function StatCard({ icon: Icon, label, value, warn }) {
   return (

@@ -28,8 +28,8 @@ const fmtBr = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFract
 // SVG/JS contexts where a CSS var() string won't resolve. Values mirror the
 // design tokens in index.css; keep the two in step by hand.
 const WORK_TYPE_COLORS = [
-  '#2D5BD6', '#0E93A0', '#C98A12', '#17864C', '#C9414B',
-  '#6355C7', '#B4690E', '#2A7FA8', '#B84A6A', '#64748B',
+  '#4C82F7', '#2DD4BF', '#E8B04B', '#34D399', '#F26D6D',
+  '#A78BFA', '#F5B23F', '#5BA8D8', '#EC7FA0', '#8593AC',
 ];
 
 // All in-production statuses (excludes terminal states)
@@ -52,7 +52,7 @@ const OTHER_STATUSES = [
 const CustomTooltip = ({ active, payload, label, prefix = '' }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', fontSize: 13, boxShadow: 'var(--shadow)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', fontSize: 13, boxShadow: 'var(--shadow-md)' }}>
       <div style={{ fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i} style={{ color: p.color || 'var(--blue)' }}>

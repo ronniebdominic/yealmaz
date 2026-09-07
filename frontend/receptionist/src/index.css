@@ -18,76 +18,77 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* ── Brand ──────────────────────────────────────────────────────────
-     A single restrained blue carries every primary action. Deep enough
-     for white text at small sizes (≈5.4:1), not electric. */
-  --brand:        #2D5BD6;
-  --brand-hover:  #2449B0;
-  --brand-active: #1D3C93;
-  --brand-soft:   #4A7BF0;
-  --brand-tint:   rgba(45,91,214,.08);
-  --brand-tint-2: rgba(45,91,214,.14);
-  --brand-ring:   rgba(45,91,214,.28);
+  /* ═══ DARK ENTERPRISE THEME ═══════════════════════════════════════
+     Deep midnight-navy base, a short ladder of solid raised surfaces,
+     hairline light borders, restrained shadows. Glass is a light touch
+     on overlays only — hierarchy is carried by surface contrast,
+     spacing and type, not blur. Accent colours are brightened one step
+     from the light theme so they read on a dark ground without being
+     neon. */
 
-  /* Legacy aliases — a lot of inline styles reference these directly.
-     Kept pointing at the new palette so nothing renders off-system. */
+  /* ── Brand ──────────────────────────────────────────────────────────
+     Lifted for a dark ground; still a calm blue, not electric. */
+  --brand:        #3E7BF0;
+  --brand-hover:  #5B90F5;
+  --brand-active: #2B62D4;
+  --brand-soft:   #7AA6FF;
+  --brand-tint:   rgba(62,123,240,.15);
+  --brand-tint-2: rgba(62,123,240,.24);
+  --brand-ring:   rgba(62,123,240,.40);
+  --brand-strong: #2B62D4;
+
+  /* Legacy aliases — a lot of inline styles reference these directly. */
   --blue:       var(--brand);
   --blue-light: var(--brand-soft);
   --blue-dim:   var(--brand-tint);
-  --navy:       #101C36;
-  --navy-mid:   #1B2C4E;
+  --navy:       #0B1120;                  /* now the darkest fill        */
+  --navy-mid:   #16213A;
 
   /* ── Semantic ───────────────────────────────────────────────────────
-     Desaturated a step from the old palette: still instantly readable as
-     success/warning/danger, without every card shouting. */
-  --green:      #17864C;
-  --green-dim:  rgba(23,134,76,.10);
-  --green-line: rgba(23,134,76,.22);
-  --amber:      #B4690E;
-  --amber-dim:  rgba(180,105,14,.10);
-  --amber-line: rgba(180,105,14,.22);
-  --red:        #C9414B;
-  --red-dim:    rgba(201,65,75,.10);
-  --red-line:   rgba(201,65,75,.22);
-  --accent:     #0E93A0;                  /* secondary analytics accent  */
-  --accent-dim: rgba(14,147,160,.10);
-  --purple:     #6355C7;
-  --purple-dim: rgba(99,85,199,.10);
-  --gold:       #C98A12;
+     Brightened for dark; the *-dim tints are low-alpha washes that sit
+     on a dark card without turning it into a colour block. */
+  --green:      #34D399;
+  --green-dim:  rgba(52,211,153,.14);
+  --green-line: rgba(52,211,153,.30);
+  --amber:      #F5B23F;
+  --amber-dim:  rgba(245,178,63,.14);
+  --amber-line: rgba(245,178,63,.30);
+  --red:        #F26D6D;
+  --red-dim:    rgba(242,109,109,.14);
+  --red-line:   rgba(242,109,109,.30);
+  --accent:     #2DD4BF;                  /* secondary analytics accent  */
+  --accent-dim: rgba(45,212,191,.13);
+  --purple:     #A78BFA;
+  --purple-dim: rgba(167,139,250,.15);
+  --gold:       #E8B04B;
 
-  /* ── Surfaces — four predictable levels ─────────────────────────────
-     1 base page · 2 solid raised · 3 glass card · 4 overlay            */
-  --bg:            #F3F6FC;
-  --surface:       #FFFFFF;
-  --surface-2:     #F5F7FC;               /* inset / quiet fill          */
-  --surface-3:     #ECF0F8;               /* pressed / track             */
-  --glass:         rgba(255,255,255,.62);
-  --glass-strong:  rgba(255,255,255,.82);
-  /* Diagonal sheen laid over a glass surface so the translucency reads as
-     glass rather than as a flat wash. Very low alpha — it should catch the
-     light, not tint the card. */
-  --glass-sheen:   linear-gradient(140deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.14) 34%,rgba(255,255,255,0) 60%);
-  --glass-hi:      inset 0 1px 0 rgba(255,255,255,.65);   /* top edge highlight */
-  --overlay:       rgba(255,255,255,.88);
-  --scrim:         rgba(16,28,54,.42);
+  /* ── Surfaces — base + three raised steps ───────────────────────────
+     Solid, not translucent: contrast between steps is what separates
+     panels on a dark UI. */
+  --bg:            #0B1120;
+  --surface:       #131C2E;               /* card / panel                */
+  --surface-2:     #1A2438;               /* inset / quiet fill          */
+  --surface-3:     #232F49;               /* pressed / track / hover     */
+  --glass:         rgba(19,28,46,.72);
+  --glass-strong:  rgba(17,25,41,.90);
+  /* Faint diagonal sheen — on dark it's barely there by design. */
+  --glass-sheen:   linear-gradient(140deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.02) 36%,rgba(255,255,255,0) 62%);
+  --glass-hi:      inset 0 1px 0 rgba(255,255,255,.06);   /* top edge highlight */
+  --overlay:       rgba(15,22,38,.94);
+  --scrim:         rgba(3,7,15,.62);
 
-  /* ── Borders ────────────────────────────────────────────────────────
-     Hairlines only. The lighter --border-soft is for inside cards where
-     a full-strength line would read as a grid. */
-  --border:      #E3E8F2;
-  --border-soft: #EDF1F8;
-  --border-2:    #CFD8E8;
-  --glass-border: rgba(255,255,255,.72);
-  --glass-edge:   rgba(16,28,54,.06);     /* outer definition on glass   */
+  /* ── Borders — light hairlines on dark ─────────────────────────────*/
+  --border:      rgba(255,255,255,.09);
+  --border-soft: rgba(255,255,255,.055);
+  --border-2:    rgba(255,255,255,.16);
+  --glass-border: rgba(255,255,255,.08);
+  --glass-edge:   rgba(0,0,0,.35);        /* outer definition on glass   */
 
-  /* ── Text — four steps, all readable ────────────────────────────────
-     --text-3 is deliberately darker than the old #94A3B8 (which sat at
-     ~2.9:1 and failed for small labels); --text-4 covers genuinely
-     decorative text where contrast isn't load-bearing. */
-  --text-1: #0E1729;
-  --text-2: #47536B;
-  --text-3: #6E7A8E;
-  --text-4: #9AA5B7;
+  /* ── Text — four steps, all readable on --bg ───────────────────────*/
+  --text-1: #EBEFF8;
+  --text-2: #AFBACE;
+  --text-3: #7E8BA4;
+  --text-4: #5A6683;
   --text-on-brand: #FFFFFF;
 
   /* ── Spacing — 8px base, 4px half-step ──────────────────────────────*/
@@ -103,14 +104,15 @@
   --radius-xl: 18px;
   --radius-pill: 999px;
 
-  /* ── Elevation — soft, tight, never dramatic ────────────────────────*/
-  --shadow-xs:      0 1px 2px rgba(16,28,54,.04);
-  --shadow-sm:      0 1px 2px rgba(16,28,54,.05), 0 2px 6px rgba(16,28,54,.03);
-  --shadow:         0 1px 2px rgba(16,28,54,.04), 0 4px 14px rgba(16,28,54,.05);
-  --shadow-md:      0 2px 4px rgba(16,28,54,.04), 0 8px 22px rgba(16,28,54,.07);
-  --shadow-lg:      0 8px 28px rgba(16,28,54,.10);
-  --shadow-overlay: 0 24px 64px rgba(16,28,54,.20), 0 2px 8px rgba(16,28,54,.08);
-  --shadow-inset-top: inset 0 1px 0 rgba(255,255,255,.6);
+  /* ── Elevation — on dark, shadows read as depth of black; kept tight.
+     Surface contrast + borders do most of the separating. ────────────*/
+  --shadow-xs:      0 1px 2px rgba(0,0,0,.30);
+  --shadow-sm:      0 1px 2px rgba(0,0,0,.34), 0 2px 6px rgba(0,0,0,.22);
+  --shadow:         0 2px 8px rgba(0,0,0,.34);
+  --shadow-md:      0 6px 20px rgba(0,0,0,.42);
+  --shadow-lg:      0 14px 36px rgba(0,0,0,.50);
+  --shadow-overlay: 0 32px 80px rgba(0,0,0,.60), 0 2px 8px rgba(0,0,0,.4);
+  --shadow-inset-top: inset 0 1px 0 rgba(255,255,255,.05);
 
   /* ── Blur — controlled. Enough to separate, never to obscure. ───────*/
   --blur-sm: 8px;
@@ -132,7 +134,7 @@
   --header-h:  60px;
 
   font-family: var(--font-body);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 /* Back-compat aliases for tokens older code still names directly. */
@@ -141,9 +143,9 @@
   --glass-bg-strong:     var(--glass-strong);
   --glass-shadow:        var(--shadow);
   --glass-blur:          var(--blur);
-  --glass-topbar-bg:     rgba(255,255,255,.76);
-  --glass-sidebar-bg:    linear-gradient(168deg,#16264A 0%,#111E3C 46%,#0D1830 100%);
-  --glass-sidebar-border: rgba(255,255,255,.07);
+  --glass-topbar-bg:     rgba(11,17,32,.82);
+  --glass-sidebar-bg:    linear-gradient(168deg,#141E36 0%,#0F1830 48%,#0A1120 100%);
+  --glass-sidebar-border: rgba(255,255,255,.06);
   --radius-lg-legacy:    var(--radius-lg);
 }
 
@@ -168,9 +170,9 @@ body{
 body::before{
   content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(1100px 700px at 8% -6%,  rgba(45,91,214,.09), transparent 60%),
-    radial-gradient(900px 620px at 98% 4%,   rgba(14,147,160,.07), transparent 62%),
-    radial-gradient(1000px 700px at 72% 104%,rgba(99,85,199,.06), transparent 62%),
+    radial-gradient(1100px 720px at 6% -8%,  rgba(62,123,240,.12), transparent 60%),
+    radial-gradient(900px 640px at 100% 2%,  rgba(45,212,191,.06), transparent 62%),
+    radial-gradient(1100px 760px at 78% 108%,rgba(167,139,250,.07), transparent 62%),
     var(--bg);
 }
 
@@ -404,24 +406,24 @@ tbody tr:hover td{background:rgba(45,91,214,.035)}
   border:1px solid transparent;
 }
 .badge::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.badge-pickup{background:#FDF3EA;color:#9A5416;border-color:#F3E2D0}.badge-pickup::before{background:#C2740A}
-.badge-pickup-assigned{background:#FBF5E3;color:#7C5E11;border-color:#F0E6C8}.badge-pickup-assigned::before{background:#B08810}
-.badge-received{background:#EEF1FC;color:#3B4593;border-color:#DFE4F8}.badge-received::before{background:#4B57C0}
-.badge-impression{background:#FDF3EA;color:#9A5416;border-color:#F3E2D0}.badge-impression::before{background:#C2740A}
-.badge-casting{background:#FBF4E6;color:#7E5A12;border-color:#F1E5CC}.badge-casting::before{background:#A97B12}
-.badge-fabrication{background:#EAF5EF;color:#14603D;border-color:#D7EBE0}.badge-fabrication::before{background:#17864C}
-.badge-qc{background:#EAF3FA;color:#1F5478;border-color:#D6E7F3}.badge-qc::before{background:#26709D}
-.badge-ready{background:#EAF5EF;color:#146041;border-color:#D7EBE0}.badge-ready::before{background:#17864C}
-.badge-dispatch{background:var(--accent-dim);color:#0B6C76;border-color:rgba(14,147,160,.2)}.badge-dispatch::before{background:var(--accent)}
-.badge-delivered{background:var(--navy);color:#fff;border-color:transparent}.badge-delivered::before{background:#5EE0C8}
-.badge-hold{background:#FCEEF0;color:#93303C;border-color:#F5DDE1}.badge-hold::before{background:#C9414B}
-.badge-review{background:var(--brand-tint);color:#27479E;border-color:rgba(45,91,214,.18)}.badge-review::before{background:var(--brand)}
-.badge-rejected{background:#2A3140;color:#F1A6AC;border-color:transparent}.badge-rejected::before{background:#E28A92}
-.badge-pay-pending{background:var(--amber-dim);color:#8F540B;border-color:var(--amber-line)}.badge-pay-pending::before{background:var(--amber)}
-.badge-pay-uploaded{background:var(--brand-tint);color:#27479E;border-color:rgba(45,91,214,.18)}.badge-pay-uploaded::before{background:var(--brand)}
-.badge-pay-verified{background:var(--green-dim);color:#136B3E;border-color:var(--green-line)}.badge-pay-verified::before{background:var(--green)}
-.badge-pay-rejected{background:var(--red-dim);color:#A23540;border-color:var(--red-line)}.badge-pay-rejected::before{background:var(--red)}
-.badge-trusted{background:var(--purple-dim);color:#4B3FA6;border-color:rgba(99,85,199,.2)}.badge-trusted::before{background:var(--purple)}
+.badge-pickup{background:var(--amber-dim);color:var(--amber);border-color:var(--amber-line)}.badge-pickup::before{background:var(--amber)}
+.badge-pickup-assigned{background:rgba(232,176,75,.14);color:var(--gold);border-color:rgba(232,176,75,.30)}.badge-pickup-assigned::before{background:var(--gold)}
+.badge-received{background:var(--brand-tint);color:var(--brand-soft);border-color:rgba(62,123,240,.30)}.badge-received::before{background:var(--brand)}
+.badge-impression{background:var(--amber-dim);color:var(--amber);border-color:var(--amber-line)}.badge-impression::before{background:var(--amber)}
+.badge-casting{background:rgba(232,176,75,.14);color:var(--gold);border-color:rgba(232,176,75,.30)}.badge-casting::before{background:var(--gold)}
+.badge-fabrication{background:var(--green-dim);color:var(--green);border-color:var(--green-line)}.badge-fabrication::before{background:var(--green)}
+.badge-qc{background:var(--accent-dim);color:var(--accent);border-color:rgba(45,212,191,.30)}.badge-qc::before{background:var(--accent)}
+.badge-ready{background:var(--green-dim);color:var(--green);border-color:var(--green-line)}.badge-ready::before{background:var(--green)}
+.badge-dispatch{background:var(--accent-dim);color:var(--accent);border-color:rgba(45,212,191,.30)}.badge-dispatch::before{background:var(--accent)}
+.badge-delivered{background:var(--surface-3);color:var(--text-1);border-color:var(--border-2)}.badge-delivered::before{background:var(--accent)}
+.badge-hold{background:var(--red-dim);color:var(--red);border-color:var(--red-line)}.badge-hold::before{background:var(--red)}
+.badge-review{background:var(--brand-tint);color:var(--brand-soft);border-color:rgba(62,123,240,.30)}.badge-review::before{background:var(--brand)}
+.badge-rejected{background:var(--red-dim);color:var(--red);border-color:var(--red-line)}.badge-rejected::before{background:var(--red)}
+.badge-pay-pending{background:var(--amber-dim);color:var(--amber);border-color:var(--amber-line)}.badge-pay-pending::before{background:var(--amber)}
+.badge-pay-uploaded{background:var(--brand-tint);color:var(--brand-soft);border-color:rgba(62,123,240,.30)}.badge-pay-uploaded::before{background:var(--brand)}
+.badge-pay-verified{background:var(--green-dim);color:var(--green);border-color:var(--green-line)}.badge-pay-verified::before{background:var(--green)}
+.badge-pay-rejected{background:var(--red-dim);color:var(--red);border-color:var(--red-line)}.badge-pay-rejected::before{background:var(--red)}
+.badge-trusted{background:var(--purple-dim);color:var(--purple);border-color:rgba(167,139,250,.30)}.badge-trusted::before{background:var(--purple)}
 
 /* ═══ Buttons ═══════════════════════════════════════════════════════
    Primary → secondary → tertiary, with visibly different weight so a
@@ -441,10 +443,10 @@ tbody tr:hover td{background:rgba(45,91,214,.035)}
 .btn-primary{background:var(--brand);color:var(--text-on-brand);box-shadow:var(--shadow-xs)}
 .btn-primary:hover{background:var(--brand-hover)}
 .btn-primary:active{background:var(--brand-active)}
-.btn-success{background:var(--green);color:#fff;box-shadow:var(--shadow-xs)}
-.btn-success:hover{background:#126B3D}
-.btn-danger{background:var(--red);color:#fff;box-shadow:var(--shadow-xs)}
-.btn-danger:hover{background:#AE3742}
+.btn-success{background:var(--green);color:#062114;box-shadow:var(--shadow-xs)}
+.btn-success:hover{background:#4ADCA8}
+.btn-danger{background:var(--red);color:#2A0808;box-shadow:var(--shadow-xs)}
+.btn-danger:hover{background:#F58585}
 /* Secondary: quiet surface + hairline, reads as available not urgent. */
 .btn-ghost{
   background:var(--surface);color:var(--text-2);
@@ -541,15 +543,15 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
 .screenshot-img{width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.4s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(23,134,76,.35)}50%{box-shadow:0 0 0 5px rgba(23,134,76,0)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.40)}50%{box-shadow:0 0 0 5px rgba(52,211,153,0)}}
 .empty-state{text-align:center;padding:var(--sp-9) var(--sp-6);color:var(--text-3);font-size:13px}
 .empty-icon{font-size:30px;margin-bottom:var(--sp-3);color:var(--text-4);display:flex;justify-content:center}
 .empty-title{font-size:14.5px;font-weight:600;color:var(--text-2);margin-bottom:var(--sp-1);letter-spacing:-.01em}
 .notification-banner{
   display:flex;align-items:center;gap:10px;
-  background:var(--accent-dim);border:1px solid rgba(14,147,160,.22);
+  background:var(--accent-dim);border:1px solid rgba(45,212,191,.28);
   border-radius:var(--radius);padding:10px var(--sp-4);margin-bottom:var(--sp-4);
-  font-size:13px;color:#0B6C76;font-weight:500;
+  font-size:13px;color:var(--accent);font-weight:500;
   animation:fadeIn var(--t-slow) var(--ease);
 }
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
@@ -613,7 +615,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   border-bottom:1px solid var(--border);
 }
 .glass-pill{
-  background:rgba(255,255,255,.7);
+  background:var(--glass);
   -webkit-backdrop-filter:blur(var(--blur-sm)) saturate(135%);
   backdrop-filter:blur(var(--blur-sm)) saturate(135%);
   border:1px solid var(--glass-border);
@@ -625,7 +627,8 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   visibility:hidden;opacity:0;position:absolute;z-index:80;
   bottom:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(3px);
   width:240px;max-width:70vw;
-  background:var(--navy);color:#fff;
+  background:var(--surface-3);color:var(--text-1);
+  border:1px solid var(--border-2);
   font-size:11.5px;font-weight:450;line-height:1.5;
   text-transform:none;letter-spacing:normal;text-align:left;
   padding:9px 11px;border-radius:var(--radius-sm);
@@ -635,7 +638,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 }
 .info-icon-wrap .info-tooltip::after{
   content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  border:5px solid transparent;border-top-color:var(--navy);
+  border:5px solid transparent;border-top-color:var(--surface-3);
 }
 .info-icon-wrap:hover .info-tooltip,.info-icon-wrap:focus-visible .info-tooltip{
   visibility:visible;opacity:1;transform:translateX(-50%) translateY(0);
@@ -647,7 +650,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   bottom:auto;top:calc(100% + 8px);transform:translateX(-50%) translateY(-3px);
 }
 .tooltip-below .info-tooltip::after{
-  top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--navy);
+  top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--surface-3);
 }
 .tooltip-below .info-icon-wrap:hover .info-tooltip,.tooltip-below .info-icon-wrap:focus-visible .info-tooltip{
   transform:translateX(-50%) translateY(0);
@@ -656,8 +659,8 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 /* ═══ Scrollbars ════════════════════════════════════════════════════ */
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#C8D2E4;border-radius:var(--radius-pill);border:2px solid transparent;background-clip:content-box}
-::-webkit-scrollbar-thumb:hover{background:#AFBBD2;background-clip:content-box}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:var(--radius-pill);border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24);background-clip:content-box}
 
 /* ═══ Login ═════════════════════════════════════════════════════════ */
 .login-page{
