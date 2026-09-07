@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../api/client';
+import api, { setUnauthorizedHandler } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -19,7 +19,15 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    return () => clearTimeout(safetyTimeout);
+    // Any 401 from the API (expired/invalid token) clears the session so
+    // the navigator drops back to the Login screen — storage is already
+    // wiped by the client's response interceptor.
+    setUnauthorizedHandler(() => setClinic(null));
+
+    return () => {
+      clearTimeout(safetyTimeout);
+      setUnauthorizedHandler(null);
+    };
   }, []);
 
   const loadStoredAuth = async () => {

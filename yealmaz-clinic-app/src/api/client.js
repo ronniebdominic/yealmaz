@@ -16,6 +16,14 @@ const api = axios.create({
   timeout: 15000,
 });
 
+// Let AuthContext register itself so a 401 anywhere can force a logout —
+// the interceptor below runs outside the React tree and has no other way
+// to update auth state.
+let onUnauthorized = null;
+export function setUnauthorizedHandler(fn) {
+  onUnauthorized = fn;
+}
+
 // Attach token to every request + log
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('ya_clinic_token');
@@ -39,6 +47,7 @@ api.interceptors.response.use(
       if (err.response.status === 401) {
         await AsyncStorage.removeItem('ya_clinic_token');
         await AsyncStorage.removeItem('ya_clinic_data');
+        if (onUnauthorized) onUnauthorized();
       }
     } else if (err.request) {
       console.error('[API] NO RESPONSE — server unreachable or timed out. Check API_BASE URL and that the backend is running.');
