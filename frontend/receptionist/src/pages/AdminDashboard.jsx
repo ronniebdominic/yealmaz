@@ -767,14 +767,22 @@ export default function AdminDashboard() {
                   {revenueByWorkType?.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>No data</div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={260}>
+                    // Only slices >= 5% get an inline label — with ~30 near-identical
+                    // categories in the data, labelling every sliver produced the
+                    // overlapping wall of text. The rest stay in the tooltip and the
+                    // scrollable legend below.
+                    <ResponsiveContainer width="100%" height={280}>
                       <PieChart>
-                        <Pie data={revenueByWorkType} dataKey="count" nameKey="workType" cx="50%" cy="50%" outerRadius={90}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                        <Pie data={revenueByWorkType} dataKey="count" nameKey="workType" cx="50%" cy="50%" outerRadius={92}
+                          minAngle={2} stroke="var(--surface)" strokeWidth={1}
+                          label={({ percent, name }) => (percent >= 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : '')}
+                          labelLine={false}>
                           {revenueByWorkType?.map((_, i) => <Cell key={i} fill={WORK_TYPE_COLORS[i % WORK_TYPE_COLORS.length]} />)}
                         </Pie>
                         <Tooltip formatter={(v, n) => [v + ' cases', n]} />
-                        <Legend iconType="circle" iconSize={8} formatter={(v) => <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{v}</span>} />
+                        <Legend iconType="circle" iconSize={8} layout="horizontal" verticalAlign="bottom"
+                          wrapperStyle={{ maxHeight: 76, overflowY: 'auto', paddingTop: 8, lineHeight: '20px' }}
+                          formatter={(v) => <span style={{ fontSize: 11.5, color: 'var(--text-2)' }}>{v}</span>} />
                       </PieChart>
                     </ResponsiveContainer>
                   )}
