@@ -181,12 +181,12 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_admin_analytics',
-        description: 'Business analytics over a date range: revenue, case/unit counts, turnaround time, on-time delivery %, top clinics and work types by revenue, remake stats. IMPORTANT: "deliveredCases" counts cases whose DELIVERY fell in the range regardless of when they were created; "deliveredOfCreated" counts, of the cases CREATED in the range, how many have since been delivered (whenever that happened). These are different questions — pick the one that matches what was actually asked, never assume they are the same number.',
+        description: 'Business analytics over a date range: revenue, case/unit counts, turnaround time, on-time delivery %, top clinics and work types by revenue, remake stats. IMPORTANT: "deliveredCases" = cases DELIVERED in the range regardless of when created; "deliveredOfCreated" = of cases CREATED in the range, how many have since been delivered. Pick the one actually asked — never conflate them.',
         parameters: {
           type: 'object',
           properties: {
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year if omitted.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today if omitted.' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.if omitted.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.if omitted.' },
             clinicId: { type: 'string', description: 'Optional — restrict to one clinic by id.' },
           },
         },
@@ -204,7 +204,7 @@ const TOOLS = [
           type: 'object',
           properties: {
             from: { type: 'string', description: 'Start date, YYYY-MM-DD, for the custom "range" figures. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
           },
         },
       },
@@ -216,12 +216,12 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_lab_performance',
-        description: 'STAFF/EMPLOYEE PERFORMANCE AND PRODUCTIVITY. Per-lab-technician scan activity over a date range: total scans, unique cases, busiest department, active days, and each tech\'s share of the lab\'s total scan volume. Use for any question about how employees/technicians/staff are PERFORMING or how productive they are — "employee performance", "who is the best worker", "who is the most active tech", "how is [name] doing". For whether someone was merely PRESENT (attendance/leave), use get_staff_attendance instead.',
+        description: 'STAFF PERFORMANCE/PRODUCTIVITY. Per-technician scan activity over a range: total scans, unique cases, busiest dept, active days, share of lab volume. Use for "how is staff performing", "best/most active tech", "how is [name] doing". For mere PRESENCE (attendance/leave), use get_staff_attendance instead.',
         parameters: {
           type: 'object',
           properties: {
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
           },
         },
       },
@@ -237,8 +237,8 @@ const TOOLS = [
         parameters: {
           type: 'object',
           properties: {
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
           },
         },
       },
@@ -261,7 +261,7 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_trusted_partners_summary',
-        description: 'Trusted-partner receivables. Returns a "totals" object (total outstanding across ALL partner clinics, how many clinics owe, total unpaid cases, overdue bill count) plus the top 10 clinics by amount owed. This is the source for "how much is outstanding from Trusted Partners" style questions — read the answer straight out of totals.totalOutstanding, which is already summed; never add the listed rows together yourself, and never present the top-10 list as if it were the full set.',
+        description: 'Trusted-partner receivables. Returns "totals" (outstanding across ALL partner clinics, clinics owing, unpaid cases, overdue count) plus the top 10 clinics by amount owed. For "how much is outstanding from Trusted Partners", read totals.totalOutstanding directly — never sum the rows yourself, and never treat the top-10 as the full set.',
         parameters: { type: 'object', properties: {} },
       },
     },
@@ -283,17 +283,17 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'search_cases',
-        description: 'Look up specific cases by patient name, clinic name, case number, status, or date range. Returns up to 20 matching cases with their status, payment status, and amount. NOT for counting/totals across the whole business — use get_admin_analytics, get_dashboard_summary, or get_cases_by_status for those instead.',
+        description: 'Look up cases by patient name, clinic, case number, status, or date range. Returns up to 20 matches with status, payment status, amount. NOT for counting/totals — use get_admin_analytics, get_dashboard_summary, or get_cases_by_status instead.',
         parameters: {
           type: 'object',
           properties: {
-            search: { type: 'string', description: 'Free-text match against patient name, case number, or clinic name.' },
-            status: { type: 'string', description: 'Exact case status, e.g. DELIVERED, READY_TO_DISPATCH, SCANNING.' },
-            paymentStatus: { type: 'string', description: 'Exact payment status: PENDING, PAYMENT_REQUESTED, SCREENSHOT_UPLOADED, VERIFIED, or REJECTED.' },
+            search: { type: 'string', description: 'Free-text: patient name, case #, or clinic name.' },
+            status: { type: 'string', description: 'Exact status, e.g. DELIVERED, SCANNING.' },
+            paymentStatus: { type: 'string', description: 'PENDING, PAYMENT_REQUESTED, SCREENSHOT_UPLOADED, VERIFIED, or REJECTED.' },
             clinicId: { type: 'string', description: 'Restrict to one clinic by id.' },
-            dateFrom: { type: 'string', description: 'Only cases created on/after this date, YYYY-MM-DD.' },
-            dateTo: { type: 'string', description: 'Only cases created on/before this date, YYYY-MM-DD.' },
-            limit: { type: 'number', description: 'Max rows to return, default 15, hard-capped at 20.' },
+            dateFrom: { type: 'string', description: 'Created on/after, YYYY-MM-DD.' },
+            dateTo: { type: 'string', description: 'Created on/before, YYYY-MM-DD.' },
+            limit: { type: 'number', description: 'Max rows, default 15, capped at 20.' },
           },
         },
       },
@@ -322,13 +322,13 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_clinic_statement',
-        description: 'The exact list of unpaid delivered cases (and amount owed for each) for one specific trusted-partner clinic — the same data Finance\'s "Generate Bill" screen shows. Needs the clinic\'s id — look it up via get_trusted_partners_summary or search_cases first if you only have a name.',
+        description: 'Exact list of unpaid delivered cases + amount owed for one trusted-partner clinic — same data as Finance\'s "Generate Bill" screen. Needs clinic id — look it up via get_trusted_partners_summary or search_cases if you only have a name.',
         parameters: {
           type: 'object',
           properties: {
             clinicId: { type: 'string', description: 'The clinic\'s internal id.' },
-            dateFrom: { type: 'string', description: 'Only cases delivered on/after this date, YYYY-MM-DD. Omit for all-time outstanding.' },
-            dateTo: { type: 'string', description: 'Only cases delivered on/before this date, YYYY-MM-DD.' },
+            dateFrom: { type: 'string', description: 'Delivered on/after, YYYY-MM-DD. Omit for all-time outstanding.' },
+            dateTo: { type: 'string', description: 'Delivered on/before, YYYY-MM-DD.' },
           },
           required: ['clinicId'],
         },
@@ -353,9 +353,9 @@ const TOOLS = [
         parameters: {
           type: 'object',
           properties: {
-            area: { type: 'string', description: 'Which area: "inventory" (stock levels, low stock), "milling" (blanks used vs crowns produced, per technician), "goods_requests" (staff supply requests and what is pending), or "staff_rewards" (staff points leaderboard).' },
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            area: { type: 'string', description: '"inventory" (stock/low-stock), "milling" (blanks vs crowns per tech), "goods_requests" (pending staff supply requests), or "staff_rewards" (points leaderboard).' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
           },
           required: ['area'],
         },
@@ -368,12 +368,12 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_staff_attendance',
-        description: 'ATTENDANCE AND LEAVE ONLY — who was physically present, not how well they worked. Days present per person, clock event counts, and any leave overlapping the range. Use for "who was in on [date]", "how many days has [name] worked", "who is on leave", "who is absent". Do NOT use this for performance or productivity questions — use get_lab_performance for those. Salary, payroll and performance reviews are NOT available.',
+        description: 'ATTENDANCE/LEAVE ONLY — presence, not performance. Days present, clock events, leave overlapping the range. Use for "who was in on [date]", "who is on leave/absent". NOT for performance — use get_lab_performance. Salary/payroll/reviews are NOT available.',
         parameters: {
           type: 'object',
           properties: {
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
             name: { type: 'string', description: 'Optional — restrict to one employee by (partial) name.' },
           },
         },
@@ -408,8 +408,8 @@ const TOOLS = [
           type: 'object',
           properties: {
             area: { type: 'string', description: '"case_scans" (production stage scans, the default), "deliveries", "attendance", or "inventory".' },
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
             limit: { type: 'number', description: 'Max events to return, default 25, capped at 50.' },
           },
         },
@@ -422,17 +422,17 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'count_cases',
-        description: 'The COMPLETE count of cases matching a filter, across the whole database with no row cap, optionally broken down by status, payment status or work type. Use this — not search_cases — whenever the question is "how many", "all", "every", or "total". search_cases only returns a limited page and must never be used to count.',
+        description: 'COMPLETE count of cases matching a filter, whole database, no row cap — optionally broken down by status/paymentStatus/workType. Use for "how many"/"all"/"every"/"total" — not search_cases, which only returns a limited page and must never be used to count.',
         parameters: {
           type: 'object',
           properties: {
-            status: { type: 'string', description: 'Exact case status, e.g. DELIVERED, SCANNING, READY_TO_DISPATCH.' },
+            status: { type: 'string', description: 'Exact status, e.g. DELIVERED, SCANNING, READY_TO_DISPATCH.' },
             paymentStatus: { type: 'string', description: 'PENDING, PAYMENT_REQUESTED, SCREENSHOT_UPLOADED, VERIFIED or REJECTED.' },
             clinicName: { type: 'string', description: 'Partial clinic name match.' },
-            workType: { type: 'string', description: 'Partial work-type match, e.g. "Zirconia".' },
-            dateFrom: { type: 'string', description: 'Only cases created on/after this date, YYYY-MM-DD.' },
-            dateTo: { type: 'string', description: 'Only cases created on/before this date, YYYY-MM-DD.' },
-            groupBy: { type: 'string', description: 'Optional breakdown: "status", "paymentStatus" or "workType".' },
+            workType: { type: 'string', description: 'Partial match, e.g. "Zirconia".' },
+            dateFrom: { type: 'string', description: 'Created on/after, YYYY-MM-DD.' },
+            dateTo: { type: 'string', description: 'Created on/before, YYYY-MM-DD.' },
+            groupBy: { type: 'string', description: '"status", "paymentStatus" or "workType".' },
           },
         },
       },
@@ -444,12 +444,12 @@ const TOOLS = [
       type: 'function',
       function: {
         name: 'get_business_insights',
-        description: 'Pre-computed analysis of what needs attention: money at risk, ageing receivables, clinic/revenue concentration, remake rate, stalled cases, low stock, capacity concentration and revenue trend. Use for open-ended questions like "how is the business doing", "what should I worry about", "where are the opportunities", "any problems". Every finding is calculated in code — report the findings exactly as given and never add your own analysis, causes or recommendations on top.',
+        description: 'Pre-computed analysis: money at risk, ageing receivables, clinic/revenue concentration, remake rate, stalled cases, low stock, capacity concentration, revenue trend. Use for "how\'s the business doing"/"what to worry about"/"opportunities"/"problems". Findings are calculated in code — report exactly as given, never add your own analysis or opinions on top.',
         parameters: {
           type: 'object',
           properties: {
-            from: { type: 'string', description: 'Start date, YYYY-MM-DD. Defaults to start of this year.' },
-            to: { type: 'string', description: 'End date, YYYY-MM-DD. Defaults to today.' },
+            from: { type: 'string', description: 'YYYY-MM-DD, default start of this year.' },
+            to: { type: 'string', description: 'YYYY-MM-DD, default today.' },
           },
         },
       },
