@@ -34,11 +34,11 @@ function RequestModal({ onClose, onSubmitted }) {
     finally { setSaving(false); }
   };
 
-  const inputStyle = { width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border, #D1D5DB)', boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', boxSizing: 'border-box', background: 'var(--surface-2)', color: 'var(--text-1)' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 420, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'var(--scrim)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="card" style={{ borderRadius: 14, width: '100%', maxWidth: 420, overflow: 'hidden', padding: 0 }}>
         <div style={{ background: 'var(--blue, var(--brand))', color: '#fff', padding: '14px 18px', fontWeight: 700, fontSize: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           Request Leave
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><MdClose size={18} /></button>
@@ -69,7 +69,7 @@ function RequestModal({ onClose, onSubmitted }) {
                 onClick={() => setDayPortion(v)}
                 style={{ flex: 1, padding: '7px 8px', fontSize: 12, fontWeight: 700, borderRadius: 7, cursor: 'pointer',
                   border: dayPortion === v ? '1.5px solid var(--blue, var(--brand))' : '1px solid var(--border)',
-                  background: dayPortion === v ? 'rgba(29,78,216,0.08)' : '#fff', color: dayPortion === v ? 'var(--blue, var(--brand))' : 'var(--text-3)' }}>
+                  background: dayPortion === v ? 'var(--brand-tint)' : 'var(--surface-2)', color: dayPortion === v ? 'var(--blue, var(--brand))' : 'var(--text-3)' }}>
                 {l}
               </button>
             ))}

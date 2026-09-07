@@ -49,25 +49,80 @@ const MAIN_TABS = [
   { label: 'Leave', icon: MdEventBusy },
   { label: 'Payroll Runs', icon: MdPaid },
 ];
-const MORE_TABS = [
-  { label: 'Timesheets', icon: MdSchedule },
-  { label: 'Overtime', icon: MdTimer },
-  { label: 'Shifts', icon: MdEventNote },
-  { label: 'Holidays', icon: MdCalendarMonth },
-  { label: 'Salary Structures', icon: MdAccountBalanceWallet },
-  { label: 'Incentives', icon: MdEmojiEvents },
-  { label: 'Advances', icon: MdCreditCard },
-  { label: 'Expenses', icon: MdReceiptLong },
-  { label: 'Reports', icon: MdAssessment },
-  { label: 'Goals', icon: MdFlag },
-  { label: 'Skills', icon: MdPsychology },
-  { label: 'Training', icon: MdSchool },
-  { label: 'Documents', icon: MdFolder },
-  { label: 'Assets', icon: MdInventory },
-  { label: 'Onboarding', icon: MdChecklist },
-  { label: 'Offboarding', icon: MdPersonRemove },
-  { label: 'Recruitment', icon: MdPersonSearch },
+// Same 17 destinations as before, just grouped so the "More" menu reads as
+// sections instead of one tall stack. Grouping is presentational only —
+// selecting any item still sets `tab` to its exact label.
+const MORE_GROUPS = [
+  { title: 'Time & Attendance', items: [
+    { label: 'Timesheets', icon: MdSchedule },
+    { label: 'Overtime', icon: MdTimer },
+    { label: 'Shifts', icon: MdEventNote },
+    { label: 'Holidays', icon: MdCalendarMonth },
+  ] },
+  { title: 'Compensation', items: [
+    { label: 'Salary Structures', icon: MdAccountBalanceWallet },
+    { label: 'Incentives', icon: MdEmojiEvents },
+    { label: 'Advances', icon: MdCreditCard },
+    { label: 'Expenses', icon: MdReceiptLong },
+  ] },
+  { title: 'Development', items: [
+    { label: 'Goals', icon: MdFlag },
+    { label: 'Skills', icon: MdPsychology },
+    { label: 'Training', icon: MdSchool },
+  ] },
+  { title: 'Records', items: [
+    { label: 'Documents', icon: MdFolder },
+    { label: 'Assets', icon: MdInventory },
+    { label: 'Reports', icon: MdAssessment },
+  ] },
+  { title: 'Lifecycle', items: [
+    { label: 'Onboarding', icon: MdChecklist },
+    { label: 'Offboarding', icon: MdPersonRemove },
+    { label: 'Recruitment', icon: MdPersonSearch },
+  ] },
 ];
+const MORE_TABS = MORE_GROUPS.flatMap(g => g.items);
+
+function HRWorkspaceStyles() {
+  return (
+    <style>{`
+      .hrw-nav{display:flex;gap:2px;border-bottom:1px solid var(--border);
+        margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+      .hrw-nav::-webkit-scrollbar{display:none}
+      .hrw-tab{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
+        padding:10px 14px;border:none;background:none;cursor:pointer;
+        font:inherit;font-size:13px;font-weight:550;color:var(--text-3);
+        border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;
+        transition:color var(--t) var(--ease-in-out),border-color var(--t) var(--ease-in-out),background var(--t) var(--ease)}
+      .hrw-tab:hover{color:var(--text-2)}
+      .hrw-tab[data-on="true"]{color:var(--text-1);border-bottom-color:var(--brand)}
+      .hrw-tab .mi{transition:transform var(--t) var(--ease)}
+      .hrw-tab[data-on="true"] .mi{transform:scale(1.05)}
+
+      .hrw-more-wrap{position:relative;flex-shrink:0}
+      .hrw-more-scrim{position:fixed;inset:0;z-index:19}
+      .hrw-more{position:absolute;top:calc(100% + 6px);right:0;z-index:20;
+        width:min(92vw,460px);max-height:min(70vh,520px);overflow-y:auto;
+        display:grid;grid-template-columns:repeat(2,1fr);gap:4px 12px;
+        padding:14px;border-radius:var(--radius-lg);
+        background:var(--surface);border:1px solid var(--border);
+        box-shadow:var(--shadow-lg);animation:fadeInScale var(--t-slow) var(--ease-out)}
+      @media (max-width:520px){.hrw-more{grid-template-columns:1fr}}
+      .hrw-more-group{break-inside:avoid;margin-bottom:6px}
+      .hrw-more-h{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+        color:var(--text-4);padding:6px 8px 4px}
+      .hrw-more-item{display:flex;align-items:center;gap:9px;width:100%;
+        padding:8px;border:none;background:none;cursor:pointer;border-radius:var(--radius-sm);
+        font:inherit;font-size:12.5px;font-weight:500;color:var(--text-2);text-align:left;
+        transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease)}
+      .hrw-more-item:hover{background:var(--surface-2);color:var(--text-1)}
+      .hrw-more-item[data-on="true"]{background:var(--brand-tint);color:var(--brand-soft)}
+      .hrw-more-item .mi{color:var(--text-4)}
+      .hrw-more-item[data-on="true"] .mi{color:var(--brand)}
+      .hrw-body{animation:fadeInUp var(--t-slow) var(--ease-out) both}
+    `}</style>
+  );
+}
 
 // ── Add Employee — a quick account-create (name/email/role/password),
 // then hands off to the full Employee Profile editor for everything else.
@@ -145,33 +200,42 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+      <HRWorkspaceStyles />
+      <nav className="hrw-nav">
         {MAIN_TABS.map(t => (
-          <button key={t.label} className={`filter-chip ${tab === t.label ? 'active' : ''}`}
-            onClick={() => { setTab(t.label); setMoreOpen(false); }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <t.icon size={14} /> {t.label}
+          <button key={t.label} className="hrw-tab" data-on={tab === t.label}
+            onClick={() => { setTab(t.label); setMoreOpen(false); }}>
+            <t.icon className="mi" size={15} /> {t.label}
           </button>
         ))}
-        <div style={{ position: 'relative' }}>
-          <button className={`filter-chip ${isMore ? 'active' : ''}`} onClick={() => setMoreOpen(o => !o)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <MdMoreHoriz size={14} /> {isMore ? tab : 'More'}
+        <div className="hrw-more-wrap">
+          <button className="hrw-tab" data-on={isMore} onClick={() => setMoreOpen(o => !o)}
+            aria-expanded={moreOpen} aria-haspopup="true">
+            <MdMoreHoriz className="mi" size={15} /> {isMore ? tab : 'More'}
           </button>
           {moreOpen && (
-            <div className="card" style={{ position: 'absolute', top: '110%', left: 0, zIndex: 20, minWidth: 180, padding: 6 }}>
-              {MORE_TABS.map(t => (
-                <button key={t.label} className="btn btn-ghost btn-sm" onClick={() => { setTab(t.label); setMoreOpen(false); }}
-                  style={{ width: '100%', justifyContent: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                  <t.icon size={14} /> {t.label}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="hrw-more-scrim" onClick={() => setMoreOpen(false)} />
+              <div className="hrw-more" role="menu">
+                {MORE_GROUPS.map(g => (
+                  <div key={g.title} className="hrw-more-group">
+                    <div className="hrw-more-h">{g.title}</div>
+                    {g.items.map(t => (
+                      <button key={t.label} className="hrw-more-item" role="menuitem" data-on={tab === t.label}
+                        onClick={() => { setTab(t.label); setMoreOpen(false); }}>
+                        <t.icon className="mi" size={15} /> {t.label}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
-      </div>
+      </nav>
 
       <ErrorBoundary key={tab}>
+        <div className="hrw-body">
         {tab === 'Dashboard' && <HRAnalyticsTab />}
         {tab === 'Employees' && (
           <EmployeesTab
@@ -201,6 +265,7 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
         {tab === 'Onboarding' && <OnboardingPanel employees={employees} />}
         {tab === 'Offboarding' && <OffboardingPanel employees={employees} />}
         {tab === 'Recruitment' && <RecruitmentPanel />}
+        </div>
       </ErrorBoundary>
 
       {selectedEmployeeId && (

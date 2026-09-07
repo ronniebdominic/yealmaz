@@ -950,15 +950,6 @@ export default function LabDashboard() {
               </div>
             )}
 
-            {/* ── Team leave requests — only renders anything for accounts
-                designated as someone's manager (EmployeeProfile.managerId),
-                e.g. an Operation Manager who stays logged in as LAB_TECH ── */}
-            <TeamLeaveRequests hideEmpty />
-
-            {/* ── Remake/redo review queue — only renders anything for
-                LEADER/ADMIN accounts, same idea as the leave queue above ── */}
-            <CaseReviewQueue hideEmpty />
-
             {/* ── SCAN ── */}
             {!activeDept ? (
               <div className="empty-state">
@@ -1030,6 +1021,15 @@ export default function LabDashboard() {
                 )}
               </>
             )}
+
+            {/* ── Secondary operational queues — kept below the primary scan
+                workflow. Both render nothing for a normal technician
+                (hideEmpty): TeamLeaveRequests only for manager accounts,
+                CaseReviewQueue (Remake / Redo review) only for LEADER/ADMIN. ── */}
+            <div style={{ marginTop: 20 }}>
+              <TeamLeaveRequests hideEmpty />
+              <CaseReviewQueue hideEmpty />
+            </div>
           </>
         )}
 
