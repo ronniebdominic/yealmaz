@@ -52,7 +52,7 @@ export default function HRDashboard() {
         </div>
       </div>
 
-      <div className="hr-shell-pad" style={{ maxWidth: 1240, margin: '0 auto', padding: '20px 24px' }}>
+      <div className="hr-shell-pad" style={{ maxWidth: 1280, margin: '0 auto', padding: 'clamp(14px,2.4vw,28px)', containerType: 'inline-size' }}>
         <HRWorkspace role="HR_MANAGER" />
       </div>
     </div>

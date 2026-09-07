@@ -80,7 +80,7 @@ export default function HRAnalyticsTab() {
         <StatCard icon={MdPaid} label="Pending Payroll" value={counts.pendingPayroll} tone="blue" emphasise />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+      <div className="grid-wide-narrow" style={{ marginBottom: 20 }}>
         <div className="card">
           <div className="card-header"><div className="card-title">Attendance Trend (14 days)</div></div>
           <div style={{ padding: '16px 16px 8px' }}>
@@ -132,7 +132,7 @@ export default function HRAnalyticsTab() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="grid-2">
         <div className="card">
           <div className="card-header"><div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdWarning size={15} /> Missing Punches Today</div></div>
           <div style={{ padding: 12 }}>

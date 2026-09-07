@@ -743,7 +743,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Revenue by Work Type */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+            <div className="grid-2" style={{ marginBottom: 20 }}>
               <div className="glass-card">
                 <div className="card-header"><div className="card-title">Revenue by Product Category</div></div>
                 <div style={{ padding: '20px 20px 12px' }}>

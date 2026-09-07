@@ -190,7 +190,23 @@ body::before{
 /* ═══ Layout shell ══════════════════════════════════════════════════ */
 .app{display:flex;height:100vh;overflow:hidden}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-.content{flex:1;overflow-y:auto;padding:var(--sp-6) var(--sp-7)}
+.content{flex:1;overflow-y:auto;padding:clamp(14px,2.2vw,32px) clamp(14px,2.6vw,36px);container-type:inline-size}
+
+/* ── Fluid / overflow guards ────────────────────────────────────────
+   Nothing should push a horizontal scrollbar onto the page. Media that
+   forgets its bounds, and the common flex/grid children that refuse to
+   shrink below their content, are clamped here once. */
+img,svg,video,canvas{max-width:100%;height:auto}
+.card,.stat-card,.glass-card,.modal,td,th,.badge{min-width:0}
+.card,.glass-card{overflow-wrap:anywhere}
+/* On a wide content column, let KPI rows breathe into more columns
+   without needing a per-page override. */
+@container (min-width:1100px){
+  .stats-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+}
+@container (min-width:1500px){
+  .stats-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+}
 
 /* ═══ Sidebar ═══════════════════════════════════════════════════════
    A navigation rail, not a colour block: deep neutral navy, hairline
@@ -285,7 +301,7 @@ body::before{
 
 /* ═══ Page headers ══════════════════════════════════════════════════ */
 .page-header{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);margin-bottom:var(--sp-5)}
-.page-title{font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--text-1)}
+.page-title{font-size:clamp(17px,.6vw + 14px,21px);font-weight:600;letter-spacing:-.02em;color:var(--text-1)}
 .page-sub{font-size:13px;color:var(--text-3);margin-top:2px;font-weight:450}
 .section-title{
   font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
@@ -334,13 +350,15 @@ body::before{
    below still pin 2/1 columns on tablet/phone. */
 .stats-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(228px,1fr));
-  gap:var(--sp-4);margin-bottom:var(--sp-6);
+  /* min(200px,100%) keeps a single column from overflowing on very
+     narrow screens; auto-fit packs more per row as width grows. */
+  grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));
+  gap:clamp(10px,1.4vw,16px);margin-bottom:clamp(16px,2.4vw,24px);
 }
 .stat-card{
   position:relative;z-index:1;isolation:isolate;
-  display:flex;flex-direction:column;gap:2px;
-  padding:var(--sp-4) var(--sp-5);
+  display:flex;flex-direction:column;gap:2px;overflow:hidden;
+  padding:clamp(12px,1.6vw,16px) clamp(13px,1.8vw,18px);
   border-radius:var(--radius-lg);
   background:var(--glass);
   border:1px solid var(--glass-border);
@@ -364,19 +382,20 @@ body::before{
    the next card over. */
 .stat-card:hover,.stat-card:focus-within{z-index:5}
 .stat-icon{
-  width:32px;height:32px;border-radius:var(--radius-sm);
+  width:30px;height:30px;border-radius:var(--radius-sm);
   display:flex;align-items:center;justify-content:center;
-  font-size:15px;margin-bottom:var(--sp-2);
+  font-size:15px;margin-bottom:6px;
   color:var(--brand);background:var(--brand-tint);
 }
 .stat-label{
   font-size:11.5px;font-weight:500;color:var(--text-3);
-  letter-spacing:.02em;line-height:1.4;
+  letter-spacing:.02em;line-height:1.35;
 }
 .stat-value{
-  font-size:26px;font-weight:650;color:var(--text-1);
+  font-size:clamp(21px,1.1vw + 15px,27px);font-weight:650;color:var(--text-1);
   line-height:1.15;letter-spacing:-.03em;
   font-variant-numeric:tabular-nums;
+  overflow-wrap:break-word;
 }
 .stat-sub{font-size:11.5px;color:var(--text-3);margin-top:3px;font-weight:450;line-height:1.45}
 
@@ -521,7 +540,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 }
 @keyframes overlayIn{from{opacity:0}to{opacity:1}}
 .modal{
-  width:100%;max-width:560px;max-height:90vh;overflow-y:auto;
+  width:min(560px,calc(100vw - 28px));max-height:min(90dvh,760px);overflow-y:auto;
   border-radius:var(--radius-xl);
   background:var(--overlay);
   border:1px solid var(--glass-border);
@@ -551,7 +570,11 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 
 /* ═══ Misc primitives ═══════════════════════════════════════════════ */
 .divider{height:1px;background:var(--border-soft);margin:var(--sp-4) 0;border:none}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4)}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:clamp(12px,1.8vw,20px)}
+/* Wide primary panel + narrower companion, that stacks when the row can't
+   hold both comfortably. No breakpoint — the fr math does it. */
+.grid-wide-narrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:clamp(12px,1.8vw,20px)}
+@container (min-width:820px){.grid-wide-narrow{grid-template-columns:2fr 1fr}}
 .screenshot-img{width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.4s infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.40)}50%{box-shadow:0 0 0 5px rgba(52,211,153,0)}}
@@ -899,8 +922,23 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 .nav-item.active .mi{transform:scale(1.05)}
 
 /* Buttons dip slightly when pressed. */
-.btn{transition:background var(--t) var(--ease),border-color var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform 90ms var(--ease)}
+.btn{transition:background var(--t) var(--ease),border-color var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform 90ms var(--ease-out)}
 .btn:active:not(:disabled){transform:translateY(1px) scale(.985)}
+.btn:disabled{cursor:not-allowed}
+
+/* ── Tactile press ─────────────────────────────────────────────────
+   Opt-in on genuinely tappable surfaces (rows, tiles, selectable
+   cards). Transform + shadow only — GPU-friendly, no layout shift. On
+   pointers that hover, a resting lift; on touch, the press does the
+   talking. */
+.pressable{transition:transform var(--t-fast) var(--ease-out),box-shadow var(--t-fast) var(--ease-out),border-color var(--t-fast) var(--ease-out)}
+.pressable:active{transform:translateY(1px) scale(.985)}
+@media (hover:hover){
+  .pressable:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+}
+/* Interactive card variant already declared elsewhere — give it the
+   same press feel on touch. */
+.card-interactive:active{transform:translateY(1px) scale(.99)}
 
 /* ── Floating AI assistant ──────────────────────────────────────── */
 .ai-fab{

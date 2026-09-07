@@ -81,8 +81,14 @@ const PIE_COLORS = ['#4C82F7', '#34D399', '#F5B23F', '#F26D6D', '#A78BFA', '#5BA
 function TechStyles() {
   return (
     <style>{`
-      .tp-shell{--tp-pad:16px}
-      @media (max-width:380px){.tp-shell{--tp-pad:12px}}
+      .tp-shell{--tp-pad:clamp(12px,4vw,18px)}
+
+      /* Every tappable surface in the portal shares one press feel:
+         a small settle on transform only (GPU-friendly, no layout
+         shift). ~150ms in, quick out. */
+      .tp-dept,.tp-tile,.tp-row,.tp-nav button,.tp-seg button{
+        -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+      }
 
       .tp-section-label{
         font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
@@ -94,12 +100,12 @@ function TechStyles() {
       .tp-dept{
         --dept:var(--accent);
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
-        min-height:76px;padding:12px 10px;border-radius:var(--radius-md);cursor:pointer;
+        min-height:clamp(68px,18vw,80px);padding:12px 10px;border-radius:var(--radius-md);cursor:pointer;
         background:var(--surface-2);border:1px solid var(--border);
         color:var(--text-2);text-align:center;
-        transition:transform var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+        transition:transform 150ms var(--ease-out),border-color 150ms var(--ease-out),background 150ms var(--ease-out),box-shadow 150ms var(--ease-out);
       }
-      .tp-dept:active{transform:scale(.97)}
+      .tp-dept:active{transform:translateY(1px) scale(.96)}
       .tp-dept-ic{
         width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;
         background:var(--deptbg,var(--surface-3));color:var(--dept);
@@ -116,11 +122,17 @@ function TechStyles() {
       /* Big tap tiles (Scan / Search) */
       .tp-tile{
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-        min-height:112px;padding:18px 12px;border-radius:var(--radius-md);cursor:pointer;
-        border:1px solid var(--border);transition:transform var(--t-fast) var(--ease);
+        min-height:clamp(100px,26vw,120px);padding:clamp(14px,4vw,18px) 12px;border-radius:var(--radius-md);cursor:pointer;
+        border:1px solid var(--border);
+        box-shadow:var(--shadow-xs);
+        transition:transform 150ms var(--ease-out),box-shadow 150ms var(--ease-out),filter 150ms var(--ease-out);
       }
-      .tp-tile:active{transform:scale(.98)}
-      .tp-tile-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+      .tp-tile:active{transform:translateY(1px) scale(.975);box-shadow:none}
+      .tp-tile .mi,.tp-tile svg{transition:transform 200ms var(--ease-emphasal)}
+      .tp-tile:active .mi,.tp-tile:active svg{transform:scale(.92)}
+      .tp-tile-primary{background:var(--brand);border-color:var(--brand);color:#fff;
+        box-shadow:0 6px 18px rgba(62,123,240,.28),var(--glass-hi)}
+      .tp-tile-primary:active{box-shadow:0 2px 8px rgba(62,123,240,.22)}
       .tp-tile-ghost{background:var(--surface);color:var(--text-1)}
       .tp-tile-hint{font-size:11px;opacity:.72;font-weight:450}
       .tp-tile-lb{font-size:13.5px;font-weight:600}
@@ -145,7 +157,9 @@ function TechStyles() {
         display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:8px;
         border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--border);
         border-left:3px solid var(--row,var(--accent));
+        transition:transform 150ms var(--ease-out),background 150ms var(--ease-out),box-shadow 150ms var(--ease-out);
       }
+      .tp-row:active{transform:translateY(1px) scale(.99);background:var(--surface-2)}
       .tp-row-mono{font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);margin-bottom:2px}
       .tp-row-title{font-size:13.5px;font-weight:600;color:var(--text-1);line-height:1.3}
       .tp-row-sub{font-size:11.5px;color:var(--text-2);margin-top:2px}
@@ -162,15 +176,26 @@ function TechStyles() {
         padding:6px 4px calc(6px + env(safe-area-inset-bottom));
       }
       .tp-nav button{
+        position:relative;
         flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
-        min-height:52px;padding:6px 4px;border:none;background:none;cursor:pointer;
-        color:var(--text-4);transition:color var(--t-fast) var(--ease);
+        min-height:54px;padding:7px 4px;border:none;background:none;cursor:pointer;
+        color:var(--text-4);transition:color 200ms var(--ease-in-out),transform 120ms var(--ease-out);
       }
+      .tp-nav button:active{transform:translateY(1px) scale(.94)}
       .tp-nav button[data-on="true"]{color:var(--accent)}
+      /* Active indicator — a short bar that slides between tabs. */
+      .tp-nav button::before{
+        content:"";position:absolute;top:2px;left:50%;width:18px;height:3px;border-radius:2px;
+        background:var(--accent);opacity:0;transform:translateX(-50%) scaleX(.3);
+        transition:opacity 200ms var(--ease-out),transform 220ms var(--ease-emphasal);
+      }
+      .tp-nav button[data-on="true"]::before{opacity:1;transform:translateX(-50%) scaleX(1)}
       .tp-nav-ic{position:relative;display:grid;place-items:center;width:44px;height:26px;border-radius:var(--radius-pill);
-        transition:background var(--t) var(--ease-in-out),transform var(--t) var(--ease-emphasal)}
-      .tp-nav button[data-on="true"] .tp-nav-ic{background:var(--accent-dim);transform:translateY(-1px) scale(1.06)}
-      .tp-nav-lb{font-size:10px;font-weight:600}
+        transition:background 200ms var(--ease-in-out),transform 220ms var(--ease-emphasal)}
+      .tp-nav button[data-on="true"] .tp-nav-ic{background:var(--accent-dim);transform:translateY(-1px) scale(1.08)}
+      .tp-nav-lb{font-size:10px;font-weight:600;transition:font-weight 200ms var(--ease),opacity 200ms var(--ease)}
+      .tp-nav button:not([data-on="true"]) .tp-nav-lb{opacity:.85}
+      .tp-nav button[data-on="true"] .tp-nav-lb{font-weight:700}
       .tp-nav-badge{
         position:absolute;top:-3px;right:2px;min-width:15px;height:15px;border-radius:8px;
         background:var(--red);color:#fff;font-size:9px;font-weight:700;
@@ -193,6 +218,12 @@ function TechStyles() {
 
       /* Tab / period content settles in on change (keyed remount). */
       .tp-fade{animation:fadeInUp var(--t-slow) var(--ease-out) both}
+
+      /* Scanner: a sweeping line so "we are actively looking" is obvious. */
+      .tp-scanline{position:absolute;left:6px;right:6px;height:2px;border-radius:2px;
+        background:linear-gradient(90deg,transparent,var(--accent),transparent);
+        box-shadow:0 0 12px var(--accent);animation:tpScan 1.9s var(--ease-in-out) infinite}
+      @keyframes tpScan{0%{top:8%;opacity:.2}15%{opacity:1}50%{top:90%}85%{opacity:1}100%{top:8%;opacity:.2}}
 
       /* Full-screen scan-success confirmation. */
       .tp-scan-ok{position:fixed;inset:0;z-index:210;display:flex;flex-direction:column;
@@ -298,9 +329,10 @@ function QRScanner({ onScan, onClose }) {
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
           }}>
             <div style={{
-              width: 200, height: 200, border: '2px solid rgba(255,255,255,0.85)', borderRadius: 12,
-              boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+              position: 'relative', width: 200, height: 200, border: '2px solid rgba(255,255,255,0.85)', borderRadius: 12,
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)', overflow: 'hidden',
             }}>
+              <div className="tp-scanline" />
               {/* Corner marks */}
               {[['0','0','auto','auto'],['0','auto','auto','0'],['auto','0','0','auto'],['auto','auto','0','0']].map((pos, i) => (
                 <div key={i} style={{
