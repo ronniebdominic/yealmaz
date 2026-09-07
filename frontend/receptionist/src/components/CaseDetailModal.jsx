@@ -5,7 +5,23 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { printCaseLabel } from '../utils/printLabel';
 import OriginalCasePicker from './OriginalCasePicker';
-import { MdAccountBalance, MdChat, MdPrint, MdCheckCircle, MdAutorenew } from 'react-icons/md';
+import { MdAccountBalance, MdChat, MdPrint, MdCheckCircle, MdAutorenew, MdViewInAr, MdSchedule, MdLocalShipping, MdCancel } from 'react-icons/md';
+
+// ── Model Request status pill + detail line ───────────────
+const MODEL_REQUEST_STATUS_LABEL = {
+  REQUESTED: 'Waiting on clinic to schedule',
+  SCHEDULED: 'Pickup scheduled',
+  ASSIGNED:  'Driver assigned',
+  COLLECTED: 'Collected',
+  CANCELLED: 'Cancelled',
+};
+const MODEL_REQUEST_STATUS_COLOR = {
+  REQUESTED: 'var(--amber, #B45309)',
+  SCHEDULED: 'var(--blue)',
+  ASSIGNED:  'var(--blue)',
+  COLLECTED: 'var(--green)',
+  CANCELLED: 'var(--text-3)',
+};
 
 const STATUSES = [
   'PENDING_PICKUP', 'PICKUP_ASSIGNED',
@@ -87,10 +103,15 @@ export default function CaseDetailModal({ caseId, onClose }) {
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
   const [siblings, setSiblings] = useState([]);
+  const [modelRequests, setModelRequests] = useState([]);
+  const [newModelNote, setNewModelNote] = useState('');
+  const [requestingModel, setRequestingModel] = useState(false);
+  const [cancelingModelId, setCancelingModelId] = useState(null);
 
   useEffect(() => {
     loadCase();
     loadComments();
+    loadModelRequests();
   }, [caseId]);
 
   // If this case was created as part of a multi-item order, show the
@@ -120,6 +141,42 @@ export default function CaseDetailModal({ caseId, onClose }) {
       toast.error(err.response?.data?.error || 'Could not add comment');
     } finally {
       setPostingComment(false);
+    }
+  };
+
+  const loadModelRequests = async () => {
+    try {
+      const res = await api.get('/model-requests', { params: { caseId } });
+      setModelRequests(res.data || []);
+    } catch { /* non-fatal */ }
+  };
+
+  const requestNewModel = async () => {
+    setRequestingModel(true);
+    try {
+      await api.post('/model-requests', { caseId, requesterNote: newModelNote.trim() || undefined });
+      toast.success('Model requested — the clinic has been notified to schedule a pickup');
+      setNewModelNote('');
+      loadModelRequests();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not request a new model');
+    } finally {
+      setRequestingModel(false);
+    }
+  };
+
+  const cancelModelRequest = async (id) => {
+    const reason = prompt('Reason for cancelling this model request (optional):');
+    if (reason === null) return; // dialog dismissed — abort, don't cancel with no confirmation
+    setCancelingModelId(id);
+    try {
+      await api.patch(`/model-requests/${id}/cancel`, { reason: reason.trim() || undefined });
+      toast.success('Model request cancelled');
+      loadModelRequests();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not cancel');
+    } finally {
+      setCancelingModelId(null);
     }
   };
 
@@ -506,6 +563,82 @@ export default function CaseDetailModal({ caseId, onClose }) {
             <button className="btn btn-primary btn-sm" onClick={saveRemake} disabled={savingRemake}>
               {savingRemake ? '…' : 'Save'}
             </button>
+          </div>
+
+          {/* Model Requests — ask the clinic to send in a new physical model */}
+          <div className="divider" />
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <MdViewInAr size={14} /> Model Requests
+              <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 2 }}>— ask the clinic to send in a new model for this case</span>
+            </div>
+
+            {modelRequests.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {modelRequests.map(r => (
+                  <div key={r.id} style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: MODEL_REQUEST_STATUS_COLOR[r.status] }}>
+                        {MODEL_REQUEST_STATUS_LABEL[r.status] || r.status}
+                      </span>
+                      {['REQUESTED', 'SCHEDULED', 'ASSIGNED'].includes(r.status) && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => cancelModelRequest(r.id)}
+                          disabled={cancelingModelId === r.id}
+                          style={{ color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                        >
+                          <MdCancel size={13} /> {cancelingModelId === r.id ? '…' : 'Cancel'}
+                        </button>
+                      )}
+                    </div>
+                    {r.requesterNote && (
+                      <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>"{r.requesterNote}"</div>
+                    )}
+                    {r.scheduledPickupAt && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <MdSchedule size={12} /> Scheduled for {format(new Date(r.scheduledPickupAt), 'dd MMM yyyy, h:mm a')}
+                      </div>
+                    )}
+                    {r.assignedDelivery && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <MdLocalShipping size={12} /> {r.assignedDelivery.name}
+                      </div>
+                    )}
+                    {r.status === 'COLLECTED' && r.collectedAt && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>
+                        Collected {format(new Date(r.collectedAt), 'dd MMM yyyy, h:mm a')}
+                      </div>
+                    )}
+                    {r.status === 'CANCELLED' && r.cancelReason && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>Reason: {r.cancelReason}</div>
+                    )}
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                      Requested by {r.requestedBy?.name || 'staff'} · {format(new Date(r.createdAt), 'dd MMM yyyy, h:mm a')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {modelRequests.some(r => ['REQUESTED', 'SCHEDULED', 'ASSIGNED'].includes(r.status)) ? (
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                A model request is already active for this case — cancel it above before requesting another.
+              </div>
+            ) : (
+              <>
+                <textarea
+                  placeholder="Why a new model is needed (e.g. original was damaged) — shown to the clinic…"
+                  value={newModelNote}
+                  onChange={e => setNewModelNote(e.target.value)}
+                  rows={2}
+                  style={{ width: '100%', marginBottom: 8, padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+                <button className="btn btn-primary btn-sm" onClick={requestNewModel} disabled={requestingModel}>
+                  {requestingModel ? '…' : 'Request New Model'}
+                </button>
+              </>
+            )}
           </div>
 
           {/* Payment screenshot */}
