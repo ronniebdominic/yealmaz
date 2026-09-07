@@ -66,6 +66,19 @@ function normalize(completion) {
   };
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Groq's FREE tier caps every model at the same 30 req/min, 8K tokens/min,
+// 1K req/day — not model-specific, so switching models doesn't raise this.
+// This bot's system prompt + tool definitions + growing multi-round history
+// can burst past 8K tokens within a single question (up to MAX_ROUNDS calls,
+// each resending most of that). A 429 here almost always means that cap,
+// not an outage — retry once using Groq's own Retry-After header (capped
+// short, so a real question never hangs waiting on a long reset window;
+// past that cap it's a config problem for the caller to report, not
+// something worth blocking on).
+const MAX_RATE_LIMIT_WAIT_MS = 6000;
+
 // messages: OpenAI-shaped [{role, content, tool_calls?, tool_call_id?}, ...]
 // tools: OpenAI-shaped [{type:'function', function:{name, description, parameters}}, ...]
 // toolChoice: undefined (model decides) | 'none' (force a prose final answer)
@@ -84,7 +97,7 @@ async function runGroqLlm({ system, messages, tools, toolChoice, maxTokens } = {
   if (toolChoice) body.tool_choice = toolChoice;
   if (maxTokens) body.max_tokens = maxTokens;
 
-  const res = await fetch(`${BASE_URL}/v1/chat/completions`, {
+  const doCall = () => fetch(`${BASE_URL}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -93,9 +106,37 @@ async function runGroqLlm({ system, messages, tools, toolChoice, maxTokens } = {
     body: JSON.stringify(body),
   });
 
+  let res = await doCall();
+
+  if (res.status === 429) {
+    const retryAfterSec = parseFloat(res.headers.get('retry-after'));
+    const waitMs = !isNaN(retryAfterSec) ? retryAfterSec * 1000 : 2000;
+    console.warn(`[GroqLLM] 429 rate-limited — free tier is capped at 30 req/min & 8K tokens/min for every model. Retry-After: ${res.headers.get('retry-after') ?? '?'}s`);
+    if (waitMs <= MAX_RATE_LIMIT_WAIT_MS) {
+      await sleep(waitMs);
+      res = await doCall();
+    }
+  }
+
+  // Log remaining quota on every call — the only way to see how close to
+  // the free-tier ceiling this bot is running without checking the Groq
+  // console by hand.
+  const remainingTokens = res.headers.get('x-ratelimit-remaining-tokens');
+  const remainingReqs = res.headers.get('x-ratelimit-remaining-requests');
+  if (remainingTokens != null || remainingReqs != null) {
+    console.log(`[GroqLLM] quota remaining — tokens/min: ${remainingTokens ?? '?'}, requests/min: ${remainingReqs ?? '?'}`);
+  }
+
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`Groq request failed (${res.status}): ${errText.slice(0, 500)}`);
+    const hint = res.status === 429
+      ? ' — free-tier rate limit (8K tokens/min, shared across all models); upgrade to Groq\'s paid tier or reduce prompt/tool size if this recurs.'
+      : res.status === 401
+        ? ' — check GROQ_API_KEY is set correctly.'
+        : res.status === 400 && errText.includes('model')
+          ? ' — check GROQ_MODEL is a valid, currently-available Groq model id.'
+          : '';
+    throw new Error(`Groq request failed (${res.status})${hint} ${errText.slice(0, 500)}`);
   }
 
   const completion = await res.json();

@@ -336,6 +336,13 @@ async function runAgentLoop(chatId, userText) {
       response = await runGroqLlm({ system, messages, tools: toolDefinitions });
     } catch (err) {
       console.error('[TelegramBot] LLM call failed:', err.message);
+      // A 429 here is almost always Groq's free-tier cap (8K tokens/min,
+      // shared across every model), not a real outage — say so instead of
+      // the generic "offline" message, which sends whoever's debugging
+      // this down the wrong path (see groqClient.js's own 429 handling).
+      if (err.message.includes('429')) {
+        return "Sorry, I'm getting rate-limited by the AI provider right now (Groq's free-tier usage cap) — please try again in a minute.";
+      }
       return "Sorry, I couldn't reach the AI model just now — it may be offline. Please try again in a moment.";
     }
 
