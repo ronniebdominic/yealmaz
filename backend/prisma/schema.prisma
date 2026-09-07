@@ -6,73 +6,75 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
   // directUrl removed — only needed for local prisma db push
   // Railway cannot reach Supabase port 5432; use SQL Editor for schema changes
 }
 
 // ── USERS ──────────────────────────────────────────────
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  role       Role
-  departments String[] @default([]) // For LAB_TECH: scopes them to these department(s). Empty = unrestricted (all departments).
-  phone      String?
-  station    String?  // for DISPATCH/DELIVERY: which station/area they cover, for routing — matches Clinic.station
-  zoneId     String?  // for DELIVERY: the broader zone (a collective of stations) they're assigned to cover
-  zone       Zone?    @relation(fields: [zoneId], references: [id])
-  isActive   Boolean  @default(true)
-  isSharedAccount Boolean @default(false) // department/role login (e.g. "Zirconia Fitting", "Finance Department") — not a real person, so HR & Payroll excludes it from the employee list
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  password        String
+  role            Role
+  departments     String[] @default([]) // For LAB_TECH: scopes them to these department(s). Empty = unrestricted (all departments).
+  phone           String?
+  station         String? // for DISPATCH/DELIVERY: which station/area they cover, for routing — matches Clinic.station
+  zoneId          String? // for DELIVERY: the broader zone (a collective of stations) they're assigned to cover
+  zone            Zone?    @relation(fields: [zoneId], references: [id])
+  isActive        Boolean  @default(true)
+  isSharedAccount Boolean  @default(false) // department/role login (e.g. "Zirconia Fitting", "Finance Department") — not a real person, so HR & Payroll excludes it from the employee list
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relations
-  casesAsReceptionist Case[]         @relation("ReceptionistCases")
-  payments            Payment[]      @relation("VerifiedPayments")
-  deliveries          DeliveryLog[]
-  notifications       Notification[]      @relation("NotificationRecipient")
-  notificationsSent   Notification[]      @relation("NotificationSender")
-  deletedCases        DeletedCase[]       @relation("DeletedCasesBy")
-  assignedDeliveries  Case[]         @relation("AssignedDeliveries")
-  pushSubscriptions   PushSubscription[]
+  casesAsReceptionist   Case[]             @relation("ReceptionistCases")
+  payments              Payment[]          @relation("VerifiedPayments")
+  deliveries            DeliveryLog[]
+  notifications         Notification[]     @relation("NotificationRecipient")
+  notificationsSent     Notification[]     @relation("NotificationSender")
+  deletedCases          DeletedCase[]      @relation("DeletedCasesBy")
+  assignedDeliveries    Case[]             @relation("AssignedDeliveries")
+  pushSubscriptions     PushSubscription[]
+  modelRequestsMade     ModelRequest[]     @relation("ModelRequestedBy")
+  modelRequestsAssigned ModelRequest[]     @relation("ModelRequestAssignedDelivery")
 
   // Inventory / milling bonus
-  inventoryTxnsPerformed    InventoryTransaction[]    @relation("InventoryTxnPerformedBy")
-  inventoryRequestsMade     InventoryRequest[]        @relation("InventoryRequestedBy")
-  inventoryRequestsReviewed InventoryRequest[]        @relation("InventoryReviewedBy")
-  millingYields             MillingYield[]            @relation("MillingYieldsByUser")
-  staffPoints               StaffPoints?              @relation("StaffPointsUser")
-  staffRewardTransactions   StaffRewardTransaction[]  @relation("StaffRewardTxnUser")
+  inventoryTxnsPerformed    InventoryTransaction[]   @relation("InventoryTxnPerformedBy")
+  inventoryRequestsMade     InventoryRequest[]       @relation("InventoryRequestedBy")
+  inventoryRequestsReviewed InventoryRequest[]       @relation("InventoryReviewedBy")
+  millingYields             MillingYield[]           @relation("MillingYieldsByUser")
+  staffPoints               StaffPoints?             @relation("StaffPointsUser")
+  staffRewardTransactions   StaffRewardTransaction[] @relation("StaffRewardTxnUser")
 
   // HR / attendance / payroll — relation-only, no scalar columns added to
   // User itself, so existing broad User queries (dropdowns, lists) never
   // touch or expose this data unless explicitly included.
-  employeeProfile          EmployeeProfile?      @relation("EmployeeProfileUser")
-  attendanceEvents         AttendanceEvent[]     @relation("AttendanceEventsUser")
-  attendanceEventsRecorded AttendanceEvent[]     @relation("AttendanceEventsRecordedBy")
-  leaveRecords             LeaveRecord[]         @relation("LeaveRecordsUser")
-  leaveRecordsRecorded     LeaveRecord[]         @relation("LeaveRecordsRecordedBy")
-  payrollEntries           PayrollEntry[]        @relation("PayrollEntriesUser")
-  payrollRunsCreated       PayrollRun[]          @relation("PayrollRunsCreatedBy")
-  payrollAdjustmentsAdded  PayrollAdjustment[]   @relation("PayrollAdjustmentsAddedBy")
+  employeeProfile          EmployeeProfile?    @relation("EmployeeProfileUser")
+  attendanceEvents         AttendanceEvent[]   @relation("AttendanceEventsUser")
+  attendanceEventsRecorded AttendanceEvent[]   @relation("AttendanceEventsRecordedBy")
+  leaveRecords             LeaveRecord[]       @relation("LeaveRecordsUser")
+  leaveRecordsRecorded     LeaveRecord[]       @relation("LeaveRecordsRecordedBy")
+  payrollEntries           PayrollEntry[]      @relation("PayrollEntriesUser")
+  payrollRunsCreated       PayrollRun[]        @relation("PayrollRunsCreatedBy")
+  payrollAdjustmentsAdded  PayrollAdjustment[] @relation("PayrollAdjustmentsAddedBy")
 
   // HR Phase 1 — Shifts / Timesheets / Overtime / Leave ledger / corrections
-  managedProfiles            EmployeeProfile[]        @relation("EmployeeProfileManager")
-  shiftAssignments           ShiftAssignment[]        @relation("ShiftAssignmentsUser")
-  shiftAssignmentsCreated    ShiftAssignment[]        @relation("ShiftAssignmentsCreatedBy")
-  timesheetEntries           TimesheetEntry[]         @relation("TimesheetEntriesUser")
-  timesheetEntriesRecorded   TimesheetEntry[]         @relation("TimesheetEntriesRecordedBy")
-  overtimeRecords            OvertimeRecord[]         @relation("OvertimeRecordsUser")
-  overtimeRecordsApproved    OvertimeRecord[]         @relation("OvertimeRecordsApprovedBy")
-  leaveLedgerEntries         LeaveLedgerEntry[]       @relation("LeaveLedgerUser")
-  leaveLedgerEntriesRecorded LeaveLedgerEntry[]       @relation("LeaveLedgerRecordedBy")
+  managedProfiles               EmployeeProfile[]      @relation("EmployeeProfileManager")
+  shiftAssignments              ShiftAssignment[]      @relation("ShiftAssignmentsUser")
+  shiftAssignmentsCreated       ShiftAssignment[]      @relation("ShiftAssignmentsCreatedBy")
+  timesheetEntries              TimesheetEntry[]       @relation("TimesheetEntriesUser")
+  timesheetEntriesRecorded      TimesheetEntry[]       @relation("TimesheetEntriesRecordedBy")
+  overtimeRecords               OvertimeRecord[]       @relation("OvertimeRecordsUser")
+  overtimeRecordsApproved       OvertimeRecord[]       @relation("OvertimeRecordsApprovedBy")
+  leaveLedgerEntries            LeaveLedgerEntry[]     @relation("LeaveLedgerUser")
+  leaveLedgerEntriesRecorded    LeaveLedgerEntry[]     @relation("LeaveLedgerRecordedBy")
   attendanceCorrections         AttendanceCorrection[] @relation("AttendanceCorrectionsUser")
   attendanceCorrectionsApproved AttendanceCorrection[] @relation("AttendanceCorrectionsApprovedBy")
-  employmentHistory           EmploymentHistory[]      @relation("EmploymentHistoryUser")
-  employmentHistoryChanged    EmploymentHistory[]      @relation("EmploymentHistoryChangedBy")
+  employmentHistory             EmploymentHistory[]    @relation("EmploymentHistoryUser")
+  employmentHistoryChanged      EmploymentHistory[]    @relation("EmploymentHistoryChangedBy")
 
   // HR Phase 2 — Salary Structures / Incentives / Advances / Expenses
   salaryAssignments        EmployeeSalaryAssignment[] @relation("SalaryAssignmentsUser")
@@ -85,19 +87,19 @@ model User {
   expenseClaimsApproved    ExpenseClaim[]             @relation("ExpenseClaimsApprovedBy")
 
   // HR Phase 3 — Skills / Training / Certifications / Documents / Assets / Goals / Performance
-  employeeSkills             EmployeeSkill[]     @relation("EmployeeSkillsUser")
-  employeeSkillsAssessed     EmployeeSkill[]     @relation("EmployeeSkillsAssessedBy")
-  trainingRecords            TrainingRecord[]    @relation("TrainingRecordsUser")
-  trainingRecordsCreated     TrainingRecord[]    @relation("TrainingRecordsCreatedBy")
-  certifications             Certification[]     @relation("CertificationsUser")
-  employeeDocuments          EmployeeDocument[]  @relation("EmployeeDocumentsUser")
-  employeeDocumentsUploaded  EmployeeDocument[]  @relation("EmployeeDocumentsUploadedBy")
-  assetAssignments           AssetAssignment[]   @relation("AssetAssignmentsUser")
-  assetAssignmentsAssigned   AssetAssignment[]   @relation("AssetAssignmentsAssignedBy")
-  goals                      Goal[]              @relation("GoalsUser")
-  goalsCreated               Goal[]              @relation("GoalsCreatedBy")
-  performanceReviews         PerformanceReview[] @relation("PerformanceReviewsUser")
-  performanceReviewsGiven    PerformanceReview[] @relation("PerformanceReviewsReviewer")
+  employeeSkills            EmployeeSkill[]     @relation("EmployeeSkillsUser")
+  employeeSkillsAssessed    EmployeeSkill[]     @relation("EmployeeSkillsAssessedBy")
+  trainingRecords           TrainingRecord[]    @relation("TrainingRecordsUser")
+  trainingRecordsCreated    TrainingRecord[]    @relation("TrainingRecordsCreatedBy")
+  certifications            Certification[]     @relation("CertificationsUser")
+  employeeDocuments         EmployeeDocument[]  @relation("EmployeeDocumentsUser")
+  employeeDocumentsUploaded EmployeeDocument[]  @relation("EmployeeDocumentsUploadedBy")
+  assetAssignments          AssetAssignment[]   @relation("AssetAssignmentsUser")
+  assetAssignmentsAssigned  AssetAssignment[]   @relation("AssetAssignmentsAssignedBy")
+  goals                     Goal[]              @relation("GoalsUser")
+  goalsCreated              Goal[]              @relation("GoalsCreatedBy")
+  performanceReviews        PerformanceReview[] @relation("PerformanceReviewsUser")
+  performanceReviewsGiven   PerformanceReview[] @relation("PerformanceReviewsReviewer")
 
   // HR Phase 4 — Onboarding / Offboarding / Recruitment
   onboardingTasks          OnboardingTask[]  @relation("OnboardingTasksUser")
@@ -143,30 +145,30 @@ model Zone {
 
 // ── CLINICS ────────────────────────────────────────────
 model Clinic {
-  id        String   @id @default(uuid())
-  code      String?  @unique
-  name      String
-  station   String?
-  zoneId    String?  // the zone (collective of stations) this clinic's station falls under
-  zone      Zone?    @relation(fields: [zoneId], references: [id])
-  email     String?  @unique
-  phone     String?
-  address   String?
-  password  String
-  isActive    Boolean  @default(true)
-  isExcluded  Boolean  @default(false)
+  id         String  @id @default(uuid())
+  code       String? @unique
+  name       String
+  station    String?
+  zoneId     String? // the zone (collective of stations) this clinic's station falls under
+  zone       Zone?   @relation(fields: [zoneId], references: [id])
+  email      String? @unique
+  phone      String?
+  address    String?
+  password   String
+  isActive   Boolean @default(true)
+  isExcluded Boolean @default(false)
 
   // Trusted-partner billing schedule (finance generates consolidated bills)
   billingCycle  String?   @default("NONE") // NONE | WEEKLY | FORTNIGHTLY | MONTHLY | CUSTOM
-  billingAnchor Int?                        // day-of-week (0-6) for weekly/fortnightly, day-of-month (1-28) for monthly
-  lastBilledAt  DateTime?                   // when finance last generated a bill for this clinic
+  billingAnchor Int? // day-of-week (0-6) for weekly/fortnightly, day-of-month (1-28) for monthly
+  lastBilledAt  DateTime? // when finance last generated a bill for this clinic
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  cases             Case[]
-  pushSubscriptions PushSubscription[]
-  clinicPoints      ClinicPoints?
+  cases              Case[]
+  pushSubscriptions  PushSubscription[]
+  clinicPoints       ClinicPoints?
   rewardTransactions RewardTransaction[]
   rewardRedemptions  RewardRedemption[]
 
@@ -175,65 +177,65 @@ model Clinic {
 
 // ── CASES ──────────────────────────────────────────────
 model Case {
-  id              String      @id @default(uuid())
-  caseNumber      String?     @unique // assigned on acceptance; null for phone orders before acceptance
-  patientName     String
-  patientAge      Int?
-  doctorName      String?     // referring doctor / dentist
-  doctorPhone     String?
-  patientGender   String?     // "Male" | "Female"
-  workType        String      // e.g. Crown, Bridge, Denture, Aligner
-  toothNumbers    String?     // e.g. "14, 15, 16"
-  units           Int?        // count of tooth numbers (or manual for legacy data)
-  deliveryDate    DateTime?   // actual date the case was delivered to clinic
-  shade           String?     // e.g. A2, B1
-  notes           String?
-  remake          Boolean     @default(false)
-  redo            Boolean     @default(false)
-  remakeReason    String?
-  isRedo          Boolean     @default(false) // redo/replacement of an existing in-mouth restoration — charged at 50%
-  dueDate         DateTime?
-  status          CaseStatus  @default(CASE_ACCEPTED)
-  qrCodeUrl       String?     // URL of the generated QR image
-  qrCodeData      String?     // The encoded URL in the QR
+  id            String     @id @default(uuid())
+  caseNumber    String?    @unique // assigned on acceptance; null for phone orders before acceptance
+  patientName   String
+  patientAge    Int?
+  doctorName    String? // referring doctor / dentist
+  doctorPhone   String?
+  patientGender String? // "Male" | "Female"
+  workType      String // e.g. Crown, Bridge, Denture, Aligner
+  toothNumbers  String? // e.g. "14, 15, 16"
+  units         Int? // count of tooth numbers (or manual for legacy data)
+  deliveryDate  DateTime? // actual date the case was delivered to clinic
+  shade         String? // e.g. A2, B1
+  notes         String?
+  remake        Boolean    @default(false)
+  redo          Boolean    @default(false)
+  remakeReason  String?
+  isRedo        Boolean    @default(false) // redo/replacement of an existing in-mouth restoration — charged at 50%
+  dueDate       DateTime?
+  status        CaseStatus @default(CASE_ACCEPTED)
+  qrCodeUrl     String? // URL of the generated QR image
+  qrCodeData    String? // The encoded URL in the QR
 
   // Delivery
-  deliveryType    DeliveryType  @default(NORMAL)
+  deliveryType DeliveryType @default(NORMAL)
 
   // Payment
-  paymentStatus   PaymentStatus @default(PENDING)
-  totalAmount     Float?        // final billed amount — already reflects any discount below
-  discountType    DiscountType? // set + locked at case-acceptance time; null = no discount applied
-  discountValue   Float?        // Br amount if discountType=AMOUNT, or percentage points if PERCENT
+  paymentStatus PaymentStatus @default(PENDING)
+  totalAmount   Float? // final billed amount — already reflects any discount below
+  discountType  DiscountType? // set + locked at case-acceptance time; null = no discount applied
+  discountValue Float? // Br amount if discountType=AMOUNT, or percentage points if PERCENT
 
   // Remake/redo review — null for ordinary cases. Set to PENDING_REVIEW the
   // moment `remake` is checked at creation/acceptance (totalAmount forced to
   // 0 at that point too); the Operation Manager's decision at
   // PATCH /cases/:id/review-decide moves it to REMAKE_FREE (stays 0) or
   // REDO_CHARGED (totalAmount becomes 50% of originalCase.totalAmount).
-  remakeStatus    RemakeReviewStatus?
+  remakeStatus RemakeReviewStatus?
 
   // Relations
-  clinicId        String
-  clinic          Clinic      @relation(fields: [clinicId], references: [id])
-  receptionistId  String?
-  receptionist    User?       @relation("ReceptionistCases", fields: [receptionistId], references: [id])
+  clinicId           String
+  clinic             Clinic  @relation(fields: [clinicId], references: [id])
+  receptionistId     String?
+  receptionist       User?   @relation("ReceptionistCases", fields: [receptionistId], references: [id])
   assignedDeliveryId String?
-  assignedDelivery   User?    @relation("AssignedDeliveries", fields: [assignedDeliveryId], references: [id])
+  assignedDelivery   User?   @relation("AssignedDeliveries", fields: [assignedDeliveryId], references: [id])
 
   // Remake/redo lineage — this case gets its OWN scan number (never reuses the
   // original's), but references the case it's a remake/redo of, like a branch
   // pointing back to its parent. Set at acceptance time by the receptionist.
-  originalCaseId  String?
-  originalCase    Case?       @relation("CaseLineage", fields: [originalCaseId], references: [id])
-  remakes         Case[]      @relation("CaseLineage")
+  originalCaseId String?
+  originalCase   Case?   @relation("CaseLineage", fields: [originalCaseId], references: [id])
+  remakes        Case[]  @relation("CaseLineage")
 
   // Shared UUID stamped on every case created together in one multi-item
   // "New Case" submission (e.g. 2 Zirconia + 1 PFM for the same patient
   // visit) — each item is still its own independently-tracked Case. Null
   // for ordinary single-item cases. No relation — just a lookup key via
   // GET /cases?orderGroupId=.
-  orderGroupId    String?
+  orderGroupId String?
 
   stages             CaseStage[]
   payment            Payment?
@@ -241,6 +243,7 @@ model Case {
   notifications      Notification[]
   rewardTransactions RewardTransaction[]
   comments           CaseComment[]
+  modelRequests      ModelRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -259,8 +262,8 @@ model Case {
 
 enum CaseStatus {
   // Intake — pickup from clinic
-  PENDING_PICKUP      // case submitted; waiting for dispatch to assign pickup
-  PICKUP_ASSIGNED     // delivery exec assigned to collect impression from clinic
+  PENDING_PICKUP // case submitted; waiting for dispatch to assign pickup
+  PICKUP_ASSIGNED // delivery exec assigned to collect impression from clinic
 
   // Case received at lab
   CASE_ACCEPTED
@@ -302,8 +305,8 @@ enum CaseStatus {
   CANCELLED
 
   // Receptionist review states
-  UNDER_REVIEW   // needs more info from dentist before acceptance
-  REJECTED       // receptionist rejected the case
+  UNDER_REVIEW // needs more info from dentist before acceptance
+  REJECTED // receptionist rejected the case
 }
 
 enum DeliveryType {
@@ -312,9 +315,9 @@ enum DeliveryType {
 }
 
 enum RemakeReviewStatus {
-  PENDING_REVIEW  // remake/redo flagged at intake — totalAmount forced to 0, awaiting Operation Manager decision
-  REMAKE_FREE     // decided: remake, free of charge — totalAmount stays 0
-  REDO_CHARGED    // decided: redo, charged 50% of the original case's totalAmount
+  PENDING_REVIEW // remake/redo flagged at intake — totalAmount forced to 0, awaiting Operation Manager decision
+  REMAKE_FREE // decided: remake, free of charge — totalAmount stays 0
+  REDO_CHARGED // decided: redo, charged 50% of the original case's totalAmount
 }
 
 enum DiscountType {
@@ -323,23 +326,23 @@ enum DiscountType {
 }
 
 enum PaymentStatus {
-  PENDING              // No payment request yet
-  PAYMENT_REQUESTED    // Finance sent amount to clinic, awaiting screenshot
-  SCREENSHOT_UPLOADED  // Clinic uploaded screenshot
-  VERIFIED             // Finance approved — invoice auto-issued
-  REJECTED             // Finance rejected (needs re-upload)
+  PENDING // No payment request yet
+  PAYMENT_REQUESTED // Finance sent amount to clinic, awaiting screenshot
+  SCREENSHOT_UPLOADED // Clinic uploaded screenshot
+  VERIFIED // Finance approved — invoice auto-issued
+  REJECTED // Finance rejected (needs re-upload)
 }
 
 // ── CASE STAGES (QR scan history) ──────────────────────
 model CaseStage {
-  id          String    @id @default(uuid())
-  caseId      String
-  case        Case      @relation(fields: [caseId], references: [id])
-  stageName   CaseStatus
-  scannedAt   DateTime  @default(now())
-  scannedBy   String?   // name or user ID of who scanned
-  location    String?   // optional lab section name
-  notes       String?
+  id        String     @id @default(uuid())
+  caseId    String
+  case      Case       @relation(fields: [caseId], references: [id])
+  stageName CaseStatus
+  scannedAt DateTime   @default(now())
+  scannedBy String? // name or user ID of who scanned
+  location  String? // optional lab section name
+  notes     String?
 
   @@index([caseId])
   @@map("case_stages")
@@ -361,19 +364,19 @@ model CaseStage {
 // payment and sheet-sync rows, so a restore rebuilds the whole record and
 // not just the header.
 model DeletedCase {
-  id           String   @id            // the ORIGINAL case id, so a restore recreates it unchanged
-  caseNumber   String?
-  patientName  String?
-  clinicName   String?
-  workType     String?
-  status       String?
-  totalAmount  Float?
-  snapshot     Json                    // full case + related rows
-  deletedAt    DateTime @default(now())
-  deletedById  String?
-  deletedBy    User?    @relation("DeletedCasesBy", fields: [deletedById], references: [id])
-  deletedByName String?
-  pointsClawedBack Int  @default(0)    // reward points reversed at delete time; surfaced on restore so it is not silently lost
+  id               String   @id // the ORIGINAL case id, so a restore recreates it unchanged
+  caseNumber       String?
+  patientName      String?
+  clinicName       String?
+  workType         String?
+  status           String?
+  totalAmount      Float?
+  snapshot         Json // full case + related rows
+  deletedAt        DateTime @default(now())
+  deletedById      String?
+  deletedBy        User?    @relation("DeletedCasesBy", fields: [deletedById], references: [id])
+  deletedByName    String?
+  pointsClawedBack Int      @default(0) // reward points reversed at delete time; surfaced on restore so it is not silently lost
 
   @@index([deletedAt])
   @@index([caseNumber])
@@ -386,8 +389,8 @@ model CaseComment {
   caseId     String
   case       Case     @relation(fields: [caseId], references: [id])
   body       String
-  authorName String?  // name of the staff member who wrote it
-  authorRole String?  // their role at the time
+  authorName String? // name of the staff member who wrote it
+  authorRole String? // their role at the time
   createdAt  DateTime @default(now())
 
   @@index([caseId])
@@ -399,10 +402,10 @@ model Payment {
   id              String        @id @default(uuid())
   caseId          String        @unique
   case            Case          @relation(fields: [caseId], references: [id])
-  screenshotUrl   String?       // Cloudinary URL
-  amount          Float?        // full amount due for this case
-  amountReceived  Float?        // partial amount already collected (status stays PENDING until amount is met in full)
-  taxWithheld     Float?        // withholding tax the clinic deducted & filed to the government directly — NOT owed to us, excluded from Outstanding by virtue of status becoming VERIFIED
+  screenshotUrl   String? // Cloudinary URL
+  amount          Float? // full amount due for this case
+  amountReceived  Float? // partial amount already collected (status stays PENDING until amount is met in full)
+  taxWithheld     Float? // withholding tax the clinic deducted & filed to the government directly — NOT owed to us, excluded from Outstanding by virtue of status becoming VERIFIED
   status          PaymentStatus @default(PENDING)
   rejectionReason String?
   uploadedAt      DateTime?
@@ -410,10 +413,10 @@ model Payment {
   verifiedById    String?
   verifiedBy      User?         @relation("VerifiedPayments", fields: [verifiedById], references: [id])
 
-  invoiceNumber   String?       @unique
+  invoiceNumber   String?   @unique
   invoiceIssuedAt DateTime?
   invoiceNotes    String?
-  fsNumber        String?       // manually entered FS number from the clinic's paper sales-invoice/fiscal receipt
+  fsNumber        String? // manually entered FS number from the clinic's paper sales-invoice/fiscal receipt
 
   // Chapa online payment
   chapaTxRef       String? @unique
@@ -429,20 +432,60 @@ model Payment {
 
 // ── DELIVERY LOGS ──────────────────────────────────────
 model DeliveryLog {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   caseId       String
-  case         Case     @relation(fields: [caseId], references: [id])
+  case         Case      @relation(fields: [caseId], references: [id])
   deliveryById String
-  deliveredBy  User     @relation(fields: [deliveryById], references: [id])
+  deliveredBy  User      @relation(fields: [deliveryById], references: [id])
   pickedUpAt   DateTime?
   deliveredAt  DateTime?
-  signature    String?  // optional base64 or URL
+  signature    String? // optional base64 or URL
   notes        String?
 
   createdAt DateTime @default(now())
 
   @@index([caseId])
   @@map("delivery_logs")
+}
+
+// ── MODEL REQUESTS ─────────────────────────────────────
+// Staff (reception/lab) asking the clinic to send in a NEW physical model
+// for a case already in the system — e.g. the original was damaged, or a
+// later production step needs another one. Deliberately its own model
+// rather than reusing Case.status/assignedDeliveryId: a case can be
+// mid-production (any status) when this comes up, and reusing
+// PENDING_PICKUP/PICKUP_ASSIGNED would corrupt that status and everywhere
+// that reads it (dispatch counts, the "arrived at lab" detection, collect-
+// impression). A case can have more than one of these over its lifetime.
+enum ModelRequestStatus {
+  REQUESTED // created by staff — clinic hasn't scheduled a pickup yet
+  SCHEDULED // clinic picked a pickup time — this is what surfaces it in Dispatch's queue
+  ASSIGNED // Dispatch assigned a delivery exec to collect it
+  COLLECTED // the exec picked it up from the clinic
+  CANCELLED // called off (by either side) before collection
+}
+
+model ModelRequest {
+  id                 String             @id @default(uuid())
+  caseId             String
+  case               Case               @relation(fields: [caseId], references: [id])
+  requestedById      String
+  requestedBy        User               @relation("ModelRequestedBy", fields: [requestedById], references: [id])
+  status             ModelRequestStatus @default(REQUESTED)
+  requesterNote      String? // why the lab needs a new model — shown to the clinic
+  scheduledPickupAt  DateTime? // set by the clinic when it schedules
+  assignedDeliveryId String?
+  assignedDelivery   User?              @relation("ModelRequestAssignedDelivery", fields: [assignedDeliveryId], references: [id])
+  collectedAt        DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([status])
+  @@map("model_requests")
 }
 
 // ── WORK TYPE PRICES ───────────────────────────────────
@@ -508,6 +551,7 @@ model RewardSetting {
   id            String   @id @default(uuid())
   pointsPerCase Int      @default(10)
   updatedAt     DateTime @updatedAt
+
   @@map("reward_settings")
 }
 
@@ -518,6 +562,7 @@ model ClinicPoints {
   totalEarned   Int      @default(0)
   totalRedeemed Int      @default(0)
   updatedAt     DateTime @updatedAt
+
   @@map("clinic_points")
 }
 
@@ -525,24 +570,26 @@ model RewardTransaction {
   id          String   @id @default(uuid())
   clinicId    String
   clinic      Clinic   @relation(fields: [clinicId], references: [id])
-  type        String   // EARN | REDEEM
+  type        String // EARN | REDEEM
   points      Int
   description String
   caseId      String?
   case        Case?    @relation(fields: [caseId], references: [id])
   createdAt   DateTime @default(now())
+
   @@map("reward_transactions")
 }
 
 model RewardItem {
-  id          String   @id @default(uuid())
+  id          String             @id @default(uuid())
   name        String
   description String?
   pointsCost  Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   redemptions RewardRedemption[]
+
   @@map("reward_items")
 }
 
@@ -557,6 +604,7 @@ model RewardRedemption {
   adminNote    String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+
   @@map("reward_redemptions")
 }
 
@@ -564,15 +612,16 @@ model RewardRedemption {
 model InventoryItem {
   id               String   @id @default(uuid())
   name             String
-  unit             String                       // free text: "pcs", "box", "kg"
+  unit             String // free text: "pcs", "box", "kg"
   quantityOnHand   Int      @default(0)
-  reorderThreshold Int?                          // null = no low-stock alert
+  reorderThreshold Int? // null = no low-stock alert
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   transactions InventoryTransaction[]
   requests     InventoryRequest[]
+
   @@map("inventory_items")
 }
 
@@ -587,7 +636,7 @@ model InventoryTransaction {
   itemId           String
   item             InventoryItem     @relation(fields: [itemId], references: [id])
   type             InventoryTxnType
-  quantity         Int               // SIGNED delta: RESTOCK/ADJUSTMENT-up positive, ISSUED/ADJUSTMENT-down negative
+  quantity         Int // SIGNED delta: RESTOCK/ADJUSTMENT-up positive, ISSUED/ADJUSTMENT-down negative
   relatedRequestId String?
   relatedRequest   InventoryRequest? @relation(fields: [relatedRequestId], references: [id])
   performedById    String
@@ -612,7 +661,7 @@ model InventoryRequest {
   item              InventoryItem          @relation(fields: [itemId], references: [id])
   requestedById     String
   requestedBy       User                   @relation("InventoryRequestedBy", fields: [requestedById], references: [id])
-  department        String                 // picked by the requester at submit time
+  department        String // picked by the requester at submit time
   quantityRequested Int
   quantityApproved  Int?
   status            InventoryRequestStatus @default(PENDING)
@@ -624,6 +673,7 @@ model InventoryRequest {
   updatedAt         DateTime               @updatedAt
 
   transactions InventoryTransaction[]
+
   @@index([status])
   @@index([requestedById])
   @@map("inventory_requests")
@@ -640,10 +690,11 @@ model MillingYield {
   user           User     @relation("MillingYieldsByUser", fields: [userId], references: [id])
   blanksUsed     Int      @default(1)
   crownsProduced Int
-  bonusPoints    Int      @default(0)   // computed against MillingBonusSetting and frozen at write time
+  bonusPoints    Int      @default(0) // computed against MillingBonusSetting and frozen at write time
   createdAt      DateTime @default(now())
 
   rewardTransactions StaffRewardTransaction[]
+
   @@index([userId])
   @@index([createdAt])
   @@map("milling_yields")
@@ -651,9 +702,10 @@ model MillingYield {
 
 model MillingBonusSetting {
   id                  String   @id @default(uuid())
-  minCrownsPerBlank   Int      @default(30)  // bonus only when crownsProduced > this
-  pointsPerExtraCrown Int      @default(5)   // bonus = (crownsProduced - minCrownsPerBlank) * pointsPerExtraCrown
+  minCrownsPerBlank   Int      @default(30) // bonus only when crownsProduced > this
+  pointsPerExtraCrown Int      @default(5) // bonus = (crownsProduced - minCrownsPerBlank) * pointsPerExtraCrown
   updatedAt           DateTime @updatedAt
+
   @@map("milling_bonus_settings")
 }
 
@@ -663,6 +715,7 @@ model StaffPoints {
   user        User     @relation("StaffPointsUser", fields: [userId], references: [id])
   totalEarned Int      @default(0)
   updatedAt   DateTime @updatedAt
+
   @@map("staff_points")
 }
 
@@ -699,23 +752,23 @@ enum EmploymentType {
 }
 
 model EmployeeProfile {
-  id               String           @id @default(uuid())
-  userId           String           @unique
-  user             User             @relation("EmployeeProfileUser", fields: [userId], references: [id])
-  employeeCode     String?          @unique // maps to whatever ID a future biometric device uses
+  id           String  @id @default(uuid())
+  userId       String  @unique
+  user         User    @relation("EmployeeProfileUser", fields: [userId], references: [id])
+  employeeCode String? @unique // maps to whatever ID a future biometric device uses
 
   // Reception kiosk PIN — bcrypt hash, never the PIN itself. Lockout
   // fields exist because a 4-digit PIN is only 10,000 combinations, which
   // is trivially brute-forced without throttling.
   attendancePin     String?
-  pinFailedAttempts Int       @default(0)
+  pinFailedAttempts Int              @default(0)
   pinLockedUntil    DateTime?
-  position         String?
-  hireDate         DateTime?
-  baseSalary       Float?
-  bankName         String?
-  bankAccount      String?
-  employmentStatus EmploymentStatus @default(ACTIVE)
+  position          String?
+  hireDate          DateTime?
+  baseSalary        Float?
+  bankName          String?
+  bankAccount       String?
+  employmentStatus  EmploymentStatus @default(ACTIVE)
 
   // Personal info (Phase 1 HR expansion)
   photoUrl              String?
@@ -731,9 +784,9 @@ model EmployeeProfile {
   probationEndDate DateTime?
   noticePeriodDays Int?
   endDate          DateTime? // termination/last-day date
-  workLocation     String?   // free-text internal work area — this is a single-lab system, not a branch model
+  workLocation     String? // free-text internal work area — this is a single-lab system, not a branch model
   managerId        String?
-  manager          User?     @relation("EmployeeProfileManager", fields: [managerId], references: [id])
+  manager          User?           @relation("EmployeeProfileManager", fields: [managerId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -752,7 +805,7 @@ enum AttendanceSource {
   BIOMETRIC
   MANUAL
   GEOFENCE // self-service via the app — CLOCK_IN/CLOCK_OUT are geofenced to ATTENDANCE_RADIUS_METERS of the lab; BREAK_START/BREAK_END are not (agents are on the road)
-  KIOSK    // shared PIN terminal at reception — for staff with no smartphone, who cannot use the geofenced self-service flow. Deliberately distinct from GEOFENCE: a PIN on a shared device is a weaker identity claim than a geofenced personal login, and the data should say which it was.
+  KIOSK // shared PIN terminal at reception — for staff with no smartphone, who cannot use the geofenced self-service flow. Deliberately distinct from GEOFENCE: a PIN on a shared device is a weaker identity claim than a geofenced personal login, and the data should say which it was.
 }
 
 // Caseless, caseless-adjacent ledger of raw clock events. Biometric-device
@@ -768,7 +821,7 @@ model AttendanceEvent {
   type           AttendanceEventType
   source         AttendanceSource
   deviceId       String?
-  recordedById   String?             // HR staff who manually entered it; null for biometric/geofence-sourced rows
+  recordedById   String? // HR staff who manually entered it; null for biometric/geofence-sourced rows
   recordedBy     User?               @relation("AttendanceEventsRecordedBy", fields: [recordedById], references: [id])
   note           String?
   // Self-reported location backing a GEOFENCE event — an audit trail HR can
@@ -786,7 +839,7 @@ model AttendanceEvent {
 enum LeaveStatus {
   APPROVED
   REJECTED
-  PENDING          // self-service request, awaiting the requester's manager (or HR if they have none)
+  PENDING // self-service request, awaiting the requester's manager (or HR if they have none)
   MANAGER_APPROVED // manager has signed off — now awaiting HR's final decision
 }
 
@@ -840,7 +893,7 @@ enum PayrollRunStatus {
 
 model PayrollRun {
   id          String           @id @default(uuid())
-  periodMonth Int              // 1-12
+  periodMonth Int // 1-12
   periodYear  Int
   status      PayrollRunStatus @default(DRAFT)
   createdById String
@@ -861,15 +914,15 @@ model PayrollRun {
 // deduction (including an attendance-based one, if HR wants one) is a
 // manually entered PayrollAdjustment row.
 model PayrollEntry {
-  id                 String   @id @default(uuid())
+  id                 String     @id @default(uuid())
   runId              String
   run                PayrollRun @relation(fields: [runId], references: [id])
   userId             String
-  user               User     @relation("PayrollEntriesUser", fields: [userId], references: [id])
-  baseSalarySnapshot Float    // frozen from EmployeeProfile.baseSalary at run-creation time
+  user               User       @relation("PayrollEntriesUser", fields: [userId], references: [id])
+  baseSalarySnapshot Float // frozen from EmployeeProfile.baseSalary at run-creation time
   netPay             Float
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   adjustments PayrollAdjustment[]
 
@@ -895,8 +948,8 @@ model PayrollAdjustment {
   id            String                @id @default(uuid())
   entryId       String
   entry         PayrollEntry          @relation(fields: [entryId], references: [id])
-  label         String                // e.g. "Attendance deduction", "Transport allowance", "Income tax"
-  amount        Float                 // signed: + bonus, - deduction
+  label         String // e.g. "Attendance deduction", "Transport allowance", "Income tax"
+  amount        Float // signed: + bonus, - deduction
   type          PayrollAdjustmentType @default(OTHER) // defaults OTHER for pre-Phase-2 rows
   autoGenerated Boolean               @default(false) // true for salary-structure/overtime/advance/expense/incentive rows created by run-generation, vs HR's manual entries
   addedById     String
@@ -927,7 +980,7 @@ enum SalaryCalcType {
 
 model SalaryComponent {
   id            String                  @id @default(uuid())
-  name          String                  // e.g. "Housing Allowance", "Transport", "Unpaid Leave Deduction"
+  name          String // e.g. "Housing Allowance", "Transport", "Unpaid Leave Deduction"
   category      SalaryComponentCategory
   calcType      SalaryCalcType          @default(FIXED)
   defaultAmount Float                   @default(0) // fixed Br, or the % for PERCENT_OF_BASIC, or the rate for PER_*
@@ -959,7 +1012,7 @@ model SalaryStructureItem {
   structure   SalaryStructure @relation(fields: [structureId], references: [id])
   componentId String
   component   SalaryComponent @relation(fields: [componentId], references: [id])
-  amount      Float?          // overrides component.defaultAmount when set
+  amount      Float? // overrides component.defaultAmount when set
   sortOrder   Int             @default(0)
   createdAt   DateTime        @default(now())
 
@@ -1034,21 +1087,21 @@ enum IncentiveAwardStatus {
 }
 
 model IncentiveAward {
-  id             String                @id @default(uuid())
+  id             String               @id @default(uuid())
   userId         String
-  user           User                  @relation("IncentiveAwardsUser", fields: [userId], references: [id])
+  user           User                 @relation("IncentiveAwardsUser", fields: [userId], references: [id])
   ruleId         String
-  rule           IncentiveRule         @relation(fields: [ruleId], references: [id])
+  rule           IncentiveRule        @relation(fields: [ruleId], references: [id])
   periodMonth    Int
   periodYear     Int
   actualValue    Float
   targetValue    Float
   awardedAmount  Float
-  status         IncentiveAwardStatus  @default(PENDING)
+  status         IncentiveAwardStatus @default(PENDING)
   payrollEntryId String?
   approvedById   String?
-  approvedBy     User?                 @relation("IncentiveAwardsApprovedBy", fields: [approvedById], references: [id])
-  createdAt      DateTime              @default(now())
+  approvedBy     User?                @relation("IncentiveAwardsApprovedBy", fields: [approvedById], references: [id])
+  createdAt      DateTime             @default(now())
 
   @@unique([userId, ruleId, periodMonth, periodYear])
   @@index([userId])
@@ -1145,13 +1198,13 @@ enum ShiftHolidayHandling {
 model Shift {
   id                             String               @id @default(uuid())
   name                           String
-  startTime                      String               // "HH:mm", interpreted in server TZ (Africa/Addis_Ababa)
+  startTime                      String // "HH:mm", interpreted in server TZ (Africa/Addis_Ababa)
   endTime                        String
   breakMinutes                   Int                  @default(0)
   gracePeriodMinutes             Int                  @default(0)
   lateThresholdMinutes           Int                  @default(0) // additional buffer after grace before "Late"
   earlyDepartureThresholdMinutes Int                  @default(0)
-  overtimeThresholdMinutes       Int?                 // null = derive from (end-start-break)
+  overtimeThresholdMinutes       Int? // null = derive from (end-start-break)
   workingDays                    Int[]                @default([1, 2, 3, 4, 5]) // 0=Sun..6=Sat
   holidayHandling                ShiftHolidayHandling @default(NO_WORK)
   isActive                       Boolean              @default(true) // soft-delete only — ShiftAssignment history references it
@@ -1199,10 +1252,10 @@ model TimesheetEntry {
   id           String          @id @default(uuid())
   userId       String
   user         User            @relation("TimesheetEntriesUser", fields: [userId], references: [id])
-  date         DateTime        // local calendar day
+  date         DateTime // local calendar day
   startTime    DateTime
   endTime      DateTime
-  category     String          // one of the hardcoded PRODUCTIVE/NON_PRODUCTIVE constants in timesheets.js
+  category     String // one of the hardcoded PRODUCTIVE/NON_PRODUCTIVE constants in timesheets.js
   productive   Boolean
   notes        String?
   status       TimesheetStatus @default(APPROVED) // HR enters authoritatively, same posture as LeaveRecord
@@ -1288,20 +1341,20 @@ enum LeaveLedgerTxnType {
 // Balance is always sum(days) for a user+leaveType — never a single stored
 // number, so entitlement/usage/carry-forward/adjustment stay auditable.
 model LeaveLedgerEntry {
-  id                    String             @id @default(uuid())
-  userId                String
-  user                  User               @relation("LeaveLedgerUser", fields: [userId], references: [id])
-  leaveTypeId           String
-  leaveType             LeaveType          @relation(fields: [leaveTypeId], references: [id])
-  transactionType       LeaveLedgerTxnType
-  days                  Float              // signed: negative for USED/EXPIRED, positive for ENTITLEMENT/CARRY_FORWARD
-  effectiveDate         DateTime
-  relatedLeaveRecordId  String?
-  relatedLeaveRecord    LeaveRecord?       @relation("LedgerFromLeaveRecord", fields: [relatedLeaveRecordId], references: [id])
-  note                  String?
-  recordedById          String
-  recordedBy            User               @relation("LeaveLedgerRecordedBy", fields: [recordedById], references: [id])
-  createdAt             DateTime           @default(now())
+  id                   String             @id @default(uuid())
+  userId               String
+  user                 User               @relation("LeaveLedgerUser", fields: [userId], references: [id])
+  leaveTypeId          String
+  leaveType            LeaveType          @relation(fields: [leaveTypeId], references: [id])
+  transactionType      LeaveLedgerTxnType
+  days                 Float // signed: negative for USED/EXPIRED, positive for ENTITLEMENT/CARRY_FORWARD
+  effectiveDate        DateTime
+  relatedLeaveRecordId String?
+  relatedLeaveRecord   LeaveRecord?       @relation("LedgerFromLeaveRecord", fields: [relatedLeaveRecordId], references: [id])
+  note                 String?
+  recordedById         String
+  recordedBy           User               @relation("LeaveLedgerRecordedBy", fields: [recordedById], references: [id])
+  createdAt            DateTime           @default(now())
 
   @@index([userId])
   @@index([leaveTypeId])
@@ -1329,9 +1382,9 @@ model Holiday {
 // original*/corrected* are both stored so nothing about a correction is
 // ever ambiguous or silently lost.
 model AttendanceCorrection {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   userId            String
-  user              User     @relation("AttendanceCorrectionsUser", fields: [userId], references: [id])
+  user              User      @relation("AttendanceCorrectionsUser", fields: [userId], references: [id])
   date              DateTime
   originalClockIn   DateTime?
   originalClockOut  DateTime?
@@ -1339,8 +1392,8 @@ model AttendanceCorrection {
   correctedClockOut DateTime?
   reason            String
   approvedById      String
-  approvedBy        User     @relation("AttendanceCorrectionsApprovedBy", fields: [approvedById], references: [id])
-  createdAt         DateTime @default(now())
+  approvedBy        User      @relation("AttendanceCorrectionsApprovedBy", fields: [approvedById], references: [id])
+  createdAt         DateTime  @default(now())
 
   @@index([userId])
   @@index([date])
@@ -1353,7 +1406,7 @@ model EmploymentHistory {
   id            String   @id @default(uuid())
   userId        String
   user          User     @relation("EmploymentHistoryUser", fields: [userId], references: [id])
-  field         String   // 'position' | 'employmentStatus' | 'managerId' | ...
+  field         String // 'position' | 'employmentStatus' | 'managerId' | ...
   oldValue      String?
   newValue      String?
   effectiveDate DateTime @default(now())
@@ -1484,7 +1537,7 @@ enum AssetStatus {
 model CompanyAsset {
   id           String      @id @default(uuid())
   name         String
-  type         String      // e.g. "Laptop", "Phone", "PPE", "ID Card" — free text, not hard-coded
+  type         String // e.g. "Laptop", "Phone", "PPE", "ID Card" — free text, not hard-coded
   serialNumber String?
   status       AssetStatus @default(AVAILABLE)
   createdAt    DateTime    @default(now())
@@ -1646,5 +1699,6 @@ model SheetSyncRow {
   caseId    String   @unique
   rowNumber Int
   updatedAt DateTime @updatedAt
+
   @@map("sheet_sync_rows")
 }
