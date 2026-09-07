@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { todayLocal } from '../../utils/date';
 import SearchableSelect from '../../components/SearchableSelect';
 import { PaymentBadge } from '../../components/StatusBadge';
+import ExportMenu from '../../components/ExportMenu';
 import { MdPointOfSale, MdHandshake, MdSearch, MdReceiptLong } from 'react-icons/md';
 
 const fmtBr = (n) => `Br ${Math.round(n || 0).toLocaleString('en-US')}`;
@@ -35,6 +36,9 @@ export default function DailyReconciliationTab() {
   const [dateTo, setDateTo] = useState(todayLocal());
   const [clinicId, setClinicId] = useState('');
   const [caseNumber, setCaseNumber] = useState('');
+  // Clicking a summary card filters the table to that sales type; click
+  // the same card again (or the ✕) to go back to showing both.
+  const [salesTypeFilter, setSalesTypeFilter] = useState('');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['finance', 'daily-reconciliation', dateFrom, dateTo, clinicId, caseNumber],
@@ -51,7 +55,21 @@ export default function DailyReconciliationTab() {
   const cash = data?.cashSales || { count: 0, billedTotal: 0, collectedTotal: 0, outstandingTotal: 0 };
   const credit = data?.creditSales || { count: 0, billedTotal: 0, collectedTotal: 0, outstandingTotal: 0 };
   const cases = data?.cases || [];
+  const visibleCases = salesTypeFilter ? cases.filter(c => c.salesType === salesTypeFilter) : cases;
   const isSingleDay = dateFrom === dateTo;
+
+  const toggleFilter = (type) => setSalesTypeFilter(f => f === type ? '' : type);
+
+  const exportColumns = [
+    { header: 'Case',      value: c => c.caseNumber || '' },
+    { header: 'Patient',   value: c => c.patientName || '' },
+    { header: 'Clinic',    value: c => c.clinicName || '' },
+    { header: 'Type',      value: c => c.salesType === 'CASH' ? 'Cash' : 'Credit' },
+    { header: 'Work Type', value: c => c.workType || '' },
+    { header: 'Amount (Br)', value: c => c.billedAmount ?? '' },
+    { header: 'Payment',   value: c => c.paymentStatus || '' },
+    { header: 'Delivered', value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy, h:mm a') : '' },
+  ];
 
   return (
     <>
@@ -86,10 +104,18 @@ export default function DailyReconciliationTab() {
             />
           </div>
           {(dateFrom !== todayLocal() || dateTo !== todayLocal() || clinicId || caseNumber) && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(todayLocal()); setDateTo(todayLocal()); setClinicId(''); setCaseNumber(''); }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(todayLocal()); setDateTo(todayLocal()); setClinicId(''); setCaseNumber(''); setSalesTypeFilter(''); }}>
               Reset to today
             </button>
           )}
+          <div style={{ marginLeft: 'auto' }}>
+            <ExportMenu
+              data={visibleCases}
+              columns={exportColumns}
+              filename="daily-reconciliation"
+              title={`Daily Reconciliation${salesTypeFilter ? ` — ${salesTypeFilter === 'CASH' ? 'Cash' : 'Credit'} Sales` : ''}`}
+            />
+          </div>
         </div>
       </div>
 
@@ -100,7 +126,16 @@ export default function DailyReconciliationTab() {
       )}
 
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', marginBottom: 16 }}>
-        <div className="stat-card">
+        <div
+          className="stat-card"
+          onClick={() => toggleFilter('CASH')}
+          title={salesTypeFilter === 'CASH' ? 'Click to show all cases' : 'Click to show only cash cases'}
+          style={{
+            cursor: 'pointer',
+            outline: salesTypeFilter === 'CASH' ? '2px solid var(--green)' : 'none',
+            outlineOffset: -2,
+          }}
+        >
           <div className="stat-icon" style={{ background: 'var(--green-dim)' }}><MdPointOfSale size={18} /></div>
           <div className="stat-label">Cash Sales</div>
           <div className="stat-value" style={{ color: 'var(--green)' }}>{fmtBr(cash.billedTotal)}</div>
@@ -109,7 +144,16 @@ export default function DailyReconciliationTab() {
             {cash.outstandingTotal > 0 && <> · <span style={{ color: 'var(--red)' }}>{fmtBr(cash.outstandingTotal)} outstanding</span></>}
           </div>
         </div>
-        <div className="stat-card">
+        <div
+          className="stat-card"
+          onClick={() => toggleFilter('CREDIT')}
+          title={salesTypeFilter === 'CREDIT' ? 'Click to show all cases' : 'Click to show only credit cases'}
+          style={{
+            cursor: 'pointer',
+            outline: salesTypeFilter === 'CREDIT' ? '2px solid var(--blue, #1565C0)' : 'none',
+            outlineOffset: -2,
+          }}
+        >
           <div className="stat-icon" style={{ background: '#EFF6FF' }}><MdHandshake size={18} /></div>
           <div className="stat-label">Credit Sales · Trusted Partners</div>
           <div className="stat-value" style={{ color: 'var(--blue, #1565C0)' }}>{fmtBr(credit.billedTotal)}</div>
@@ -119,6 +163,13 @@ export default function DailyReconciliationTab() {
           </div>
         </div>
       </div>
+
+      {salesTypeFilter && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12.5, color: 'var(--text-3)' }}>
+          Showing only <strong style={{ color: 'var(--text-1)' }}>{salesTypeFilter === 'CASH' ? 'Cash' : 'Credit'}</strong> cases
+          <button className="btn btn-ghost btn-sm" onClick={() => setSalesTypeFilter('')} style={{ padding: '2px 8px' }}>✕ Clear filter</button>
+        </div>
+      )}
 
       <div className="card">
         <div className="table-wrap">
@@ -134,12 +185,12 @@ export default function DailyReconciliationTab() {
             <tbody>
               {isLoading ? (
                 <tr><td colSpan={isSingleDay ? 7 : 8} className="empty-state">Loading…</td></tr>
-              ) : cases.length === 0 ? (
+              ) : visibleCases.length === 0 ? (
                 <tr><td colSpan={isSingleDay ? 7 : 8} className="empty-state">
-                  No cases delivered {isSingleDay ? 'on this date' : 'in this range'}
+                  No {salesTypeFilter ? (salesTypeFilter === 'CASH' ? 'cash' : 'credit') + ' ' : ''}cases delivered {isSingleDay ? 'on this date' : 'in this range'}
                   {clinicId || caseNumber ? ' matching this filter' : ''}.
                 </td></tr>
-              ) : cases.map(c => (
+              ) : visibleCases.map(c => (
                 <tr key={c.id}>
                   <td><span className="case-number">{c.caseNumber || '—'}</span></td>
                   <td><span className="patient-name">{c.patientName || '—'}</span></td>
