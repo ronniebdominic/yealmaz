@@ -5,8 +5,9 @@ import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
   MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge, MdWarehouse, MdGroups,
   MdDesk, MdPointOfSale, MdLocalShipping, MdTwoWheeler, MdScience, MdSupervisorAccount, MdInventory,
-  MdPeopleAlt, MdDelete, MdSmartToy,
+  MdPeopleAlt, MdDelete,
 } from 'react-icons/md';
+import FloatingAIAssistant from './FloatingAIAssistant';
 
 // Dashboards each staff role normally logs into directly — the admin
 // account can open any of these to view/operate them without a separate
@@ -25,10 +26,6 @@ const VIEW_AS_ITEMS = [
 function NavItems({ active, onNav }) {
   return (
     <>
-      <button className={active('/admin/ai-chat')} onClick={() => onNav('/admin/ai-chat')}>
-        <MdSmartToy className="mi" size={17} /> AI Assistant
-      </button>
-
       <div className="nav-section-label">Analytics</div>
       <button className={active('/admin')} onClick={() => onNav('/admin')}>
         <MdAnalytics className="mi" size={17} /> Analytics Dashboard
@@ -151,6 +148,8 @@ export default function AdminLayout({ children }) {
       <main className="main">
         {children}
       </main>
+
+      <FloatingAIAssistant />
     </div>
   );
 }

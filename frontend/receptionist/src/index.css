@@ -801,6 +801,90 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   .modal-overlay{padding:var(--sp-3)}
 }
 
+/* ═══ Motion ════════════════════════════════════════════════════════
+   Small, fast, purposeful. Everything here is inside the global
+   prefers-reduced-motion kill-switch below. */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fadeInScale{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+@keyframes fabIn{from{opacity:0;transform:scale(.4) translateY(12px)}to{opacity:1;transform:none}}
+@keyframes panelIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes floatBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+/* Route content drifts up on mount. Applied to .content so every screen
+   gets the same settle. */
+.content>*{animation:fadeInUp var(--t-slow) var(--ease) both}
+
+/* Opt-in stagger: give a grid/list this class and its direct children
+   cascade in. Used on the dashboard KPI rows and card grids. */
+.stagger-in>*{animation:fadeInUp 420ms var(--ease) both}
+.stagger-in>*:nth-child(1){animation-delay:20ms}
+.stagger-in>*:nth-child(2){animation-delay:60ms}
+.stagger-in>*:nth-child(3){animation-delay:100ms}
+.stagger-in>*:nth-child(4){animation-delay:140ms}
+.stagger-in>*:nth-child(5){animation-delay:180ms}
+.stagger-in>*:nth-child(6){animation-delay:220ms}
+.stagger-in>*:nth-child(7){animation-delay:260ms}
+.stagger-in>*:nth-child(8){animation-delay:300ms}
+
+/* Nav items ease their icon on hover for a touch of life. */
+.nav-item{transition:background var(--t) var(--ease),color var(--t) var(--ease),transform var(--t) var(--ease)}
+.nav-item:hover{transform:translateX(2px)}
+.nav-item .mi{transition:transform var(--t) var(--ease)}
+.nav-item:hover .mi{transform:scale(1.08)}
+.nav-item.active .mi{transform:scale(1.05)}
+
+/* Buttons dip slightly when pressed. */
+.btn{transition:background var(--t) var(--ease),border-color var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform 90ms var(--ease)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.985)}
+
+/* ── Floating AI assistant ──────────────────────────────────────── */
+.ai-fab{
+  position:fixed;right:24px;bottom:24px;z-index:940;
+  width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;
+  display:grid;place-items:center;color:#fff;
+  background:linear-gradient(145deg,var(--brand) 0%,var(--brand-strong,#2247B0) 100%);
+  box-shadow:0 10px 28px rgba(45,91,214,.38),0 2px 6px rgba(16,28,54,.18),var(--glass-hi);
+  animation:fabIn 380ms var(--ease) both;
+  transition:transform 160ms var(--ease),box-shadow 160ms var(--ease),background 160ms var(--ease);
+}
+.ai-fab:hover{transform:translateY(-2px) scale(1.05);box-shadow:0 16px 36px rgba(45,91,214,.46),0 3px 8px rgba(16,28,54,.2)}
+.ai-fab:active{transform:translateY(0) scale(.96)}
+.ai-fab .mi{transition:transform 220ms var(--ease)}
+.ai-fab[data-open="true"] .mi{transform:rotate(90deg)}
+.ai-fab[data-open="false"]:not(:hover){animation:fabIn 380ms var(--ease) both,floatBob 4.5s ease-in-out 1.2s infinite}
+.ai-fab-ping{position:absolute;inset:0;border-radius:50%;border:2px solid var(--brand);opacity:0;animation:pulse 2.8s ease-out infinite}
+
+.ai-panel{
+  position:fixed;right:24px;bottom:92px;z-index:940;
+  width:min(420px,calc(100vw - 32px));
+  height:min(600px,calc(100vh - 140px));
+  display:flex;flex-direction:column;overflow:hidden;
+  border-radius:var(--radius-lg);
+  background:var(--glass-strong);
+  border:1px solid var(--glass-border);
+  box-shadow:0 24px 64px rgba(16,28,54,.24),0 0 0 1px var(--glass-edge),var(--glass-hi);
+  -webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);
+  backdrop-filter:blur(var(--blur-lg)) saturate(160%);
+  animation:panelIn 260ms var(--ease) both;
+}
+.ai-panel-head{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 14px;border-bottom:1px solid var(--border-soft);
+  font-size:13.5px;font-weight:600;color:var(--text-1);flex-shrink:0;
+}
+.ai-panel-head .ai-panel-close{
+  margin-left:auto;border:none;background:transparent;cursor:pointer;
+  width:28px;height:28px;border-radius:var(--radius-sm);
+  display:grid;place-items:center;color:var(--text-3);
+  transition:background var(--t) var(--ease),color var(--t) var(--ease);
+}
+.ai-panel-head .ai-panel-close:hover{background:var(--surface-2);color:var(--text-1)}
+.ai-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px}
+@media (max-width:540px){
+  .ai-fab{right:16px;bottom:16px}
+  .ai-panel{right:8px;left:8px;bottom:80px;width:auto;height:min(70vh,560px)}
+}
+
 /* ═══ Reduced motion ════════════════════════════════════════════════ */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{
