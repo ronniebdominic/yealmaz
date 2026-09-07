@@ -222,9 +222,13 @@ const emptyItem = () => ({
 // Selection, Work Type, Shade, Redo, Due Date, estimated Amount) now lives
 // here, repeated once per item — each item becomes its own independently-
 // tracked case (own case number/QR) on submit.
+// "14, 15, 16" → [14, 15, 16] — same format the odontogram/backend use.
+const parseToothNumbers = (str) =>
+  !str ? [] : String(str).split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+
 function WorkItemCard({
   item, index, onChange, onRemove, canRemove,
-  priceMap, durationMap, expressDurationMap, deliveryType,
+  priceMap, durationMap, expressDurationMap, deliveryType, onFillFromOriginal,
 }) {
   const [showWorkTypes, setShowWorkTypes] = useState(false);
   const [showShades, setShowShades] = useState(false);
@@ -463,7 +467,20 @@ function WorkItemCard({
             <Text style={[styles.label, { marginTop: Spacing.md }]}>Original Case *</Text>
             <OriginalCaseSearch
               selected={item.originalCase}
-              onSelect={rc => onChange({ originalCase: rc })}
+              onSelect={rc => {
+                // Pull this item's own details straight from the original
+                // case — a redo/replacement is almost always the same work,
+                // so there's no reason to make the clinic re-type it.
+                const teeth = parseToothNumbers(rc.toothNumbers);
+                onChange({
+                  originalCase: rc,
+                  workType: rc.workType || item.workType,
+                  shade: rc.shade || item.shade,
+                  selectedTeeth: teeth,
+                  manualUnits: teeth.length === 0 && rc.units != null ? String(rc.units) : item.manualUnits,
+                });
+                onFillFromOriginal?.(rc);
+              }}
               onClear={() => onChange({ originalCase: null })}
             />
             <Text style={[styles.label, { marginTop: Spacing.md }]}>Reason (optional)</Text>
@@ -761,6 +778,14 @@ export default function NewCaseScreen({ navigation }) {
             durationMap={durationMap}
             expressDurationMap={expressDurationMap}
             deliveryType={form.deliveryType}
+            onFillFromOriginal={rc => setForm(prev => ({
+              ...prev,
+              patientName:   rc.patientName || prev.patientName,
+              patientAge:    rc.patientAge != null ? String(rc.patientAge) : prev.patientAge,
+              patientGender: rc.patientGender || prev.patientGender,
+              doctorName:    rc.doctorName || prev.doctorName,
+              doctorPhone:   rc.doctorPhone || prev.doctorPhone,
+            }))}
           />
         ))}
         <TouchableOpacity style={styles.addItemBtn} onPress={addItem} activeOpacity={0.8}>
