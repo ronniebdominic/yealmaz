@@ -8,10 +8,7 @@ import { todayLocal, toLocalDateString, startOfWeekLocal, startOfMonthLocal } fr
 function EventTypeBadge({ type, pickupKind }) {
   const isPickup = type === 'PICKUP';
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, whiteSpace: 'nowrap',
-      background: isPickup ? '#DBEAFE' : '#D1FAE5', color: isPickup ? '#1E40AF' : '#065F46',
-    }}>
+    <span className={`badge ${isPickup ? 'badge-received' : 'badge-pay-verified'}`} style={{ whiteSpace: 'nowrap' }}>
       {isPickup ? (pickupKind === 'IMPRESSION' ? 'Picked Up · Impression' : 'Picked Up · From Lab') : 'Delivered'}
     </span>
   );
@@ -59,7 +56,7 @@ function MiniSparkline({ dailyCounts, from, to }) {
           style={{
             flex: 1, minWidth: 4, borderRadius: '3px 3px 0 0',
             height: `${Math.max((b.count / max) * 100, b.count > 0 ? 12 : 4)}%`,
-            background: i === buckets.length - 1 ? 'var(--amber)' : 'var(--amber)66',
+            background: 'var(--amber)', opacity: i === buckets.length - 1 ? 1 : 0.45,
           }}
         />
       ))}
@@ -89,22 +86,17 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 700, fontSize: 15 }}>
           <MdInsights size={19} /> My Performance
         </div>
-        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <MdClose size={17} />
         </button>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         {/* Range presets */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div className="seg" style={{ width: '100%', marginBottom: 16 }}>
           {RANGE_PRESETS.map(p => (
-            <button key={p.id} onClick={() => { setRangeId(p.id); setPage(1); }}
-              style={{
-                flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-                border: `2px solid ${rangeId === p.id ? 'var(--amber)' : 'var(--border)'}`,
-                background: rangeId === p.id ? 'rgba(217,119,6,0.08)' : 'var(--surface)',
-                color: rangeId === p.id ? 'var(--amber)' : 'var(--text-2)',
-              }}>
+            <button key={p.id} className={rangeId === p.id ? 'active' : ''} style={{ flex: 1 }}
+              onClick={() => { setRangeId(p.id); setPage(1); }}>
               {p.label}
             </button>
           ))}
@@ -138,13 +130,16 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
 
             {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
             {summary?.shareOfTotalPercent != null && (
-              <div style={{ background: 'var(--amber)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Your Share of the Lab</div>
-                <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                  <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
+              <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-3)' }}>Your Share of the Lab</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--amber)', fontVariantNumeric: 'tabular-nums' }}>{summary.shareOfTotalPercent}%</div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  {summary.shareOfTotalPercent}% — {summary.totalOrders} of {summary.totalLabOrders} lab orders (pickups + deliveries) in this range
+                <div style={{ height: 8, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: 'var(--amber)', borderRadius: 4, transition: 'width var(--t-data) var(--ease-out)' }} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {summary.totalOrders} of {summary.totalLabOrders} lab orders (pickups + deliveries) in this range
                 </div>
               </div>
             )}
