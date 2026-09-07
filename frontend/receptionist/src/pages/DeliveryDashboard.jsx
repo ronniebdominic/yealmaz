@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import api, { socket } from '../api';
 import toast from 'react-hot-toast';
@@ -6,10 +6,13 @@ import { format } from 'date-fns';
 import {
   MdCheckCircle, MdUndo, MdLocalHospital, MdLocationOn, MdCall, MdWarning,
   MdSearch, MdClose, MdLogout, MdArchive, MdExpandLess, MdExpandMore,
-  MdMenu, MdInsights, MdMyLocation,
+  MdMenu, MdInsights, MdMyLocation, MdVolumeUp, MdVolumeOff,
 } from 'react-icons/md';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useLiveLocationSharing } from '../hooks/useLiveLocationSharing';
+import { feedback, soundEnabled, setSoundEnabled } from '../utils/feedback';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import CountUp from '../components/CountUp';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import InstallAppBanner from '../components/InstallAppBanner';
@@ -43,7 +46,27 @@ function DPStyles() {
         padding:0 7px;border-radius:var(--radius-pill);
         background:var(--red-dim);border:1px solid var(--red-line);color:var(--red);
         font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;
+        transition:transform var(--t) var(--ease-emphasal);
       }
+      .dp-count[data-bump="up"]{animation:dpBump 360ms var(--ease-emphasal)}
+      @keyframes dpBump{0%{transform:scale(1)}40%{transform:scale(1.28)}100%{transform:scale(1)}}
+
+      /* Hamburger ↔ close */
+      .dp-menu-ic{transition:transform var(--t-slow) var(--ease-emphasal)}
+      .dp-icon-btn[data-open="true"] .dp-menu-ic{transform:rotate(90deg)}
+
+      /* Location — pulses only while actively sharing (state, not decor). */
+      .dp-loc-live{position:relative}
+      .dp-loc-live::after{content:"";position:absolute;left:-3px;top:50%;width:8px;height:8px;margin-top:-4px;
+        border-radius:50%;background:var(--green);animation:pulseDot 1.8s var(--ease-in-out) infinite}
+
+      /* Pull-to-refresh */
+      .dp-ptr{display:flex;align-items:center;justify-content:center;overflow:hidden;
+        color:var(--text-3);font-size:12px;font-weight:600;will-change:height}
+      .dp-ptr svg{transition:transform 160ms var(--ease-out)}
+      .dp-ptr[data-armed="true"] svg{transform:rotate(180deg)}
+      .dp-ptr[data-spin="true"] svg{animation:spin .7s linear infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}
 
       /* Content */
       .dp-body{flex:1;padding:clamp(12px,3vw,20px);container-type:inline-size;
@@ -74,9 +97,16 @@ function DPStyles() {
         border-left:3px solid var(--acc,var(--brand));
         padding:12px 14px;
         box-shadow:var(--shadow-xs);
-        animation:fadeInUp var(--t-slow) var(--ease-out) both;
-        transition:transform var(--t-fast) var(--ease-out),box-shadow var(--t-fast) var(--ease-out),border-color var(--t-fast) var(--ease-out);
+        animation:fadeInUp var(--t-slower) var(--ease-out) both;
+        transition:transform var(--t-fast) var(--ease-out),box-shadow var(--t-fast) var(--ease-out),border-color var(--t) var(--ease-out),opacity var(--t-slow) var(--ease-out);
       }
+      /* Short entry stagger — capped so a long list never feels slow. */
+      .dp-grid>*:nth-child(1){animation-delay:0ms}
+      .dp-grid>*:nth-child(2){animation-delay:40ms}
+      .dp-grid>*:nth-child(3){animation-delay:80ms}
+      .dp-grid>*:nth-child(4){animation-delay:120ms}
+      .dp-grid>*:nth-child(n+5){animation-delay:150ms}
+      .dp-card.is-clearing{opacity:0;transform:scale(.96);pointer-events:none}
       @media (hover:hover){.dp-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}}
       .dp-card:active{transform:scale(.99)}
       .dp-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
@@ -405,7 +435,7 @@ function DeliveryArchive() {
 }
 
 // ── Navigation drawer ────────────────────────────────────────────────
-function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenPerformance, onLogout }) {
+function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenPerformance, onLogout, soundOn, onToggleSound }) {
   return (
     <>
       <div className="dp-scrim" onClick={onClose} />
@@ -434,6 +464,12 @@ function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenP
         <div className="dp-drawer-sec">Performance</div>
         <button onClick={onOpenPerformance} className="dp-drawer-item"><MdInsights size={16} /> My Performance</button>
 
+        <div className="dp-drawer-sec">Sound</div>
+        <button onClick={onToggleSound} className="dp-drawer-item" role="switch" aria-checked={soundOn}
+          style={soundOn ? { background: 'var(--green-dim)', borderColor: 'var(--green-line)', color: 'var(--green)' } : undefined}>
+          {soundOn ? <MdVolumeUp size={16} /> : <MdVolumeOff size={16} />} Interaction sounds {soundOn ? 'on' : 'off'}
+        </button>
+
         <div style={{ marginTop: 'auto', paddingTop: 16 }}>
           <button onClick={onLogout} className="dp-drawer-item"
             style={{ background: 'var(--red-dim)', borderColor: 'var(--red-line)', color: 'var(--red)' }}>
@@ -458,6 +494,12 @@ export default function DeliveryDashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [soundOn, setSoundOn] = useState(soundEnabled());
+  const [countBump, setCountBump] = useState(false);
+  const [ptr, setPtr] = useState({ dist: 0, armed: false, spin: false });
+  const prevActiveRef = useRef(0);
+  const ptrRef = useRef({ startY: 0, pulling: false });
+  const reducedMotion = usePrefersReducedMotion();
 
   const { sharing, error: locError, toggle: toggleLocation } = useLiveLocationSharing();
 
@@ -518,10 +560,42 @@ export default function DeliveryDashboard() {
       }
       const wasSuccess = modal.action === 'picked_up' || modal.action === 'lab_pickup' || modal.action === 'delivered';
       setModal(null);
-      if (wasSuccess) { setFlash(true); setTimeout(() => setFlash(false), 900); }
+      if (wasSuccess) { setFlash(true); feedback('success'); setTimeout(() => setFlash(false), 900); }
       loadCases();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed'); }
+    } catch (err) {
+      feedback('error');
+      toast.error(err.response?.data?.error || 'Failed');
+    }
     finally { setProcessing(false); }
+  };
+
+  // Pull-to-refresh — drives only the existing loadCases(). Touch-only,
+  // disabled under reduced motion.
+  const REFRESH_AT = 64;
+  const onTouchStart = (e) => {
+    if (reducedMotion) return;
+    const el = e.currentTarget;
+    if (el.scrollTop > 0) return;
+    ptrRef.current = { startY: e.touches[0].clientY, pulling: true };
+  };
+  const onTouchMove = (e) => {
+    if (!ptrRef.current.pulling) return;
+    const dy = e.touches[0].clientY - ptrRef.current.startY;
+    if (dy <= 0) { setPtr(p => (p.dist ? { dist: 0, armed: false, spin: false } : p)); return; }
+    const dist = Math.min(dy * 0.5, 90);
+    setPtr({ dist, armed: dist >= REFRESH_AT, spin: false });
+  };
+  const onTouchEnd = async () => {
+    if (!ptrRef.current.pulling) return;
+    const armed = ptr.armed;
+    ptrRef.current.pulling = false;
+    if (armed) {
+      setPtr({ dist: 36, armed: false, spin: true });
+      feedback('light');
+      try { await loadCases(); } finally { setPtr({ dist: 0, armed: false, spin: false }); }
+    } else {
+      setPtr({ dist: 0, armed: false, spin: false });
+    }
   };
 
   // Filter
@@ -548,6 +622,17 @@ export default function DeliveryDashboard() {
   const totalActive = pickupList.length + deliveryList.length;
   const hasFilter = search || dateFrom || dateTo;
 
+  // Task-count number transition — bump the badge when active work rises.
+  useEffect(() => {
+    if (totalActive > prevActiveRef.current && prevActiveRef.current !== 0) {
+      setCountBump(true);
+      const id = setTimeout(() => setCountBump(false), 400);
+      prevActiveRef.current = totalActive;
+      return () => clearTimeout(id);
+    }
+    prevActiveRef.current = totalActive;
+  }, [totalActive]);
+
   return (
     <div className="dp-shell">
       <DPStyles />
@@ -566,19 +651,28 @@ export default function DeliveryDashboard() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            {totalActive > 0 && <span className="dp-count">{totalActive}</span>}
+            {totalActive > 0 && (
+              <span className="dp-count" data-bump={countBump ? 'up' : undefined}>
+                <CountUp value={totalActive} duration={320} />
+              </span>
+            )}
             <button onClick={() => setSearchOpen(o => !o)} className="dp-icon-btn" aria-label="Search"
               style={searchOpen ? { background: 'var(--brand-tint)', borderColor: 'var(--brand)', color: 'var(--brand)' } : undefined}>
               <MdSearch size={18} />
             </button>
-            <button onClick={() => setMenuOpen(true)} className="dp-icon-btn" aria-label="Menu"><MdMenu size={20} /></button>
+            <button onClick={() => setMenuOpen(o => !o)} className="dp-icon-btn" data-open={menuOpen ? 'true' : 'false'}
+              aria-label={menuOpen ? 'Close menu' : 'Menu'} aria-expanded={menuOpen}>
+              <span className="dp-menu-ic">{menuOpen ? <MdClose size={19} /> : <MdMenu size={20} />}</span>
+            </button>
           </div>
         </header>
 
         {/* ── Live-sharing strip ── */}
         {sharing && (
           <div className="dp-loc-strip">
-            <MdMyLocation size={14} /> Sharing your live location
+            <span className="dp-loc-live" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, paddingLeft: 6 }}>
+              <MdMyLocation size={14} /> Sharing your live location
+            </span>
             <button onClick={toggleLocation} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--green)', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', fontSize: 12.5 }}>Stop</button>
           </div>
         )}
@@ -604,7 +698,12 @@ export default function DeliveryDashboard() {
           </div>
         )}
 
-        <div className="dp-body">
+        <div className="dp-body" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+          style={ptr.dist ? { transform: `translateY(${ptr.dist}px)`, transition: ptr.spin ? 'none' : 'transform .18s var(--ease-out)' } : undefined}>
+          <div className="dp-ptr" data-armed={ptr.armed ? 'true' : 'false'} data-spin={ptr.spin ? 'true' : 'false'}
+            style={{ height: ptr.dist ? Math.min(ptr.dist, 44) : 0, marginTop: ptr.dist ? -8 : 0 }} aria-hidden="true">
+            {ptr.dist > 6 && <><MdUndo size={15} style={{ transform: 'scaleX(-1)' }} /> <span style={{ marginLeft: 6 }}>{ptr.spin ? 'Refreshing…' : ptr.armed ? 'Release to refresh' : 'Pull to refresh'}</span></>}
+          </div>
           {loading ? (
             <div className="dp-grid">
               {[0, 1, 2].map(i => <div key={i} className="skeleton-card" style={{ height: 168 }} />)}
@@ -666,6 +765,8 @@ export default function DeliveryDashboard() {
           onToggleLocation={toggleLocation}
           onOpenPerformance={() => { setMenuOpen(false); setShowPerformance(true); }}
           onLogout={logout}
+          soundOn={soundOn}
+          onToggleSound={() => { const next = !soundOn; setSoundEnabled(next); setSoundOn(next); if (next) feedback('submit'); }}
         />
       )}
 
