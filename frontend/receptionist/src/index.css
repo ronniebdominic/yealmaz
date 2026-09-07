@@ -119,20 +119,28 @@
   --blur:    14px;
   --blur-lg: 22px;
 
-  /* ── Motion ─────────────────────────────────────────────────────────
-     One family of easing curves, one set of durations. UI interactions
-     sit at 120–260ms; data visuals (count-ups, bars, chart entrances)
-     at 400–650ms. Everything is inside the prefers-reduced-motion
-     kill-switch at the end of this file. */
+  /* ── Motion — the Ye-Almaz timing bands ────────────────────────────
+     One easing family, one duration ladder. Every value below maps to a
+     band in the motion spec; nothing animates outside these.
+       micro-interaction    120–180ms  → --t-fast
+       standard interaction 180–250ms  → --t
+       navigation           180–280ms  → --t-slow
+       modal                200–300ms  → --t-slow / --t-slower
+       data visualisation   400–700ms  → --t-data
+       success feedback     250–450ms  → --t-success
+     Long durations are only ever used to communicate real state
+     (progress, a chart drawing itself). Everything here is inside the
+     prefers-reduced-motion kill-switch at the end of this file. */
   --ease:          cubic-bezier(.2,.8,.3,1);   /* default / entrance (ease-out) */
   --ease-out:      cubic-bezier(.2,.8,.3,1);
   --ease-in:       cubic-bezier(.4,0,1,1);     /* exits */
   --ease-in-out:   cubic-bezier(.5,0,.2,1);    /* movement between two states */
   --ease-emphasal: cubic-bezier(.2,1.3,.4,1);  /* gentle overshoot for confirmations */
-  --t-fast:   120ms;   /* press / hover / micro */
-  --t:        160ms;   /* default control transition */
-  --t-slow:   240ms;   /* entrances, dropdowns, modals */
-  --t-slower: 320ms;   /* larger surfaces */
+  --t-fast:    140ms;  /* micro: press, hover, icon nudge (120–180) */
+  --t:         190ms;  /* standard control transition (180–250) */
+  --t-slow:    240ms;  /* navigation, dropdowns, modals (180–300) */
+  --t-slower:  300ms;  /* larger surfaces / modal envelope */
+  --t-success: 380ms;  /* success / confirmation feedback (250–450) */
   --t-data:   520ms;   /* progress bars, chart entrance */
   --t-count:  640ms;   /* KPI count-ups */
 
@@ -914,16 +922,26 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 .stagger-in>*:nth-child(7){animation-delay:260ms}
 .stagger-in>*:nth-child(8){animation-delay:300ms}
 
-/* Nav items ease their icon on hover for a touch of life. */
+/* ── Interaction hierarchy ─────────────────────────────────────────
+   Feedback strength tracks action importance: a primary action pushes
+   back hardest, a tertiary/text action barely moves, navigation is a
+   whisper, and information/background don't move at all. */
+
+/* NAVIGATION — subtle. */
 .nav-item{transition:background var(--t) var(--ease),color var(--t) var(--ease),transform var(--t) var(--ease)}
 .nav-item:hover{transform:translateX(2px)}
 .nav-item .mi{transition:transform var(--t) var(--ease)}
-.nav-item:hover .mi{transform:scale(1.08)}
-.nav-item.active .mi{transform:scale(1.05)}
+.nav-item:hover .mi{transform:scale(1.06)}
+.nav-item.active .mi{transform:scale(1.04)}
+.nav-item:active{transform:translateX(1px) scale(.99)}
 
-/* Buttons dip slightly when pressed. */
-.btn{transition:background var(--t) var(--ease),border-color var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform 90ms var(--ease-out)}
-.btn:active:not(:disabled){transform:translateY(1px) scale(.985)}
+/* BUTTONS — press depth by tier. */
+.btn{transition:background var(--t) var(--ease),border-color var(--t) var(--ease),color var(--t) var(--ease),box-shadow var(--t) var(--ease),transform var(--t-fast) var(--ease-out)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.98)}          /* default / secondary — moderate */
+.btn-primary:active:not(:disabled),
+.btn-success:active:not(:disabled),
+.btn-danger:active:not(:disabled){transform:translateY(1.5px) scale(.965)} /* primary — strongest */
+.btn-tertiary:active:not(:disabled){transform:translateY(.5px) scale(.99)} /* tertiary / text — minimal */
 .btn:disabled{cursor:not-allowed}
 
 /* ── Tactile press ─────────────────────────────────────────────────
@@ -954,7 +972,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 .ai-fab:active{transform:translateY(0) scale(.96)}
 .ai-fab .mi{transition:transform 220ms var(--ease)}
 .ai-fab[data-open="true"] .mi{transform:rotate(90deg)}
-.ai-fab[data-open="false"]:not(:hover){animation:fabIn 380ms var(--ease) both,floatBob 4.5s ease-in-out 1.2s infinite}
+/* Entrance only — no idle bob. Background elements stay static. */
 .ai-fab-ping{position:absolute;inset:0;border-radius:50%;border:2px solid var(--brand);opacity:0;animation:pulse 2.8s ease-out infinite}
 
 .ai-panel{
