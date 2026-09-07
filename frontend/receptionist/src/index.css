@@ -61,8 +61,13 @@
   --surface:       #FFFFFF;
   --surface-2:     #F5F7FC;               /* inset / quiet fill          */
   --surface-3:     #ECF0F8;               /* pressed / track             */
-  --glass:         rgba(255,255,255,.74);
-  --glass-strong:  rgba(255,255,255,.86);
+  --glass:         rgba(255,255,255,.62);
+  --glass-strong:  rgba(255,255,255,.82);
+  /* Diagonal sheen laid over a glass surface so the translucency reads as
+     glass rather than as a flat wash. Very low alpha — it should catch the
+     light, not tint the card. */
+  --glass-sheen:   linear-gradient(140deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.14) 34%,rgba(255,255,255,0) 60%);
+  --glass-hi:      inset 0 1px 0 rgba(255,255,255,.65);   /* top edge highlight */
   --overlay:       rgba(255,255,255,.88);
   --scrim:         rgba(16,28,54,.42);
 
@@ -278,12 +283,17 @@ body::before{
    One card system: translucent surface, hairline edge, tight shadow.
    Variants add a semantic left edge rather than a coloured background. */
 .card{
+  position:relative;isolation:isolate;
   border-radius:var(--radius-lg);
   background:var(--glass);
   border:1px solid var(--glass-border);
-  box-shadow:var(--shadow),0 0 0 1px var(--glass-edge);
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(140%);
-  backdrop-filter:blur(var(--blur)) saturate(140%);
+  box-shadow:var(--shadow),0 0 0 1px var(--glass-edge),var(--glass-hi);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+  backdrop-filter:blur(var(--blur)) saturate(150%);
+}
+.card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  background:var(--glass-sheen);pointer-events:none;z-index:-1;
 }
 .card-header{
   padding:var(--sp-4) var(--sp-5) var(--sp-3);
@@ -306,20 +316,33 @@ body::before{
 /* ═══ KPI / stat cards ══════════════════════════════════════════════
    Restrained: small tinted icon, quiet label, authoritative number.
    The number carries the weight — the card doesn't. */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);margin-bottom:var(--sp-6)}
+/* Auto-fit so a row of 3, 4 or 5 tiles reflows on its own as the viewport
+   narrows — no per-row column count to keep in sync. The media queries
+   below still pin 2/1 columns on tablet/phone. */
+.stats-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(228px,1fr));
+  gap:var(--sp-4);margin-bottom:var(--sp-6);
+}
 .stat-card{
-  position:relative;z-index:1;
+  position:relative;z-index:1;isolation:isolate;
   display:flex;flex-direction:column;gap:2px;
   padding:var(--sp-4) var(--sp-5);
   border-radius:var(--radius-lg);
   background:var(--glass);
   border:1px solid var(--glass-border);
-  box-shadow:var(--shadow-sm),0 0 0 1px var(--glass-edge);
-  -webkit-backdrop-filter:blur(var(--blur-sm)) saturate(135%);
-  backdrop-filter:blur(var(--blur-sm)) saturate(135%);
+  box-shadow:var(--shadow-sm),0 0 0 1px var(--glass-edge),var(--glass-hi);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+  backdrop-filter:blur(var(--blur)) saturate(150%);
   transition:transform var(--t) var(--ease),box-shadow var(--t) var(--ease);
 }
-.stat-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-md),0 0 0 1px var(--glass-edge)}
+/* Diagonal light-catch. A pseudo-element so it sits above the backdrop
+   blur but below the tile's content, and never intercepts clicks. */
+.stat-card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  background:var(--glass-sheen);pointer-events:none;z-index:-1;
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg),0 0 0 1px var(--glass-edge),var(--glass-hi)}
 /* backdrop-filter gives every card its own stacking context, so a tooltip
    inside one card can't paint over a LATER sibling card no matter its own
    z-index — that z-index only wins within its own card's context. Raising
@@ -553,13 +576,17 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
    Equivalent to the base .card/.stat-card treatment, kept for the spots
    that opt in explicitly by name. */
 .glass-card{
-  position:relative;z-index:1;
+  position:relative;z-index:1;isolation:isolate;
   background:var(--glass);
   border:1px solid var(--glass-border);
   border-radius:var(--radius-lg);
-  box-shadow:var(--shadow),0 0 0 1px var(--glass-edge);
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(140%);
-  backdrop-filter:blur(var(--blur)) saturate(140%);
+  box-shadow:var(--shadow),0 0 0 1px var(--glass-edge),var(--glass-hi);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+  backdrop-filter:blur(var(--blur)) saturate(150%);
+}
+.glass-card::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  background:var(--glass-sheen);pointer-events:none;z-index:-1;
 }
 /* Same stacking-context fix as .stat-card — see its comment. */
 .glass-card:hover,.glass-card:focus-within{z-index:5}

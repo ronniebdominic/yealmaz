@@ -412,13 +412,6 @@ export default function AdminDashboard() {
             filename="admin-clinic-performance"
             title={`Clinic Performance — ${fromDate} to ${toDate}`}
           />
-          <div className="glass-pill" style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 11.5, fontWeight: 500, color: 'var(--text-3)',
-            padding: '4px 10px', borderRadius: 'var(--radius-pill)',
-          }}>
-            <div className="live-dot" /> Live
-          </div>
         </div>
       </div>
 
@@ -538,7 +531,7 @@ export default function AdminDashboard() {
           <>
             {/* ── Section 1: Financial Projection ── */}
             <SectionHeader>Financial Projection</SectionHeader>
-            <div className="stats-grid tooltip-below" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+            <div className="stats-grid tooltip-below" style={{ marginBottom: 24 }}>
               <ColorTile icon={MdAssignment} label="Total Cases" value={kpi?.totalCases ?? '—'}
                 sub="In selected range" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'totalCases'} onClick={() => handleDrill('totalCases')}
@@ -555,7 +548,7 @@ export default function AdminDashboard() {
 
             {/* ── Section 2: Revenue Vs Volume ── */}
             <SectionHeader>Revenue Vs Volume</SectionHeader>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', marginBottom: 16 }}>
+            <div className="stats-grid" style={{ marginBottom: 16 }}>
               <ColorTile icon={MdCheckCircle} label="Total Cases Delivered" value={kpi?.deliveredCases ?? '—'}
                 sub="Completed" color="var(--green)" bg="var(--green-dim)"
                 active={drillKey === 'deliveredCases'} onClick={() => handleDrill('deliveredCases')}
@@ -631,7 +624,7 @@ export default function AdminDashboard() {
             <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8, marginTop: -4 }}>
               Status breakdown of the same cohort as "Total Cases" above (by order date) — these four always add up exactly.
             </div>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 8 }}>
+            <div className="stats-grid" style={{ marginBottom: 8 }}>
               <ColorTile icon={MdSettings} label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
                 sub="In production" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')}
@@ -654,7 +647,7 @@ export default function AdminDashboard() {
                 {(kpi.activeCases ?? 0).toLocaleString()} + {(kpi.readyToDispatch ?? 0).toLocaleString()} + {(kpi.deliveredOfCreated ?? 0).toLocaleString()} + {(kpi.otherCases ?? 0).toLocaleString()} = {((kpi.activeCases ?? 0) + (kpi.readyToDispatch ?? 0) + (kpi.deliveredOfCreated ?? 0) + (kpi.otherCases ?? 0)).toLocaleString()} — matches Total Cases ({(kpi.totalCases ?? 0).toLocaleString()}) ✓
               </div>
             )}
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
               <ColorTile icon={MdAutorenew} label="Total Remake" value={kpi?.totalRemakes ?? '—'}
                 sub={kpi?.mostCommonRemakeReason ? `Top reason: ${kpi.mostCommonRemakeReason}` : 'In selected range'}
                 color="var(--red)" bg="var(--red-dim)"
@@ -685,7 +678,7 @@ export default function AdminDashboard() {
 
             {/* ── Section 4: Inventory ── */}
             <SectionHeader>Inventory</SectionHeader>
-            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 24 }}>
+            <div className="stats-grid" style={{ marginBottom: 24 }}>
               <ColorTile icon={MdWarning} label="Low Stock Items" value={invSummary?.lowStockCount ?? '—'}
                 sub="Below reorder threshold" color="var(--red)" bg="var(--red-dim)"
                 onClick={() => navigate('/admin/inventory')}
