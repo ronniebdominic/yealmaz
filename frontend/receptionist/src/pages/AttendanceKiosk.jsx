@@ -52,7 +52,7 @@ function Setup({ onSaved }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg-1)', padding: 24 }}>
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg)', padding: 24 }}>
       <form onSubmit={submit} className="card" style={{ padding: 28, width: 'min(460px, 92vw)' }}>
         <h2 style={{ margin: '0 0 6px' }}>Kiosk setup</h2>
         <p style={{ margin: '0 0 18px', color: 'var(--text-3)', fontSize: 13, lineHeight: 1.5 }}>
@@ -62,7 +62,7 @@ function Setup({ onSaved }) {
         <input
           autoFocus type="password" value={value} onChange={e => setValue(e.target.value)}
           placeholder="Kiosk key"
-          style={{ width: '100%', padding: '14px 16px', fontSize: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }}
+          style={{ width: '100%', padding: '14px 16px', fontSize: 16, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)' }}
         />
         {error && <div style={{ color: 'var(--red)', fontSize: 13, marginTop: 10 }}>{error}</div>}
         <button className="btn btn-primary" disabled={busy || !value.trim()} style={{ width: '100%', marginTop: 16, padding: 14, fontSize: 16 }}>
@@ -98,7 +98,7 @@ function PinPad({ value, onChange, onSubmit, disabled }) {
             style={{
               padding: '22px 0', fontSize: k.length === 1 ? 26 : 15, fontWeight: 600,
               borderRadius: 12, border: '1px solid var(--border)',
-              background: k.length === 1 ? 'var(--bg-2)' : 'transparent',
+              background: k.length === 1 ? 'var(--surface-2)' : 'transparent',
               color: 'var(--text-1)', cursor: 'pointer',
             }}
           >
@@ -217,7 +217,7 @@ export default function AttendanceKiosk() {
   if (!secret) return <Setup onSaved={saveSecret} />;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-1)', padding: 'clamp(12px, 3vw, 28px)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: 'clamp(12px, 3vw, 28px)' }}>
       {/* Hidden capture source. Kept mounted so the stream is warm. */}
       <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
 
@@ -273,7 +273,7 @@ export default function AttendanceKiosk() {
             <MdSearch size={20} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)' }} />
             <input
               value={query} onChange={e => setQuery(e.target.value)} placeholder="Find your name"
-              style={{ width: '100%', padding: '14px 14px 14px 44px', fontSize: 16, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }}
+              style={{ width: '100%', padding: '14px 14px 14px 44px', fontSize: 16, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)' }}
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
@@ -283,7 +283,7 @@ export default function AttendanceKiosk() {
                 title={s.hasPin ? '' : 'No PIN set — ask HR'}
                 style={{
                   padding: '18px 14px', borderRadius: 12, textAlign: 'left', cursor: s.hasPin ? 'pointer' : 'not-allowed',
-                  border: '1px solid var(--border)', background: 'var(--bg-2)', opacity: s.hasPin ? 1 : 0.4, color: 'var(--text-1)',
+                  border: '1px solid var(--border)', background: 'var(--surface-2)', opacity: s.hasPin ? 1 : 0.4, color: 'var(--text-1)',
                 }}
               >
                 <div style={{ fontWeight: 600, fontSize: 15 }}>{s.name}</div>

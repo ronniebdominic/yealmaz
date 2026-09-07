@@ -208,38 +208,59 @@ function DrillDownPanel({ drill, fromDate, toDate, clinicId, onClose }) {
 // ── Section header (matches the 3-block mockup: Financial Projection /
 // Revenue Vs Volume / Operation) ──────────────────────────
 function SectionHeader({ children }) {
-  return <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-1)', margin: '4px 0 12px' }}>{children}</div>;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      margin: '4px 0 12px',
+    }}>
+      <span style={{
+        fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase',
+        color: 'var(--text-3)', whiteSpace: 'nowrap',
+      }}>{children}</span>
+      <span style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+    </div>
+  );
 }
 
-// ── Colored KPI tile (mockup uses flat green/red/yellow/blue blocks) ─────
-// Glassmorphic: keeps the semantic tint (bg) but frosts it with a blur +
-// soft inset highlight, rather than flattening every card to neutral white.
+// ── KPI tile ─────────────────────────────────────────────────────────────
+// Neutral glass surface with the semantic hue carried by a small tinted
+// icon and (only where the metric itself is semantic, e.g. money owed) the
+// figure. Deliberately not a filled colour block: a dashboard of a dozen
+// saturated tiles gives every metric the same visual urgency, which makes
+// the one that actually needs attention impossible to spot.
+// `color`/`bg` keep their existing call signature — bg is now the icon
+// tint rather than the whole card, and color drives the icon + accent.
 function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active, info }) {
+  // Red is the only hue that should also colour the number — it's the one
+  // that means "this needs attention" rather than "this is a total".
+  const emphasise = color === 'var(--red)' || color === 'var(--amber)';
   return (
     <div
       onClick={onClick}
+      className="stat-card"
       style={{
-        background: bg, borderRadius: 12, padding: '14px 16px', cursor: onClick ? 'pointer' : 'default',
-        border: `1px solid ${color}33`, outline: active ? `2px solid ${color}` : 'none', outlineOffset: 2,
-        WebkitBackdropFilter: 'blur(12px) saturate(160%)', backdropFilter: 'blur(12px) saturate(160%)',
-        boxShadow: active ? `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)` : 'inset 0 1px 0 rgba(255,255,255,.5)',
-        transition: 'box-shadow .15s, transform .15s',
+        cursor: onClick ? 'pointer' : 'default',
+        borderColor: active ? color : undefined,
+        boxShadow: active ? `0 0 0 3px ${color}22, var(--shadow-sm)` : undefined,
       }}
-      onMouseEnter={e => { if (onClick) { e.currentTarget.style.boxShadow = `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)`; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = active ? `0 0 0 2px ${color}44, inset 0 1px 0 rgba(255,255,255,.5)` : 'inset 0 1px 0 rgba(255,255,255,.5)'; e.currentTarget.style.transform = 'translateY(0)'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-        <Icon className="mi" size={16} />
-        <span style={{ flex: 1 }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{
+          width: 28, height: 28, borderRadius: 'var(--radius-xs)', flexShrink: 0,
+          display: 'grid', placeItems: 'center', background: bg, color,
+        }}>
+          <Icon className="mi" size={15} />
+        </span>
         {info && (
-          <span className="info-icon-wrap" tabIndex={0} onClick={e => e.stopPropagation()}>
-            <MdInfoOutline size={13} style={{ opacity: 0.55 }} />
+          <span className="info-icon-wrap" tabIndex={0} onClick={e => e.stopPropagation()} style={{ marginLeft: 'auto' }}>
+            <MdInfoOutline size={13} style={{ color: 'var(--text-4)' }} />
             <span className="info-tooltip">{info}</span>
           </span>
         )}
       </div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{sub}</div>}
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={emphasise ? { color } : undefined}>{value}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
     </div>
   );
 }
@@ -369,15 +390,15 @@ export default function AdminDashboard() {
     <AdminLayout>
       <div className="topbar glass-topbar">
         <div className="topbar-title">Analytics Dashboard</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={exportToExcel} disabled={loading || !data}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: loading || !data ? 'var(--border)' : 'var(--green)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: loading || !data ? 'not-allowed' : 'pointer' }}>
-            <MdBarChart className="mi" size={16} /> Export Excel
+        {/* Action hierarchy: exporting the analysis is the primary job here;
+            the workflow test is a diagnostic and shouldn't compete with it. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="btn btn-primary btn-sm" onClick={exportToExcel} disabled={loading || !data}>
+            <MdBarChart className="mi" size={15} /> Export Excel
           </button>
-          <button onClick={runWorkflowTest} disabled={testRunning}
-            title="Run end-to-end workflow test through all lab stages"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: testRunning ? 'var(--border)' : 'var(--navy)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: testRunning ? 'not-allowed' : 'pointer' }}>
-            {testRunning ? <><MdPendingActions className="mi" size={16} /> Testing…</> : <><MdScience className="mi" size={16} /> Run Test</>}
+          <button className="btn btn-tertiary btn-sm" onClick={runWorkflowTest} disabled={testRunning}
+            title="Run end-to-end workflow test through all lab stages">
+            {testRunning ? <><MdPendingActions className="mi" size={15} /> Testing…</> : <><MdScience className="mi" size={15} /> Run Test</>}
           </button>
           <ExportMenu
             data={revenueByClinic || []}
@@ -391,7 +412,11 @@ export default function AdminDashboard() {
             filename="admin-clinic-performance"
             title={`Clinic Performance — ${fromDate} to ${toDate}`}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-3)' }}>
+          <div className="glass-pill" style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 11.5, fontWeight: 500, color: 'var(--text-3)',
+            padding: '4px 10px', borderRadius: 'var(--radius-pill)',
+          }}>
             <div className="live-dot" /> Live
           </div>
         </div>
@@ -401,7 +426,10 @@ export default function AdminDashboard() {
         {/* Filters */}
         <div className="glass-card" style={{ marginBottom: 20, padding: '14px 20px', position: 'relative', zIndex: 40 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Filters</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: '.08em',
+              textTransform: 'uppercase', color: 'var(--text-3)',
+            }}>Filters</span>
             <div className="search-input" style={{ minWidth: 200, margin: 0 }}>
               <span className="icon mi"><MdSearch size={16} /></span>
               <input
@@ -434,13 +462,31 @@ export default function AdminDashboard() {
                 style={{ minWidth: 160 }}
               />
             </div>
-            <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+            {/* Quick ranges read as one segmented control rather than four
+                loose buttons competing with the filters to their left. */}
+            <div style={{
+              display: 'flex', marginLeft: 'auto',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+              overflow: 'hidden', background: 'var(--surface)',
+            }}>
               {[
                 { label: 'Today',      f: () => { const n=todayLocal(); setFromDate(n); setToDate(n); setDrillKey(null); } },
                 { label: 'This Month', f: () => { const n=new Date(); setFromDate(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`); setToDate(todayLocal()); setDrillKey(null); } },
                 { label: 'This Year',  f: () => { setFromDate(`${thisYear}-01-01`); setToDate(todayLocal()); setDrillKey(null); } },
                 { label: 'All Time',   f: () => { setFromDate('2020-01-01'); setToDate(todayLocal()); setDrillKey(null); } },
-              ].map(({ label, f }) => <button key={label} className="btn btn-ghost btn-sm" onClick={f}>{label}</button>)}
+              ].map(({ label, f }, i) => (
+                <button key={label} onClick={f}
+                  style={{
+                    padding: '6px 12px', fontSize: 12, fontWeight: 500,
+                    fontFamily: 'var(--font-body)', color: 'var(--text-2)',
+                    background: 'transparent', cursor: 'pointer',
+                    border: 'none', borderLeft: i === 0 ? 'none' : '1px solid var(--border)',
+                    transition: 'background var(--t-fast), color var(--t-fast)',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-tint)'; e.currentTarget.style.color = 'var(--brand)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-2)'; }}
+                >{label}</button>
+              ))}
             </div>
           </div>
         </div>
@@ -546,23 +592,35 @@ export default function AdminDashboard() {
               const receivedPct    = billableTotal > 0 ? (received / billableTotal) * 100 : 0;
               const outstandingPct = billableTotal > 0 ? (outstanding / billableTotal) * 100 : 0;
               return (
-                <div style={{ marginBottom: 24, padding: '16px 20px', borderRadius: 'var(--radius-lg)', background: 'linear-gradient(90deg, #F0A500, #F59E0B)', border: '1px solid rgba(255,255,255,.35)', boxShadow: '0 8px 28px rgba(217,119,6,.25), inset 0 1px 0 rgba(255,255,255,.4)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div className="card" style={{ marginBottom: 24, padding: '16px 20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, gap: 12 }}>
+                    <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       Collection Rate
                       <span className="info-icon-wrap" tabIndex={0}>
-                        <MdInfoOutline size={13} style={{ opacity: 0.75 }} />
+                        <MdInfoOutline size={13} style={{ color: 'var(--text-4)' }} />
                         <span className="info-tooltip">Of the money billed on delivered cases in this range (Total Case Value, delivered only), what share has actually been collected vs. is still owed. Not paid-for cases still in production — this is purely about delivered work.</span>
                       </span>
                     </div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{collectionRate}%</div>
+                    <div style={{
+                      fontSize: 22, fontWeight: 650, letterSpacing: '-.03em',
+                      color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                    }}>{collectionRate}%</div>
                   </div>
-                  <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.35)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${receivedPct}%`, background: '#fff', borderRadius: 6, transition: 'width .6s ease' }} />
+                  <div style={{ height: 8, borderRadius: 'var(--radius-pill)', background: 'var(--surface-3)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${receivedPct}%`, borderRadius: 'var(--radius-pill)',
+                      background: 'var(--green)', transition: 'width .6s var(--ease)',
+                    }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                    <span>Received {receivedPct.toFixed(1)}%</span>
-                    <span>Outstanding {outstandingPct.toFixed(1)}%</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11.5, fontWeight: 500 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--text-3)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
+                      Received {receivedPct.toFixed(1)}%
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--text-3)' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--surface-3)', border: '1px solid var(--border-2)' }} />
+                      Outstanding {outstandingPct.toFixed(1)}%
+                    </span>
                   </div>
                 </div>
               );
@@ -993,8 +1051,10 @@ function TrustedPartnersSummary() {
   );
 }
 
+// Matches the global input treatment in index.css (which this overrides for
+// the compact filter row) — kept in step with those tokens by hand.
 const inputStyle = {
-  border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px',
+  border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', padding: '6px 10px',
   fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)',
-  outline: 'none', fontFamily: 'Manrope, sans-serif',
+  outline: 'none', fontFamily: 'var(--font-body)', minHeight: 32,
 };

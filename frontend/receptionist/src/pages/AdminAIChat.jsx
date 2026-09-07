@@ -57,28 +57,30 @@ function Message({ role, text, pending }) {
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
       {!isUser && (
         <div style={{
-          width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginRight: 8,
+          width: 28, height: 28, borderRadius: '50%', flexShrink: 0, marginRight: 8,
           display: 'grid', placeItems: 'center',
-          background: isError ? 'var(--red-dim)' : 'var(--accent-dim)',
-          color: isError ? 'var(--red)' : 'var(--accent)',
+          background: isError ? 'var(--red-dim)' : 'var(--brand-tint)',
+          color: isError ? 'var(--red)' : 'var(--brand)',
         }}>
           {isError ? <MdErrorOutline size={16} /> : <MdSmartToy size={16} />}
         </div>
       )}
       <div style={{
-        maxWidth: '72%', padding: '10px 14px', borderRadius: 14,
-        borderTopLeftRadius: isUser ? 14 : 4, borderTopRightRadius: isUser ? 4 : 14,
-        background: isUser ? 'var(--accent)' : isError ? 'var(--red-dim)' : 'var(--bg-2)',
+        maxWidth: '72%', padding: '10px 14px', borderRadius: 'var(--radius-md)',
+        borderTopLeftRadius: isUser ? 'var(--radius-md)' : 'var(--radius-xs)',
+        borderTopRightRadius: isUser ? 'var(--radius-xs)' : 'var(--radius-md)',
+        background: isUser ? 'var(--brand)' : isError ? 'var(--red-dim)' : 'var(--surface)',
         color: isUser ? '#fff' : isError ? 'var(--red)' : 'var(--text-1)',
-        border: isUser ? 'none' : `1px solid ${isError ? 'rgba(229,62,62,0.25)' : 'var(--border)'}`,
-        fontSize: 14, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        border: isUser ? 'none' : `1px solid ${isError ? 'var(--red-line)' : 'var(--border)'}`,
+        boxShadow: isUser ? 'var(--shadow-xs)' : 'none',
+        fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       }}>
         {pending ? <ThinkingDots /> : text}
       </div>
       {isUser && (
         <div style={{
           width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginLeft: 8,
-          display: 'grid', placeItems: 'center', background: 'var(--bg-2)', color: 'var(--text-3)',
+          display: 'grid', placeItems: 'center', background: 'var(--surface-2)', color: 'var(--text-3)',
         }}>
           <MdPerson size={16} />
         </div>
@@ -97,7 +99,7 @@ function ThinkingDots() {
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-3)' }}>
       <span className="thinking-dots"><i /><i /><i /></span>
       {elapsed >= Math.round(SLOW_HINT_MS / 1000) && (
-        <span style={{ fontSize: 12 }}>Still thinking — local models can take a while ({elapsed}s)…</span>
+        <span style={{ fontSize: 12 }}>Still thinking ({elapsed}s)…</span>
       )}
     </span>
   );
@@ -197,9 +199,16 @@ export default function AdminAIChat() {
         <div ref={listRef} className="card" style={{ flex: 1, overflowY: 'auto', padding: 16, marginBottom: 12 }}>
           {messages.length === 0 ? (
             <div className="empty-state" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-              <div style={{ textAlign: 'center' }}>
-                <MdSmartToy size={32} style={{ color: 'var(--text-3)', marginBottom: 8 }} />
-                <div>Ask about cases, payments, clinic balances, lab performance, or business insights.</div>
+              <div style={{ textAlign: 'center', maxWidth: 380 }}>
+                <div style={{
+                  width: 46, height: 46, borderRadius: '50%', margin: '0 auto 12px',
+                  display: 'grid', placeItems: 'center',
+                  background: 'var(--brand-tint)', color: 'var(--brand)',
+                }}>
+                  <MdSmartToy size={22} />
+                </div>
+                <div className="empty-title">Ask about the business</div>
+                <div>Cases, payments, clinic balances, lab performance, or business insights.</div>
                 {!sttSupported && (
                   <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)' }}>
                     Voice input isn’t supported in this browser — try Chrome or Edge.
@@ -220,9 +229,12 @@ export default function AdminAIChat() {
               rows={1}
               disabled={sending}
               style={{
-                flex: 1, resize: 'none', padding: '10px 12px', borderRadius: 10, minHeight: 40, maxHeight: 120,
-                border: `1px solid ${listening ? 'var(--accent)' : 'var(--border)'}`, background: 'var(--bg-2)', color: 'var(--text-1)',
-                fontFamily: 'inherit', fontSize: 14,
+                flex: 1, resize: 'none', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+                minHeight: 40, maxHeight: 120,
+                border: `1px solid ${listening ? 'var(--brand)' : 'var(--border)'}`,
+                boxShadow: listening ? '0 0 0 3px var(--brand-ring)' : 'none',
+                background: 'var(--surface)', color: 'var(--text-1)',
+                fontFamily: 'inherit', fontSize: 13.5,
               }}
             />
             <button
@@ -237,7 +249,7 @@ export default function AdminAIChat() {
               className="btn btn-ghost btn-sm" title={ttsSupported ? (autoSpeak ? 'Voice replies on — click to mute' : 'Voice replies off — click to enable') : 'Text-to-speech not supported in this browser'}
               disabled={!ttsSupported}
               onClick={() => { setAutoSpeak(v => !v); if (autoSpeak) window.speechSynthesis?.cancel(); }}
-              style={{ padding: 10, color: autoSpeak ? 'var(--accent)' : undefined }}
+              style={{ padding: 10, color: autoSpeak ? 'var(--brand)' : undefined }}
             >
               {autoSpeak ? <MdVolumeUp size={18} /> : <MdVolumeOff size={18} />}
             </button>

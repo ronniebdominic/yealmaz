@@ -170,7 +170,7 @@ function KioskPinControl({ employeeId, hasPin, onChanged }) {
         <input
           value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
           placeholder="New PIN" inputMode="numeric"
-          style={{ width: 120, fontSize: 13, padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }}
+          style={{ width: 120, fontSize: 13, padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)' }}
         />
         <button className="btn btn-primary btn-sm" disabled={busy || pin.length < 4} onClick={() => save(pin)}>
           {hasPin ? 'Replace PIN' : 'Set PIN'}

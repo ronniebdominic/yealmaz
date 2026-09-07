@@ -83,12 +83,12 @@ export default function DailyReconciliationTab() {
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>FROM</div>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }} />
+              style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)' }} />
           </div>
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>TO</div>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }} />
+              style={{ padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)' }} />
           </div>
           <div style={{ minWidth: 200 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>CLINIC</div>
@@ -100,7 +100,7 @@ export default function DailyReconciliationTab() {
             <input
               value={caseNumber} onChange={e => setCaseNumber(e.target.value)}
               placeholder="e.g. YDL26007600"
-              style={{ padding: '8px 10px 8px 32px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)', width: '100%' }}
+              style={{ padding: '8px 10px 8px 32px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)', width: '100%' }}
             />
           </div>
           {(dateFrom !== todayLocal() || dateTo !== todayLocal() || clinicId || caseNumber) && (

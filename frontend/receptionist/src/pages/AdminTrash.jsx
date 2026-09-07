@@ -110,7 +110,7 @@ export default function AdminTrash() {
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search case number, patient or clinic"
-            style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--text-1)' }}
+            style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-1)' }}
           />
         </div>
 
