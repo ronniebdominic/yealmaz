@@ -121,10 +121,99 @@ function Odontogram({ selected, onToggle }) {
   );
 }
 
+// ── Original Case Search (for Remake/Redo) ────────────────
+// Debounced search over this clinic's own past cases — GET /cases auto-
+// scopes to the clinic's own cases for a CLINIC-role token, so there's no
+// risk of linking to another clinic's case. Mirrors the receptionist app's
+// OriginalCasePicker: the lab's eventual free-remake-vs-50%-redo decision
+// is priced off THIS linked case's totalAmount, so nothing can be decided
+// without it — hence the link is required, not optional.
+function OriginalCaseSearch({ selected, onSelect, onClear }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    setSearching(true);
+    const t = setTimeout(() => {
+      api.get('/cases', { params: { search: query.trim(), limit: 8 } })
+        .then(res => setResults(res.data.cases || []))
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  if (selected) {
+    return (
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        padding: 12, borderRadius: Radius.md, borderWidth: 1.5,
+        borderColor: Colors.border, backgroundColor: Colors.bg,
+      }}>
+        <MaterialCommunityIcons name="clipboard-text-outline" size={16} color={Colors.text2} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.text1 }} numberOfLines={1}>
+            {selected.caseNumber || 'No scan #'}
+          </Text>
+          <Text style={{ fontSize: 11, color: Colors.text3 }} numberOfLines={1}>
+            {selected.patientName}{selected.workType ? ` · ${selected.workType}` : ''}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onClear} hitSlop={8}>
+          <MaterialCommunityIcons name="close" size={18} color={Colors.red} />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <TextInput
+        style={styles.input}
+        placeholder="Search patient name or scan number…"
+        placeholderTextColor={Colors.textMuted}
+        value={query}
+        onChangeText={setQuery}
+      />
+      {query.trim().length > 0 && (
+        <View style={styles.dropdown}>
+          {searching ? (
+            <View style={{ padding: Spacing.md }}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+            </View>
+          ) : results.length === 0 ? (
+            <Text style={{ padding: Spacing.md, fontSize: 12, color: Colors.text3, fontStyle: 'italic' }}>
+              No matching cases found.
+            </Text>
+          ) : (
+            <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+              {results.map(rc => (
+                <TouchableOpacity
+                  key={rc.id}
+                  style={styles.dropdownItem}
+                  onPress={() => { onSelect(rc); setQuery(''); }}
+                >
+                  <Text style={styles.dropdownText}>{rc.caseNumber || 'No scan #'} · {rc.patientName}</Text>
+                  <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 1 }}>
+                    {rc.workType || ''}{rc.units ? ` · ${rc.units}u` : ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
 let itemKeySeq = 0;
 const emptyItem = () => ({
   key: `item-${++itemKeySeq}`,
-  workType: '', shade: '', dueDate: '', isRedo: false,
+  workType: '', shade: '', dueDate: '',
+  remake: false, remakeReason: '', originalCase: null,
   selectedTeeth: [], manualUnits: '',
 });
 
@@ -142,16 +231,21 @@ function WorkItemCard({
   const [customShade, setCustomShade] = useState(false);
   const [autoCalcDays, setAutoCalcDays] = useState(null);
 
+  // A remake/redo item's price is never computed here — the lab's Operation
+  // Manager decides free-remake vs. 50%-of-original-case after review, so
+  // totalAmount is forced to 0 at submission regardless of this item's own
+  // work type/units (mirrors the receptionist app's same rule).
   const selectedPrice = useMemo(() => {
+    if (item.remake) return null;
     const p = priceMap[item.workType];
     if (!p) return null;
     const isExpress = deliveryType === 'EXPRESS' && p.expressPrice != null;
     const unit = isExpress ? p.expressPrice : p.price;
     const isFlat = FLAT_PRICE_TYPES.has(item.workType);
     const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
-    const total = Math.round(unit * count * (item.isRedo ? 0.5 : 1));
-    return { unit, count, isFlat, isExpress, isRedo: item.isRedo, total };
-  }, [priceMap, item.workType, deliveryType, item.selectedTeeth.length, item.isRedo]);
+    const total = Math.round(unit * count);
+    return { unit, count, isFlat, isExpress, total };
+  }, [priceMap, item.workType, deliveryType, item.selectedTeeth.length, item.remake]);
 
   useEffect(() => {
     if (!item.workType) return;
@@ -268,11 +362,18 @@ function WorkItemCard({
             <Text style={styles.priceBoxLabel}>Estimated Amount</Text>
             <Text style={styles.priceBoxValue}>
               Br {selectedPrice.total.toLocaleString('en-US')}
-              {!selectedPrice.isRedo && !selectedPrice.isFlat && selectedPrice.count > 1 && (
+              {!selectedPrice.isFlat && selectedPrice.count > 1 && (
                 <Text style={styles.priceBoxSub}>  ·  Br {selectedPrice.unit.toLocaleString('en-US')} × {selectedPrice.count}</Text>
               )}
               {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ express</Text>}
-              {selectedPrice.isRedo && <Text style={styles.priceBoxSub}>  ·  ♻️ 50% redo</Text>}
+            </Text>
+          </View>
+        )}
+        {item.remake && (
+          <View style={[styles.priceBox, { backgroundColor: Colors.amberDim, borderColor: Colors.amber + '40' }]}>
+            <Text style={[styles.priceBoxLabel, { color: Colors.amber }]}>Pending Review</Text>
+            <Text style={{ fontSize: 12.5, color: Colors.text2, marginTop: 2 }}>
+              Priced after the lab reviews the linked case — free remake or 50% of its amount.
             </Text>
           </View>
         )}
@@ -334,25 +435,47 @@ function WorkItemCard({
       <View style={styles.formGroup}>
         <Text style={styles.label}>Redo / Replacement</Text>
         <TouchableOpacity
-          onPress={() => onChange({ isRedo: !item.isRedo })}
+          onPress={() => onChange({
+            remake: !item.remake,
+            ...(item.remake ? { remakeReason: '', originalCase: null } : {}),
+          })}
           activeOpacity={0.8}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
             borderRadius: Radius.md, borderWidth: 1.5,
-            borderColor: item.isRedo ? Colors.amber : Colors.border,
-            backgroundColor: item.isRedo ? Colors.amber + '12' : Colors.bg,
+            borderColor: item.remake ? Colors.amber : Colors.border,
+            backgroundColor: item.remake ? Colors.amber + '12' : Colors.bg,
           }}
         >
-          <Text style={{ fontSize: 18 }}>{item.isRedo ? '☑' : '☐'}</Text>
+          <Text style={{ fontSize: 18 }}>{item.remake ? '☑' : '☐'}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: item.isRedo ? Colors.amber : Colors.text1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: item.remake ? Colors.amber : Colors.text1 }}>
               This is a redo / replacement
             </Text>
             <Text style={{ fontSize: 11, color: Colors.text3 }}>
-              Replacing an existing restoration — charged at 50%
+              Remaking or replacing a previous case — the lab decides free vs. 50% charge after review
             </Text>
           </View>
         </TouchableOpacity>
+
+        {item.remake && (
+          <>
+            <Text style={[styles.label, { marginTop: Spacing.md }]}>Original Case *</Text>
+            <OriginalCaseSearch
+              selected={item.originalCase}
+              onSelect={rc => onChange({ originalCase: rc })}
+              onClear={() => onChange({ originalCase: null })}
+            />
+            <Text style={[styles.label, { marginTop: Spacing.md }]}>Reason (optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Fractured on delivery, wrong shade…"
+              placeholderTextColor={Colors.textMuted}
+              value={item.remakeReason}
+              onChangeText={v => onChange({ remakeReason: v })}
+            />
+          </>
+        )}
       </View>
 
       <View style={styles.formGroup}>
@@ -445,6 +568,10 @@ export default function NewCaseScreen({ navigation }) {
         Alert.alert('Required', 'Please select a shade for every non-aligner item.');
         return false;
       }
+      if (it.remake && !it.originalCase) {
+        Alert.alert('Required', 'Search for and select the original case being redone/replaced.');
+        return false;
+      }
     }
     return true;
   };
@@ -464,13 +591,18 @@ export default function NewCaseScreen({ navigation }) {
         const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
         // Arch scan fee rides on the first item only — one scan session covers the whole visit.
         const fee = index === 0 ? archFee : 0;
-        const totalAmount = unit != null ? Math.round((unit * count + fee) * (item.isRedo ? 0.5 : 1)) : undefined;
+        // A remake/redo item's totalAmount is forced to 0 server-side
+        // regardless of what's sent — the Operation Manager prices it
+        // (free remake, or 50% of the linked original case) after review.
+        const totalAmount = item.remake ? undefined : (unit != null ? Math.round(unit * count + fee) : undefined);
         return {
           workType: item.workType,
           shade: item.shade,
           toothNumbers: item.selectedTeeth.length > 0 ? item.selectedTeeth.join(', ') : undefined,
           units: resolvedUnits,
-          isRedo: item.isRedo,
+          remake: item.remake,
+          remakeReason: item.remake ? (item.remakeReason.trim() || undefined) : undefined,
+          originalCaseId: item.remake ? item.originalCase?.id : undefined,
           totalAmount,
         };
       };
