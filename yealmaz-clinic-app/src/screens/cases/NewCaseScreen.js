@@ -385,7 +385,7 @@ export default function NewCaseScreen({ navigation }) {
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
     patientGender: '', notes: '',
-    deliveryType: 'NORMAL', deliveryDate: '', intakeMethod: 'PICKUP',
+    deliveryType: 'NORMAL', intakeMethod: 'PICKUP',
     archUpper: false, archLower: false,
   });
   const [items, setItems] = useState([emptyItem()]);
@@ -437,15 +437,13 @@ export default function NewCaseScreen({ navigation }) {
       Alert.alert('Required', 'Select at least one arch (Upper/Lower) that was scanned.');
       return false;
     }
-    // Doctor name/contact/shade are mandatory for new orders (historical entries with a delivery date are exempt)
-    if (!form.deliveryDate) {
-      if (!form.doctorName.trim())  { Alert.alert('Required', "Please enter the doctor's name."); return false; }
-      if (!form.doctorPhone.trim()) { Alert.alert('Required', "Please enter the doctor's contact number."); return false; }
-      for (const it of items) {
-        if (!/aligner/i.test(it.workType) && !it.shade.trim()) {
-          Alert.alert('Required', 'Please select a shade for every non-aligner item.');
-          return false;
-        }
+    // Doctor name/contact/shade are mandatory for new orders.
+    if (!form.doctorName.trim())  { Alert.alert('Required', "Please enter the doctor's name."); return false; }
+    if (!form.doctorPhone.trim()) { Alert.alert('Required', "Please enter the doctor's contact number."); return false; }
+    for (const it of items) {
+      if (!/aligner/i.test(it.workType) && !it.shade.trim()) {
+        Alert.alert('Required', 'Please select a shade for every non-aligner item.');
+        return false;
       }
     }
     return true;
@@ -492,7 +490,6 @@ export default function NewCaseScreen({ navigation }) {
         patientAge: form.patientAge ? parseInt(form.patientAge) : undefined,
         notes: [scanNote, form.notes].filter(Boolean).join('\n'),
         deliveryType: form.deliveryType,
-        deliveryDate: form.deliveryDate || undefined,
         dropOffAtLab,
       };
 
@@ -506,7 +503,7 @@ export default function NewCaseScreen({ navigation }) {
         type: 'success',
         text1: items.length > 1 ? `${items.length} Cases Submitted!` : 'Case Submitted!',
         text2: dropOffAtLab
-          ? 'Your case is on its way into production — no pickup needed.'
+          ? 'No pickup needed — the lab will review and confirm receipt shortly.'
           : 'Dispatch will assign a driver to collect the impression.',
         visibilityTime: 4000,
       });
@@ -745,18 +742,6 @@ export default function NewCaseScreen({ navigation }) {
                 );
               })}
             </View>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Delivery Date <Text style={{ fontSize: 11, color: Colors.text3, fontWeight: '400' }}>(historical cases only — YYYY-MM-DD)</Text></Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 2024-03-15"
-              placeholderTextColor={Colors.text3}
-              value={form.deliveryDate}
-              onChangeText={set('deliveryDate')}
-              keyboardType="numbers-and-punctuation"
-            />
           </View>
 
           <View style={styles.formGroup}>

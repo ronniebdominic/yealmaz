@@ -393,12 +393,6 @@ export default function CaseDetailScreen({ navigation, route }) {
             label="Due Date"
             value={caseData.dueDate ? format(new Date(caseData.dueDate), 'dd MMMM yyyy') : null}
           />
-          {caseData.deliveryDate && (
-            <InfoRow
-              label="Delivered On"
-              value={format(new Date(caseData.deliveryDate), 'dd MMMM yyyy, h:mm a')}
-            />
-          )}
           <InfoRow label="Doctor" value={caseData.doctorName} />
           <InfoRow label="Doctor Phone" value={caseData.doctorPhone} />
           <InfoRow label="Patient Gender" value={caseData.patientGender} />
