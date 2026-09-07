@@ -119,11 +119,22 @@
   --blur:    14px;
   --blur-lg: 22px;
 
-  /* ── Motion ─────────────────────────────────────────────────────────*/
-  --ease:   cubic-bezier(.2,.8,.3,1);
-  --t-fast: 120ms;
-  --t:      160ms;
-  --t-slow: 260ms;
+  /* ── Motion ─────────────────────────────────────────────────────────
+     One family of easing curves, one set of durations. UI interactions
+     sit at 120–260ms; data visuals (count-ups, bars, chart entrances)
+     at 400–650ms. Everything is inside the prefers-reduced-motion
+     kill-switch at the end of this file. */
+  --ease:          cubic-bezier(.2,.8,.3,1);   /* default / entrance (ease-out) */
+  --ease-out:      cubic-bezier(.2,.8,.3,1);
+  --ease-in:       cubic-bezier(.4,0,1,1);     /* exits */
+  --ease-in-out:   cubic-bezier(.5,0,.2,1);    /* movement between two states */
+  --ease-emphasal: cubic-bezier(.2,1.3,.4,1);  /* gentle overshoot for confirmations */
+  --t-fast:   120ms;   /* press / hover / micro */
+  --t:        160ms;   /* default control transition */
+  --t-slow:   240ms;   /* entrances, dropdowns, modals */
+  --t-slower: 320ms;   /* larger surfaces */
+  --t-data:   520ms;   /* progress bars, chart entrance */
+  --t-count:  640ms;   /* KPI count-ups */
 
   /* ── Type ───────────────────────────────────────────────────────────*/
   --font-body: 'Manrope','Plus Jakarta Sans','Inter',system-ui,-apple-system,sans-serif;
@@ -812,6 +823,57 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 @keyframes fabIn{from{opacity:0;transform:scale(.4) translateY(12px)}to{opacity:1;transform:none}}
 @keyframes panelIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes floatBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes shimmer{100%{background-position:-200% 0}}
+@keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
+@keyframes checkPop{0%{transform:scale(.4);opacity:0}55%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes checkRing{0%{transform:scale(.6);opacity:.55}100%{transform:scale(1.9);opacity:0}}
+@keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes tabIndicator{from{opacity:0;transform:scaleX(.4)}to{opacity:1;transform:scaleX(1)}}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Skeleton loading ──────────────────────────────────────────────
+   A quiet sweep, not a flash. Use .skeleton on a block, or the text /
+   card presets. */
+.skeleton,.skeleton-text,.skeleton-card{
+  background:linear-gradient(100deg,var(--surface-2) 30%,var(--surface-3) 50%,var(--surface-2) 70%);
+  background-size:200% 100%;animation:shimmer 1.4s var(--ease-in-out) infinite;
+  border-radius:var(--radius-sm);
+}
+.skeleton-text{height:.85em;margin:.35em 0;border-radius:var(--radius-xs)}
+.skeleton-text.w-40{width:40%}.skeleton-text.w-60{width:60%}.skeleton-text.w-80{width:80%}
+.skeleton-card{height:96px;border-radius:var(--radius-lg)}
+
+/* ── Progress bar ─────────────────────────────────────────────────*/
+.progress{height:8px;border-radius:var(--radius-pill);background:var(--surface-3);overflow:hidden}
+.progress__fill{height:100%;border-radius:inherit;background:var(--brand);
+  transform-origin:left center;transition:width var(--t-data) var(--ease-out)}
+
+/* ── Success check ───────────────────────────────────────────────*/
+.check-pop{animation:checkPop 420ms var(--ease-emphasal) both}
+.check-pop--ring{position:relative}
+.check-pop--ring::after{content:"";position:absolute;inset:0;border-radius:50%;
+  border:2px solid currentColor;animation:checkRing 600ms var(--ease-out) both}
+
+/* ── Error shake ─────────────────────────────────────────────────*/
+.shake{animation:shake 360ms var(--ease-in-out) both}
+
+/* ── Segmented control (Daily/Weekly/Monthly, quick ranges) ──────
+   The active pill transitions its own surface; add .seg for the frame. */
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:var(--radius);
+  background:var(--surface-2);border:1px solid var(--border)}
+.seg>button{border:none;background:transparent;cursor:pointer;
+  padding:7px 14px;border-radius:calc(var(--radius) - 4px);
+  font:inherit;font-size:12.5px;font-weight:600;color:var(--text-3);
+  transition:background var(--t) var(--ease-in-out),color var(--t) var(--ease-in-out),box-shadow var(--t) var(--ease)}
+.seg>button[aria-pressed="true"],.seg>button.active{
+  background:var(--surface);color:var(--text-1);box-shadow:var(--shadow-xs)}
+
+/* ── Tab underline indicator ─────────────────────────────────────*/
+.tab-indicator{transform-origin:left center;animation:tabIndicator var(--t-slow) var(--ease-out) both;
+  transition:left var(--t-slow) var(--ease-in-out),width var(--t-slow) var(--ease-in-out)}
+
+/* Count-up numbers shouldn't cause layout shift while ticking. */
+.countup{font-variant-numeric:tabular-nums}
 
 /* Route content drifts up on mount. Applied to .content so every screen
    gets the same settle. */
@@ -888,10 +950,21 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   .ai-panel{right:8px;left:8px;bottom:80px;width:auto;height:min(70vh,560px)}
 }
 
-/* ═══ Reduced motion ════════════════════════════════════════════════ */
+/* ═══ Reduced motion ════════════════════════════════════════════════
+   Collapse every transition/animation to instant, and swap the looping
+   or moving affordances for static equivalents so nothing is lost —
+   skeletons still read as placeholders, progress bars still show their
+   value, the success check still appears. Interaction is never gated on
+   animation, so removing the animation removes nothing functional. */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{
     animation-duration:.01ms!important;animation-iteration-count:1!important;
+    animation-delay:0ms!important;
     transition-duration:.01ms!important;scroll-behavior:auto!important;
   }
+  .skeleton,.skeleton-text,.skeleton-card{
+    animation:none!important;background:var(--surface-2)!important;
+  }
+  .check-pop--ring::after{display:none!important}
+  .live-dot,.ai-fab-ping{animation:none!important}
 }

@@ -73,6 +73,8 @@ export default function AttendanceClock() {
     background: bg, border: 'none', color: '#fff', borderRadius: 7,
     padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: clocking ? 'not-allowed' : 'pointer',
     display: 'inline-flex', alignItems: 'center', gap: 5,
+    transition: 'background var(--t) var(--ease), opacity var(--t) var(--ease), transform var(--t-fast) var(--ease)',
+    opacity: clocking ? 0.65 : 1,
   });
 
   if (onBreak) {

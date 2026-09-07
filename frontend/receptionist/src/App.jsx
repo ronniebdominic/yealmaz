@@ -148,10 +148,16 @@ export default function App() {
         <BrowserRouter>
           <Toaster
             position="top-right"
+            gutter={10}
             toastOptions={{
-              style: { fontFamily: 'Manrope, sans-serif', fontSize: '13px', borderRadius: '10px' },
-              success: { iconTheme: { primary: 'var(--green)', secondary: '#fff' } },
-              error: { iconTheme: { primary: 'var(--red)', secondary: '#fff' } }
+              duration: 3500,
+              style: {
+                fontFamily: 'Manrope, sans-serif', fontSize: '13px', fontWeight: 500,
+                borderRadius: '10px', background: 'var(--surface)', color: 'var(--text-1)',
+                border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
+              },
+              success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--surface)' } },
+              error: { duration: 5000, iconTheme: { primary: 'var(--red)', secondary: 'var(--surface)' } },
             }}
           />
           <AppSplash />

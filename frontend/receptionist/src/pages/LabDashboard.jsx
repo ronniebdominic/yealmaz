@@ -21,7 +21,10 @@ import CaseReviewQueue from '../components/CaseReviewQueue';
 import InstallAppBanner from '../components/InstallAppBanner';
 import NotificationBell from '../components/NotificationBell';
 import MyProfileTab from '../components/MyProfileTab';
+import CountUp from '../components/CountUp';
+import ProgressBar from '../components/ProgressBar';
 import { useNotifications } from '../hooks/useNotifications';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 
 // ── Department config ─────────────────────────────────────
 // `color` is a bright hex tuned for the dark theme (identity accent only —
@@ -105,8 +108,10 @@ function TechStyles() {
       .tp-dept[data-on="true"]{
         background:var(--accent-dim);border-color:var(--accent);color:var(--text-1);
         box-shadow:0 0 0 3px rgba(45,212,191,.22);
+        animation:tpDeptPick 260ms var(--ease-emphasal);
       }
-      .tp-dept-check{position:absolute;top:6px;right:6px;color:var(--accent)}
+      @keyframes tpDeptPick{0%{transform:scale(1)}45%{transform:scale(1.035)}100%{transform:scale(1)}}
+      .tp-dept-check{position:absolute;top:6px;right:6px;color:var(--accent);animation:checkPop 300ms var(--ease-emphasal) both}
 
       /* Big tap tiles (Scan / Search) */
       .tp-tile{
@@ -162,8 +167,9 @@ function TechStyles() {
         color:var(--text-4);transition:color var(--t-fast) var(--ease);
       }
       .tp-nav button[data-on="true"]{color:var(--accent)}
-      .tp-nav-ic{position:relative;display:grid;place-items:center;width:44px;height:26px;border-radius:var(--radius-pill);transition:background var(--t-fast) var(--ease)}
-      .tp-nav button[data-on="true"] .tp-nav-ic{background:var(--accent-dim)}
+      .tp-nav-ic{position:relative;display:grid;place-items:center;width:44px;height:26px;border-radius:var(--radius-pill);
+        transition:background var(--t) var(--ease-in-out),transform var(--t) var(--ease-emphasal)}
+      .tp-nav button[data-on="true"] .tp-nav-ic{background:var(--accent-dim);transform:translateY(-1px) scale(1.06)}
       .tp-nav-lb{font-size:10px;font-weight:600}
       .tp-nav-badge{
         position:absolute;top:-3px;right:2px;min-width:15px;height:15px;border-radius:8px;
@@ -182,8 +188,22 @@ function TechStyles() {
       .tp-sheet-grab{width:36px;height:4px;background:var(--border-2);border-radius:2px;margin:0 auto 14px}
       .tp-sheet-title{font-size:15.5px;font-weight:600;color:var(--text-1);margin-bottom:12px;display:flex;align-items:center;gap:7px}
       .tp-field-l{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px}
-      .tp-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--surface-2);color:var(--text-1);font-family:inherit;box-sizing:border-box}
+      .tp-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--surface-2);color:var(--text-1);font-family:inherit;box-sizing:border-box;transition:border-color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
       .tp-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-ring)}
+
+      /* Tab / period content settles in on change (keyed remount). */
+      .tp-fade{animation:fadeInUp var(--t-slow) var(--ease-out) both}
+
+      /* Full-screen scan-success confirmation. */
+      .tp-scan-ok{position:fixed;inset:0;z-index:210;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;gap:14px;background:var(--scrim);
+        -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:fadeIn 140ms var(--ease-out)}
+      .tp-scan-ok__badge{position:relative;width:88px;height:88px;border-radius:50%;display:grid;place-items:center;
+        color:var(--green);background:var(--green-dim);border:2px solid var(--green);
+        animation:checkPop 460ms var(--ease-emphasal) both}
+      .tp-scan-ok__badge::after{content:"";position:absolute;width:88px;height:88px;border-radius:50%;
+        border:2px solid var(--green);animation:checkRing 640ms var(--ease-out) both}
+      .tp-scan-ok__label{font-size:14px;font-weight:600;color:var(--text-1)}
     `}</style>
   );
 }
@@ -487,6 +507,7 @@ function MiniSparkline({ dailyCounts, from, to }) {
 }
 
 function PerformanceTab() {
+  const reducedMotion = usePrefersReducedMotion();
   const [rangeId, setRangeId] = useState('weekly');
   const [page, setPage] = useState(1);
   const toDate = todayLocal();
@@ -514,11 +535,21 @@ function PerformanceTab() {
       </div>
 
       {isLoading ? (
-        <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 40 }}>Loading…</div>
+        <div className="tp-fade">
+          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+            <div className="tp-kpis">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i}><div className="skeleton-text w-80" /><div className="skeleton-text w-60" style={{ height: '1.4em' }} /></div>
+              ))}
+            </div>
+          </div>
+          <div className="skeleton-card" style={{ marginBottom: 12 }} />
+          <div className="skeleton-card" style={{ height: 200 }} />
+        </div>
       ) : isError ? (
         <div style={{ textAlign: 'center', color: 'var(--red)', padding: 40 }}>Could not load your performance.</div>
       ) : (
-        <>
+        <div className="tp-fade" key={rangeId}>
           {/* Summary */}
           <div className="card" style={{ padding: 16, marginBottom: 12 }}>
             <div className="tp-kpis" style={{ marginBottom: summary?.totalScans ? 14 : 0 }}>
@@ -530,7 +561,7 @@ function PerformanceTab() {
               ].map(([label, value]) => (
                 <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
                   <div className="tp-kpi-l">{label}</div>
-                  <div className="tp-kpi-v">{value}</div>
+                  <div className="tp-kpi-v"><CountUp value={value} /></div>
                 </div>
               ))}
             </div>
@@ -542,11 +573,11 @@ function PerformanceTab() {
             <div className="card" style={{ padding: 16, marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
                 <div className="tp-section-label" style={{ margin: 0 }}>Your Share of the Lab</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{summary.shareOfTotalPercent}%</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+                  <CountUp value={`${summary.shareOfTotalPercent}%`} />
+                </div>
               </div>
-              <div style={{ height: 8, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: 'var(--accent)', borderRadius: 4 }} />
-              </div>
+              <ProgressBar value={Math.min(100, summary.shareOfTotalPercent)} color="var(--accent)" style={{ marginBottom: 8 }} />
               <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 {summary.totalScans} of {summary.totalLabScans} lab scans in this range
               </div>
@@ -559,7 +590,8 @@ function PerformanceTab() {
               <div className="tp-section-label">Department Breakdown</div>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={summary.departmentBreakdown} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70} stroke="var(--surface)" label={({ label }) => label}>
+                  <Pie data={summary.departmentBreakdown} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70} stroke="var(--surface)" label={({ label }) => label}
+                    isAnimationActive={!reducedMotion} animationDuration={550} animationEasing="ease-out">
                     {summary.departmentBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
                   <RTooltip />
@@ -602,7 +634,7 @@ function PerformanceTab() {
               <button className="btn btn-ghost btn-sm" disabled={page === pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -771,6 +803,7 @@ export default function LabDashboard() {
   const [scanComment, setScanComment] = useState('');
   const [processing, setProcessing] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
+  const [scanOk, setScanOk] = useState(false); // brief visual scan-success flash
   const confirmingRef = useRef(false); // guard: prevents double-submit
 
   const { unreadCount } = useNotifications(user?.id);
@@ -823,6 +856,8 @@ export default function LabDashboard() {
       setRecentScans(prev => [{ ...scanResult, dept: selectedDept?.label, scannedAt: new Date(), newStatus: res.data.newStatus }, ...prev.slice(0, 9)]);
       setScanResult(null);
       setScanComment('');
+      setScanOk(true);
+      setTimeout(() => setScanOk(false), 950); // non-blocking visual flash
       queryClient.invalidateQueries({ queryKey: ['lab', 'active'] });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Scan failed');
@@ -874,7 +909,7 @@ export default function LabDashboard() {
         </div>
       </header>
 
-      <div style={{ flex: 1, padding: 'var(--tp-pad, 16px)', paddingBottom: 28, overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: 'var(--tp-pad, 16px)', paddingBottom: 28, overflowY: 'auto' }} key={tab} className="tp-fade">
 
         {tab === 'scan' && (
           <>
@@ -1025,6 +1060,15 @@ export default function LabDashboard() {
       </div>
 
       <TabBar tab={tab} setTab={setTab} unreadCount={unreadCount} />
+
+      {/* Scan-success flash — purely visual, non-blocking (pointer-events:none),
+          auto-clears in under a second. The toast carries the detail. */}
+      {scanOk && (
+        <div className="tp-scan-ok" style={{ pointerEvents: 'none' }} aria-hidden="true">
+          <div className="tp-scan-ok__badge"><MdCheckCircle size={46} /></div>
+          <div className="tp-scan-ok__label">Scan logged</div>
+        </div>
+      )}
 
       {/* ── Modals ── */}
       {showScanner && <QRScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}

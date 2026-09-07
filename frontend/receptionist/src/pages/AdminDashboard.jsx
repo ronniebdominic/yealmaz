@@ -4,6 +4,9 @@ import AdminLayout from '../components/AdminLayout';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportMenu from '../components/ExportMenu';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
+import CountUp from '../components/CountUp';
+import ProgressBar from '../components/ProgressBar';
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import api, { downloadExport } from '../api';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -259,7 +262,9 @@ function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active, 
         )}
       </div>
       <div className="stat-label">{label}</div>
-      <div className="stat-value" style={emphasise ? { color } : undefined}>{value}</div>
+      <div className="stat-value" style={emphasise ? { color } : undefined}>
+        {typeof value === 'string' || typeof value === 'number' ? <CountUp value={value} /> : value}
+      </div>
       {sub && <div className="stat-sub">{sub}</div>}
     </div>
   );
@@ -291,6 +296,8 @@ const DRILL_MAP = {
 // ── Main component ────────────────────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const reducedMotion = usePrefersReducedMotion();
+  const chartAnim = { isAnimationActive: !reducedMotion, animationDuration: 550, animationEasing: 'ease-out' };
   const [selectedClinic, setSelectedClinic] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState(''); // committed on Enter/blur — avoids a request per keystroke
@@ -597,14 +604,10 @@ export default function AdminDashboard() {
                     <div style={{
                       fontSize: 22, fontWeight: 650, letterSpacing: '-.03em',
                       color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
-                    }}>{collectionRate}%</div>
+                    }}><CountUp value={`${collectionRate}%`} /></div>
                   </div>
-                  <div style={{ height: 8, borderRadius: 'var(--radius-pill)', background: 'var(--surface-3)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${receivedPct}%`, borderRadius: 'var(--radius-pill)',
-                      background: 'var(--green)', transition: 'width .6s var(--ease)',
-                    }} />
-                  </div>
+                  <ProgressBar value={receivedPct} color="var(--green)" />
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11.5, fontWeight: 500 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--text-3)' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
@@ -718,7 +721,7 @@ export default function AdminDashboard() {
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-3)' }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
                     <Tooltip content={<CustomTooltip prefix="Br " />} />
-                    <Bar dataKey="revenue" name="Revenue" fill="var(--blue)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="revenue" name="Revenue" fill="var(--blue)" radius={[4, 4, 0, 0]} {...chartAnim} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -733,7 +736,7 @@ export default function AdminDashboard() {
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'var(--text-3)' }} />
                     <YAxis tick={{ fontSize: 11, fill: 'var(--text-3)' }} allowDecimals={false} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="cases" name="Cases" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3, fill: 'var(--accent)' }} />
+                    <Line type="monotone" dataKey="cases" name="Cases" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3, fill: "var(--accent)" }} {...chartAnim} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -753,7 +756,7 @@ export default function AdminDashboard() {
                         <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--text-3)' }} tickFormatter={v => 'Br ' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v)} />
                         <YAxis type="category" dataKey="workType" width={110} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
                         <Tooltip content={<CustomTooltip prefix="Br " />} />
-                        <Bar dataKey="revenue" name="Revenue" radius={[0, 4, 4, 0]}>
+                        <Bar dataKey="revenue" name="Revenue" radius={[0, 4, 4, 0]} {...chartAnim}>
                           {revenueByWorkType?.map((_, i) => <Cell key={i} fill={WORK_TYPE_COLORS[i % WORK_TYPE_COLORS.length]} />)}
                         </Bar>
                       </BarChart>
@@ -774,7 +777,7 @@ export default function AdminDashboard() {
                     <ResponsiveContainer width="100%" height={280}>
                       <PieChart>
                         <Pie data={revenueByWorkType} dataKey="count" nameKey="workType" cx="50%" cy="50%" outerRadius={92}
-                          minAngle={2} stroke="var(--surface)" strokeWidth={1}
+                          minAngle={2} stroke="var(--surface)" strokeWidth={1} {...chartAnim}
                           label={({ percent, name }) => (percent >= 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : '')}
                           labelLine={false}>
                           {revenueByWorkType?.map((_, i) => <Cell key={i} fill={WORK_TYPE_COLORS[i % WORK_TYPE_COLORS.length]} />)}
@@ -821,9 +824,8 @@ export default function AdminDashboard() {
                           <td style={{ fontWeight: 700, color: 'var(--green)' }}>{ETB(row.revenue)}</td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', minWidth: 60 }}>
-                                <div style={{ width: `${share}%`, height: '100%', borderRadius: 3, background: WORK_TYPE_COLORS[i % WORK_TYPE_COLORS.length] }} />
-                              </div>
+                              <ProgressBar value={share} color={WORK_TYPE_COLORS[i % WORK_TYPE_COLORS.length]}
+                                height={6} rounded={false} style={{ flex: 1, minWidth: 60 }} />
                               <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 36 }}>{share}%</span>
                             </div>
                           </td>
@@ -866,9 +868,7 @@ export default function AdminDashboard() {
                               <td>{c.paidCases}</td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--border)', minWidth: 60 }}>
-                                    <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: 'var(--blue)', transition: 'width 0.4s ease' }} />
-                                  </div>
+                                  <ProgressBar value={pct} color="var(--blue)" height={6} style={{ flex: 1, minWidth: 60 }} />
                                   <span style={{ fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>{ETB(c.revenue)}</span>
                                 </div>
                               </td>
