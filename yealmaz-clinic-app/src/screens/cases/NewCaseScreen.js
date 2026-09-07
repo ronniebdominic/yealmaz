@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, StatusBar, ActivityIndicator, Alert,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Modal, SafeAreaView,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -121,23 +121,29 @@ function Odontogram({ selected, onToggle }) {
   );
 }
 
-// ── Original Case Search (for Remake/Redo) ────────────────
+// ── Original Case Picker — full-screen popup (for Remake/Redo) ─────────
 // Debounced search over this clinic's own past cases — GET /cases auto-
 // scopes to the clinic's own cases for a CLINIC-role token, so there's no
 // risk of linking to another clinic's case. Mirrors the receptionist app's
 // OriginalCasePicker: the lab's eventual free-remake-vs-50%-redo decision
 // is priced off THIS linked case's totalAmount, so nothing can be decided
-// without it — hence the link is required, not optional.
-function OriginalCaseSearch({ selected, onSelect, onClear }) {
+// without it — hence the link is required, not optional. Pops up the
+// moment "Redo / Replacement" is checked, so searching happens right away
+// instead of the clinic having to notice a field further down the form.
+function OriginalCasePickerModal({ visible, onClose, onSelect }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
+    if (!visible) { setQuery(''); setResults([]); return; }
+  }, [visible]);
+
+  useEffect(() => {
     if (!query.trim()) { setResults([]); return; }
     setSearching(true);
     const t = setTimeout(() => {
-      api.get('/cases', { params: { search: query.trim(), limit: 8 } })
+      api.get('/cases', { params: { search: query.trim(), limit: 15 } })
         .then(res => setResults(res.data.cases || []))
         .catch(() => setResults([]))
         .finally(() => setSearching(false));
@@ -145,67 +151,80 @@ function OriginalCaseSearch({ selected, onSelect, onClear }) {
     return () => clearTimeout(t);
   }, [query]);
 
-  if (selected) {
-    return (
-      <View style={{
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <SafeAreaView style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Search Original Case</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <MaterialCommunityIcons name="close" size={22} color={Colors.text2} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.modalHint}>
+            Find the case this redo/replacement is for — by patient name or scan number.
+          </Text>
+          <TextInput
+            style={[styles.input, { marginTop: Spacing.md }]}
+            placeholder="Search patient name or scan number…"
+            placeholderTextColor={Colors.textMuted}
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+          />
+          <ScrollView style={{ marginTop: Spacing.md }} keyboardShouldPersistTaps="handled">
+            {searching ? (
+              <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+              </View>
+            ) : !query.trim() ? (
+              <Text style={styles.modalEmptyText}>Start typing to search this clinic's past cases.</Text>
+            ) : results.length === 0 ? (
+              <Text style={styles.modalEmptyText}>No matching cases found.</Text>
+            ) : results.map(rc => (
+              <TouchableOpacity key={rc.id} style={styles.modalResultRow} onPress={() => onSelect(rc)}>
+                <MaterialCommunityIcons name="clipboard-text-outline" size={18} color={Colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dropdownText}>{rc.caseNumber || 'No scan #'} · {rc.patientName}</Text>
+                  <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 1 }}>
+                    {rc.workType || ''}{rc.units ? ` · ${rc.units}u` : ''}{rc.shade ? ` · Shade ${rc.shade}` : ''}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </View>
+    </Modal>
+  );
+}
+
+// Read-only summary of the linked case once one's been picked — tap to
+// reopen the popup and pick a different one.
+function SelectedOriginalCase({ selected, onPress, onClear }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={{
         flexDirection: 'row', alignItems: 'center', gap: 8,
         padding: 12, borderRadius: Radius.md, borderWidth: 1.5,
         borderColor: Colors.border, backgroundColor: Colors.bg,
-      }}>
-        <MaterialCommunityIcons name="clipboard-text-outline" size={16} color={Colors.text2} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.text1 }} numberOfLines={1}>
-            {selected.caseNumber || 'No scan #'}
-          </Text>
-          <Text style={{ fontSize: 11, color: Colors.text3 }} numberOfLines={1}>
-            {selected.patientName}{selected.workType ? ` · ${selected.workType}` : ''}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={onClear} hitSlop={8}>
-          <MaterialCommunityIcons name="close" size={18} color={Colors.red} />
-        </TouchableOpacity>
+      }}
+    >
+      <MaterialCommunityIcons name="clipboard-text-outline" size={16} color={Colors.text2} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.text1 }} numberOfLines={1}>
+          {selected.caseNumber || 'No scan #'}
+        </Text>
+        <Text style={{ fontSize: 11, color: Colors.text3 }} numberOfLines={1}>
+          {selected.patientName}{selected.workType ? ` · ${selected.workType}` : ''}
+        </Text>
       </View>
-    );
-  }
-
-  return (
-    <View>
-      <TextInput
-        style={styles.input}
-        placeholder="Search patient name or scan number…"
-        placeholderTextColor={Colors.textMuted}
-        value={query}
-        onChangeText={setQuery}
-      />
-      {query.trim().length > 0 && (
-        <View style={styles.dropdown}>
-          {searching ? (
-            <View style={{ padding: Spacing.md }}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-            </View>
-          ) : results.length === 0 ? (
-            <Text style={{ padding: Spacing.md, fontSize: 12, color: Colors.text3, fontStyle: 'italic' }}>
-              No matching cases found.
-            </Text>
-          ) : (
-            <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
-              {results.map(rc => (
-                <TouchableOpacity
-                  key={rc.id}
-                  style={styles.dropdownItem}
-                  onPress={() => { onSelect(rc); setQuery(''); }}
-                >
-                  <Text style={styles.dropdownText}>{rc.caseNumber || 'No scan #'} · {rc.patientName}</Text>
-                  <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 1 }}>
-                    {rc.workType || ''}{rc.units ? ` · ${rc.units}u` : ''}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      )}
-    </View>
+      <TouchableOpacity onPress={onClear} hitSlop={8}>
+        <MaterialCommunityIcons name="close" size={18} color={Colors.red} />
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 }
 
@@ -234,6 +253,23 @@ function WorkItemCard({
   const [showShades, setShowShades] = useState(false);
   const [customShade, setCustomShade] = useState(false);
   const [autoCalcDays, setAutoCalcDays] = useState(null);
+  const [originalCasePickerOpen, setOriginalCasePickerOpen] = useState(false);
+
+  // Selecting an original case pulls this item's own details straight from
+  // it — a redo/replacement is almost always the same work, so there's no
+  // reason to make the clinic re-type it.
+  const selectOriginalCase = (rc) => {
+    const teeth = parseToothNumbers(rc.toothNumbers);
+    onChange({
+      originalCase: rc,
+      workType: rc.workType || item.workType,
+      shade: rc.shade || item.shade,
+      selectedTeeth: teeth,
+      manualUnits: teeth.length === 0 && rc.units != null ? String(rc.units) : item.manualUnits,
+    });
+    onFillFromOriginal?.(rc);
+    setOriginalCasePickerOpen(false);
+  };
 
   // A remake/redo item's price is never computed here — the lab's Operation
   // Manager decides free-remake vs. 50%-of-original-case after review, so
@@ -439,10 +475,15 @@ function WorkItemCard({
       <View style={styles.formGroup}>
         <Text style={styles.label}>Redo / Replacement</Text>
         <TouchableOpacity
-          onPress={() => onChange({
-            remake: !item.remake,
-            ...(item.remake ? { remakeReason: '', originalCase: null } : {}),
-          })}
+          onPress={() => {
+            const turningOn = !item.remake;
+            onChange({
+              remake: turningOn,
+              ...(turningOn ? {} : { remakeReason: '', originalCase: null }),
+            });
+            // Pop the search up immediately — no separate field to notice.
+            if (turningOn) setOriginalCasePickerOpen(true);
+          }}
           activeOpacity={0.8}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
@@ -465,23 +506,28 @@ function WorkItemCard({
         {item.remake && (
           <>
             <Text style={[styles.label, { marginTop: Spacing.md }]}>Original Case *</Text>
-            <OriginalCaseSearch
-              selected={item.originalCase}
-              onSelect={rc => {
-                // Pull this item's own details straight from the original
-                // case — a redo/replacement is almost always the same work,
-                // so there's no reason to make the clinic re-type it.
-                const teeth = parseToothNumbers(rc.toothNumbers);
-                onChange({
-                  originalCase: rc,
-                  workType: rc.workType || item.workType,
-                  shade: rc.shade || item.shade,
-                  selectedTeeth: teeth,
-                  manualUnits: teeth.length === 0 && rc.units != null ? String(rc.units) : item.manualUnits,
-                });
-                onFillFromOriginal?.(rc);
-              }}
-              onClear={() => onChange({ originalCase: null })}
+            {item.originalCase ? (
+              <SelectedOriginalCase
+                selected={item.originalCase}
+                onPress={() => setOriginalCasePickerOpen(true)}
+                onClear={() => onChange({ originalCase: null })}
+              />
+            ) : (
+              <TouchableOpacity
+                onPress={() => setOriginalCasePickerOpen(true)}
+                activeOpacity={0.8}
+                style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}
+              >
+                <MaterialCommunityIcons name="magnify" size={18} color={Colors.primary} />
+                <Text style={{ fontSize: 13.5, color: Colors.primary, fontWeight: '700' }}>
+                  Search for the original case…
+                </Text>
+              </TouchableOpacity>
+            )}
+            <OriginalCasePickerModal
+              visible={originalCasePickerOpen}
+              onClose={() => setOriginalCasePickerOpen(false)}
+              onSelect={selectOriginalCase}
             />
             <Text style={[styles.label, { marginTop: Spacing.md }]}>Reason (optional)</Text>
             <TextInput
@@ -941,6 +987,21 @@ export default function NewCaseScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
+
+  // Original Case picker popup
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(11,29,58,0.5)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg, maxHeight: '85%', minHeight: '55%',
+  },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  modalTitle: { fontSize: 16, fontFamily: FontFamily.extrabold, color: Colors.text1 },
+  modalHint: { fontSize: 12, color: Colors.text3, marginTop: 4 },
+  modalEmptyText: { padding: Spacing.lg, fontSize: 13, color: Colors.text3, fontStyle: 'italic', textAlign: 'center' },
+  modalResultRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
   header: {
     backgroundColor: Colors.primary, paddingTop: 52, paddingBottom: 14,
     paddingHorizontal: Spacing.lg,
