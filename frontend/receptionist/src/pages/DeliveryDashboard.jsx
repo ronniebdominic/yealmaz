@@ -43,10 +43,10 @@ function ConfirmModal({ caseData, action, onConfirm, onClose, loading }) {
           <div style={{ background: '#F9FAFB', borderRadius: 10, padding: '12px 14px', marginBottom: 14, border: '1px solid #E5E7EB' }}>
             <div style={{ fontWeight: 800, fontSize: 15, color: '#1F2937', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
               <MdLocalHospital size={15} /> {caseData.clinic?.name}
-              {caseData.clinic?.station && <span style={{ color: '#1A56A0', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}> · <MdLocationOn size={13} /> {caseData.clinic.station}</span>}
+              {caseData.clinic?.station && <span style={{ color: '#1D4ED8', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}> · <MdLocationOn size={13} /> {caseData.clinic.station}</span>}
             </div>
             {caseData.clinic?.address && <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={13} /> {caseData.clinic.address}</div>}
-            {caseData.clinic?.phone  && <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> <a href={`tel:${caseData.clinic.phone}`} style={{ color: '#1A56A0', fontWeight: 700 }}>{caseData.clinic.phone}</a></div>}
+            {caseData.clinic?.phone  && <div style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}><MdCall size={13} /> <a href={`tel:${caseData.clinic.phone}`} style={{ color: '#1D4ED8', fontWeight: 700 }}>{caseData.clinic.phone}</a></div>}
             {(caseData.caseNumber || caseData.workType) && (
               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #E5E7EB', fontSize: 12, color: '#6B7280' }}>
                 {caseData.caseNumber && <span style={{ fontFamily: 'monospace', marginRight: 8 }}>{caseData.caseNumber}</span>}
@@ -92,7 +92,7 @@ function JobCard({ c, section, onAction }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>{c.clinic?.name || '—'}</div>
-          {c.clinic?.station && <div style={{ fontSize: 11, color: '#1A56A0', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
+          {c.clinic?.station && <div style={{ fontSize: 11, color: '#1D4ED8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
         </div>
         {c.caseNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#9CA3AF', flexShrink: 0, whiteSpace: 'nowrap' }}>{c.caseNumber}</span>}
       </div>
@@ -103,7 +103,7 @@ function JobCard({ c, section, onAction }) {
         </div>
       )}
       {c.clinic?.phone && (
-        <a href={`tel:${c.clinic.phone}`} style={{ fontSize: 13, color: '#1A56A0', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+        <a href={`tel:${c.clinic.phone}`} style={{ fontSize: 13, color: '#1D4ED8', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
           <MdCall size={14} /> {c.clinic.phone}
         </a>
       )}
@@ -221,15 +221,15 @@ function DeliveryArchive() {
               {EVENT_TYPE_FILTERS.map(f => (
                 <button key={f.id} onClick={() => setType(f.id)} style={{
                   flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                  border: `1.5px solid ${type === f.id ? '#1A56A0' : '#E5E7EB'}`,
-                  background: type === f.id ? '#EFF6FF' : '#fff', color: type === f.id ? '#1A56A0' : '#6B7280',
+                  border: `1.5px solid ${type === f.id ? '#1D4ED8' : '#E5E7EB'}`,
+                  background: type === f.id ? '#EFF6FF' : '#fff', color: type === f.id ? '#1D4ED8' : '#6B7280',
                 }}>{f.label}</button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB' }} />
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ flex: 1, padding: '7px 8px', fontSize: 12.5, borderRadius: 8, border: '1px solid #E5E7EB' }} />
-              <button onClick={() => load(1)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#1A56A0', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Go</button>
+              <button onClick={() => load(1)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#1D4ED8', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Go</button>
             </div>
           </div>
 
@@ -417,7 +417,7 @@ export default function DeliveryDashboard() {
   const iconBtn = { background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'DM Sans, sans-serif', maxWidth: 520, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'Sora, sans-serif', maxWidth: 520, margin: '0 auto' }}>
       <InstallAppBanner />
 
       {/* ── Header — decluttered to logo/title + active badge + menu ── */}

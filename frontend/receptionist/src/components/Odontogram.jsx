@@ -9,9 +9,9 @@ export default function Odontogram({ selected, onToggle, onClear }) {
     return {
       width: 34, height: 40,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      border: `1.5px solid ${active ? '#1A56A0' : '#E2E8F0'}`,
+      border: `1.5px solid ${active ? '#1D4ED8' : '#E2E8F0'}`,
       borderRadius: isUpper ? '5px 5px 0 0' : '0 0 5px 5px',
-      background: active ? '#1A56A0' : '#fff',
+      background: active ? '#1D4ED8' : '#fff',
       cursor: 'pointer',
       fontSize: 11, fontWeight: 600,
       color: active ? '#fff' : '#94A3B8',

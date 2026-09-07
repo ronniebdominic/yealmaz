@@ -126,7 +126,7 @@ function ClinicFormModal({ initial, onSaved, onClose }) {
           {!isEdit && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'var(--blue-dim, #EEF2FF)', border: '1px solid rgba(26,86,160,0.15)',
+              background: 'var(--blue-dim, #EEF2FF)', border: '1px solid rgba(29,78,216,0.15)',
               borderRadius: 8, padding: '10px 14px', marginBottom: 18, gap: 12,
             }}>
               <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
@@ -525,9 +525,9 @@ export default function AdminClinics() {
                       <td style={{ padding: '8px 16px' }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
-                          background: c.isExcluded ? 'rgba(26,86,160,0.1)' : 'var(--surface-2)',
+                          background: c.isExcluded ? 'rgba(29,78,216,0.1)' : 'var(--surface-2)',
                           color: c.isExcluded ? 'var(--blue)' : 'var(--text-3)',
-                          border: `1px solid ${c.isExcluded ? 'rgba(26,86,160,0.25)' : 'var(--border)'}`,
+                          border: `1px solid ${c.isExcluded ? 'rgba(29,78,216,0.25)' : 'var(--border)'}`,
                           borderRadius: 999, padding: '3px 10px',
                           fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
                         }}>
@@ -591,9 +591,9 @@ export default function AdminClinics() {
                             }}
                             style={{
                               display: 'flex', alignItems: 'center', gap: 3,
-                              background: c.isExcluded ? 'rgba(229,62,62,0.07)' : 'rgba(26,86,160,0.07)',
+                              background: c.isExcluded ? 'rgba(229,62,62,0.07)' : 'rgba(29,78,216,0.07)',
                               color: c.isExcluded ? 'var(--red)' : 'var(--blue)',
-                              border: `1px solid ${c.isExcluded ? 'rgba(229,62,62,0.2)' : 'rgba(26,86,160,0.2)'}`,
+                              border: `1px solid ${c.isExcluded ? 'rgba(229,62,62,0.2)' : 'rgba(29,78,216,0.2)'}`,
                               borderRadius: 6, padding: '4px 9px',
                               fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                             }}

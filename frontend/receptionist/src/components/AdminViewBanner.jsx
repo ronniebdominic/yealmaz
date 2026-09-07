@@ -13,7 +13,7 @@ export default function AdminViewBanner({ label }) {
       background: '#F0A500', color: '#0F2044',
       padding: '6px 16px', fontSize: 12, fontWeight: 700,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      fontFamily: 'DM Sans, sans-serif',
+      fontFamily: 'Sora, sans-serif',
     }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <MdVisibility size={14} /> Admin view mode — viewing as {label}

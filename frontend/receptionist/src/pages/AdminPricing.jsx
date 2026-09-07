@@ -608,7 +608,7 @@ const inputStyle = {
   color: 'var(--text-1)',
   background: 'var(--surface)',
   outline: 'none',
-  fontFamily: 'DM Sans, sans-serif',
+  fontFamily: 'Sora, sans-serif',
   width: '100%',
   maxWidth: 320,
 };

@@ -39,7 +39,7 @@ function RequestModal({ onClose, onSubmitted }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 420, overflow: 'hidden' }}>
-        <div style={{ background: 'var(--blue, #1A56A0)', color: '#fff', padding: '14px 18px', fontWeight: 800, fontSize: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'var(--blue, #1D4ED8)', color: '#fff', padding: '14px 18px', fontWeight: 800, fontSize: 15, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           Request Leave
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><MdClose size={18} /></button>
         </div>
@@ -68,8 +68,8 @@ function RequestModal({ onClose, onSubmitted }) {
               <button key={v} type="button"
                 onClick={() => setDayPortion(v)}
                 style={{ flex: 1, padding: '7px 8px', fontSize: 12, fontWeight: 700, borderRadius: 7, cursor: 'pointer',
-                  border: dayPortion === v ? '1.5px solid var(--blue, #1A56A0)' : '1px solid #E5E7EB',
-                  background: dayPortion === v ? 'rgba(26,86,160,0.08)' : '#fff', color: dayPortion === v ? 'var(--blue, #1A56A0)' : '#6B7280' }}>
+                  border: dayPortion === v ? '1.5px solid var(--blue, #1D4ED8)' : '1px solid #E5E7EB',
+                  background: dayPortion === v ? 'rgba(29,78,216,0.08)' : '#fff', color: dayPortion === v ? 'var(--blue, #1D4ED8)' : '#6B7280' }}>
                 {l}
               </button>
             ))}
@@ -79,7 +79,7 @@ function RequestModal({ onClose, onSubmitted }) {
             <input value={reason} onChange={e => setReason(e.target.value)} style={inputStyle} />
           </div>
           <button onClick={submit} disabled={saving}
-            style={{ marginTop: 6, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--blue, #1A56A0)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer' }}>
+            style={{ marginTop: 6, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--blue, #1D4ED8)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer' }}>
             {saving ? 'Submitting…' : 'Submit Request'}
           </button>
         </div>

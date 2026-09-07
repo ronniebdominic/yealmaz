@@ -64,7 +64,7 @@ const STAGE_COLORS = {
   ON_HOLD: '#B71C1C', REMAKE: '#6A1B9A', CANCELLED: '#424242',
 };
 
-const PIE_COLORS = ['#1A56A0', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777', '#0D9488'];
+const PIE_COLORS = ['#1D4ED8', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777', '#0D9488'];
 
 // ── QR Scanner component (native getUserMedia + jsQR) ────────
 function QRScanner({ onScan, onClose }) {

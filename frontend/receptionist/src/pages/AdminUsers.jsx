@@ -48,7 +48,7 @@ const DEPARTMENTS = [
 ];
 
 const ROLE_COLORS = {
-  RECEPTIONIST:      { bg: 'rgba(26,86,160,0.1)',   color: 'var(--blue)' },
+  RECEPTIONIST:      { bg: 'rgba(29,78,216,0.1)',   color: 'var(--blue)' },
   LAB_TECH:          { bg: 'rgba(124,58,237,0.1)',  color: '#7C3AED'     },
   DELIVERY:          { bg: 'rgba(217,119,6,0.1)',   color: '#D97706'     },
   DISPATCH:          { bg: 'rgba(14,165,233,0.1)',  color: '#0EA5E9'     },

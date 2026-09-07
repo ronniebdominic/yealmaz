@@ -1,8 +1,10 @@
 import LabDashboard from './pages/LabDashboard';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './AuthContext';
+import SplashScreen from './components/SplashScreen';
 import Login from './pages/Login';
 import AttendanceKiosk from './pages/AttendanceKiosk';
 import AdminTrash from './pages/AdminTrash';
@@ -122,6 +124,23 @@ function AppRoutes() {
   );
 }
 
+// Shown once per page load, on top of the real app (which mounts and
+// resolves auth/routes underneath it the whole time, so there's no blank
+// flash once it fades) — held briefly, then faded out and removed.
+function AppSplash() {
+  const [visible, setVisible] = useState(true);
+  const [fadingOut, setFadingOut] = useState(false);
+
+  useEffect(() => {
+    const fadeTimer = setTimeout(() => setFadingOut(true), 1300);
+    const removeTimer = setTimeout(() => setVisible(false), 1650);
+    return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
+  }, []);
+
+  if (!visible) return null;
+  return <SplashScreen fadingOut={fadingOut} />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -130,11 +149,12 @@ export default function App() {
           <Toaster
             position="top-right"
             toastOptions={{
-              style: { fontFamily: 'DM Sans, sans-serif', fontSize: '13px', borderRadius: '10px' },
+              style: { fontFamily: 'Sora, sans-serif', fontSize: '13px', borderRadius: '10px' },
               success: { iconTheme: { primary: '#16A34A', secondary: '#fff' } },
               error: { iconTheme: { primary: '#E53E3E', secondary: '#fff' } }
             }}
           />
+          <AppSplash />
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>

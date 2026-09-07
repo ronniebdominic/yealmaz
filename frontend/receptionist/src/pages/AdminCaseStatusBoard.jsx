@@ -58,7 +58,7 @@ function DeptCard({ icon: Icon, label, count, active, onClick }) {
         padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
         background: active ? 'var(--blue)' : 'var(--surface)',
         border: `1.5px solid ${active ? 'var(--blue)' : 'var(--border)'}`,
-        boxShadow: active ? '0 4px 14px rgba(26,86,160,0.25)' : 'var(--shadow, none)',
+        boxShadow: active ? '0 4px 14px rgba(29,78,216,0.25)' : 'var(--shadow, none)',
         transition: 'transform .1s, box-shadow .15s',
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}

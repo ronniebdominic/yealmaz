@@ -13,7 +13,7 @@ import {
   MdPendingActions, MdPaid, MdWarning, MdCardMembership, MdHourglassEmpty, MdDescription,
 } from 'react-icons/md';
 
-const PIE_COLORS = ['#1A56A0', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777'];
+const PIE_COLORS = ['#1D4ED8', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#0EA5E9', '#DB2777'];
 
 function StatCard({ icon: Icon, label, value, warn }) {
   return (

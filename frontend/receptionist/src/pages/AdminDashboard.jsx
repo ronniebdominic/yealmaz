@@ -25,7 +25,7 @@ const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
 const fmtBr = (v) => `Br ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const WORK_TYPE_COLORS = [
-  '#1A56A0', '#00C4B4', '#F0A500', '#16A34A', '#E53E3E',
+  '#1D4ED8', '#00C4B4', '#F0A500', '#16A34A', '#E53E3E',
   '#7C3AED', '#D97706', '#0EA5E9', '#EC4899', '#6B7280',
 ];
 
@@ -993,5 +993,5 @@ function TrustedPartnersSummary() {
 const inputStyle = {
   border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px',
   fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)',
-  outline: 'none', fontFamily: 'DM Sans, sans-serif',
+  outline: 'none', fontFamily: 'Sora, sans-serif',
 };

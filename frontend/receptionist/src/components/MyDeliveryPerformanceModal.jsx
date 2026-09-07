@@ -162,7 +162,7 @@ export default function MyDeliveryPerformanceModal({ onClose }) {
               events.map(ev => (
                 <div key={ev.id} style={{
                   background: 'var(--surface)', borderRadius: 10, padding: '11px 14px', marginBottom: 8,
-                  border: '1px solid var(--border)', borderLeft: `3px solid ${ev.type === 'PICKUP' ? '#1A56A0' : '#D97706'}`,
+                  border: '1px solid var(--border)', borderLeft: `3px solid ${ev.type === 'PICKUP' ? '#1D4ED8' : '#D97706'}`,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ minWidth: 0 }}>

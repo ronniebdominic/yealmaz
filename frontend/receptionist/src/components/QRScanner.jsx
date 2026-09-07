@@ -137,7 +137,7 @@ export default function QRScanner({ onScan, onClose }) {
           <div style={{ fontWeight: 700, fontSize: 18 }}>Camera Unavailable</div>
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, maxWidth: 280, lineHeight: 1.6 }}>{error}</div>
           <button onClick={onClose} style={{
-            marginTop: 8, background: '#1A56A0', border: 'none', color: '#fff',
+            marginTop: 8, background: '#1D4ED8', border: 'none', color: '#fff',
             borderRadius: 10, padding: '12px 28px', cursor: 'pointer', fontSize: 15, fontWeight: 600
           }}>
             Go Back

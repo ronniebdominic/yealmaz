@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  --navy:#0F2044;--navy-mid:#1A3560;--blue:#1A56A0;--blue-light:#2E75B6;
+  --navy:#0F2044;--navy-mid:#1A3560;--blue:#1D4ED8;--blue-light:#3B82F6;
   --accent:#00C4B4;--accent-dim:#00C4B420;--gold:#F0A500;
   --red:#E53E3E;--red-dim:#E53E3E15;--green:#16A34A;--green-dim:#16A34A15;
   --amber:#D97706;--amber-dim:#D9770615;
@@ -12,39 +12,42 @@
   --radius:10px;--radius-lg:16px;
   --shadow:0 1px 3px rgba(15,32,68,.08),0 4px 16px rgba(15,32,68,.04);
   --shadow-lg:0 8px 32px rgba(15,32,68,.12);
-  --font-body:'Plus Jakarta Sans','DM Sans',sans-serif;
+  --font-body:'Sora','Plus Jakarta Sans',sans-serif;
   --font-mono:'JetBrains Mono','DM Mono',monospace;
   font-family:var(--font-body);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#root{height:100%}
-body{background:var(--bg);color:var(--text-1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
+body{background:var(--bg);color:var(--text-1);font-size:14px;font-weight:500;line-height:1.5;-webkit-font-smoothing:antialiased;position:relative}
 /* Soft gradient-blob backdrop, fixed behind everything, so the glass blur
-   throughout the app has something to reveal. CSS-only (body::before) so
-   every page gets it automatically — no per-page markup needed. */
+   throughout the app has something to reveal. Richer/more saturated than a
+   plain pale wash — frosted glass only reads as "frosted" when there's
+   actual color behind it to diffuse; too faint just looks washed out.
+   CSS-only (body::before) so every page gets it automatically — no
+   per-page markup needed. */
 body::before{
   content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(circle at 12% 18%, rgba(26,86,160,.16), transparent 42%),
-    radial-gradient(circle at 88% 12%, rgba(0,196,180,.14), transparent 40%),
-    radial-gradient(circle at 30% 92%, rgba(240,165,0,.10), transparent 42%),
-    radial-gradient(circle at 82% 85%, rgba(124,58,237,.10), transparent 42%),
+    radial-gradient(circle at 12% 18%, rgba(29,78,216,.26), transparent 45%),
+    radial-gradient(circle at 88% 12%, rgba(0,196,180,.22), transparent 42%),
+    radial-gradient(circle at 30% 92%, rgba(240,165,0,.16), transparent 45%),
+    radial-gradient(circle at 82% 85%, rgba(124,58,237,.16), transparent 45%),
     var(--bg);
 }
 .app{display:flex;height:100vh;overflow:hidden}
 .sidebar{
   width:var(--sidebar-w);min-width:var(--sidebar-w);display:flex;flex-direction:column;overflow-y:auto;
   background:var(--glass-sidebar-bg);
-  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  -webkit-backdrop-filter:blur(22px) saturate(175%);backdrop-filter:blur(22px) saturate(175%);
   border-right:1px solid var(--glass-sidebar-border);
 }
 .sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
 .sidebar-logo .tooth{font-size:24px;margin-bottom:4px}
-.sidebar-logo .lab-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:.02em}
+.sidebar-logo .lab-name{font-size:13.5px;font-weight:800;color:#fff;letter-spacing:.02em}
 .role-badge{display:inline-block;margin-top:4px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-dim);padding:2px 8px;border-radius:20px}
 .sidebar-nav{padding:12px 10px;flex:1}
 .nav-section-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);padding:8px 10px 4px;margin-top:8px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;font-size:13.5px;font-weight:500;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;text-decoration:none}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s;font-size:13.5px;font-weight:700;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;text-decoration:none}
 .nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
 .nav-item.active{background:var(--blue);color:#fff}
 .nav-item .badge-count{margin-left:auto;background:var(--accent);color:var(--navy);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;min-width:20px;text-align:center}
@@ -59,17 +62,17 @@ body::before{
 .topbar{
   height:var(--header-h);border-bottom:1px solid var(--glass-border);display:flex;align-items:center;padding:0 24px;gap:16px;flex-shrink:0;
   background:var(--glass-topbar-bg);
-  -webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);
+  -webkit-backdrop-filter:blur(16px) saturate(185%);backdrop-filter:blur(16px) saturate(185%);
 }
-.topbar-title{font-size:16px;font-weight:600;color:var(--text-1);flex:1}
+.topbar-title{font-size:16px;font-weight:800;color:var(--text-1);flex:1}
 .content{flex:1;overflow-y:auto;padding:24px}
 .card{
   border-radius:var(--radius-lg);
   background:var(--glass-bg);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);
-  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);backdrop-filter:blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(200%);backdrop-filter:blur(var(--glass-blur)) saturate(200%);
 }
 .card-header{padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.card-title{font-size:14px;font-weight:600;color:var(--text-1)}
+.card-title{font-size:14px;font-weight:700;color:var(--text-1)}
 .card-body{padding:20px}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
 .stat-card{
@@ -77,7 +80,7 @@ body::before{
   border-radius:var(--radius-lg);padding:18px 20px;display:flex;flex-direction:column;gap:4px;transition:transform .15s, box-shadow .15s;
   background:var(--glass-bg);border:1px solid var(--glass-border);
   box-shadow:0 4px 20px rgba(15,32,68,.08), inset 0 1px 0 rgba(255,255,255,.5);
-  -webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);
+  -webkit-backdrop-filter:blur(14px) saturate(185%);backdrop-filter:blur(14px) saturate(185%);
 }
 .stat-card:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(15,32,68,.14), inset 0 1px 0 rgba(255,255,255,.6)}
 /* backdrop-filter gives every card its own stacking context, so a tooltip
@@ -88,19 +91,19 @@ body::before{
    the next card over. */
 .stat-card:hover,.stat-card:focus-within{z-index:5}
 .stat-label{font-size:12px;color:var(--text-3);font-weight:500;letter-spacing:.02em}
-.stat-value{font-size:28px;font-weight:700;color:var(--text-1);line-height:1}
+.stat-value{font-size:28px;font-weight:800;color:var(--text-1);line-height:1}
 .stat-sub{font-size:12px;color:var(--text-3);margin-top:2px}
 .stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:4px}
 .table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 thead tr{border-bottom:2px solid var(--border)}
-th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);white-space:nowrap}
+th{padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);white-space:nowrap}
 td{padding:13px 16px;font-size:13.5px;color:var(--text-2);border-bottom:1px solid var(--border);vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--surface-2)}
-.patient-name{font-weight:600;color:var(--text-1)}
+.patient-name{font-weight:700;color:var(--text-1)}
 .case-number{font-family:var(--font-mono);font-size:12px;color:var(--text-3)}
-.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
 .badge::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .badge-pickup{background:#FFF7ED;color:#EA580C}.badge-pickup::before{background:#EA580C}
 .badge-pickup-assigned{background:#FEF9C3;color:#854D0E}.badge-pickup-assigned::before{background:#CA8A04}
@@ -120,7 +123,7 @@ tr:hover td{background:var(--surface-2)}
 .badge-pay-verified{background:var(--green-dim);color:var(--green)}.badge-pay-verified::before{background:var(--green)}
 .badge-pay-rejected{background:var(--red-dim);color:var(--red)}.badge-pay-rejected::before{background:var(--red)}
 .badge-trusted{background:#F5F3FF;color:#6D28D9}.badge-trusted::before{background:#7C3AED}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:var(--font-body);white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s;font-family:var(--font-body);white-space:nowrap}
 .btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--navy-mid)}
 .btn-success{background:var(--green);color:#fff}.btn-success:hover{background:#15803d}
 .btn-danger{background:var(--red);color:#fff}.btn-danger:hover{background:#C53030}
@@ -128,7 +131,7 @@ tr:hover td{background:var(--surface-2)}
 .btn-sm{padding:5px 12px;font-size:12px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .form-group{margin-bottom:16px}
-label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
+label{display:block;font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:5px}
 input,select,textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;font-family:var(--font-body);color:var(--text-1);background:var(--surface);transition:border-color .15s;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--blue)}
 input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
@@ -139,23 +142,23 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
 .modal{
   border-radius:var(--radius-lg);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:slideUp .2s ease;
   background:var(--glass-bg-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.6);
-  -webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(200%);backdrop-filter:blur(20px) saturate(200%);
 }
 @keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
 .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.modal-title{font-size:16px;font-weight:700}
+.modal-title{font-size:17px;font-weight:800}
 .modal-close{background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;line-height:1}
 .modal-body{padding:24px}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.page-title{font-size:20px;font-weight:700}
+.page-title{font-size:20px;font-weight:800}
 .page-sub{font-size:13px;color:var(--text-3);margin-top:2px}
 .divider{height:1px;background:var(--border);margin:16px 0}
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,196,180,.4)}50%{box-shadow:0 0 0 6px rgba(0,196,180,0)}}
 .empty-state{text-align:center;padding:48px 24px;color:var(--text-3)}
 .empty-icon{font-size:36px;margin-bottom:12px}
-.empty-title{font-size:15px;font-weight:600;color:var(--text-2);margin-bottom:4px}
+.empty-title{font-size:15px;font-weight:700;color:var(--text-2);margin-bottom:4px}
 .screenshot-img{width:100%;border-radius:8px;border:1px solid var(--border);cursor:pointer}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .timeline{display:flex;flex-direction:column;gap:0}
@@ -164,10 +167,10 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
 .timeline-dot{width:30px;height:30px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;z-index:1}
 .timeline-dot.done{background:var(--green-dim);border-color:var(--green)}
 .timeline-content{flex:1;padding-top:4px}
-.timeline-label{font-size:13px;font-weight:600;color:var(--text-1)}
+.timeline-label{font-size:13px;font-weight:700;color:var(--text-1)}
 .timeline-time{font-size:11px;color:var(--text-3);margin-top:2px}
 .filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
-.filter-chip{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text-2);transition:all .12s}
+.filter-chip{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text-2);transition:all .12s}
 .filter-chip:hover{border-color:var(--blue);color:var(--blue)}
 .filter-chip.active{background:var(--blue);border-color:var(--blue);color:#fff}
 .notification-banner{display:flex;align-items:center;gap:10px;background:var(--accent-dim);border:1px solid rgba(0,196,180,.3);border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#00796B;font-weight:500;animation:fadeIn .3s ease}
@@ -179,27 +182,62 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
   min-height:100vh;display:flex;align-items:center;justify-content:center;
   background:
     radial-gradient(circle at 15% 20%, rgba(0,196,180,.20), transparent 45%),
-    radial-gradient(circle at 85% 80%, rgba(26,86,160,.35), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(29,78,216,.35), transparent 45%),
     linear-gradient(160deg, var(--navy), var(--navy-mid));
 }
 .login-card{
   border-radius:20px;padding:40px;width:380px;
   background:var(--glass-bg-strong);border:1px solid var(--glass-border);
   box-shadow:var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.6);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(200%);backdrop-filter:blur(24px) saturate(200%);
 }
 .login-logo{text-align:center;margin-bottom:28px}
 .login-logo .tooth{font-size:40px}
-.login-logo h1{font-size:20px;font-weight:700;color:var(--navy);margin-top:8px}
+.login-logo h1{font-size:22px;font-weight:800;color:var(--navy);margin-top:8px}
 .login-logo p{font-size:13px;color:var(--text-3);margin-top:4px}
+
+/* ── App boot splash ──────────────────────────────────────────────────────
+   Shown once on first load (see App.jsx) — same navy/gold branding as the
+   clinic app's own splash screen. Fixed + high z-index so it sits above
+   everything (including the login page) until faded out. */
+.splash-screen{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(0,196,180,.22), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(29,78,216,.38), transparent 45%),
+    linear-gradient(160deg, var(--navy), var(--navy-mid));
+  animation:splashIn .4s ease;
+  transition:opacity .35s ease;
+}
+.splash-screen.splash-fade-out{opacity:0;pointer-events:none}
+@keyframes splashIn{from{opacity:0}to{opacity:1}}
+.splash-logo-ring{
+  width:120px;height:120px;border-radius:50%;padding:6px;margin-bottom:28px;
+  background:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.5);
+  box-shadow:0 0 40px rgba(240,165,0,.4);
+  animation:splashLogoIn .55s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes splashLogoIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.splash-logo{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.splash-text-block{text-align:center;margin-bottom:48px;animation:splashTextIn .4s ease .3s both}
+@keyframes splashTextIn{from{opacity:0}to{opacity:1}}
+.splash-app-name{font-size:32px;font-weight:800;color:#fff;letter-spacing:.03em;margin-bottom:4px}
+.splash-app-sub{font-size:14px;font-weight:600;color:rgba(255,255,255,.65);letter-spacing:.25em;text-transform:uppercase;margin-bottom:16px}
+.splash-divider{width:40px;height:2px;background:var(--gold);border-radius:2px;margin:0 auto 14px}
+.splash-tagline{font-size:12.5px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase}
+.splash-dots{display:flex;gap:8px;margin-bottom:64px}
+.splash-dot{width:7px;height:7px;border-radius:4px;background:var(--gold);animation:splashDotPulse 1.1s ease-in-out infinite}
+@keyframes splashDotPulse{0%,100%{opacity:.3}50%{opacity:1}}
+.splash-footer{position:absolute;bottom:28px;font-size:11px;color:rgba(255,255,255,.35);letter-spacing:.03em}
 
 /* ── Mobile drawer nav ──────────────────────────────────────────────────── */
 .mobile-topbar{
   display:none;height:52px;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;
   background:var(--glass-sidebar-bg);
-  -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+  -webkit-backdrop-filter:blur(18px) saturate(175%);backdrop-filter:blur(18px) saturate(175%);
 }
-.mobile-topbar-title{flex:1;font-size:15px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mobile-topbar-title{flex:1;font-size:15px;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-topbar .live-dot{flex-shrink:0}
 .hamburger{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;padding:6px 8px;border-radius:6px;display:flex;align-items:center;justify-content:center;line-height:1;font-size:22px}
 .hamburger:hover{background:rgba(255,255,255,.1);color:#fff}
@@ -210,7 +248,7 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
 .drawer{
   position:fixed;top:0;left:0;height:100%;width:260px;max-width:82vw;z-index:201;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s ease;overflow-y:auto;
   background:var(--glass-sidebar-bg);
-  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  -webkit-backdrop-filter:blur(22px) saturate(175%);backdrop-filter:blur(22px) saturate(175%);
   border-right:1px solid var(--glass-sidebar-border);
 }
 .drawer.open{transform:translateX(0)}
@@ -223,21 +261,21 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
    The .glass-* classes below stay defined for any spot that opts in
    explicitly (equivalent, just named) — no page-specific overrides. ──── */
 :root {
-  --glass-bg: rgba(255,255,255,.55);
-  --glass-bg-strong: rgba(255,255,255,.7);
-  --glass-border: rgba(255,255,255,.5);
-  --glass-shadow: 0 8px 32px rgba(15,32,68,.10), inset 0 1px 0 rgba(255,255,255,.6);
-  --glass-blur: 18px;
-  --glass-sidebar-bg: linear-gradient(165deg, rgba(26,86,160,.58), rgba(15,32,68,.68) 55%, rgba(10,22,48,.72));
-  --glass-sidebar-border: rgba(255,255,255,.09);
-  --glass-topbar-bg: rgba(255,255,255,.6);
+  --glass-bg: rgba(255,255,255,.68);
+  --glass-bg-strong: rgba(255,255,255,.8);
+  --glass-border: rgba(255,255,255,.65);
+  --glass-shadow: 0 8px 36px rgba(15,32,68,.14), inset 0 1px 0 rgba(255,255,255,.7);
+  --glass-blur: 20px;
+  --glass-sidebar-bg: linear-gradient(165deg, rgba(29,78,216,.62), rgba(15,32,68,.72) 55%, rgba(10,22,48,.78));
+  --glass-sidebar-border: rgba(255,255,255,.1);
+  --glass-topbar-bg: rgba(255,255,255,.72);
 }
 
 .glass-card{
   position:relative;z-index:1;
   background:var(--glass-bg);
-  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(180%);
-  backdrop-filter:blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(200%);
+  backdrop-filter:blur(var(--glass-blur)) saturate(200%);
   border:1px solid var(--glass-border);
   border-radius:var(--radius-lg);
   box-shadow:var(--glass-shadow);
@@ -250,8 +288,8 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
 .glass-stat-card{
   position:relative;z-index:1;
   background:var(--glass-bg);
-  -webkit-backdrop-filter:blur(14px) saturate(170%);
-  backdrop-filter:blur(14px) saturate(170%);
+  -webkit-backdrop-filter:blur(14px) saturate(185%);
+  backdrop-filter:blur(14px) saturate(185%);
   border:1px solid var(--glass-border);
   border-radius:var(--radius-lg);
   box-shadow:0 4px 20px rgba(15,32,68,.08), inset 0 1px 0 rgba(255,255,255,.5);
@@ -262,20 +300,20 @@ input[type="checkbox"],input[type="radio"]{width:16px;flex-shrink:0;padding:0}
 .glass-stat-card:hover,.glass-stat-card:focus-within{z-index:5}
 .glass-sidebar{
   background:var(--glass-sidebar-bg)!important;
-  -webkit-backdrop-filter:blur(22px) saturate(160%);
-  backdrop-filter:blur(22px) saturate(160%);
+  -webkit-backdrop-filter:blur(22px) saturate(175%);
+  backdrop-filter:blur(22px) saturate(175%);
   border-right:1px solid var(--glass-sidebar-border);
 }
 .glass-topbar{
   background:var(--glass-topbar-bg)!important;
-  -webkit-backdrop-filter:blur(16px) saturate(170%);
-  backdrop-filter:blur(16px) saturate(170%);
+  -webkit-backdrop-filter:blur(16px) saturate(185%);
+  backdrop-filter:blur(16px) saturate(185%);
   border-bottom:1px solid var(--glass-border);
 }
 .glass-pill{
   background:rgba(255,255,255,.5);
-  -webkit-backdrop-filter:blur(10px) saturate(160%);
-  backdrop-filter:blur(10px) saturate(160%);
+  -webkit-backdrop-filter:blur(10px) saturate(175%);
+  backdrop-filter:blur(10px) saturate(175%);
   border:1px solid var(--glass-border);
 }
 /* Material icon alignment helper */

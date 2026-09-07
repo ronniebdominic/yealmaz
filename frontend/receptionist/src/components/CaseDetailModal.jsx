@@ -468,7 +468,7 @@ export default function CaseDetailModal({ caseId, onClose }) {
                 type="date"
                 value={deliveryDateInput}
                 onChange={e => setDeliveryDateInput(e.target.value)}
-                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}
+                style={{ flex: 1, border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', background: 'var(--surface)', outline: 'none', fontFamily: 'Sora, sans-serif' }}
               />
               <button
                 className="btn btn-primary btn-sm"

@@ -22,7 +22,7 @@ function agentIcon(name) {
     className: '',
     html: `<div style="
       width:32px;height:32px;border-radius:50%;background:${AMBER};color:#fff;
-      display:flex;align-items:center;justify-content:center;font:700 12px/1 'DM Sans',sans-serif;
+      display:flex;align-items:center;justify-content:center;font:700 12px/1 'Sora',sans-serif;
       border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);
     ">${initials}</div>`,
     iconSize: [32, 32],
@@ -84,7 +84,7 @@ export default function LiveTrackingMap() {
         {agents.map(a => (
           <Marker key={a.userId} position={[a.latitude, a.longitude]} icon={agentIcon(a.name)}>
             <Popup>
-              <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 13, minWidth: 140 }}>
+              <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 13, minWidth: 140 }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>{a.name}</div>
                 {a.station && <div style={{ color: '#6B7280', fontSize: 12, marginBottom: 4 }}>{a.station}</div>}
                 <div style={{ color: '#9CA3AF', fontSize: 11 }}>Updated {timeAgo(a.updatedAt)}</div>

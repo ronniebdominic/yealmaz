@@ -234,7 +234,7 @@ export default function InventoryDashboard() {
   const pendingCount = requests.filter(r => r.status === 'PENDING').length;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'DM Sans, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: 'Sora, sans-serif' }}>
       <div style={{ background: '#0F2044', color: '#fff', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/logo.png" alt="logo" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />

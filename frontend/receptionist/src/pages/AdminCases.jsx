@@ -398,7 +398,7 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
                 border: `1.5px solid ${reason.trim() ? 'var(--border)' : 'rgba(229,62,62,0.4)'}`,
                 borderRadius: 8, fontSize: 13, resize: 'vertical',
                 background: 'var(--surface)', color: 'var(--text-1)',
-                fontFamily: 'DM Sans, sans-serif',
+                fontFamily: 'Sora, sans-serif',
               }}
             />
           </div>
@@ -430,11 +430,11 @@ const selectStyle = {
   border: '1px solid var(--border)', borderRadius: 8,
   padding: '7px 12px', fontSize: 13, color: 'var(--text-1)',
   background: 'var(--surface)', outline: 'none',
-  fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
+  fontFamily: 'Sora, sans-serif', cursor: 'pointer',
 };
 
 const fieldLabel = { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 };
-const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)', fontFamily: 'DM Sans, sans-serif' };
+const fieldInput = { width: '100%', padding: '9px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, background: 'var(--surface)', color: 'var(--text-1)', fontFamily: 'Sora, sans-serif' };
 
 // ── Edit Case Modal ────────────────────────────────────────
 // Admin-only — edits core case details. Status/payment are changed via their
