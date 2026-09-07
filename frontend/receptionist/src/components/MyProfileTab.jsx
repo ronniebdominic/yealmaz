@@ -15,7 +15,7 @@ const EMPLOYMENT_TYPE_LABEL = {
 function Row({ icon: Icon, label, value }) {
   if (!value) return null;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.35)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-soft)' }}>
       <Icon size={16} color="var(--text-3)" style={{ flexShrink: 0 }} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
@@ -67,20 +67,20 @@ export default function MyProfileTab() {
 
   return (
     <div>
-      <div className="glass-card" style={{ padding: 20, textAlign: 'center', marginBottom: 14 }}>
+      <div className="card" style={{ padding: 20, textAlign: 'center', marginBottom: 14 }}>
         <div style={{ position: 'relative', width: 84, height: 84, margin: '0 auto 12px' }}>
           {profile?.photoUrl ? (
-            <img src={profile.photoUrl} alt="" style={{ width: 84, height: 84, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.6)' }} />
+            <img src={profile.photoUrl} alt="" style={{ width: 84, height: 84, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border-2)' }} />
           ) : (
             <div style={{
-              width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: '#fff',
+              width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: 'var(--navy)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700,
-              border: '3px solid rgba(255,255,255,0.6)',
+              border: '3px solid var(--border-2)',
             }}>{initials}</div>
           )}
           <button onClick={() => fileRef.current?.click()} disabled={uploading} title="Change photo" style={{
             position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderRadius: '50%',
-            background: 'var(--navy)', border: '2px solid #fff', color: '#fff', display: 'flex',
+            background: 'var(--surface-3)', border: '2px solid var(--surface)', color: 'var(--text-1)', display: 'flex',
             alignItems: 'center', justifyContent: 'center', cursor: uploading ? 'not-allowed' : 'pointer',
           }}>
             <MdCameraAlt size={13} />
@@ -89,12 +89,12 @@ export default function MyProfileTab() {
         </div>
         <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-1)' }}>{profile?.preferredName || data?.name}</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>{profile?.position || 'Lab Technician'}</div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: data?.isActive ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)', color: data?.isActive ? 'var(--green)' : 'var(--red)' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: data?.isActive ? 'var(--green-dim)' : 'var(--red-dim)', color: data?.isActive ? 'var(--green)' : 'var(--red)' }}>
           {data?.isActive ? <MdVerified size={12} /> : <MdBlock size={12} />} {data?.isActive ? 'Active' : 'Inactive'}
         </div>
       </div>
 
-      <div className="glass-card" style={{ padding: '4px 16px 6px' }}>
+      <div className="card" style={{ padding: '4px 16px 6px' }}>
         <Row icon={MdBadge} label="Department Scope" value={deptScope} />
         <Row icon={MdWork} label="Employment Type" value={profile?.employmentType ? EMPLOYMENT_TYPE_LABEL[profile.employmentType] || profile.employmentType : null} />
         <Row icon={MdCalendarToday} label="Hire Date" value={profile?.hireDate ? format(new Date(profile.hireDate), 'dd MMM yyyy') : null} />

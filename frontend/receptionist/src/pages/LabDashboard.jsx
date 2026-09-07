@@ -11,7 +11,7 @@ import {
   MdLocalFireDepartment, MdSearch, MdCheckCircle, MdInventory2, MdPerson,
   MdPhotoCamera, MdBackHand, MdLightbulb, MdInbox, MdLogout,
   MdInsights, MdCalendarToday, MdAddBox, MdCelebration, MdQrCodeScanner,
-  MdNotifications,
+  MdNotifications, MdChevronRight,
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString, startOfWeekLocal, startOfMonthLocal } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
@@ -24,22 +24,26 @@ import MyProfileTab from '../components/MyProfileTab';
 import { useNotifications } from '../hooks/useNotifications';
 
 // ── Department config ─────────────────────────────────────
+// `color` is a bright hex tuned for the dark theme (identity accent only —
+// the *selected* state uses the shared --accent so the portal matches the
+// rest of the product). `bg` keeps the "<hex><alpha>" form other code
+// appends to. Codes / labels / order / nextDept are unchanged.
 const DEPARTMENTS = [
-  { code: 'PLASTER',      label: 'Plaster Department',   short: 'PLS', color: '#6A1B9A', bg: '#6A1B9A18', icon: MdScience,  nextDept: 'Margin Department' },
-  { code: 'MARGIN',       label: 'Margin Department',    short: 'MRG', color: '#7B1FA2', bg: '#7B1FA218', icon: MdContentCut,  nextDept: 'Scanning' },
-  { code: 'SCANNING',     label: 'Scanning',             short: 'SCN', color: 'var(--brand)', bg: 'var(--brand)18', icon: MdBiotech,  nextDept: 'Designing' },
-  { code: 'DESIGNING',    label: 'Designing',            short: 'DES', color: '#0277BD', bg: '#0277BD18', icon: MdComputer,  nextDept: 'Milling / Printing' },
-  { code: 'MILLING',      label: 'Milling / Sintering',  short: 'MIL', color: '#E65100', bg: '#E6510018', icon: MdSettings,  nextDept: 'Metal Finishing' },
-  { code: 'RESIN_PRINT',  label: 'Resin 3D Printing',    short: 'R3D', color: '#BF360C', bg: '#BF360C18', icon: MdPrint,  nextDept: 'Trimming' },
-  { code: 'METAL_PRINT',  label: 'Metal 3D Printing',    short: 'M3D', color: '#4E342E', bg: '#4E342E18', icon: MdBuild,  nextDept: 'Metal Finishing' },
-  { code: 'METAL_FINISH', label: 'Metal Finishing',      short: 'MFN', color: '#795548', bg: '#79554818', icon: MdBuild,  nextDept: 'Opaque Application' },
-  { code: 'OPAQUE',       label: 'Opaque Application',   short: 'OPQ', color: '#F57F17', bg: '#F57F1718', icon: MdPalette,  nextDept: 'Ceramic Layering' },
-  { code: 'CERAMIC',      label: 'Ceramic Layering',     short: 'CER', color: '#D84315', bg: '#D8431518', icon: MdAccountBalance,  nextDept: 'Glazing' },
-  { code: 'ZIRCONIA',     label: 'Zirconia Fitting',     short: 'ZRC', color: '#00695C', bg: '#00695C18', icon: MdDiamond,  nextDept: 'Glazing' },
-  { code: 'GLAZING',      label: 'Glazing',              short: 'GLZ', color: '#00838F', bg: '#00838F18', icon: MdAutoAwesome,  nextDept: 'Quality Control' },
-  { code: 'THERMO',       label: 'Thermo Press',         short: 'THP', color: '#C62828', bg: '#C6282818', icon: MdLocalFireDepartment,  nextDept: 'Quality Control' },
-  { code: 'TRIMMING',     label: 'Trimming',             short: 'TRM', color: '#558B2F', bg: '#558B2F18', icon: MdContentCut,  nextDept: 'Quality Control' },
-  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: 'var(--green)', bg: 'var(--green)18', icon: MdSearch,  nextDept: 'Ready to Dispatch' },
+  { code: 'PLASTER',      label: 'Plaster Department',   short: 'PLS', color: '#B98BE8', bg: '#B98BE81F', icon: MdScience,  nextDept: 'Margin Department' },
+  { code: 'MARGIN',       label: 'Margin Department',    short: 'MRG', color: '#C58BE0', bg: '#C58BE01F', icon: MdContentCut,  nextDept: 'Scanning' },
+  { code: 'SCANNING',     label: 'Scanning',             short: 'SCN', color: '#4C82F7', bg: '#4C82F71F', icon: MdBiotech,  nextDept: 'Designing' },
+  { code: 'DESIGNING',    label: 'Designing',            short: 'DES', color: '#3FB6E8', bg: '#3FB6E81F', icon: MdComputer,  nextDept: 'Milling / Printing' },
+  { code: 'MILLING',      label: 'Milling / Sintering',  short: 'MIL', color: '#F5934C', bg: '#F5934C1F', icon: MdSettings,  nextDept: 'Metal Finishing' },
+  { code: 'RESIN_PRINT',  label: 'Resin 3D Printing',    short: 'R3D', color: '#F2795E', bg: '#F2795E1F', icon: MdPrint,  nextDept: 'Trimming' },
+  { code: 'METAL_PRINT',  label: 'Metal 3D Printing',    short: 'M3D', color: '#C9A18F', bg: '#C9A18F1F', icon: MdBuild,  nextDept: 'Metal Finishing' },
+  { code: 'METAL_FINISH', label: 'Metal Finishing',      short: 'MFN', color: '#C2A594', bg: '#C2A5941F', icon: MdBuild,  nextDept: 'Opaque Application' },
+  { code: 'OPAQUE',       label: 'Opaque Application',   short: 'OPQ', color: '#F5B23F', bg: '#F5B23F1F', icon: MdPalette,  nextDept: 'Ceramic Layering' },
+  { code: 'CERAMIC',      label: 'Ceramic Layering',     short: 'CER', color: '#F0855C', bg: '#F0855C1F', icon: MdAccountBalance,  nextDept: 'Glazing' },
+  { code: 'ZIRCONIA',     label: 'Zirconia Fitting',     short: 'ZRC', color: '#2DD4BF', bg: '#2DD4BF1F', icon: MdDiamond,  nextDept: 'Glazing' },
+  { code: 'GLAZING',      label: 'Glazing',              short: 'GLZ', color: '#4FC3D4', bg: '#4FC3D41F', icon: MdAutoAwesome,  nextDept: 'Quality Control' },
+  { code: 'THERMO',       label: 'Thermo Press',         short: 'THP', color: '#F26D6D', bg: '#F26D6D1F', icon: MdLocalFireDepartment,  nextDept: 'Quality Control' },
+  { code: 'TRIMMING',     label: 'Trimming',             short: 'TRM', color: '#9CCC65', bg: '#9CCC651F', icon: MdContentCut,  nextDept: 'Quality Control' },
+  { code: 'QC',           label: 'Quality Control',      short: 'QC',  color: '#34D399', bg: '#34D3991F', icon: MdSearch,  nextDept: 'Ready to Dispatch' },
 ];
 
 const STAGE_LABELS = {
@@ -53,19 +57,136 @@ const STAGE_LABELS = {
   ON_HOLD: 'On Hold', REMAKE: 'Remake', CANCELLED: 'Cancelled',
 };
 
+// Bright, dark-theme-tuned stage hues. Used as chip tints (hex + alpha)
+// and card accent edges. Same keys as before.
 const STAGE_COLORS = {
-  CASE_ACCEPTED: '#3949AB', PLASTER_DEPARTMENT: '#6A1B9A', MARGIN_DEPARTMENT: '#7B1FA2',
-  SCANNING: '#2D5BD6', DESIGNING: '#0277BD',
-  MILLING_SINTERING: '#E65100', RESIN_3D_PRINTING: '#BF360C', METAL_3D_PRINTING: '#4E342E',
-  METAL_FINISHING: '#795548', OPAQUE_APPLICATION: '#F57F17', CERAMIC_LAYERING: '#D84315',
-  ZIRCONIA_FITTING_FINISHING: '#00695C', GLAZING: '#00838F', THERMO_PRESS: '#C62828', TRIMMING: '#558B2F',
-  QUALITY_CHECK: '#17864C', PAYMENT_INVOICING: '#00695C',
-  READY_TO_DISPATCH: '#0E7490', OUT_FOR_DELIVERY: '#B4690E', DELIVERED: '#101C36',
-  ON_HOLD: '#B71C1C', REMAKE: '#6A1B9A', CANCELLED: '#424242',
+  CASE_ACCEPTED: '#7C8BF5', PLASTER_DEPARTMENT: '#B98BE8', MARGIN_DEPARTMENT: '#C58BE0',
+  SCANNING: '#4C82F7', DESIGNING: '#3FB6E8',
+  MILLING_SINTERING: '#F5934C', RESIN_3D_PRINTING: '#F2795E', METAL_3D_PRINTING: '#C9A18F',
+  METAL_FINISHING: '#C2A594', OPAQUE_APPLICATION: '#F5B23F', CERAMIC_LAYERING: '#F0855C',
+  ZIRCONIA_FITTING_FINISHING: '#2DD4BF', GLAZING: '#4FC3D4', THERMO_PRESS: '#F26D6D', TRIMMING: '#9CCC65',
+  QUALITY_CHECK: '#34D399', PAYMENT_INVOICING: '#2DD4BF',
+  READY_TO_DISPATCH: '#3FB6E8', OUT_FOR_DELIVERY: '#F5B23F', DELIVERED: '#7E8BA4',
+  ON_HOLD: '#F26D6D', REMAKE: '#B98BE8', CANCELLED: '#5A6683',
 };
 
 // Literal hex, not tokens — chart libs can't resolve var(). Mirrors index.css.
 const PIE_COLORS = ['#4C82F7', '#34D399', '#F5B23F', '#F26D6D', '#A78BFA', '#5BA8D8', '#EC7FA0', '#2DD4BF'];
+
+// Shared mobile styles for the technician portal. Scoped by the `tp-`
+// class prefix so nothing here can reach the Admin or other portals.
+function TechStyles() {
+  return (
+    <style>{`
+      .tp-shell{--tp-pad:16px}
+      @media (max-width:380px){.tp-shell{--tp-pad:12px}}
+
+      .tp-section-label{
+        font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+        color:var(--text-3);margin:0 0 10px;display:flex;align-items:center;gap:6px;
+      }
+
+      /* Department grid — 2-up on small phones, more when width allows. */
+      .tp-dept-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:10px}
+      .tp-dept{
+        --dept:var(--accent);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+        min-height:76px;padding:12px 10px;border-radius:var(--radius-md);cursor:pointer;
+        background:var(--surface-2);border:1px solid var(--border);
+        color:var(--text-2);text-align:center;
+        transition:transform var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),background var(--t-fast) var(--ease);
+      }
+      .tp-dept:active{transform:scale(.97)}
+      .tp-dept-ic{
+        width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;
+        background:var(--deptbg,var(--surface-3));color:var(--dept);
+      }
+      .tp-dept-lb{font-size:12px;font-weight:600;line-height:1.3;color:inherit;overflow-wrap:anywhere}
+      .tp-dept[data-on="true"]{
+        background:var(--accent-dim);border-color:var(--accent);color:var(--text-1);
+        box-shadow:0 0 0 3px rgba(45,212,191,.22);
+      }
+      .tp-dept-check{position:absolute;top:6px;right:6px;color:var(--accent)}
+
+      /* Big tap tiles (Scan / Search) */
+      .tp-tile{
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+        min-height:112px;padding:18px 12px;border-radius:var(--radius-md);cursor:pointer;
+        border:1px solid var(--border);transition:transform var(--t-fast) var(--ease);
+      }
+      .tp-tile:active{transform:scale(.98)}
+      .tp-tile-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+      .tp-tile-ghost{background:var(--surface);color:var(--text-1)}
+      .tp-tile-hint{font-size:11px;opacity:.72;font-weight:450}
+      .tp-tile-lb{font-size:13.5px;font-weight:600}
+
+      /* Segmented control */
+      .tp-seg{display:flex;gap:4px;padding:4px;border-radius:var(--radius);background:var(--surface-2);border:1px solid var(--border)}
+      .tp-seg button{
+        flex:1;padding:8px 6px;border:none;border-radius:calc(var(--radius) - 4px);cursor:pointer;
+        font-size:12.5px;font-weight:600;background:transparent;color:var(--text-3);
+        transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+      }
+      .tp-seg button[data-on="true"]{background:var(--surface);color:var(--text-1);box-shadow:var(--shadow-xs)}
+
+      /* KPI mini grid */
+      .tp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+      @media (max-width:340px){.tp-kpis{grid-template-columns:repeat(2,1fr);row-gap:12px}}
+      .tp-kpi-l{font-size:9.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--text-3);line-height:1.25;min-height:2.4em}
+      .tp-kpi-v{font-size:18px;font-weight:650;color:var(--text-1);font-variant-numeric:tabular-nums;margin-top:2px}
+
+      /* Queue / history rows */
+      .tp-row{
+        display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:8px;
+        border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--border);
+        border-left:3px solid var(--row,var(--accent));
+      }
+      .tp-row-mono{font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);margin-bottom:2px}
+      .tp-row-title{font-size:13.5px;font-weight:600;color:var(--text-1);line-height:1.3}
+      .tp-row-sub{font-size:11.5px;color:var(--text-2);margin-top:2px}
+      .tp-chip{
+        display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;
+        padding:2px 8px;border-radius:var(--radius-pill);white-space:nowrap;
+        background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);
+      }
+
+      /* Bottom nav */
+      .tp-nav{
+        position:sticky;bottom:0;z-index:60;display:flex;
+        background:var(--surface);border-top:1px solid var(--border);
+        padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      }
+      .tp-nav button{
+        flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+        min-height:52px;padding:6px 4px;border:none;background:none;cursor:pointer;
+        color:var(--text-4);transition:color var(--t-fast) var(--ease);
+      }
+      .tp-nav button[data-on="true"]{color:var(--accent)}
+      .tp-nav-ic{position:relative;display:grid;place-items:center;width:44px;height:26px;border-radius:var(--radius-pill);transition:background var(--t-fast) var(--ease)}
+      .tp-nav button[data-on="true"] .tp-nav-ic{background:var(--accent-dim)}
+      .tp-nav-lb{font-size:10px;font-weight:600}
+      .tp-nav-badge{
+        position:absolute;top:-3px;right:2px;min-width:15px;height:15px;border-radius:8px;
+        background:var(--red);color:#fff;font-size:9px;font-weight:700;
+        display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid var(--surface);
+      }
+
+      /* Bottom-sheet modal */
+      .tp-sheet-scrim{position:fixed;inset:0;z-index:200;background:var(--scrim);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center}
+      .tp-sheet{
+        width:100%;max-width:480px;background:var(--surface);
+        border-radius:var(--radius-xl) var(--radius-xl) 0 0;border:1px solid var(--border);border-bottom:none;
+        padding:16px 16px calc(24px + env(safe-area-inset-bottom));
+        animation:slideUp .22s var(--ease);max-height:88vh;overflow-y:auto;
+      }
+      .tp-sheet-grab{width:36px;height:4px;background:var(--border-2);border-radius:2px;margin:0 auto 14px}
+      .tp-sheet-title{font-size:15.5px;font-weight:600;color:var(--text-1);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+      .tp-field-l{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px}
+      .tp-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:var(--surface-2);color:var(--text-1);font-family:inherit;box-sizing:border-box}
+      .tp-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-ring)}
+    `}</style>
+  );
+}
 
 // ── QR Scanner component (native getUserMedia + jsQR) ────────
 function QRScanner({ onScan, onClose }) {
@@ -132,17 +253,15 @@ function QRScanner({ onScan, onClose }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.92)',
+      position: 'fixed', inset: 0, background: 'rgba(3,7,15,0.94)',
       backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20,
     }}>
-      <div style={{ width: '100%', maxWidth: 380, background: '#000', borderRadius: 20, overflow: 'hidden' }}>
+      <div style={{ width: '100%', maxWidth: 380, background: '#000', borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border)' }}>
         {/* Header */}
-        <div style={{ padding: '14px 18px', background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Scan QR Code</div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-            Cancel
-          </button>
+        <div style={{ padding: '14px 18px', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ color: 'var(--text-1)', fontWeight: 600, fontSize: 15, display: 'flex', alignItems: 'center', gap: 7 }}><MdQrCodeScanner size={18} /> Scan QR Code</div>
+          <button onClick={onClose} className="btn btn-ghost btn-sm">Cancel</button>
         </div>
 
         {/* Single clean video feed */}
@@ -159,8 +278,8 @@ function QRScanner({ onScan, onClose }) {
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
           }}>
             <div style={{
-              width: 200, height: 200, border: '2px solid rgba(255,255,255,0.8)', borderRadius: 12,
-              boxShadow: '0 0 0 9999px rgba(0,0,0,0.45)',
+              width: 200, height: 200, border: '2px solid rgba(255,255,255,0.85)', borderRadius: 12,
+              boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
             }}>
               {/* Corner marks */}
               {[['0','0','auto','auto'],['0','auto','auto','0'],['auto','0','0','auto'],['auto','auto','0','0']].map((pos, i) => (
@@ -177,7 +296,7 @@ function QRScanner({ onScan, onClose }) {
           </div>
         </div>
 
-        <div style={{ padding: '12px 18px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.6)', background: '#111' }}>
+        <div style={{ padding: '12px 18px', textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.6)', background: '#0A0A0A' }}>
           Point camera at the case QR code
         </div>
       </div>
@@ -202,36 +321,28 @@ function ManualEntryModal({ onSubmit, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 36px', animation: 'slideUp 0.2s ease' }}>
-        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}><MdSearch size={17} /> Search Case</div>
+    <div className="tp-sheet-scrim" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="tp-sheet">
+        <div className="tp-sheet-grab" />
+        <div className="tp-sheet-title"><MdSearch size={17} /> Search Case</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input placeholder="Case number or patient name…" value={caseNum} onChange={e => setCaseNum(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && search()}
-            style={{ flex: 1, padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14 }} />
-          <button className="btn btn-primary" onClick={search} disabled={searching} style={{ flex: 0 }}>
+          <input className="tp-input" placeholder="Case number or patient name…" value={caseNum} onChange={e => setCaseNum(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && search()} style={{ flex: 1 }} />
+          <button className="btn btn-primary" onClick={search} disabled={searching} style={{ flexShrink: 0 }}>
             {searching ? '…' : 'Search'}
           </button>
         </div>
-        <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+        <div style={{ maxHeight: 300, overflowY: 'auto' }}>
           {cases.map(c => (
-            <div key={c.id} onClick={() => onSubmit(c.id)}
-              style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 8, cursor: 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
-              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{c.patientName}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'monospace' }}>{c.caseNumber}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{c.workType} · {c.clinic?.name}</div>
-                </div>
-                <span style={{ fontSize: 11, background: STAGE_COLORS[c.status] + '20', color: STAGE_COLORS[c.status], padding: '3px 8px', borderRadius: 20, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {STAGE_LABELS[c.status]}
-                </span>
+            <div key={c.id} onClick={() => onSubmit(c.id)} className="tp-row" style={{ cursor: 'pointer', '--row': STAGE_COLORS[c.status] || 'var(--accent)' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="tp-row-mono">{c.caseNumber}</div>
+                <div className="tp-row-title">{c.patientName}</div>
+                <div className="tp-row-sub">{c.workType} · {c.clinic?.name}</div>
               </div>
+              <span className="tp-chip" style={{ background: (STAGE_COLORS[c.status] || '#7E8BA4') + '22', color: STAGE_COLORS[c.status] || 'var(--text-2)', borderColor: 'transparent' }}>
+                {STAGE_LABELS[c.status]}
+              </span>
             </div>
           ))}
           {cases.length === 0 && caseNum && !searching && (
@@ -255,29 +366,29 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
   const showComment = COMMENT_DEPARTMENTS.has(department);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 40px', animation: 'slideUp 0.2s ease' }}>
-        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
+    <div className="tp-sheet-scrim">
+      <div className="tp-sheet">
+        <div className="tp-sheet-grab" />
 
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}><MdCheckCircle size={19} color="var(--green)" /> Case Found</div>
-        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16 }}>Confirm scan at {dept?.label}</div>
+        <div className="tp-sheet-title" style={{ fontSize: 17 }}><MdCheckCircle size={19} color="var(--green)" /> Case Found</div>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 16, marginTop: -6 }}>Confirm scan at {dept?.label}</div>
 
         {/* Case card */}
-        <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '16px', marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace', marginBottom: 4 }}>{result.caseNumber}</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>{result.patientName}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>{result.workType} · {result.clinic?.name}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, background: STAGE_COLORS[result.status] + '20', color: STAGE_COLORS[result.status], padding: '3px 10px', borderRadius: 20, fontWeight: 600 }}>
+        <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', padding: '16px', marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{result.caseNumber}</div>
+          <div style={{ fontSize: 20, fontWeight: 650, color: 'var(--text-1)', marginBottom: 4 }}>{result.patientName}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>{result.workType} · {result.clinic?.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, background: (STAGE_COLORS[result.status] || '#7E8BA4') + '22', color: STAGE_COLORS[result.status] || 'var(--text-2)', padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontWeight: 600 }}>
               {STAGE_LABELS[result.status]}
             </span>
-            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>→</span>
-            <span style={{ fontSize: 12, background: dept?.bg, color: dept?.color, padding: '3px 10px', borderRadius: 20, fontWeight: 700, border: `1px solid ${dept?.color}40`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <MdChevronRight size={14} style={{ color: 'var(--text-3)' }} />
+            <span style={{ fontSize: 12, background: dept?.bg, color: dept?.color, padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontWeight: 600, border: `1px solid ${dept?.color}40`, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {dept?.icon && <dept.icon size={13} />} {dept?.label}
             </span>
           </div>
           {result.dueDate && (
-            <div style={{ marginTop: 8, fontSize: 12, color: new Date(result.dueDate) < new Date() ? 'var(--red)' : 'var(--text-3)' }}>
+            <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: new Date(result.dueDate) < new Date() ? 'var(--red)' : 'var(--text-3)' }}>
               Due: {format(new Date(result.dueDate), 'dd MMM yyyy')}
             </div>
           )}
@@ -286,9 +397,9 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
         {/* Stage history */}
         {result.stages?.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Recent Activity</div>
+            <div className="tp-section-label">Recent Activity</div>
             {result.stages.slice(0, 3).map((s, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-2)', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-2)', padding: '7px 0', borderBottom: '1px solid var(--border-soft)' }}>
                 <span>{STAGE_LABELS[s.stageName]}</span>
                 <span style={{ color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'dd MMM, h:mm a')}</span>
               </div>
@@ -298,7 +409,7 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
 
         {showComment && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+            <div className="tp-field-l" style={{ textTransform: 'none', letterSpacing: 0 }}>
               Comment (optional) — visible to lab staff only, not the clinic
             </div>
             <textarea
@@ -306,7 +417,8 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
               value={comment}
               onChange={e => onCommentChange(e.target.value)}
               placeholder={`Note for other departments about this ${dept?.label.toLowerCase()} step…`}
-              style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'inherit', resize: 'vertical' }}
+              className="tp-input"
+              style={{ resize: 'vertical' }}
             />
           </div>
         )}
@@ -366,7 +478,7 @@ function MiniSparkline({ dailyCounts, from, to }) {
           style={{
             flex: 1, minWidth: 4, borderRadius: '3px 3px 0 0',
             height: `${Math.max((b.count / max) * 100, b.count > 0 ? 12 : 4)}%`,
-            background: i === buckets.length - 1 ? 'var(--accent)' : 'var(--accent)66',
+            background: 'var(--accent)', opacity: i === buckets.length - 1 ? 1 : 0.45,
           }}
         />
       ))}
@@ -393,15 +505,9 @@ function PerformanceTab() {
   return (
     <div>
       {/* Range presets */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div className="tp-seg" style={{ marginBottom: 16 }}>
         {RANGE_PRESETS.map(p => (
-          <button key={p.id} onClick={() => { setRangeId(p.id); setPage(1); }}
-            style={{
-              flex: 1, padding: '8px 6px', borderRadius: 10, fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-              border: `2px solid ${rangeId === p.id ? 'var(--accent)' : 'var(--glass-border)'}`,
-              background: rangeId === p.id ? 'rgba(0,196,180,0.12)' : 'rgba(255,255,255,0.4)',
-              color: rangeId === p.id ? 'var(--accent)' : 'var(--text-2)',
-            }}>
+          <button key={p.id} data-on={rangeId === p.id} onClick={() => { setRangeId(p.id); setPage(1); }}>
             {p.label}
           </button>
         ))}
@@ -414,8 +520,8 @@ function PerformanceTab() {
       ) : (
         <>
           {/* Summary */}
-          <div className="glass-card" style={{ padding: 16, marginBottom: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: summary?.totalScans ? 14 : 0 }}>
+          <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+            <div className="tp-kpis" style={{ marginBottom: summary?.totalScans ? 14 : 0 }}>
               {[
                 ['Scans', summary?.totalScans ?? 0],
                 ['Cases', summary?.uniqueCases ?? 0],
@@ -423,34 +529,37 @@ function PerformanceTab() {
                 ['Avg / Day', summary?.avgPerActiveDay ?? 0],
               ].map(([label, value]) => (
                 <div key={label} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25, minHeight: '2.4em' }}>{label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', fontVariantNumeric: 'tabular-nums', marginTop: 'auto' }}>{value}</div>
+                  <div className="tp-kpi-l">{label}</div>
+                  <div className="tp-kpi-v">{value}</div>
                 </div>
               ))}
             </div>
             {summary?.totalScans > 0 && <MiniSparkline dailyCounts={summary.dailyCounts} from={fromDate} to={toDate} />}
           </div>
 
-          {/* Lab Share — highlighted, matching the app's Collection Rate bar convention */}
+          {/* Lab Share — compact component, calc unchanged */}
           {summary?.shareOfTotalPercent != null && (
-            <div style={{ background: 'var(--accent)', borderRadius: 12, padding: '14px 16px', marginBottom: 16, color: '#fff' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Your Share of the Lab</div>
-              <div style={{ height: 8, background: 'rgba(255,255,255,0.25)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: '#fff', borderRadius: 4 }} />
+            <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                <div className="tp-section-label" style={{ margin: 0 }}>Your Share of the Lab</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{summary.shareOfTotalPercent}%</div>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>
-                {summary.shareOfTotalPercent}% — {summary.totalScans} of {summary.totalLabScans} lab scans in this range
+              <div style={{ height: 8, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ height: '100%', width: `${Math.min(100, summary.shareOfTotalPercent)}%`, background: 'var(--accent)', borderRadius: 4 }} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                {summary.totalScans} of {summary.totalLabScans} lab scans in this range
               </div>
             </div>
           )}
 
           {/* Department breakdown — pie chart + exact counts */}
           {summary?.departmentBreakdown?.length > 0 && (
-            <div className="glass-card" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 }}>Department Breakdown</div>
+            <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+              <div className="tp-section-label">Department Breakdown</div>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={summary.departmentBreakdown} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70} label={({ label }) => label}>
+                  <Pie data={summary.departmentBreakdown} dataKey="count" nameKey="label" cx="50%" cy="50%" outerRadius={70} stroke="var(--surface)" label={({ label }) => label}>
                     {summary.departmentBreakdown.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
                   <RTooltip />
@@ -458,40 +567,30 @@ function PerformanceTab() {
               </ResponsiveContainer>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
                 {summary.departmentBreakdown.map(d => (
-                  <span key={d.code} style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--text-2)' }}>
-                    {d.label} · {d.count}
-                  </span>
+                  <span key={d.code} className="tp-chip">{d.label} · {d.count}</span>
                 ))}
               </div>
             </div>
           )}
 
           {/* Scan history */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <MdCalendarToday size={12} /> Scan History
-          </div>
+          <div className="tp-section-label"><MdCalendarToday size={12} /> Scan History</div>
           {scans.length === 0 ? (
-            <div className="glass-card" style={{ padding: '28px 16px', textAlign: 'center' }}>
-              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
-              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans in this range</div>
+            <div className="card" style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
+              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={24} /></div>
+              <div style={{ fontSize: 13 }}>No scans in this range</div>
             </div>
           ) : (
             scans.map(s => (
-              <div key={s.id} className="glass-card" style={{
-                padding: '11px 14px', marginBottom: 8, borderLeft: `3px solid ${STAGE_COLORS[s.stageName] || 'var(--accent)'}`,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{s.caseNumber || '—'}</div>
-                    <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-1)' }}>{s.patientName}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>{s.workType} · {s.clinicName}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
-                    <div style={{ fontSize: 10.5, background: 'var(--surface-2)', color: 'var(--text-2)', padding: '2px 7px', borderRadius: 20, fontWeight: 700, marginBottom: 4, whiteSpace: 'nowrap' }}>
-                      {STAGE_LABELS[s.stageName] || s.stageName}
-                    </div>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'dd MMM, h:mm a')}</div>
-                  </div>
+              <div key={s.id} className="tp-row" style={{ '--row': STAGE_COLORS[s.stageName] || 'var(--accent)' }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="tp-row-mono">{s.caseNumber || '—'}</div>
+                  <div className="tp-row-title">{s.patientName}</div>
+                  <div className="tp-row-sub">{s.workType} · {s.clinicName}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div className="tp-chip" style={{ marginBottom: 4 }}>{STAGE_LABELS[s.stageName] || s.stageName}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'dd MMM, h:mm a')}</div>
                 </div>
               </div>
             ))
@@ -541,37 +640,33 @@ function RequestGoodsModal({ onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 36px', animation: 'slideUp 0.2s ease' }}>
-        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}><MdAddBox size={17} /> Request Goods</div>
+    <div className="tp-sheet-scrim" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="tp-sheet">
+        <div className="tp-sheet-grab" />
+        <div className="tp-sheet-title"><MdAddBox size={17} /> Request Goods</div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>ITEM</div>
-            <select value={itemId} onChange={e => setItemId(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14 }}>
+            <div className="tp-field-l">Item</div>
+            <select className="tp-input" value={itemId} onChange={e => setItemId(e.target.value)}>
               <option value="">Select an item…</option>
               {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>QUANTITY</div>
-            <input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+            <div className="tp-field-l">Quantity</div>
+            <input className="tp-input" type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>DEPARTMENT</div>
-            <select value={department} onChange={e => setDepartment(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14 }}>
+            <div className="tp-field-l">Department</div>
+            <select className="tp-input" value={department} onChange={e => setDepartment(e.target.value)}>
               {departmentOptions.map(label => <option key={label} value={label}>{label}</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>NOTE (OPTIONAL)</div>
-            <textarea rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Anything the Inventory Manager should know…"
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+            <div className="tp-field-l">Note (optional)</div>
+            <textarea className="tp-input" rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="Anything the Inventory Manager should know…"
+              style={{ resize: 'vertical' }} />
           </div>
         </div>
 
@@ -612,23 +707,20 @@ function MillingYieldModal({ onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,32,68,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '20px 20px 36px', animation: 'slideUp 0.2s ease' }}>
-        <div style={{ width: 36, height: 4, background: 'var(--border-2)', borderRadius: 2, margin: '0 auto 16px' }} />
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}><MdSettings size={17} /> Record Blank Yield</div>
-        <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>Yielding more than 30 crowns from one blank earns a bonus.</p>
+    <div className="tp-sheet-scrim" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="tp-sheet">
+        <div className="tp-sheet-grab" />
+        <div className="tp-sheet-title"><MdSettings size={17} /> Record Blank Yield</div>
+        <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14, marginTop: -6 }}>Yielding more than 30 crowns from one blank earns a bonus.</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>BLANKS USED</div>
-            <input type="number" min="1" value={blanksUsed} onChange={e => setBlanksUsed(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+            <div className="tp-field-l">Blanks Used</div>
+            <input className="tp-input" type="number" min="1" value={blanksUsed} onChange={e => setBlanksUsed(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', marginBottom: 4 }}>CROWNS PRODUCED</div>
-            <input type="number" min="1" value={crownsProduced} onChange={e => setCrownsProduced(e.target.value)} autoFocus
-              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+            <div className="tp-field-l">Crowns Produced</div>
+            <input className="tp-input" type="number" min="1" value={crownsProduced} onChange={e => setCrownsProduced(e.target.value)} autoFocus />
           </div>
         </div>
 
@@ -652,28 +744,17 @@ function TabBar({ tab, setTab, unreadCount }) {
     { id: 'profile', label: 'Profile', icon: MdPerson },
   ];
   return (
-    <div className="glass-topbar" style={{
-      position: 'sticky', bottom: 0, zIndex: 60, display: 'flex',
-      padding: '8px 6px calc(6px + env(safe-area-inset-bottom))', borderTop: '1px solid var(--glass-border)', borderBottom: 'none',
-    }}>
+    <nav className="tp-nav">
       {TABS.map(t => (
-        <button key={t.id} onClick={() => setTab(t.id)} style={{
-          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 4px',
-          background: 'none', border: 'none', cursor: 'pointer', color: tab === t.id ? 'var(--accent)' : 'var(--text-3)',
-        }}>
-          <div style={{ position: 'relative' }}>
-            <t.icon size={21} />
-            {t.badge > 0 && (
-              <span style={{
-                position: 'absolute', top: -4, right: -7, minWidth: 14, height: 14, borderRadius: 8, background: 'var(--red)',
-                color: '#fff', fontSize: 8.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
-              }}>{t.badge > 9 ? '9+' : t.badge}</span>
-            )}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: 700 }}>{t.label}</span>
+        <button key={t.id} data-on={tab === t.id} onClick={() => setTab(t.id)}>
+          <span className="tp-nav-ic">
+            <t.icon size={20} />
+            {t.badge > 0 && <span className="tp-nav-badge">{t.badge > 9 ? '9+' : t.badge}</span>}
+          </span>
+          <span className="tp-nav-lb">{t.label}</span>
         </button>
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -752,69 +833,82 @@ export default function LabDashboard() {
   };
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: 520, margin: '0 auto',
-      background: 'linear-gradient(180deg, #E9F1FB 0%, #F2F6FB 45%, #ECF1F8 100%)',
+    <div className="tp-shell" style={{
+      display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: 480, margin: '0 auto',
+      background: 'var(--bg)',
     }}>
+      <TechStyles />
       <InstallAppBanner />
 
-      {/* ── Header — decluttered to identity + dept badge + AttendanceClock;
-          everything else (Leave, Request Goods, Performance, Notifications,
-          Logout) moved into its own tab below. ── */}
-      <div style={{ background: 'var(--navy)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <MdInventory2 size={20} color="#fff" style={{ flexShrink: 0 }} />
+      {/* ── Header — identity + current department + AttendanceClock.
+          Everything else (Leave, Request Goods, Performance, Notifications,
+          Logout) lives in its own tab / quick action below. ── */}
+      <header style={{
+        background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+        padding: 'calc(env(safe-area-inset-top) + 10px) var(--tp-pad, 16px) 10px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+        position: 'sticky', top: 0, zIndex: 50,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--brand-tint)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <MdInventory2 size={19} style={{ color: 'var(--brand)' }} />
+          </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>Ye-Almaz Lab</div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user?.name?.split(' ')[0]}
+            <div style={{ color: 'var(--text-1)', fontWeight: 600, fontSize: 13.5, lineHeight: 1.25 }}>Ye-Almaz Lab</div>
+            <div style={{ color: 'var(--text-3)', fontSize: 11.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.name?.split(' ')[0] || 'Technician'}
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {selectedDept && (
-            <div style={{ background: selectedDept.bg, border: `1px solid ${selectedDept.color}40`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: selectedDept.color }}>
+            <span style={{
+              maxWidth: '34vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              background: selectedDept.bg, border: `1px solid ${selectedDept.color}44`, borderRadius: 'var(--radius-pill)',
+              padding: '4px 10px', fontSize: 11.5, fontWeight: 600, color: selectedDept.color,
+            }}>
               {selectedDept.label}
-            </div>
+            </span>
           )}
           <AttendanceClock />
         </div>
-      </div>
+      </header>
 
-      <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: 'var(--tp-pad, 16px)', paddingBottom: 28, overflowY: 'auto' }}>
 
         {tab === 'scan' && (
           <>
             {/* ── Department — locked from login OR selectable ── */}
             {lockedDept ? (
-              <div className="glass-card" style={{ marginBottom: 16, padding: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Your Department
-                </div>
+              <div style={{ marginBottom: 16 }}>
+                <div className="tp-section-label">Your Department</div>
                 <div style={{
-                  background: selectedDept?.bg, border: `2px solid ${selectedDept?.color}40`,
-                  borderRadius: 12, padding: '14px 16px',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderLeft: `3px solid ${selectedDept?.color}`,
+                  borderRadius: 'var(--radius-md)', padding: '14px 16px',
+                  display: 'flex', alignItems: 'center', gap: 12,
                 }}>
-                  <div style={{ fontWeight: 700, fontSize: 16, color: selectedDept?.color }}>{selectedDept?.label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Next → {selectedDept?.nextDept}</div>
+                  <span style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: selectedDept?.bg, color: selectedDept?.color }}>
+                    {selectedDept?.icon && <selectedDept.icon size={19} />}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-1)' }}>{selectedDept?.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 1 }}>Next → {selectedDept?.nextDept}</div>
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="glass-card" style={{ marginBottom: 16, padding: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div className="tp-section-label">
                   {myDepartments.length > 0 ? 'Select Your Department' : 'Select Your Department (unrestricted)'}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <div className="tp-dept-grid">
                   {pickableDepartments.map(d => (
-                    <button key={d.code} onClick={() => setDepartment(d.code)}
-                      style={{
-                        padding: '10px 8px', borderRadius: 10,
-                        border: `2px solid ${department === d.code ? d.color : 'var(--glass-border)'}`,
-                        background: department === d.code ? d.bg : 'rgba(255,255,255,0.4)',
-                        cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: department === d.code ? d.color : 'var(--text-2)', lineHeight: 1.3 }}>{d.label}</span>
+                    <button key={d.code} onClick={() => setDepartment(d.code)} className="tp-dept" data-on={department === d.code}
+                      style={{ '--dept': d.color, '--deptbg': d.bg, position: 'relative' }}>
+                      {department === d.code && <MdCheckCircle size={15} className="tp-dept-check" />}
+                      <span className="tp-dept-ic"><d.icon size={17} /></span>
+                      <span className="tp-dept-lb">{d.label}</span>
                     </button>
                   ))}
                 </div>
@@ -833,27 +927,25 @@ export default function LabDashboard() {
             {/* ── SCAN ── */}
             {!activeDept ? (
               <div className="empty-state">
-                <div className="empty-icon mi"><MdBackHand size={32} /></div>
-                <div className="empty-title" style={{ fontSize: 16 }}>Select Department First</div>
-                <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', maxWidth: 220 }}>
-                  Choose your department above before scanning
+                <div className="empty-icon mi"><MdBackHand size={30} /></div>
+                <div className="empty-title" style={{ fontSize: 15 }}>Select a department first</div>
+                <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', maxWidth: 240, margin: '0 auto' }}>
+                  Choose your department above, then scan.
                 </p>
               </div>
             ) : (
               <>
-                {/* Scan buttons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <button className="btn btn-primary" style={{ flexDirection: 'column', gap: 6, padding: '20px 12px', height: 'auto' }}
-                    onClick={() => setShowScanner(true)}>
-                    <MdPhotoCamera size={32} />
-                    <span style={{ fontSize: 13 }}>Scan QR Code</span>
-                    <span style={{ fontSize: 11, opacity: 0.7 }}>Use camera</span>
+                {/* Scan tiles */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <button className="tp-tile tp-tile-primary" onClick={() => setShowScanner(true)}>
+                    <MdPhotoCamera size={30} />
+                    <span className="tp-tile-lb">Scan QR</span>
+                    <span className="tp-tile-hint">Use camera</span>
                   </button>
-                  <button className="btn btn-ghost" style={{ flexDirection: 'column', gap: 6, padding: '20px 12px', height: 'auto' }}
-                    onClick={() => setShowManual(true)}>
-                    <MdSearch size={32} />
-                    <span style={{ fontSize: 13 }}>Search Case</span>
-                    <span style={{ fontSize: 11, opacity: 0.7 }}>Manual lookup</span>
+                  <button className="tp-tile tp-tile-ghost" onClick={() => setShowManual(true)}>
+                    <MdSearch size={30} />
+                    <span className="tp-tile-lb">Search Case</span>
+                    <span className="tp-tile-hint">Manual lookup</span>
                   </button>
                 </div>
 
@@ -872,34 +964,31 @@ export default function LabDashboard() {
                 </div>
 
                 {/* Quick tip */}
-                <div className="glass-card" style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 24, display: 'flex', gap: 6 }}>
-                  <MdLightbulb size={14} style={{ flexShrink: 0, marginTop: 1 }} /> <span>Scan the QR code attached to the physical case. Each scan advances the case to <strong style={{ color: 'var(--text-2)' }}>{selectedDept.label}</strong> stage and notifies the clinic.</span>
+                <div className="card" style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6, marginBottom: 20, display: 'flex', gap: 8 }}>
+                  <MdLightbulb size={14} style={{ flexShrink: 0, marginTop: 2, color: 'var(--amber)' }} />
+                  <span>Scan the QR code on the physical case. Each scan advances it to the <strong style={{ color: 'var(--text-2)' }}>{selectedDept.label}</strong> stage and notifies the clinic.</span>
                 </div>
 
-                {/* ── Scan History ── */}
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                  Today's Scans
-                </div>
+                {/* ── Session scans ── */}
+                <div className="tp-section-label">Today's Scans</div>
                 {recentScans.length === 0 ? (
-                  <div className="glass-card" style={{ padding: '28px 16px', textAlign: 'center' }}>
-                    <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={28} /></div>
-                    <div style={{ fontSize: 13, color: 'var(--text-3)' }}>No scans yet this session</div>
+                  <div className="card" style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-3)' }}>
+                    <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}><MdInbox size={24} /></div>
+                    <div style={{ fontSize: 13 }}>No scans yet this session</div>
                   </div>
                 ) : (
                   recentScans.map((s, i) => (
-                    <div key={i} className="glass-card" style={{
-                      padding: '12px 14px', marginBottom: 8, borderLeft: `3px solid ${STAGE_COLORS[s.newStatus] || 'var(--accent)'}`,
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{s.caseNumber}</div>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>{s.patientName}</div>
-                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{s.workType} · {s.clinic?.name}</div>
+                    <div key={i} className="tp-row" style={{ '--row': STAGE_COLORS[s.newStatus] || 'var(--green)' }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="tp-row-mono">{s.caseNumber}</div>
+                        <div className="tp-row-title">{s.patientName}</div>
+                        <div className="tp-row-sub">{s.workType} · {s.clinic?.name}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div className="tp-chip" style={{ background: 'var(--green-dim)', color: 'var(--green)', borderColor: 'transparent', marginBottom: 4 }}>
+                          <MdCheckCircle size={11} /> Scanned
                         </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
-                          <div style={{ fontSize: 11, background: 'var(--green-dim)', color: 'var(--green)', padding: '2px 8px', borderRadius: 20, fontWeight: 700, marginBottom: 4 }}>✓ Scanned</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'h:mm a')}</div>
-                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{format(new Date(s.scannedAt), 'h:mm a')}</div>
                       </div>
                     </div>
                   ))
@@ -912,7 +1001,7 @@ export default function LabDashboard() {
         {tab === 'performance' && <PerformanceTab />}
 
         {tab === 'notifications' && (
-          <div className="glass-card" style={{ padding: 16 }}>
+          <div className="card" style={{ padding: 16 }}>
             <NotificationBell variant="full" />
           </div>
         )}
@@ -920,12 +1009,12 @@ export default function LabDashboard() {
         {tab === 'profile' && (
           <div>
             <MyProfileTab />
-            <div className="glass-card" style={{ padding: 16, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="card" style={{ padding: 16, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <LeaveRequestButton />
               <button onClick={logout} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 12px',
-                borderRadius: 9, border: '1px solid rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.08)',
-                color: 'var(--red)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 12px',
+                borderRadius: 'var(--radius-sm)', border: '1px solid var(--red-line)', background: 'var(--red-dim)',
+                color: 'var(--red)', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
               }}>
                 <MdLogout size={16} /> Logout
               </button>
