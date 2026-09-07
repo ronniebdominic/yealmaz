@@ -91,7 +91,7 @@ function JobCard({ c, section, onAction }) {
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid var(--border)', padding: 14, marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>{c.clinic?.name || '—'}</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>{c.clinic?.name || '—'}</div>
           {c.clinic?.station && <div style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}><MdLocationOn size={11} /> {c.clinic.station}</div>}
         </div>
         {c.caseNumber && <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-4)', flexShrink: 0, whiteSpace: 'nowrap' }}>{c.caseNumber}</span>}
@@ -126,14 +126,14 @@ function DeliveredCard({ c }) {
     <div style={{ background: '#F0FDF4', borderRadius: 12, border: '1px solid #BBF7D0', padding: 14, marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{c.clinic?.name}</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>{c.clinic?.name}</div>
           {c.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{c.caseNumber}</div>}
         </div>
         <span style={{ background: 'var(--green)', color: '#fff', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, whiteSpace: 'nowrap' }}>
           <MdCheckCircle size={12} /> {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM') : 'Delivered'}
         </span>
       </div>
-      {c.clinic?.address && <div style={{ fontSize: 12, color: '#4B5563', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={12} /> {c.clinic.address}</div>}
+      {c.clinic?.address && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}><MdLocationOn size={12} /> {c.clinic.address}</div>}
     </div>
   );
 }
@@ -241,7 +241,7 @@ function DeliveryArchive() {
             items.map(ev => (
               <div key={ev.id} style={{ borderTop: '1px solid var(--surface-2)', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#111827' }}>{ev.clinicName}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{ev.clinicName}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{ev.patientName || '—'}</div>
                   {ev.caseNumber && <div style={{ fontFamily: 'monospace', fontSize: 10.5, color: 'var(--text-4)', marginTop: 1 }}>{ev.caseNumber}</div>}
                 </div>
@@ -282,7 +282,7 @@ function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenP
       <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 290, maxWidth: '86vw', background: '#fff', zIndex: 151, boxShadow: '-6px 0 24px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', padding: '18px 16px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>{user?.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)' }}>{user?.name}</div>
             <div style={{ fontSize: 11.5, color: 'var(--text-4)' }}>Delivery Executive</div>
           </div>
           <button onClick={onClose} style={{ background: 'var(--surface-2)', border: 'none', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><MdClose size={16} /></button>
