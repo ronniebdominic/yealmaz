@@ -78,7 +78,7 @@ export function printOnboardingSheet({ clinic, url, qrCodeUrl, expiresAt }) {
     <ol>
       <li>Scan this QR code with your phone camera.</li>
       <li>Confirm your clinic's contact details on the page that opens.</li>
-      <li>Set your own password for logging into the Ye-Almaz clinic app.</li>
+      <li>Set your own password, then log in at <b>yealmazdentallab.odontofusion.com</b>.</li>
     </ol>
   </div>
 

@@ -3,11 +3,12 @@
 // QR" action). No login required — the token in the URL is the credential.
 // Deliberately outside ProtectedRoute, same pattern as /kiosk in App.jsx.
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { inputStyle, labelStyle, Field, PasswordInput, generatePassword } from '../utils/adminForms';
 
+const CLINIC_APP_URL = import.meta.env.VITE_CLINIC_APP_URL || 'https://yealmazdentallab.odontofusion.com';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const EMPTY_FORM = { name: '', station: '', email: '', phone: '', address: '', password: '', confirm: '' };
@@ -84,14 +85,14 @@ export default function ClinicOnboarding() {
             <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#166534', marginBottom: 6 }}>You're all set!</div>
             <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 18 }}>
-              Your clinic details are saved and your password is set. You can now log in to the Ye-Almaz clinic app.
+              Your clinic details are saved and your password is set. Log in to the Ye-Almaz clinic app with your email and new password.
             </div>
-            <Link to="/login" style={{
+            <a href={CLINIC_APP_URL} style={{
               display: 'inline-block', background: '#1A56A0', color: '#fff', textDecoration: 'none',
               borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 700,
             }}>
-              Go to Login
-            </Link>
+              Open the Clinic App
+            </a>
           </div>
         ) : (
           <form onSubmit={submit}>
