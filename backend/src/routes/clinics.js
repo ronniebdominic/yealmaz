@@ -13,7 +13,8 @@ const ONBOARDING_TOKEN_TTL_DAYS = 14;
 
 // The onboarding form lives in the receptionist web app (public /onboard/:token
 // route), not the API — reuse the same FRONTEND_URL already configured for CORS.
-const ONBOARDING_BASE_URL = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/onboard`;
+// FRONTEND_URL can be a comma-separated CORS allowlist; the first entry is the primary app.
+const ONBOARDING_BASE_URL = `${(process.env.ONBOARDING_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '')}/onboard`;
 
 router.get('/', protect, async (req, res) => {
   const cacheKey = 'clinics';

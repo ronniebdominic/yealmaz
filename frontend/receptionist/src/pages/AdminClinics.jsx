@@ -482,7 +482,7 @@ export default function AdminClinics() {
 
         {/* Table */}
         <div className="card">
-          <div className="table-wrap">
+          <div className="table-wrap" style={{ overflowX: 'auto' }}>
             {isLoading ? (
               <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-3)' }}>Loading clinics…</div>
             ) : filtered.length === 0 ? (
@@ -492,18 +492,18 @@ export default function AdminClinics() {
                 <p>{search ? 'Try a different search term' : 'Create the first clinic using the button above'}</p>
               </div>
             ) : (
-              <table style={{ tableLayout: 'fixed' }}>
+              <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1385 }}>
                 <colgroup>
-                  <col style={{ width: 200 }} />
-                  <col style={{ width: 80 }} />
-                  <col style={{ width: 100 }} />
-                  <col style={{ width: 100 }} />
-                  <col style={{ width: 200 }} />
-                  <col style={{ width: 120 }} />
-                  <col style={{ width: 100 }} />
-                  <col style={{ width: 80 }} />
+                  <col style={{ width: 170 }} />
+                  <col style={{ width: 70 }} />
                   <col style={{ width: 90 }} />
-                  <col style={{ width: 380 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 170 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 75 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 410 }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -606,7 +606,7 @@ export default function AdminClinics() {
                               cursor: generatingQr === c.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                             }}
                           >
-                            <MdQrCode2 size={13} /> {generatingQr === c.id ? 'Generating…' : 'Onboarding QR'}
+                            <MdQrCode2 size={13} /> {generatingQr === c.id ? 'Generating…' : 'Setup QR'}
                           </button>
                           <button
                             onClick={() => printCredCard(c)}
@@ -621,7 +621,7 @@ export default function AdminClinics() {
                               cursor: generatingCard === c.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
                             }}
                           >
-                            <MdBadge size={13} /> {generatingCard === c.id ? 'Generating…' : 'Credentials Card'}
+                            <MdBadge size={13} /> {generatingCard === c.id ? 'Generating…' : 'Login Card'}
                           </button>
                           <button
                             onClick={() => {
