@@ -25,9 +25,13 @@ export default function HRDashboard() {
         }
       `}</style>
       <div style={{
-        background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '0 20px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-        height: 56, position: 'sticky', top: 0, zIndex: 40,
+        background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 20px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px',
+        // minHeight + wrap, not a fixed 56px: below ~500px the action buttons
+        // no longer fit beside the title, and a fixed-height row that refuses
+        // to wrap crushes the title and pushes the avatar off-screen. Wrapping
+        // puts the actions on a second row instead.
+        flexWrap: 'wrap', minHeight: 56, position: 'sticky', top: 0, zIndex: 40,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
           <img src="/logo.png" alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
@@ -36,12 +40,12 @@ export default function HRDashboard() {
             <span style={{ fontSize: 10.5, color: 'var(--text-3)', fontWeight: 500 }}>HR &amp; Payroll</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginLeft: 'auto' }}>
           {/* Primary + secondary workflow actions */}
           <AttendanceClock />
           <LeaveRequestButton />
           {/* User controls — quieter, set off by a divider */}
-          <span style={{ width: 1, height: 22, background: 'var(--border)' }} />
+          <span className="hr-hide-sm" style={{ width: 1, height: 22, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-tint)', color: 'var(--brand-soft)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{initials}</div>
             <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="hr-hide-sm">{user?.name?.split(' ')[0]}</span>

@@ -14,6 +14,7 @@ import {
 } from 'react-icons/md';
 import CountUp from '../../../components/CountUp';
 import { usePrefersReducedMotion } from '../../../hooks/usePrefersReducedMotion';
+import { useElementWidth } from '../../../hooks/useElementWidth';
 
 // Literal hex, not tokens — chart libs can't resolve var(). Mirrors index.css.
 const PIE_COLORS = ['#4C82F7', '#34D399', '#F5B23F', '#F26D6D', '#A78BFA', '#5BA8D8', '#EC7FA0', '#2DD4BF'];
@@ -42,6 +43,8 @@ function StatCard({ icon: Icon, label, value, tone = 'neutral', emphasise }) {
 export default function HRAnalyticsTab() {
   const reducedMotion = usePrefersReducedMotion();
   const chartAnim = { isAnimationActive: !reducedMotion, animationDuration: 550, animationEasing: 'ease-out' };
+  const [pieRef, pieWidth] = useElementWidth();
+  const narrowPie = pieWidth > 0 && pieWidth < 420;   // labels around the donut need ~420px to fit
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ['hr', 'analytics'], queryFn: () => api.get('/hr-analytics').then(r => r.data) });
 
   if (error) {
@@ -97,14 +100,17 @@ export default function HRAnalyticsTab() {
         </div>
         <div className="card">
           <div className="card-header"><div className="card-title">Department Headcount</div></div>
-          <div style={{ padding: '16px 16px 8px' }}>
+          <div ref={pieRef} style={{ padding: '16px 16px 8px' }}>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 {/* Labels only on slices >= 6% — the rest read from the legend,
-                    so department names don't pile up over the chart. */}
+                    so department names don't pile up over the chart. In a narrow
+                    card there is no room for names around the donut at all (they
+                    were cut off at both card edges), so it relies on the legend
+                    and tooltip alone. */}
                 <Pie data={charts.departmentHeadcount} dataKey="count" nameKey="name" cx="50%" cy="50%"
                   innerRadius={44} outerRadius={78} paddingAngle={1.5} stroke="var(--surface)" strokeWidth={1} {...chartAnim}
-                  label={({ name, percent }) => (percent >= 0.06 ? name : '')} labelLine={false}>
+                  label={narrowPie ? false : ({ name, percent }) => (percent >= 0.06 ? name : '')} labelLine={false}>
                   {charts.departmentHeadcount.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={(v, n) => [`${v}`, n]} />

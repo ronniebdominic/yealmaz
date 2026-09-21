@@ -24,9 +24,9 @@ function InvStyles() {
     <style>{`
       .inv-shell{min-height:100vh;background:var(--bg)}
       .inv-header{
-        position:sticky;top:0;z-index:40;height:56px;
-        display:flex;align-items:center;justify-content:space-between;gap:16px;
-        padding:0 clamp(12px,2.4vw,22px);
+        position:sticky;top:0;z-index:40;min-height:56px;
+        display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;
+        padding:8px clamp(12px,2.4vw,22px);
         background:var(--surface);border-bottom:1px solid var(--border);
       }
       .inv-body{max-width:1240px;margin:0 auto;padding:clamp(14px,2.4vw,28px);container-type:inline-size}
@@ -329,10 +329,10 @@ export default function InventoryDashboard() {
             <span style={{ fontSize: 10.5, color: 'var(--amber)', fontWeight: 600 }}>Inventory Manager</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginLeft: 'auto' }}>
           <AttendanceClock />
           <LeaveRequestButton />
-          <span style={{ width: 1, height: 22, background: 'var(--border)' }} />
+          <span className="inv-hide-sm" style={{ width: 1, height: 22, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--amber-dim)', color: 'var(--amber)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{initials}</div>
             <span className="inv-hide-sm" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name?.split(' ')[0]}</span>

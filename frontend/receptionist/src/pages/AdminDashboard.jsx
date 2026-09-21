@@ -262,7 +262,7 @@ function ColorTile({ icon: Icon, label, value, sub, color, bg, onClick, active, 
         )}
       </div>
       <div className="stat-label">{label}</div>
-      <div className="stat-value" style={emphasise ? { color } : undefined}>
+      <div className="stat-value" data-fit style={{ '--chars': String(value ?? '').length || 8, ...(emphasise ? { color } : {}) }}>
         {typeof value === 'string' || typeof value === 'number' ? <CountUp value={value} /> : value}
       </div>
       {sub && <div className="stat-sub">{sub}</div>}
@@ -445,15 +445,15 @@ export default function AdminDashboard() {
                 onClick={() => { setSearchInput(''); setSearch(''); }}><MdClose className="mi" size={14} /></button>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>From</label>
+              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>From</label>
               <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setDrillKey(null); }} style={inputStyle} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>To</label>
+              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>To</label>
               <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setDrillKey(null); }} style={inputStyle} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500 }}>Clinic</label>
+              <label style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>Clinic</label>
               <SearchableSelect
                 value={selectedClinic}
                 onChange={v => { setSelectedClinic(v); setDrillKey(null); }}

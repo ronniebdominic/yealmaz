@@ -12,6 +12,13 @@ export default function FloatingAIAssistant() {
   const panelRef = useRef(null);
   const fabRef = useRef(null);
 
+  // Tell the stylesheet a fixed button is on screen so the scroll area can
+  // keep room beneath its content (see .has-ai-fab in index.css).
+  useEffect(() => {
+    document.documentElement.classList.add('has-ai-fab');
+    return () => document.documentElement.classList.remove('has-ai-fab');
+  }, []);
+
   // Esc to close; click outside the panel (and not on the FAB) to close.
   useEffect(() => {
     if (!open) return;

@@ -17,7 +17,7 @@ export default function LeaderDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'var(--font-body)' }}>
-      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+      <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '8px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px 16px', flexWrap: 'wrap', minHeight: 56 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img src="/logo.png" alt="logo" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
           <div>
@@ -25,7 +25,7 @@ export default function LeaderDashboard() {
             <span style={{ fontSize: 11, background: 'rgba(219,39,119,0.1)', color: '#DB2777', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>Operation Manager</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</div>
           <AttendanceClock /> <LeaveRequestButton />
           <button onClick={logout} title="Logout" className="btn btn-ghost btn-sm">

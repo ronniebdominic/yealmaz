@@ -206,7 +206,12 @@ body::before{
    shrink below their content, are clamped here once. */
 img,svg,video,canvas{max-width:100%;height:auto}
 .card,.stat-card,.glass-card,.modal,td,th,.badge{min-width:0}
-.card,.glass-card{overflow-wrap:anywhere}
+/* break-word, not anywhere: both break a token that genuinely can't fit, but
+   `anywhere` ALSO drops the element's min-content width to one character, so
+   a flex row inside a card shrinks its labels first — "From" rendered as
+   "Fro" over "m", "To" as "T" over "o". break-word keeps min-content at the
+   longest whole word, so labels hold their shape and the row wraps instead. */
+.card,.glass-card{overflow-wrap:break-word}
 /* On a wide content column, let KPI rows breathe into more columns
    without needing a per-page override. */
 @container (min-width:1100px){
@@ -404,6 +409,18 @@ img,svg,video,canvas{max-width:100%;height:auto}
   line-height:1.15;letter-spacing:-.03em;
   font-variant-numeric:tabular-nums;
   overflow-wrap:break-word;
+}
+/* Fit a long figure to its tile instead of letting it break mid-value
+   ("Br" on one line, "139,404,415.00" on the next). The tile is a size
+   container, so 100cqi is exactly the width the number has; the caller
+   supplies --chars (the rendered length) and the font shrinks just enough to
+   keep it on one line. Short values still get the full design size — the
+   min() only bites when the number would not otherwise fit. Opt-in via
+   data-fit so no other stat-value in the app changes. */
+.stats-grid > .stat-card{container-type:inline-size}
+.stat-value[data-fit]{
+  white-space:nowrap;
+  font-size:min(clamp(21px,1.1vw + 15px,27px), max(14px, calc(100cqi / (var(--chars, 8) * .64))));
 }
 .stat-sub{font-size:11.5px;color:var(--text-3);margin-top:3px;font-weight:450;line-height:1.45}
 
@@ -698,6 +715,24 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   transform:translateX(-50%) translateY(0);
 }
 
+/* The tooltip is rendered by utils/infoTooltips.js on <body>, clamped to the
+   viewport — the in-place bubble above is clipped by its card and runs off
+   the screen, so it stays in the markup (as the text source) but never shows. */
+.info-icon-wrap .info-tooltip{display:none!important}
+.info-tooltip-floating{
+  position:fixed;left:0;top:0;z-index:1200;pointer-events:none;
+  width:max-content;max-width:260px;
+  background:var(--surface-3);color:var(--text-1);
+  border:1px solid var(--border-2);
+  font-size:11.5px;font-weight:450;line-height:1.5;
+  text-transform:none;letter-spacing:normal;text-align:left;overflow-wrap:break-word;
+  padding:9px 11px;border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-lg);
+  opacity:0;visibility:hidden;transform:translateY(3px);
+  transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease),visibility var(--t-fast);
+}
+.info-tooltip-floating[data-open="true"]{opacity:1;visibility:visible;transform:none}
+
 /* ═══ Scrollbars ════════════════════════════════════════════════════ */
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -824,7 +859,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   .app{flex-direction:column}
   .main>.topbar{display:none}      /* mobile-topbar replaces it */
   .hamburger-topbar{display:flex}  /* for standalone pages (Dispatch) */
-  .modal{max-height:92vh}
+  .modal{max-height:92dvh}
   .modal-body{padding:var(--sp-5)}
   .modal-header{padding:var(--sp-4) var(--sp-5) var(--sp-3)}
   .modal-footer{padding:var(--sp-3) var(--sp-5)}
@@ -978,7 +1013,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 .ai-panel{
   position:fixed;right:24px;bottom:92px;z-index:940;
   width:min(420px,calc(100vw - 32px));
-  height:min(600px,calc(100vh - 140px));
+  height:min(600px,calc(100dvh - 140px));
   display:flex;flex-direction:column;overflow:hidden;
   border-radius:var(--radius-lg);
   background:var(--glass-strong);
@@ -1003,7 +1038,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 .ai-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px}
 @media (max-width:540px){
   .ai-fab{right:16px;bottom:16px}
-  .ai-panel{right:8px;left:8px;bottom:80px;width:auto;height:min(70vh,560px)}
+  .ai-panel{right:8px;left:8px;bottom:80px;width:auto;height:min(70dvh,560px)}
 }
 
 /* ═══ Reduced motion ════════════════════════════════════════════════
@@ -1023,4 +1058,82 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   }
   .check-pop--ring::after{display:none!important}
   .live-dot,.ai-fab-ping{animation:none!important}
+}
+
+/* ═══ Responsive hardening ══════════════════════════════════════════
+   Fixes found by auditing every route at 320-2560px. Kept in one block so
+   the reasoning stays together; each rule says what it is for. */
+
+/* ── Phone tables: real stacked cards ───────────────────────────────
+   The rules above turned every <td> into a block but left <table>,
+   <tbody> and <tr> as table boxes, so all the block cells collapsed into
+   the FIRST column's width — 21% on tables with a <colgroup>, which left
+   cards stopping two-thirds of the way across the screen. Making the whole
+   chain block makes each row a full-width card. Column widths, fixed
+   layouts and inline min-widths are meaningless in that mode, hence the
+   !important (they are set inline). */
+@media (max-width:540px){
+  .table-wrap table,.table-wrap tbody,.table-wrap tfoot,.table-wrap tr{
+    display:block;width:100%;min-width:0!important;table-layout:auto!important;
+  }
+  .table-wrap colgroup{display:none}
+  .table-wrap td{text-align:left!important}
+  /* Headers are hidden on phones, which left values like "—" with no clue
+     which field they were. utils/responsiveTables.js copies each column's
+     header text onto its cells as data-label; show it as a small caption. */
+  .table-wrap td[data-label]:not([data-label=""])::before{
+    content:attr(data-label);display:block;margin-bottom:2px;
+    font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);
+  }
+}
+
+/* ── Touch targets ──────────────────────────────────────────────────
+   On touch devices and phone-width windows, interactive controls get a
+   comfortable minimum hit area (WCAG 2.5.8 asks for 24px; platform
+   guidance is 44px — 40px is the compromise that doesn't wreck dense
+   admin screens). min-* only raises a floor: larger controls are
+   untouched and nothing is forced narrower. */
+@media (pointer:coarse),(max-width:540px){
+  button,[role="button"],select,.btn,.filter-chip,.modal-close,.nav-item,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),textarea{
+    min-height:40px;
+  }
+  button,[role="button"],.btn,.modal-close{min-width:40px}
+  .modal-close{display:inline-grid;place-items:center}
+  input[type="checkbox"],input[type="radio"]{width:20px;height:20px}
+}
+
+/* ── Floating AI button never covers the last thing on the page ─────
+   A fixed 56px button sits over the bottom-right of every admin screen,
+   so the final row of a table or the last tile could never be scrolled
+   clear of it. FloatingAIAssistant sets .has-ai-fab on <html> while it is
+   mounted; the scroll area then keeps room beneath its content. */
+.has-ai-fab .content{padding-bottom:calc(clamp(14px,2.2vw,32px) + 72px + env(safe-area-inset-bottom,0px))}
+.ai-fab{bottom:max(24px,calc(env(safe-area-inset-bottom,0px) + 12px));right:max(24px,calc(env(safe-area-inset-right,0px) + 12px))}
+@media (max-width:540px){
+  .ai-fab{right:max(16px,calc(env(safe-area-inset-right,0px) + 8px));bottom:max(16px,calc(env(safe-area-inset-bottom,0px) + 8px));width:52px;height:52px}
+}
+/* Short screens (phone landscape, small laptop windows): a panel sized as
+   100dvh - 140px would shrink to a sliver. Pin it to the viewport instead. */
+@media (max-height:520px){
+  .ai-panel{top:8px;bottom:76px;height:auto}
+}
+
+/* ── Short screens: modals ──────────────────────────────────────────
+   In phone landscape (~360px tall) a centred modal with generous padding
+   left no room for its content. Tighten the chrome and let the modal use
+   the full height; the overlay itself scrolls if a modal still can't fit. */
+@media (max-height:520px){
+  .modal-overlay{padding:var(--sp-2);align-items:flex-start;overflow-y:auto}
+  .modal{max-height:none}
+  .modal-header{padding:var(--sp-3) var(--sp-4) var(--sp-2)}
+  .modal-body{padding:var(--sp-4)}
+  .modal-footer{padding:var(--sp-2) var(--sp-4)}
+}
+
+/* ── Safe areas ─────────────────────────────────────────────────────
+   Notched phones in landscape put content under the notch. */
+.content{
+  padding-left:max(clamp(14px,2.6vw,36px),env(safe-area-inset-left,0px));
+  padding-right:max(clamp(14px,2.6vw,36px),env(safe-area-inset-right,0px));
 }
