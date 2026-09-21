@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import SplashScreen from './components/SplashScreen';
 import Login from './pages/Login';
 import AttendanceKiosk from './pages/AttendanceKiosk';
+import ClinicOnboarding from './pages/ClinicOnboarding';
 import AdminTrash from './pages/AdminTrash';
 import AdminAIChat from './pages/AdminAIChat';
 import Dashboard from './pages/Dashboard';
@@ -88,6 +89,8 @@ function AppRoutes() {
       {/* Shared reception tablet. Deliberately outside ProtectedRoute: there is no
           user session on that device - see pages/AttendanceKiosk.jsx. */}
       <Route path="/kiosk" element={<AttendanceKiosk />} />
+      {/* Clinic self-onboarding via QR/link token — no user session on that device either. */}
+      <Route path="/onboard/:token" element={<ClinicOnboarding />} />
       <Route path="/" element={<ProtectedRoute><RoleHome /></ProtectedRoute>} />
       <Route path="/cases" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Cases /></ProtectedRoute>} />
       <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST','DISPATCH']}><NewCase /></ProtectedRoute>} />

@@ -9,9 +9,11 @@ import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
 import { todayLocal } from '../utils/date';
+import { printOnboardingSheet } from '../utils/printOnboarding';
+import { printCredentialsCard } from '../utils/printCredentialsCard';
 import {
   MdEdit, MdLocalHospital, MdAutoAwesome, MdVpnKey, MdCheckCircle, MdSearch,
-  MdPause, MdPlayArrow, MdHandshake,
+  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge,
 } from 'react-icons/md';
 
 // ── Clinic-specific Helpers ───────────────────────────────
@@ -390,6 +392,37 @@ export default function AdminClinics() {
     (c.zone?.name || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const [generatingQr,   setGeneratingQr]   = useState(null); // clinic id currently generating
+  const [generatingCard, setGeneratingCard] = useState(null); // clinic id currently generating
+
+  const printOnboardingQr = async (clinic) => {
+    setGeneratingQr(clinic.id);
+    try {
+      const { data } = await api.post(`/clinics/${clinic.id}/onboarding-link`);
+      printOnboardingSheet({ clinic: data.clinic, url: data.url, qrCodeUrl: data.qrCodeUrl, expiresAt: data.expiresAt });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not generate onboarding QR');
+    } finally {
+      setGeneratingQr(null);
+    }
+  };
+
+  const printCredCard = async (clinic) => {
+    if (!clinic.email) { toast.error('Add an email for this clinic first'); return; }
+    if (!window.confirm(`This resets ${clinic.name}'s password to a new one and prints it on a card. Continue?`)) return;
+    setGeneratingCard(clinic.id);
+    try {
+      const { data } = await api.post(`/clinics/${clinic.id}/credentials-card`);
+      printCredentialsCard({ clinic: data.clinic, password: data.password, qrCodeUrl: data.qrCodeUrl });
+      toast.success(`New password printed for ${clinic.name}`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not generate credentials card');
+    } finally {
+      setGeneratingCard(null);
+    }
+  };
+
   const handleSaved = (clinic, plainPassword) => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
     queryClient.invalidateQueries({ queryKey: ['clinics'] });
@@ -470,7 +503,7 @@ export default function AdminClinics() {
                   <col style={{ width: 100 }} />
                   <col style={{ width: 80 }} />
                   <col style={{ width: 90 }} />
-                  <col style={{ width: 200 }} />
+                  <col style={{ width: 380 }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -552,12 +585,43 @@ export default function AdminClinics() {
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
                       </td>
                       <td style={{ padding: '8px 16px' }}>
-                        <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
                           <button
                             className="btn btn-ghost btn-sm"
+                            style={{ whiteSpace: 'nowrap' }}
                             onClick={() => setEditTarget(c)}
                           >
                             <MdEdit className="mi" size={14} /> Edit
+                          </button>
+                          <button
+                            onClick={() => printOnboardingQr(c)}
+                            disabled={generatingQr === c.id}
+                            title="Print an onboarding form + QR for this clinic to fill in their details and set their own password"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 3,
+                              background: 'rgba(29,78,216,0.07)', color: 'var(--blue)',
+                              border: '1px solid rgba(29,78,216,0.2)',
+                              borderRadius: 6, padding: '4px 9px',
+                              fontSize: 12, fontWeight: 700,
+                              cursor: generatingQr === c.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <MdQrCode2 size={13} /> {generatingQr === c.id ? 'Generating…' : 'Onboarding QR'}
+                          </button>
+                          <button
+                            onClick={() => printCredCard(c)}
+                            disabled={generatingCard === c.id}
+                            title="Reset this clinic's password and print a business-card-sized QR + credentials"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 3,
+                              background: 'rgba(107,33,168,0.07)', color: '#6B21A8',
+                              border: '1px solid rgba(107,33,168,0.2)',
+                              borderRadius: 6, padding: '4px 9px',
+                              fontSize: 12, fontWeight: 700,
+                              cursor: generatingCard === c.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <MdBadge size={13} /> {generatingCard === c.id ? 'Generating…' : 'Credentials Card'}
                           </button>
                           <button
                             onClick={() => {
@@ -575,7 +639,7 @@ export default function AdminClinics() {
                               color: c.isActive ? 'var(--red)' : 'var(--green)',
                               border: `1px solid ${c.isActive ? 'rgba(229,62,62,0.2)' : 'rgba(22,163,74,0.25)'}`,
                               borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                             }}
                           >
                             {c.isActive ? <><MdPause size={13} /> Deactivate</> : <><MdPlayArrow size={13} /> Activate</>}

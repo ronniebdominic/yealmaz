@@ -163,6 +163,13 @@ model Clinic {
   billingAnchor Int? // day-of-week (0-6) for weekly/fortnightly, day-of-month (1-28) for monthly
   lastBilledAt  DateTime? // when finance last generated a bill for this clinic
 
+  // Self-service onboarding: admin prints a QR/link carrying this token so the
+  // clinic owner can fill in their own details and set their own password,
+  // instead of admin handing out a temp password directly.
+  onboardingToken          String?   @unique
+  onboardingTokenExpiresAt DateTime?
+  onboardedAt              DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
