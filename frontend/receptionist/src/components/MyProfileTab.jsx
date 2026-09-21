@@ -73,7 +73,7 @@ export default function MyProfileTab() {
             <img src={profile.photoUrl} alt="" style={{ width: 84, height: 84, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--border-2)' }} />
           ) : (
             <div style={{
-              width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: 'var(--navy)',
+              width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: 'var(--on-accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, fontWeight: 700,
               border: '3px solid var(--border-2)',
             }}>{initials}</div>

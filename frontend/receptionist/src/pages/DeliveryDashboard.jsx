@@ -17,6 +17,7 @@ import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import InstallAppBanner from '../components/InstallAppBanner';
 import MyDeliveryPerformanceModal from '../components/MyDeliveryPerformanceModal';
+import ThemeToggle from '../components/ThemeToggle';
 
 // Portal-scoped styles — `dp-` prefix, so nothing here reaches the
 // Admin / HR / Inventory / Technician / Clinic portals.
@@ -121,7 +122,7 @@ function DPStyles() {
       .dp-btn-primary{
         flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
         min-height:42px;padding:0 12px;border:none;border-radius:var(--radius-sm);cursor:pointer;
-        background:var(--green);color:#062114;font:inherit;font-size:13px;font-weight:600;
+        background:var(--green);color:var(--on-green);font:inherit;font-size:13px;font-weight:600;
         box-shadow:0 4px 14px rgba(52,211,153,.24);
         transition:transform var(--t-fast) var(--ease-out),box-shadow var(--t-fast) var(--ease-out),filter var(--t-fast) var(--ease-out);
       }
@@ -463,6 +464,9 @@ function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenP
 
         <div className="dp-drawer-sec">Performance</div>
         <button onClick={onOpenPerformance} className="dp-drawer-item"><MdInsights size={16} /> My Performance</button>
+
+        <div className="dp-drawer-sec">Appearance</div>
+        <ThemeToggle tone="row" className="dp-drawer-item" />
 
         <div className="dp-drawer-sec">Sound</div>
         <button onClick={onToggleSound} className="dp-drawer-item" role="switch" aria-checked={soundOn}

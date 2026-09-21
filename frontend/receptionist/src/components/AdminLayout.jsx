@@ -8,6 +8,7 @@ import {
   MdPeopleAlt, MdDelete,
 } from 'react-icons/md';
 import FloatingAIAssistant from './FloatingAIAssistant';
+import ThemeToggle from './ThemeToggle';
 
 // Dashboards each staff role normally logs into directly — the admin
 // account can open any of these to view/operate them without a separate
@@ -130,6 +131,7 @@ export default function AdminLayout({ children }) {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Administrator</div>
             </div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
@@ -152,6 +154,7 @@ export default function AdminLayout({ children }) {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Administrator</div>
             </div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>

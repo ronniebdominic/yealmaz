@@ -25,6 +25,7 @@ import CountUp from '../components/CountUp';
 import ProgressBar from '../components/ProgressBar';
 import { useNotifications } from '../hooks/useNotifications';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import ThemeToggle from '../components/ThemeToggle';
 
 // ── Department config ─────────────────────────────────────
 // `color` is a bright hex tuned for the dark theme (identity accent only —
@@ -1078,6 +1079,7 @@ export default function LabDashboard() {
             <MyProfileTab />
             <div className="card" style={{ padding: 16, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <LeaveRequestButton />
+              <ThemeToggle tone="row" style={{ width: '100%', justifyContent: 'center', padding: '11px 12px' }} />
               <button onClick={logout} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 12px',
                 borderRadius: 'var(--radius-sm)', border: '1px solid var(--red-line)', background: 'var(--red-dim)',

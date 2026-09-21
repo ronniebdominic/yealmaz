@@ -58,6 +58,8 @@
   --red-line:   rgba(242,109,109,.30);
   --accent:     #2DD4BF;                  /* secondary analytics accent  */
   --accent-dim: rgba(45,212,191,.13);
+  --on-green:   #062114;                  /* text on a solid --green fill  */
+  --on-accent:  #04252A;                  /* text on a solid --accent fill */
   --purple:     #A78BFA;
   --purple-dim: rgba(167,139,250,.15);
   --gold:       #E8B04B;
@@ -498,7 +500,7 @@ tbody tr:hover td{background:rgba(45,91,214,.035)}
 .btn-primary{background:var(--brand);color:var(--text-on-brand);box-shadow:var(--shadow-xs)}
 .btn-primary:hover{background:var(--brand-hover)}
 .btn-primary:active{background:var(--brand-active)}
-.btn-success{background:var(--green);color:#062114;box-shadow:var(--shadow-xs)}
+.btn-success{background:var(--green);color:var(--on-green);box-shadow:var(--shadow-xs)}
 .btn-success:hover{background:#4ADCA8}
 .btn-danger{background:var(--red);color:#2A0808;box-shadow:var(--shadow-xs)}
 .btn-danger:hover{background:#F58585}
@@ -1221,3 +1223,118 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 @media (pointer:coarse),(max-width:540px){
   a[href^="tel:"]{display:inline-flex;align-items:center;min-height:40px}
 }
+
+
+/* ═══ LIGHT THEME ═══════════════════════════════════════════════════
+   Selected with <html data-theme="light"> (utils/theme.js, ThemeToggle).
+   Only tokens are redefined: every surface, border, text and semantic colour
+   above is consumed through them, so components follow without edits. Dark stays
+   the default and is untouched. Brand blue drops one step so it keeps contrast
+   on white; the semantic colours are the deeper light-ground versions. */
+:root[data-theme="light"]{
+  --brand:        #2D5BD6;
+  --brand-hover:  #2450BE;
+  --brand-active: #1E43A0;
+  --brand-soft:   #3B6BE0;
+  --brand-tint:   rgba(45,91,214,.10);
+  --brand-tint-2: rgba(45,91,214,.17);
+  --brand-ring:   rgba(45,91,214,.30);
+  --brand-strong: #1E43A0;
+  --navy:         #0F2044;
+  --navy-mid:     #1B2C52;
+
+  --green:      #15803D;
+  --green-dim:  rgba(22,163,74,.12);
+  --green-line: rgba(22,163,74,.30);
+  --amber:      #B45309;
+  --amber-dim:  rgba(217,119,6,.13);
+  --amber-line: rgba(217,119,6,.32);
+  --red:        #DC2626;
+  --red-dim:    rgba(220,38,38,.09);
+  --red-line:   rgba(220,38,38,.28);
+  --accent:     #0F766E;
+  --accent-dim: rgba(13,148,136,.12);
+  --on-green:   #FFFFFF;
+  --on-accent:  #FFFFFF;
+  --purple:     #6D28D9;
+  --purple-dim: rgba(124,58,237,.11);
+  --gold:       #A16207;
+
+  --bg:            #EEF2F8;
+  --surface:       #FFFFFF;
+  --surface-2:     #F3F6FB;
+  --surface-3:     #E6EBF4;
+  --glass:         rgba(255,255,255,.80);
+  --glass-strong:  rgba(255,255,255,.95);
+  --glass-sheen:   linear-gradient(140deg,rgba(255,255,255,.65) 0%,rgba(255,255,255,.25) 36%,rgba(255,255,255,0) 62%);
+  --glass-hi:      inset 0 1px 0 rgba(255,255,255,.9);
+  --overlay:       rgba(255,255,255,.97);
+  --scrim:         rgba(15,26,48,.42);
+
+  --border:       rgba(15,26,48,.12);
+  --border-soft:  rgba(15,26,48,.075);
+  --border-2:     rgba(15,26,48,.22);
+  --glass-border: rgba(15,26,48,.10);
+  --glass-edge:   rgba(15,26,48,.08);
+
+  --text-1: #0F1A30;
+  --text-2: #3D4A66;
+  --text-3: #5F6C86;
+  --text-4: #8893A8;
+
+  --shadow-xs:      0 1px 2px rgba(15,26,48,.08);
+  --shadow-sm:      0 1px 2px rgba(15,26,48,.08), 0 2px 6px rgba(15,26,48,.06);
+  --shadow:         0 2px 8px rgba(15,26,48,.10);
+  --shadow-md:      0 6px 20px rgba(15,26,48,.12);
+  --shadow-lg:      0 14px 36px rgba(15,26,48,.15);
+  --shadow-overlay: 0 32px 80px rgba(15,26,48,.28), 0 2px 8px rgba(15,26,48,.12);
+  --shadow-inset-top: inset 0 1px 0 rgba(255,255,255,.85);
+
+  --glass-topbar-bg: rgba(255,255,255,.86);
+  color-scheme: light;
+}
+:root[data-theme="light"] body::before{
+  background:
+    radial-gradient(1100px 720px at 6% -8%,  rgba(45,91,214,.07), transparent 60%),
+    radial-gradient(900px 640px at 100% 2%,  rgba(13,148,136,.05), transparent 62%),
+    var(--bg);
+}
+
+/* The navigation rail stays navy in both themes (a light page with a dark rail
+   is the usual pairing, and it keeps the brand anchor). Its children may read the
+   text/border tokens, so those are pinned to their dark values inside it. */
+:root[data-theme="light"] :is(.sidebar,.drawer,.mobile-topbar){
+  --text-1:#EBEFF8; --text-2:#AFBACE; --text-3:#7E8BA4; --text-4:#5A6683;
+  --border:rgba(255,255,255,.09); --border-soft:rgba(255,255,255,.055); --border-2:rgba(255,255,255,.16);
+  --surface-2:#1A2438; --surface-3:#232F49;
+  --accent:#2DD4BF; --accent-dim:rgba(45,212,191,.13); --on-green:#062114; --on-accent:#04252A; --brand-soft:#7AA6FF; --brand-tint:rgba(62,123,240,.15);
+  --green:#34D399; --red:#F26D6D; --amber:#F5B23F;
+  color-scheme:dark;
+}
+
+/* Literal white hairlines that only make sense on dark */
+:root[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(15,26,48,.22);background-clip:content-box}
+:root[data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(15,26,48,.36);background-clip:content-box}
+
+/* AI assistant panel + composer (their dark gradient is literal) */
+:root[data-theme="light"] .ai-panel{
+  background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(244,247,252,.98));
+  border-color:rgba(45,91,214,.22);
+  box-shadow:0 28px 70px rgba(15,26,48,.28),0 0 0 1px var(--glass-edge),0 0 40px rgba(45,91,214,.10),var(--glass-hi);
+}
+:root[data-theme="light"] .ai-composer{background:rgba(243,246,251,.7)}
+:root[data-theme="light"] .ai-head-ic,
+:root[data-theme="light"] .ai-hero-ic{border-color:rgba(45,91,214,.25)}
+
+/* Theme toggle in the (always-dark) sidebar reads like the logout control */
+.theme-toggle{flex-shrink:0}
+
+.theme-toggle.logout-btn{margin-left:auto}
+.theme-toggle.logout-btn + .logout-btn{margin-left:0}
+
+/* Sidebar footer: a long name truncates instead of wrapping now that a toggle shares the row */
+.user-info>div:not(.user-avatar){min-width:0;flex:1}
+.user-name,.user-role{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Keep the footer (user, theme toggle, logout) on screen when the rail itself scrolls. */
+.sidebar .sidebar-footer{position:sticky;bottom:0;background:#0A1120;z-index:1}

@@ -9,6 +9,7 @@ import { MdLogout } from 'react-icons/md';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import HRWorkspace from './hr/HRWorkspace';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function HRDashboard() {
   const { user, logout } = useAuth();
@@ -49,6 +50,7 @@ export default function HRDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--brand-tint)', color: 'var(--brand-soft)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{initials}</div>
             <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="hr-hide-sm">{user?.name?.split(' ')[0]}</span>
+            <ThemeToggle tone="page" />
             <button onClick={logout} title="Logout" className="btn btn-tertiary btn-sm" style={{ padding: 7 }}>
               <MdLogout size={15} />
             </button>

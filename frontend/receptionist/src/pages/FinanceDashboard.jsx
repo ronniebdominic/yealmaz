@@ -27,6 +27,7 @@ import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import DailyReconciliationTab from './finance/DailyReconciliationTab';
 import BulkPaymentModal, { remainingOf } from './finance/BulkPaymentModal';
+import ThemeToggle from '../components/ThemeToggle';
 
 const PAGE_SIZE = 15;
 const HIST_SIZE = 20;
@@ -2785,6 +2786,7 @@ export default function FinanceDashboard() {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">{roleLabel}</div>
             </div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
@@ -2811,6 +2813,7 @@ export default function FinanceDashboard() {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">{roleLabel}</div>
             </div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>

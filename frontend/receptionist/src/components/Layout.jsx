@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import ThemeToggle from './ThemeToggle';
 import {
   MdDashboard, MdMoveToInbox, MdLocalShipping, MdSearch, MdAdd,
   MdAssignment, MdLogout,
@@ -77,6 +78,7 @@ export default function Layout({ children }) {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Receptionist</div>
             </div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
@@ -99,6 +101,7 @@ export default function Layout({ children }) {
               <div className="user-name">{user?.name}</div>
               <div className="user-role">Receptionist</div>
             </div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>

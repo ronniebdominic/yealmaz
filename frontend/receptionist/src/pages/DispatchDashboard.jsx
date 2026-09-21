@@ -22,6 +22,7 @@ import { todayLocal } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import LiveTrackingMap from '../components/LiveTrackingMap';
+import ThemeToggle from '../components/ThemeToggle';
 
 const ETB = (v) => v != null ? `Br ${Number(v).toLocaleString('en-US')}` : '—';
 
@@ -1016,6 +1017,7 @@ export default function DispatchDashboard() {
           <div className="user-info">
             <div className="user-avatar" style={{ background: '#3B82F6', color: '#fff' }}>{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Dispatch</div></div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
           </div>
         </div>
@@ -1033,6 +1035,7 @@ export default function DispatchDashboard() {
           <div className="user-info">
             <div className="user-avatar" style={{ background: '#3B82F6', color: '#fff' }}>{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Dispatch</div></div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout">⏻</button>
           </div>
         </div>

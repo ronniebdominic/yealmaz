@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import { installResponsiveTables } from './utils/responsiveTables'
 import { installInfoTooltips } from './utils/infoTooltips'
+import { initTheme } from './utils/theme'
+
+initTheme();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

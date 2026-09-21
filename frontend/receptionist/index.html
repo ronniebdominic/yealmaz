@@ -11,6 +11,19 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ye-Almaz Lab" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      /* Apply the saved theme before first paint so there is no flash. Mirrors utils/theme.js. */
+      (function () {
+        try {
+          var t = localStorage.getItem('ya_theme');
+          if (t === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', '#EEF2F8');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>Ye-Almaz Dental Lab</title>
   </head>
   <body>

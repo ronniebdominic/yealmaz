@@ -22,6 +22,7 @@ import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import OriginalCasePicker from '../components/OriginalCasePicker';
+import ThemeToggle from '../components/ThemeToggle';
 
 // Common dental shade options
 const SHADE_OPTIONS = [
@@ -1624,6 +1625,7 @@ export default function Dashboard() {
           <div className="user-info">
             <div className="user-avatar">{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Receptionist</div></div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
@@ -1642,6 +1644,7 @@ export default function Dashboard() {
           <div className="user-info">
             <div className="user-avatar">{initials}</div>
             <div><div className="user-name">{user?.name}</div><div className="user-role">Receptionist</div></div>
+            <ThemeToggle />
             <button className="logout-btn" onClick={logout} title="Logout"><MdLogout className="mi" size={17} /></button>
           </div>
         </div>
