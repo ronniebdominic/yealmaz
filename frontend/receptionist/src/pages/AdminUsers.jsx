@@ -544,18 +544,18 @@ export default function AdminUsers() {
                 <p>{search || roleFilter ? 'Try adjusting your search or filter' : 'Add the first user with the button above'}</p>
               </div>
             ) : (
-              <table style={{ tableLayout: 'fixed' }}>
+              <table className="users-table" style={{ tableLayout: 'fixed', minWidth: 1100 }}>
                 <colgroup>
-                  <col style={{ width: 200 }} />
-                  <col style={{ width: 210 }} />
-                  <col style={{ width: 120 }} />
-                  <col style={{ width: 160 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 80 }} />
-                  <col style={{ width: 90 }} />
-                  <col style={{ width: 230 }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '24%' }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -577,7 +577,7 @@ export default function AdminUsers() {
                     const roleColor = ROLE_COLORS[u.role] || { bg: 'var(--surface-2)', color: 'var(--text-2)' };
                     return (
                       <tr key={u.id} style={{ opacity: u.isActive ? 1 : 0.5 }}>
-                        <td style={{ padding: '8px 16px' }}>
+                        <td style={{ padding: '8px 10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 26, height: 26, borderRadius: 7, background: roleColor.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                               {u.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
@@ -593,13 +593,13 @@ export default function AdminUsers() {
                             </div>
                           </div>
                         </td>
-                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.email}</td>
-                        <td style={{ padding: '8px 16px' }}>
+                        <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.email}</td>
+                        <td style={{ padding: '8px 10px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             {roleInfo.icon && <roleInfo.icon size={11} />} {roleInfo.label || u.role}
                           </span>
                         </td>
-                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
                           title={u.role === 'LAB_TECH' ? (u.departments || []).map(c => DEPARTMENTS.find(d => d.code === c)?.label || c).join(', ') : ''}>
                           {u.role === 'LAB_TECH'
                             ? ((u.departments?.length)
@@ -607,23 +607,23 @@ export default function AdminUsers() {
                                 : <span style={{ color: 'var(--text-3)' }}>Flexible</span>)
                             : <span style={{ color: 'var(--text-3)' }}>—</span>}
                         </td>
-                        <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
-                        <td style={{ padding: '8px 16px', fontSize: 13, whiteSpace: 'nowrap' }}>{u.station || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
-                        <td style={{ padding: '8px 16px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
+                        <td style={{ padding: '8px 10px', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.station || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {u.zone?.name
                             ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(21,101,192,0.1)', color: 'var(--blue)' }}>{u.zone.name}</span>
                             : <span style={{ color: 'var(--text-3)' }}>—</span>}
                         </td>
-                        <td style={{ padding: '8px 16px' }}>
+                        <td style={{ padding: '8px 10px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: u.isActive ? 'rgba(22,163,74,0.1)' : 'rgba(229,62,62,0.1)', color: u.isActive ? 'var(--green)' : 'var(--red)', whiteSpace: 'nowrap' }}>
                             {u.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </td>
-                        <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
                           {format(new Date(u.createdAt), 'dd MMM yyyy')}
                         </td>
-                        <td style={{ padding: '8px 16px' }}>
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'nowrap' }}>
+                        <td style={{ padding: '8px 10px' }}>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(u)}><MdEdit className="mi" size={14} /> Edit</button>
                             {!u.isSharedAccount && (
                               <button className="btn btn-ghost btn-sm" title="Reception kiosk PIN" onClick={() => setPinTarget(u)}><MdDialpad className="mi" size={14} /> PIN</button>

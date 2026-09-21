@@ -1182,3 +1182,5 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 @media (max-width:540px){
   .table-wrap td.sticky-actions,.table-wrap th.sticky-actions{position:static;box-shadow:none;background:transparent}
 }
+
+.users-table th{padding-left:10px;padding-right:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
