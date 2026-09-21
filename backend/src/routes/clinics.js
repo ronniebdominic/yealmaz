@@ -219,7 +219,7 @@ router.post('/:id/credentials-card', protect, restrict('ADMIN'), async (req, res
     });
 
     const qrPayload = `Ye-Almaz Clinic Login\nEmail: ${updated.email}\nPassword: ${password}`;
-    const qrCodeUrl = await QRCode.toDataURL(qrPayload, { width: 260, margin: 2, color: { dark: '#1A56A0', light: '#FFFFFF' } });
+    const qrCodeUrl = await QRCode.toDataURL(qrPayload, { width: 300, margin: 0, errorCorrectionLevel: 'M', color: { dark: '#0B1120', light: '#FFFFFF' } });
 
     await appCache.del('clinics');
     res.json({ clinic: updated, password, qrCodeUrl });
