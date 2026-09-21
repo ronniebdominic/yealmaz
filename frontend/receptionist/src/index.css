@@ -1024,36 +1024,44 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 /* Entrance only — no idle bob. Background elements stay static. */
 .ai-fab-ping{position:absolute;inset:0;border-radius:50%;border:2px solid var(--brand);opacity:0;animation:pulse 2.8s ease-out infinite}
 
+/* Panel shell. Sits above the FAB (bottom:92px) so the button stays clickable;
+   the inner layout lives in components/ai/ai.css. Height is capped so it never
+   reaches under the top bar on tall screens. */
 .ai-panel{
   position:fixed;right:24px;bottom:92px;z-index:90;
-  width:min(420px,calc(100vw - 32px));
-  height:min(600px,calc(100dvh - 140px));
+  width:min(460px,calc(100vw - 32px));
+  height:min(820px,calc(100dvh - 162px));
   display:flex;flex-direction:column;overflow:hidden;
-  border-radius:var(--radius-lg);
-  background:var(--glass-strong);
-  border:1px solid var(--glass-border);
-  box-shadow:0 24px 64px rgba(16,28,54,.24),0 0 0 1px var(--glass-edge),var(--glass-hi);
+  border-radius:22px;
+  background:linear-gradient(180deg,rgba(20,30,52,.94),rgba(13,20,36,.96));
+  border:1px solid rgba(96,140,230,.22);
+  box-shadow:0 28px 70px rgba(0,0,0,.55),0 0 0 1px var(--glass-edge),0 0 44px rgba(62,123,240,.14),var(--glass-hi);
   -webkit-backdrop-filter:blur(var(--blur-lg)) saturate(160%);
   backdrop-filter:blur(var(--blur-lg)) saturate(160%);
-  animation:panelIn 260ms var(--ease) both;
+  animation:aiPanelIn 220ms var(--ease) both;
 }
-.ai-panel-head{
-  display:flex;align-items:center;gap:8px;
-  padding:12px 14px;border-bottom:1px solid var(--border-soft);
-  font-size:13.5px;font-weight:600;color:var(--text-1);flex-shrink:0;
+.ai-panel[hidden]{display:none}
+.ai-panel--min{height:auto}
+.ai-panel--min .ai-body,.ai-panel--min .ai-composer{display:none}
+.ai-panel--min .ai-head{border-bottom:none}
+@keyframes aiPanelIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.ai-page-card{flex:1;min-height:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+@media (max-width:900px){
+  .ai-panel{width:min(420px,calc(100vw - 32px))}
 }
-.ai-panel-head .ai-panel-close{
-  margin-left:auto;border:none;background:transparent;cursor:pointer;
-  width:28px;height:28px;border-radius:var(--radius-sm);
-  display:grid;place-items:center;color:var(--text-3);
-  transition:background var(--t) var(--ease),color var(--t) var(--ease);
-}
-.ai-panel-head .ai-panel-close:hover{background:var(--surface-2);color:var(--text-1)}
-.ai-panel-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px}
 @media (max-width:540px){
   .ai-fab{right:16px;bottom:16px}
-  .ai-panel{right:8px;left:8px;bottom:80px;width:auto;height:min(70dvh,560px)}
+  /* Phone: a full-screen sheet, clear of notches and the home indicator. */
+  .ai-panel{
+    inset:0;width:auto;height:100dvh;border-radius:0;border:none;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+    animation-name:aiSheetIn;
+  }
+  .ai-panel--min{display:none}
+  .ai-fab[data-open="true"]{display:none}
 }
+@keyframes aiSheetIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 
 /* ═══ Reduced motion ════════════════════════════════════════════════
    Collapse every transition/animation to instant, and swap the looping
@@ -1129,7 +1137,7 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 }
 /* Short screens (phone landscape, small laptop windows): a panel sized as
    100dvh - 140px would shrink to a sliver. Pin it to the viewport instead. */
-@media (max-height:520px){
+@media (max-height:520px) and (min-width:541px){
   .ai-panel{top:8px;bottom:76px;height:auto}
 }
 

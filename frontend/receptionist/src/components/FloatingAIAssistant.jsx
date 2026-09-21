@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { MdSmartToy, MdClose } from 'react-icons/md';
-import AIChatPanel from './AIChatPanel';
+import AIAssistant from './ai/AIAssistant';
+import useAIChat from '../hooks/useAIChat';
 
-// Floating entry point for the AI assistant — a fixed action button that
-// opens a glass chat panel in place. Mounted once in AdminLayout so it's
-// available on every admin screen without its own route or nav item.
-// The panel hosts the exact same <AIChatPanel/> the /admin/ai-chat route
-// renders, so behaviour (agent loop, voice, reset) is unchanged.
+// Floating entry point for the AI assistant: a fixed button that opens a panel
+// on the right. Mounted once in AdminLayout so it's available on every admin
+// screen without its own route or nav item.
+//
+// The conversation state lives HERE, above the panel, and the panel stays
+// mounted while closed (just hidden) - closing or minimising never throws the
+// thread away. States: closed -> open (welcome) -> conversation; "minimised"
+// collapses the panel to its header bar on desktop and to the button on phones.
 export default function FloatingAIAssistant() {
   const [open, setOpen] = useState(false);
-  const panelRef = useRef(null);
+  const [minimized, setMinimized] = useState(false);
+  const [focusSignal, setFocusSignal] = useState(0);
   const fabRef = useRef(null);
+  const chat = useAIChat();
 
   // Tell the stylesheet a fixed button is on screen so the scroll area can
   // keep room beneath its content (see .has-ai-fab in index.css).
@@ -19,49 +25,49 @@ export default function FloatingAIAssistant() {
     return () => document.documentElement.classList.remove('has-ai-fab');
   }, []);
 
-  // Esc to close; click outside the panel (and not on the FAB) to close.
+  const close = () => { setOpen(false); setMinimized(false); fabRef.current?.focus(); };
+  const toggle = () => {
+    if (open && !minimized) { close(); return; }
+    setOpen(true); setMinimized(false); setFocusSignal(n => n + 1);
+  };
+
+  // Esc closes. (Clicking elsewhere no longer does: the assistant is a docked
+  // copilot you keep beside the dashboard, not a popover.)
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    const onDown = (e) => {
-      if (panelRef.current?.contains(e.target) || fabRef.current?.contains(e.target)) return;
-      setOpen(false);
-    };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
     document.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onDown);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onDown);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
   return (
     <>
-      {open && (
-        <div className="ai-panel" ref={panelRef} role="dialog" aria-label="AI Assistant">
-          <div className="ai-panel-head">
-            <MdSmartToy className="mi" size={17} style={{ color: 'var(--brand)' }} />
-            AI Assistant
-            <button className="ai-panel-close" onClick={() => setOpen(false)} aria-label="Close assistant">
-              <MdClose size={17} />
-            </button>
-          </div>
-          <div className="ai-panel-body">
-            <AIChatPanel />
-          </div>
-        </div>
-      )}
+      <div
+        className={`ai-panel${minimized ? ' ai-panel--min' : ''}`}
+        role="dialog"
+        aria-labelledby="ai-assistant-title"
+        aria-modal="false"
+        hidden={!open}
+      >
+        <AIAssistant
+          chat={chat}
+          focusSignal={open && !minimized ? focusSignal : 0}
+          onMinimize={() => setMinimized(m => !m)}
+          onClose={close}
+        />
+      </div>
 
       <button
         ref={fabRef}
         className="ai-fab"
-        data-open={open ? 'true' : 'false'}
-        onClick={() => setOpen(o => !o)}
-        aria-label={open ? 'Close AI Assistant' : 'Open AI Assistant'}
+        data-open={open && !minimized ? 'true' : 'false'}
+        onClick={toggle}
+        aria-label={open && !minimized ? 'Close AI Assistant' : 'Open AI Assistant'}
+        aria-expanded={open && !minimized}
         title="AI Assistant"
       >
-        {!open && <span className="ai-fab-ping" aria-hidden="true" />}
-        {open ? <MdClose className="mi" size={24} /> : <MdSmartToy className="mi" size={24} />}
+        {!(open && !minimized) && <span className="ai-fab-ping" aria-hidden="true" />}
+        {open && !minimized ? <MdClose className="mi" size={24} /> : <MdSmartToy className="mi" size={24} />}
       </button>
     </>
   );
