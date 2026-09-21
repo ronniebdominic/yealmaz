@@ -11,10 +11,13 @@ const prisma = new PrismaClient();
 
 const ONBOARDING_TOKEN_TTL_DAYS = 14;
 
-// The onboarding form lives in the receptionist web app (public /onboard/:token
-// route), not the API — reuse the same FRONTEND_URL already configured for CORS.
-// FRONTEND_URL can be a comma-separated CORS allowlist; the first entry is the primary app.
-const ONBOARDING_BASE_URL = `${(process.env.ONBOARDING_BASE_URL || process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '')}/onboard`;
+// The form is served by the staff web app. Prefer an explicit override, then the
+// site the admin is actually using (Origin header), then the first FRONTEND_URL
+// entry (it can be a comma-separated CORS allowlist).
+const onboardingBaseUrl = (req) => {
+  const raw = process.env.ONBOARDING_BASE_URL || req.get('origin') || process.env.FRONTEND_URL || 'http://localhost:5173';
+  return `${raw.split(',')[0].trim().replace(/\/$/, '')}/onboard`;
+};
 
 router.get('/', protect, async (req, res) => {
   const cacheKey = 'clinics';
@@ -243,7 +246,7 @@ router.post('/:id/onboarding-link', protect, restrict('ADMIN'), async (req, res)
       data: { onboardingToken: token, onboardingTokenExpiresAt: expiresAt },
     });
 
-    const url = `${ONBOARDING_BASE_URL}/${token}`;
+    const url = `${onboardingBaseUrl(req)}/${token}`;
     const qrCodeUrl = await QRCode.toDataURL(url, { width: 320, margin: 2, color: { dark: '#1A56A0', light: '#FFFFFF' } });
 
     res.json({ url, qrCodeUrl, expiresAt, clinic: { id: clinic.id, name: clinic.name, code: clinic.code } });
