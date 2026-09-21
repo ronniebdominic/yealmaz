@@ -1,3 +1,27 @@
+import { UPPER_TEETH, LOWER_TEETH } from '../components/Odontogram';
+
+// Renders the same FDI tooth chart used on-screen (Odontogram.jsx) as a
+// static print-friendly grid, with the case's selected teeth filled in.
+function buildOdontogramHTML(toothNumbers) {
+  const selected = new Set(
+    String(toothNumbers).split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean)
+  );
+  const toothCell = (num, isUpper) => {
+    const active = selected.has(num);
+    const radius = isUpper ? '2px 2px 0 0' : '0 0 2px 2px';
+    return `<div class="tooth${active ? ' active' : ''}" style="border-radius:${radius}">${num}</div>`;
+  };
+  const row = (teeth, isUpper) => {
+    const midlineAt = isUpper ? 21 : 31;
+    return teeth.map(num => (num === midlineAt ? '<div class="tooth-mid"></div>' : '') + toothCell(num, isUpper)).join('');
+  };
+  return `
+    <div class="odonto-row">${row(UPPER_TEETH, true)}</div>
+    <div class="odonto-divider"><span>UPPER</span><i></i><span>LOWER</span></div>
+    <div class="odonto-row">${row(LOWER_TEETH, false)}</div>
+  `;
+}
+
 // Ye-Almaz — Shared A5 production-tracking label printer.
 // Used by CaseDetailModal (View → click QR) and any list that offers a
 // one-click "Print Label" action without opening the full case modal.
@@ -154,10 +178,34 @@ export function printCaseLabel(data) {
       line-height: 1.25;
     }
     .info-cell.teeth .info-value {
-      font-size: 18px;
-      letter-spacing: 0.5px;
+      font-size: 12px;
+      letter-spacing: 0.3px;
+      font-weight: 700;
+      color: #92400E;
     }
     .info-cell.full { grid-column: 1 / -1; }
+
+    /* ── Odontogram (FDI tooth chart) ── */
+    .odonto-row { display: flex; justify-content: center; align-items: stretch; margin: 1.5px 0; }
+    .tooth {
+      width: 6.8mm; height: 7.5mm;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #E2E8F0;
+      background: #fff;
+      color: #94A3B8;
+      font-size: 8.5px; font-weight: 700;
+      font-family: 'Courier New', monospace;
+      margin: 0 0.4px;
+      flex-shrink: 0;
+    }
+    .tooth.active { background: #1A56A0; border-color: #1A56A0; color: #fff; }
+    .tooth-mid { width: 1.5px; background: #CBD5E0; margin: 0 1.2px; flex-shrink: 0; }
+    .odonto-divider {
+      display: flex; align-items: center; gap: 4px;
+      margin: 2px 0; padding: 0 4px;
+    }
+    .odonto-divider i { flex: 1; height: 1px; background: #E2E8F0; }
+    .odonto-divider span { font-size: 7px; font-weight: 800; color: #94A3B8; letter-spacing: 0.6px; }
 
     /* ── Delivery badge ── */
     .delivery-badge {
@@ -238,6 +286,7 @@ export function printCaseLabel(data) {
     ${data.toothNumbers ? `
     <div class="info-cell full teeth">
       <div class="info-label">Teeth (FDI Numbering)</div>
+      ${buildOdontogramHTML(data.toothNumbers)}
       <div class="info-value">${data.toothNumbers}</div>
     </div>` : ''}
     <div class="info-cell">

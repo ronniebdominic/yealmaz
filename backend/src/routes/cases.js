@@ -139,8 +139,21 @@ async function createSingleCase(db, fields, actorUser) {
   // PENDING_PICKUP cases (mobile submissions, phone orders) go through dispatch → pickup →
   // receptionist acceptance. The scan/case number and QR code are assigned at acceptance,
   // NOT at submission, so the clinic doesn't see a number that implies the case is in production.
-  const finalStatus = deliveryDate ? 'DELIVERED' : (dropOffAtLab ? 'CASE_ACCEPTED' : 'PENDING_PICKUP');
-  const needsScanNumber = finalStatus !== 'PENDING_PICKUP';
+  //
+  // dropOffAtLab skips the pickup leg (no courier needed — the impression is already at
+  // the lab, physically or as an emailed file), but it must NOT also skip receptionist
+  // review: when the CLINIC app submits it, the case still needs a human to verify/complete
+  // the details before it's real production. Reuse PICKUP_ASSIGNED-with-no-driver, the same
+  // "arrived at lab, needs acceptance" bucket a courier-delivered case lands in once the
+  // driver is cleared — see arrivedAtLabAll in Dashboard.jsx. Only a RECEPTIONIST/ADMIN
+  // creating the case themselves (already reviewed, e.g. via NewCase.jsx) can auto-accept it.
+  const isStaffActor = actorUser.role === 'RECEPTIONIST' || actorUser.role === 'ADMIN';
+  const finalStatus = deliveryDate
+    ? 'DELIVERED'
+    : dropOffAtLab
+      ? (isStaffActor ? 'CASE_ACCEPTED' : 'PICKUP_ASSIGNED')
+      : 'PENDING_PICKUP';
+  const needsScanNumber = finalStatus === 'DELIVERED' || finalStatus === 'CASE_ACCEPTED';
   const caseNumber = needsScanNumber ? await generateCaseNumber(db) : null;
 
   const newCase = await db.case.create({

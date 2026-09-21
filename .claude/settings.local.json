@@ -16,7 +16,10 @@
       "Bash(npm install *)",
       "Bash(Get-ChildItem -Recurse \"c:\\\\Users\\\\allen\\\\Projects\\\\yealmaz\\\\frontend\\\\receptionist\\\\src\")",
       "Bash(Select-Object FullName)",
-      "Bash(node -e \"const p = require\\('c:/yealmaz/yealmaz-clinic-app/node_modules/expo/package.json'\\); console.log\\('expo:', p.version\\); console.log\\('peerDeps:', JSON.stringify\\(p.peerDependencies, null, 2\\)\\)\")"
+      "Bash(node -e \"const p = require\\('c:/yealmaz/yealmaz-clinic-app/node_modules/expo/package.json'\\); console.log\\('expo:', p.version\\); console.log\\('peerDeps:', JSON.stringify\\(p.peerDependencies, null, 2\\)\\)\")",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(git pull *)",
+      "Bash(git push *)"
     ]
   },
   "enabledMcpjsonServers": [
