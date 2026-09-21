@@ -1,6 +1,6 @@
 // Ye-Almaz — Admin Clinic Management
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import ExportMenu from '../components/ExportMenu';
 import api from '../api';
@@ -13,8 +13,79 @@ import { printOnboardingSheet } from '../utils/printOnboarding';
 import { printCredentialsCard } from '../utils/printCredentialsCard';
 import {
   MdEdit, MdLocalHospital, MdAutoAwesome, MdVpnKey, MdCheckCircle, MdSearch,
-  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge,
+  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge, MdMoreVert,
 } from 'react-icons/md';
+
+// ── Row action menu ───────────────────────────────────────
+// The table used to render five action buttons inline per row, which forced
+// a 1,385px minimum width and pushed the actions off-screen. They now live
+// in a menu. It is position:fixed (measured from the button) rather than
+// absolutely positioned, because the table sits in an overflow container
+// that would clip an absolute popover on the last rows.
+function RowMenu({ items }) {
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+
+  const close = () => setPos(null);
+  useEffect(() => {
+    if (!pos) return;
+    const onKey = (e) => e.key === 'Escape' && close();
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [pos]);
+
+  const toggle = () => {
+    if (pos) return close();
+    const r = btnRef.current.getBoundingClientRect();
+    const menuH = items.length * 38 + 12;
+    const openUp = r.bottom + menuH > window.innerHeight - 8;
+    setPos({
+      right: Math.max(8, window.innerWidth - r.right),
+      top: openUp ? undefined : r.bottom + 4,
+      bottom: openUp ? window.innerHeight - r.top + 4 : undefined,
+    });
+  };
+
+  return (
+    <>
+      <button ref={btnRef} className="btn btn-ghost btn-sm" onClick={toggle} title="More actions" aria-haspopup="menu" aria-expanded={!!pos} style={{ padding: '4px 6px' }}>
+        <MdMoreVert size={17} />
+      </button>
+      {pos && (
+        <>
+          <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
+          <div role="menu" style={{
+            position: 'fixed', right: pos.right, top: pos.top, bottom: pos.bottom, zIndex: 1000, minWidth: 190,
+            background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.35)', padding: 6,
+          }}>
+            {items.map(it => (
+              <button key={it.label} role="menuitem" disabled={it.disabled} title={it.title}
+                onClick={() => { close(); it.onClick(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                  background: 'transparent', border: 'none', borderRadius: 6, padding: '8px 10px',
+                  fontSize: 13, fontWeight: 600, color: it.color || 'var(--text-1)',
+                  cursor: it.disabled ? 'not-allowed' : 'pointer', opacity: it.disabled ? 0.5 : 1,
+                }}
+                onMouseEnter={e => { if (!it.disabled) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                {it.icon} {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
 
 // ── Clinic-specific Helpers ───────────────────────────────
 function slugify(name) {
@@ -492,31 +563,29 @@ export default function AdminClinics() {
                 <p>{search ? 'Try a different search term' : 'Create the first clinic using the button above'}</p>
               </div>
             ) : (
-              <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 1385 }}>
+              <table style={{ tableLayout: 'fixed', width: '100%', minWidth: 980 }}>
                 <colgroup>
-                  <col style={{ width: 170 }} />
-                  <col style={{ width: 70 }} />
-                  <col style={{ width: 90 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 170 }} />
-                  <col style={{ width: 110 }} />
-                  <col style={{ width: 90 }} />
-                  <col style={{ width: 75 }} />
-                  <col style={{ width: 90 }} />
-                  <col style={{ width: 410 }} />
+                  {/* Sums to exactly 100% so the table fills — and never exceeds — its
+                      container. (A mix of % and px columns overflows by the px amount.) */}
+                  <col style={{ width: '21%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '10%' }} />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Clinic</th>
-                    <th>Code</th>
                     <th>Station</th>
                     <th>Zone</th>
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Partner</th>
                     <th>Status</th>
-                    <th>Added</th>
-                    <th>Actions</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -539,13 +608,11 @@ export default function AdminClinics() {
                             >
                               {c.name}
                             </div>
+                            {c.code && (
+                              <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>{c.code}</div>
+                            )}
                           </div>
                         </div>
-                      </td>
-                      <td style={{ padding: '8px 16px', whiteSpace: 'nowrap' }}>
-                        {c.code
-                          ? <span style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 6px' }}>{c.code}</span>
-                          : <span style={{ color: 'var(--text-3)' }}>—</span>}
                       </td>
                       <td style={{ padding: '8px 16px', fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.station || '—'}</td>
                       <td style={{ padding: '8px 16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -580,90 +647,56 @@ export default function AdminClinics() {
                         }}>
                           {c.isActive ? 'Active' : 'Inactive'}
                         </span>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }} title="Date added">
+                          {format(new Date(c.createdAt), 'dd MMM yyyy')}
+                        </div>
                       </td>
-                      <td style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
-                        {format(new Date(c.createdAt), 'dd MMM yyyy')}
-                      </td>
-                      <td style={{ padding: '8px 16px' }}>
-                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            style={{ whiteSpace: 'nowrap' }}
-                            onClick={() => setEditTarget(c)}
-                          >
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                          <button className="btn btn-ghost btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setEditTarget(c)}>
                             <MdEdit className="mi" size={14} /> Edit
                           </button>
-                          <button
-                            onClick={() => printOnboardingQr(c)}
-                            disabled={generatingQr === c.id}
-                            title="Print an onboarding form + QR for this clinic to fill in their details and set their own password"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 3,
-                              background: 'rgba(29,78,216,0.07)', color: 'var(--blue)',
-                              border: '1px solid rgba(29,78,216,0.2)',
-                              borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700,
-                              cursor: generatingQr === c.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-                            }}
-                          >
-                            <MdQrCode2 size={13} /> {generatingQr === c.id ? 'Generating…' : 'Setup QR'}
-                          </button>
-                          <button
-                            onClick={() => printCredCard(c)}
-                            disabled={generatingCard === c.id}
-                            title="Reset this clinic's password and print a business-card-sized QR + credentials"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 3,
-                              background: 'rgba(107,33,168,0.07)', color: '#6B21A8',
-                              border: '1px solid rgba(107,33,168,0.2)',
-                              borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700,
-                              cursor: generatingCard === c.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
-                            }}
-                          >
-                            <MdBadge size={13} /> {generatingCard === c.id ? 'Generating…' : 'Login Card'}
-                          </button>
-                          <button
-                            onClick={() => {
-                              api.patch(`/clinics/${c.id}`, { isActive: !c.isActive })
-                                .then(() => {
-                                  toast.success(`${c.name} ${c.isActive ? 'deactivated' : 'activated'}`);
-                                  queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
-                                  queryClient.invalidateQueries({ queryKey: ['clinics'] });
-                                })
-                                .catch(() => toast.error('Update failed'));
-                            }}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 3,
-                              background: c.isActive ? 'rgba(229,62,62,0.07)' : 'rgba(22,163,74,0.08)',
-                              color: c.isActive ? 'var(--red)' : 'var(--green)',
-                              border: `1px solid ${c.isActive ? 'rgba(229,62,62,0.2)' : 'rgba(22,163,74,0.25)'}`,
-                              borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {c.isActive ? <><MdPause size={13} /> Deactivate</> : <><MdPlayArrow size={13} /> Activate</>}
-                          </button>
-                          <button
-                            onClick={() => {
-                              api.patch(`/clinics/${c.id}`, { isExcluded: !c.isExcluded })
-                                .then(() => {
-                                  toast.success(`${c.name} ${c.isExcluded ? 'removed from partners' : 'marked as trusted partner'}`);
-                                  queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
-                                })
-                                .catch(() => toast.error('Update failed'));
-                            }}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 3,
-                              background: c.isExcluded ? 'rgba(229,62,62,0.07)' : 'rgba(29,78,216,0.07)',
+                          <RowMenu items={[
+                            {
+                              label: generatingQr === c.id ? 'Generating…' : 'Setup QR',
+                              icon: <MdQrCode2 size={15} />, color: 'var(--blue)', disabled: generatingQr === c.id,
+                              title: 'Print an onboarding form + QR for this clinic to fill in their details and set their own password',
+                              onClick: () => printOnboardingQr(c),
+                            },
+                            {
+                              label: generatingCard === c.id ? 'Generating…' : 'Login Card',
+                              icon: <MdBadge size={15} />, color: '#A855F7', disabled: generatingCard === c.id,
+                              title: "Reset this clinic's password and print a business-card-sized QR + credentials",
+                              onClick: () => printCredCard(c),
+                            },
+                            {
+                              label: c.isExcluded ? 'Remove Partner' : 'Mark Partner',
+                              icon: c.isExcluded ? null : <MdHandshake size={15} />,
                               color: c.isExcluded ? 'var(--red)' : 'var(--blue)',
-                              border: `1px solid ${c.isExcluded ? 'rgba(229,62,62,0.2)' : 'rgba(29,78,216,0.2)'}`,
-                              borderRadius: 6, padding: '4px 9px',
-                              fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {c.isExcluded ? '✕ Remove Partner' : <><MdHandshake size={13} /> Mark Partner</>}
-                          </button>
+                              onClick: () => {
+                                api.patch(`/clinics/${c.id}`, { isExcluded: !c.isExcluded })
+                                  .then(() => {
+                                    toast.success(`${c.name} ${c.isExcluded ? 'removed from partners' : 'marked as trusted partner'}`);
+                                    queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
+                                  })
+                                  .catch(() => toast.error('Update failed'));
+                              },
+                            },
+                            {
+                              label: c.isActive ? 'Deactivate' : 'Activate',
+                              icon: c.isActive ? <MdPause size={15} /> : <MdPlayArrow size={15} />,
+                              color: c.isActive ? 'var(--red)' : 'var(--green)',
+                              onClick: () => {
+                                api.patch(`/clinics/${c.id}`, { isActive: !c.isActive })
+                                  .then(() => {
+                                    toast.success(`${c.name} ${c.isActive ? 'deactivated' : 'activated'}`);
+                                    queryClient.invalidateQueries({ queryKey: ['admin', 'clinics', 'all'] });
+                                    queryClient.invalidateQueries({ queryKey: ['clinics'] });
+                                  })
+                                  .catch(() => toast.error('Update failed'));
+                              },
+                            },
+                          ]} />
                         </div>
                       </td>
                     </tr>
