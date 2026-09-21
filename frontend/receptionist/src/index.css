@@ -1207,3 +1207,9 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
   .nav-item{min-height:28px;padding-top:2px;padding-bottom:2px}
   .nav-section-label{padding-top:6px}
 }
+
+/* Tap-to-call links are the main action on the delivery list; a 19px-tall
+   text link is easy to miss with a thumb. */
+@media (pointer:coarse),(max-width:540px){
+  a[href^="tel:"]{display:inline-flex;align-items:center;min-height:40px}
+}
