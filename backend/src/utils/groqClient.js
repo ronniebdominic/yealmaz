@@ -22,6 +22,14 @@ const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 // tool calls and phrasing for the same question every time over
 // conversational variety. Not 0: a little headroom avoids the model
 // getting stuck in a degenerate repeat-itself loop on edge cases.
+// gpt-oss models "think" before answering and those reasoning tokens are
+// billed like output. This is a look-up-and-report bot, so the lowest effort
+// is plenty and cuts most of the per-call output. Set GROQ_REASONING_EFFORT
+// to low|medium|high to override, or 'off' to send nothing.
+const REASONING_EFFORT = process.env.GROQ_REASONING_EFFORT || 'low';
+// Hard ceiling on one completion (reasoning + reply). Answers are meant to be
+// 1-2 sentences, so this only ever bites a runaway generation.
+const DEFAULT_MAX_TOKENS = parseInt(process.env.GROQ_MAX_TOKENS, 10) || 700;
 const TEMPERATURE = process.env.GROQ_TEMPERATURE != null ? parseFloat(process.env.GROQ_TEMPERATURE) : 0.2;
 
 function isConfigured() {
@@ -95,7 +103,9 @@ async function runGroqLlm({ system, messages, tools, toolChoice, maxTokens } = {
   };
   if (tools?.length) body.tools = tools;
   if (toolChoice) body.tool_choice = toolChoice;
-  if (maxTokens) body.max_tokens = maxTokens;
+  body.max_tokens = maxTokens || DEFAULT_MAX_TOKENS;
+  const wantsReasoning = /gpt-oss/i.test(DEFAULT_MODEL) && REASONING_EFFORT !== 'off';
+  if (wantsReasoning) { body.reasoning_effort = REASONING_EFFORT; body.include_reasoning = false; }
 
   const doCall = () => fetch(`${BASE_URL}/v1/chat/completions`, {
     method: 'POST',
@@ -107,6 +117,17 @@ async function runGroqLlm({ system, messages, tools, toolChoice, maxTokens } = {
   });
 
   let res = await doCall();
+
+  // If the provider rejects the reasoning knobs, drop them and go on rather
+  // than taking the whole assistant down over an optimisation.
+  if (res.status === 400 && wantsReasoning) {
+    const errText = await res.clone().text().catch(() => '');
+    if (/reasoning/i.test(errText)) {
+      console.warn('[GroqLLM] reasoning params rejected - retrying without them:', errText.slice(0, 200));
+      delete body.reasoning_effort; delete body.include_reasoning;
+      res = await doCall();
+    }
+  }
 
   if (res.status === 429) {
     const retryAfterSec = parseFloat(res.headers.get('retry-after'));

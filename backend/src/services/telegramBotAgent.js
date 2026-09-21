@@ -104,7 +104,8 @@ Today's date is ${a.today}. When a tool needs a date range, resolve it using the
 // noise is turn-specific working state, not conversational context a
 // follow-up question needs, and keeping it out bounds how much of the
 // limited context window history eats into on every subsequent call.
-const MAX_HISTORY_PAIRS = 6; // 6 user+assistant exchanges = 12 messages
+const MAX_HISTORY_PAIRS = 3; // 3 user+assistant exchanges = 6 messages
+const MAX_STORED_REPLY_CHARS = 500; // a follow-up needs the gist, not the whole earlier answer
 const conversationHistory = new Map(); // chatId -> [{role, content}, ...]
 
 function getHistory(chatId) {
@@ -113,7 +114,10 @@ function getHistory(chatId) {
 
 function appendToHistory(chatId, userText, replyText) {
   const history = getHistory(chatId);
-  history.push({ role: 'user', content: userText }, { role: 'assistant', content: replyText });
+  history.push(
+    { role: 'user', content: userText },
+    { role: 'assistant', content: replyText.length > MAX_STORED_REPLY_CHARS ? `${replyText.slice(0, MAX_STORED_REPLY_CHARS)}...` : replyText },
+  );
   while (history.length > MAX_HISTORY_PAIRS * 2) history.shift();
   conversationHistory.set(chatId, history);
 }
@@ -291,6 +295,95 @@ function correctCurrencySymbols(text) {
     .replace(/\bUSD\s?(?=\d)/g, 'Br ');
 }
 
+// -- Token economy ----------------------------------------------------
+// Every round resends the system prompt, the tool definitions (~2.8K tokens
+// for all 17) and every earlier tool result, so these helpers keep that
+// payload proportional to the question actually asked.
+
+// 1. Send only the tools a question could plausibly need. Matching looks at
+// this message plus the previous user message, so a follow-up ("and last
+// month?") keeps the tools of the question it refers to. Anything that
+// matches no group gets the full set, so routing can only ever save tokens,
+// never remove a capability the model needed.
+const ALWAYS_TOOLS = ['count_cases', 'get_dashboard_summary', 'get_admin_analytics'];
+const TOOL_GROUPS = [
+  { re: /pay|paid|unpaid|collect|receivable|outstanding|balance|revenue|financ|owe|credit|trusted|statement|invoice|cash|tax|withh|money|birr|sales/i,
+    tools: ['get_finance_report', 'get_clinic_balances', 'get_trusted_partners_summary', 'get_clinic_statement'] },
+  { re: /lab|tech|deliver|driver|agent|perform|productiv|fast|slow|turnaround/i,
+    tools: ['get_lab_performance', 'get_delivery_performance'] },
+  { re: /attend|present|absent|late|leave|staff|employee|shift|inventor|stock|mill|yield|goods|request|reward|point|remake|redo/i,
+    tools: ['get_staff_attendance', 'get_operations_report'] },
+  { re: /case|scan|status|histor|audit|pipeline|stage|where|track|clinic|patient|pending|progress|ready|dispatch|order/i,
+    tools: ['get_cases_by_status', 'search_cases', 'get_case_detail', 'get_case_history'] },
+  { re: /activity|log|who (did|changed|edited|deleted)|changed|edited|deleted/i,
+    tools: ['get_activity_log'] },
+  { re: /insight|worry|opportunit|business|how.?s|doing|trend|health|flag|concern|overview|summary/i,
+    tools: ['get_business_insights'] },
+];
+function selectTools(userText, previousUserText = '') {
+  const text = `${userText} ${previousUserText}`;
+  const wanted = new Set(ALWAYS_TOOLS);
+  let matched = false;
+  for (const grp of TOOL_GROUPS) {
+    if (grp.re.test(text)) { matched = true; grp.tools.forEach(t => wanted.add(t)); }
+  }
+  if (!matched) return toolDefinitions;
+  const picked = toolDefinitions.filter(t => wanted.has(t.function.name));
+  return picked.length ? picked : toolDefinitions;
+}
+
+// 2. Compact a tool result before the model sees it. The model doesn't need
+// nulls, empty strings/arrays or 10-digit floats, and a long list can only be
+// summarised in a sentence or two anyway. Anything still over the budget has
+// its longest array halved (with a note, so a partial list is never passed
+// off as complete) until it fits.
+const MAX_TOOL_RESULT_CHARS = 3500; // ~1K tokens
+function tidy(v) {
+  if (Array.isArray(v)) {
+    const arr = v.map(tidy).filter(x => x !== undefined);
+    return arr.length ? arr : undefined;
+  }
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, val] of Object.entries(v)) {
+      const t = tidy(val);
+      if (t !== undefined) out[k] = t;
+    }
+    return Object.keys(out).length ? out : undefined;
+  }
+  if (v === null || v === '' || v === undefined) return undefined;
+  if (typeof v === 'number' && !Number.isInteger(v)) return Math.round(v * 100) / 100;
+  if (typeof v === 'string' && v.length > 160) return `${v.slice(0, 160)}...`;
+  return v;
+}
+function longestArray(node, best = { len: 0, holder: null, key: null }) {
+  if (Array.isArray(node)) {
+    node.forEach(x => { if (x && typeof x === 'object') longestArray(x, best); });
+  } else if (node && typeof node === 'object') {
+    for (const [k, val] of Object.entries(node)) {
+      if (Array.isArray(val) && val.length > best.len) { best.len = val.length; best.holder = node; best.key = k; }
+      longestArray(val, best);
+    }
+  }
+  return best;
+}
+function compactResult(result) {
+  const data = tidy(result);
+  if (data === undefined) return '{}';
+  let json = JSON.stringify(data);
+  for (let i = 0; i < 12 && json.length > MAX_TOOL_RESULT_CHARS; i++) {
+    const { len, holder, key } = longestArray(data);
+    if (len <= 3) break;
+    const keep = Math.max(3, Math.ceil(len / 2));
+    holder[key] = holder[key].slice(0, keep);
+    // Keep the ORIGINAL length across repeated halvings, so the note never understates the list.
+    const prior = /of (\d+)/.exec(holder[`${key}_note`] || '');
+    holder[`${key}_note`] = `showing first ${keep} of ${prior ? prior[1] : len}`;
+    json = JSON.stringify(data);
+  }
+  return json.length > MAX_TOOL_RESULT_CHARS * 1.5 ? `${json.slice(0, MAX_TOOL_RESULT_CHARS)}...[truncated]` : json;
+}
+
 async function executeToolCall(toolCall, userText) {
   const { id, name, arguments: rawArgs } = toolCall;
   if (rawArgs === null) {
@@ -307,7 +400,7 @@ async function executeToolCall(toolCall, userText) {
   const args = sanitizeDateArgs(rawArgs, userText);
   try {
     const result = await handler(args || {});
-    return { id, content: JSON.stringify(result) };
+    return { id, content: compactResult(result) };
   } catch (err) {
     console.error(`[TelegramBot] Tool "${name}" failed:`, err.message);
     return { id, content: JSON.stringify({ error: `That lookup failed: ${err.message}` }) };
@@ -333,7 +426,9 @@ async function runAgentLoop(chatId, userText) {
   // Prior clean Q&A pairs first, then this turn's message — the tool-call
   // back-and-forth that happens below is local to `messages` for this
   // turn only and never gets persisted (see appendToHistory).
-  const messages = [...getHistory(chatId), { role: 'user', content: userText }];
+  const history = getHistory(chatId);
+  const messages = [...history, { role: 'user', content: userText }];
+  const tools = selectTools(userText, [...history].reverse().find(m => m.role === 'user')?.content || '');
   let toolCalledThisTurn = false;
   let lastRealRange = null;
   let groundingRetried = false;
@@ -341,7 +436,7 @@ async function runAgentLoop(chatId, userText) {
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     let response;
     try {
-      response = await runGroqLlm({ system, messages, tools: toolDefinitions });
+      response = await runGroqLlm({ system, messages, tools });
     } catch (err) {
       console.error('[TelegramBot] LLM call failed:', err.message);
       // A 429 here is almost always Groq's free-tier cap (8K tokens/min,
