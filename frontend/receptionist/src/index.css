@@ -1134,6 +1134,21 @@ input:disabled,select:disabled,textarea:disabled{background:var(--surface-2);col
 /* ── Safe areas ─────────────────────────────────────────────────────
    Notched phones in landscape put content under the notch. */
 .content{
-  padding-left:max(clamp(14px,2.6vw,36px),env(safe-area-inset-left,0px));
-  padding-right:max(clamp(14px,2.6vw,36px),env(safe-area-inset-right,0px));
+  padding-left:max(clamp(14px,2.6vw,36px),env(safe-area-inset-left,0px),calc((100% - 1800px) / 2));
+  padding-right:max(clamp(14px,2.6vw,36px),env(safe-area-inset-right,0px),calc((100% - 1800px) / 2));
 }
+
+/* ── Ultrawide: cap the readable width ──────────────────────────────
+   The layout is fluid, which is right up to a point: at 2560px three KPI
+   tiles became ~800px each — a small number at the far left, its info icon
+   marooned at the far right, and acres of empty card between. Past 1800px
+   the content is centred rather than stretched. Only screens wider than
+   ~2050px (1800 + sidebar + padding) are affected; laptops and standard
+   desktops are untouched.
+
+   Done with the scroll area's own padding rather than max-width + margin:auto
+   on its children: several children (section headers) set inline margins,
+   which beat the auto margins and left them pinned to the far left while the
+   tiles beneath were centred. Percentage padding resolves against the width
+   of the area itself, so (100% - 1800px) / 2 is exactly the side gutter that
+   leaves an 1800px column, and it is 0 on anything narrower. */

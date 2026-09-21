@@ -24,7 +24,11 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <img src="/logo.png" alt="Ye-Almaz Dental Laboratory" style={{ width: 110, height: 110, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, boxShadow: '0 4px 16px rgba(15,32,68,.15)' }} />
+          {/* The logo is black line-art on a TRANSPARENT background — drawn for white, so on
+            the dark card its ring and lettering disappeared. A white background on the
+            image itself (with a slim rim, and `contain` so the outer ring is never
+            cropped) shows it as designed, in dark and light themes alike. */}
+          <img src="/logo.png" alt="Ye-Almaz Dental Laboratory" style={{ width: 110, height: 110, borderRadius: '50%', objectFit: 'contain', background: '#fff', padding: 4, boxSizing: 'border-box', marginBottom: 10, boxShadow: '0 4px 16px rgba(15,32,68,.25)' }} />
           <h1>Ye-Almaz Dental Lab</h1>
           <p>Management System</p>
         </div>
