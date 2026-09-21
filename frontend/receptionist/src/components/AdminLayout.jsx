@@ -24,6 +24,11 @@ const VIEW_AS_ITEMS = [
 ];
 
 function NavItems({ active, onNav }) {
+  // Eight rarely-used shortcuts would push the daily menu off-screen, so they
+  // fold away; the group opens by itself when one of its pages is showing.
+  const viewing = VIEW_AS_ITEMS.some(i => active(i.path).includes('active'));
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const showSwitch = switchOpen || viewing;
   return (
     <>
       <div className="nav-section-label">Analytics</div>
@@ -69,8 +74,15 @@ function NavItems({ active, onNav }) {
         <MdGroups className="mi" size={17} /> HR & Payroll
       </button>
 
-      <div className="nav-section-label">Switch Dashboard</div>
-      {VIEW_AS_ITEMS.map(item => (
+      <button
+        type="button"
+        className="nav-section-label nav-section-toggle"
+        aria-expanded={showSwitch}
+        onClick={() => setSwitchOpen(o => !o)}
+      >
+        Switch Dashboard <span className="nav-chevron" aria-hidden="true">{showSwitch ? '▾' : '▸'}</span>
+      </button>
+      {showSwitch && VIEW_AS_ITEMS.map(item => (
         <button key={item.path} className={active(item.path)} onClick={() => onNav(item.path)}>
           <item.icon className="mi" size={17} /> {item.label}
         </button>
