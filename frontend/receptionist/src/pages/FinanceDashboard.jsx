@@ -26,6 +26,7 @@ import { todayLocal, toLocalDateString } from '../utils/date';
 import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import DailyReconciliationTab from './finance/DailyReconciliationTab';
+import BulkPaymentModal, { remainingOf } from './finance/BulkPaymentModal';
 
 const PAGE_SIZE = 15;
 const HIST_SIZE = 20;
@@ -984,6 +985,9 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
   const [marking, setMarking]       = useState(false);
   const [fsEdits, setFsEdits]       = useState({}); // { [caseId]: in-progress value }
   const [fsSaving, setFsSaving]     = useState({}); // { [caseId]: true }
+  // Multi-select for recording a payment against several cases at once.
+  const [selected, setSelected]     = useState(() => new Set());
+  const [payOpen, setPayOpen]       = useState(false);
 
   const range = rangeForPreset(preset, customFrom, customTo);
   const periodLabel = preset === 'all' ? 'All Outstanding'
@@ -994,6 +998,7 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
     try {
       const res = await api.get(`/payments/statement/${clinicId}`, { params: range });
       setCases(res.data);
+      setSelected(prev => new Set([...prev].filter(id => res.data.some(c => c.id === id))));
     } catch {
       toast.error('Failed to load bill data');
     } finally {
@@ -1026,8 +1031,13 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
 
   // Still-owed amount per case, not the gross billed total — subtracts any
   // partial amountReceived already collected on it.
-  const outstandingAmount = (c) => (c.totalAmount || 0) - (c.payment?.amountReceived || 0);
+  const outstandingAmount = (c) => remainingOf(c);
   const total = cases.reduce((s, c) => s + outstandingAmount(c), 0);
+  const selectedCases = cases.filter(c => selected.has(c.id));
+  const selectedTotal = selectedCases.reduce((s, c) => s + outstandingAmount(c), 0);
+  const allSelected = cases.length > 0 && selected.size === cases.length;
+  const toggleOne = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(cases.map(c => c.id)));
 
   const print = () => {
     const w = window.open('', '_blank');
@@ -1120,6 +1130,21 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
             </div>
           </div>
 
+          {/* Selection bar — appears once cases are ticked */}
+          {selected.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: 'var(--blue-dim, rgba(59,130,246,0.1))', border: '1px solid var(--blue)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+              <div style={{ fontSize: 13 }}>
+                <strong>{selected.size}</strong> case{selected.size === 1 ? '' : 's'} selected · <strong>Br {selectedTotal.toLocaleString('en-US')}</strong> owed
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+                <button className="btn btn-primary btn-sm" onClick={() => setPayOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <MdPaid size={14} /> Record payment
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Case preview table */}
           {loading ? (
             <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)' }}>Loading cases…</div>
@@ -1134,6 +1159,9 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-2)', position: 'sticky', top: 0 }}>
+                    <th style={{ padding: '8px 12px', width: 34, borderBottom: '1px solid var(--border)' }}>
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} title="Select all" style={{ cursor: 'pointer' }} />
+                    </th>
                     {['Case #', 'Patient', 'Work Type', 'Units', 'Delivered', 'Invoice #', 'FS #', 'Amount'].map(h => (
                       <th key={h} style={{ padding: '8px 12px', fontWeight: 700, fontSize: 11, color: 'var(--text-3)', textAlign: h === 'Amount' ? 'right' : h === 'Units' ? 'center' : 'left', borderBottom: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
@@ -1141,7 +1169,10 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
                 </thead>
                 <tbody>
                   {cases.map(c => (
-                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border)', background: selected.has(c.id) ? 'var(--blue-dim, rgba(59,130,246,0.08))' : undefined }}>
+                      <td style={{ padding: '9px 12px' }}>
+                        <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleOne(c.id)} style={{ cursor: 'pointer' }} />
+                      </td>
                       <td style={{ padding: '9px 12px', fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{c.caseNumber}</td>
                       <td style={{ padding: '9px 12px', fontWeight: 600 }}>{c.patientName}</td>
                       <td style={{ padding: '9px 12px', color: 'var(--text-2)' }}>{c.workType}</td>
@@ -1162,13 +1193,21 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
                       </td>
                       <td style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         {c.totalAmount ? `Br ${outstandingAmount(c).toLocaleString('en-US')}` : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        {(c.payment?.amountReceived || 0) > 0 && (
+                          <div
+                            style={{ fontSize: 10, fontWeight: 600, color: 'var(--green)' }}
+                            title={(c.payment.receipts || []).map(r => `${format(new Date(r.receivedAt), 'dd MMM yyyy')}: Br ${r.amount.toLocaleString('en-US')}${r.reference ? ` (${r.reference})` : ''}`).join(String.fromCharCode(10))}
+                          >
+                            Br {c.payment.amountReceived.toLocaleString('en-US')} paid
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--surface-2)', borderTop: '2px solid var(--border)' }}>
-                    <td colSpan={7} style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', fontSize: 13 }}>Total</td>
+                    <td colSpan={8} style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'right', fontSize: 13 }}>Total</td>
                     <td style={{ padding: '10px 12px', fontWeight: 700, fontSize: 15, color: 'var(--blue)', textAlign: 'right' }}>
                       Br {total.toLocaleString('en-US')}
                     </td>
@@ -1179,6 +1218,21 @@ function StatementModal({ clinicId, clinic, onClose, onBilled }) {
           )}
         </div>
       </div>
+
+      {payOpen && (
+        <BulkPaymentModal
+          clinic={clinic}
+          clinicId={clinicId}
+          cases={selectedCases}
+          onClose={() => setPayOpen(false)}
+          onDone={() => {
+            setPayOpen(false);
+            setSelected(new Set());
+            load();
+            onBilled?.();   // refresh the Trusted Partners list's outstanding figures
+          }}
+        />
+      )}
     </div>
   );
 }

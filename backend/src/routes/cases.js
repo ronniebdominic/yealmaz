@@ -859,7 +859,7 @@ async function snapshotCase(caseId) {
     prisma.caseStage.findMany({ where: { caseId } }),
     prisma.caseComment.findMany({ where: { caseId } }),
     prisma.deliveryLog.findMany({ where: { caseId } }),
-    prisma.payment.findFirst({ where: { caseId } }),
+    prisma.payment.findFirst({ where: { caseId }, include: { receipts: true } }),
     prisma.sheetSyncRow.findMany({ where: { caseId } }),
     prisma.rewardTransaction.findMany({ where: { caseId, type: 'EARN' } }),
   ]);
@@ -908,10 +908,20 @@ router.post('/trash/:id/restore', protect, restrict('ADMIN'), async (req, res) =
       if (snap.stages?.length) await tx.caseStage.createMany({ data: snap.stages });
       if (snap.comments?.length) await tx.caseComment.createMany({ data: snap.comments });
       if (snap.deliveryLogs?.length) await tx.deliveryLog.createMany({ data: snap.deliveryLogs });
-      if (snap.payment) await tx.payment.create({ data: snap.payment });
+      if (snap.payment) {
+        // receipts are part of the payment's history; restore them with it
+        // (they cascade-delete with the payment, so they must be re-created)
+        const { receipts, ...paymentRow } = snap.payment;
+        await tx.payment.create({ data: paymentRow });
+        if (receipts?.length) await tx.paymentReceipt.createMany({ data: receipts });
+      }
       if (snap.sheetRows?.length) await tx.sheetSyncRow.createMany({ data: snap.sheetRows });
       await tx.deletedCase.delete({ where: { id: archived.id } });
-    });
+    // Rebuilds a case from up to seven tables one statement at a time over a
+    // remote database. Prisma's default interactive-transaction timeout is 5s,
+    // which a slow round-trip can exceed part-way - the restore then aborts
+    // with "Transaction not found". 30s, same as the bulk collect.
+    }, { timeout: 30_000 });
 
     await invalidate(`case:${archived.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*');
 

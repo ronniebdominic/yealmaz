@@ -36,6 +36,7 @@ model User {
   notifications         Notification[]     @relation("NotificationRecipient")
   notificationsSent     Notification[]     @relation("NotificationSender")
   deletedCases          DeletedCase[]      @relation("DeletedCasesBy")
+  paymentReceipts       PaymentReceipt[]   @relation("PaymentReceiptsBy")
   assignedDeliveries    Case[]             @relation("AssignedDeliveries")
   pushSubscriptions     PushSubscription[]
   modelRequestsMade     ModelRequest[]     @relation("ModelRequestedBy")
@@ -429,6 +430,8 @@ model Payment {
   chapaTxRef       String? @unique
   chapaCheckoutUrl String?
 
+  receipts PaymentReceipt[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -493,6 +496,34 @@ model ModelRequest {
   @@index([caseId])
   @@index([status])
   @@map("model_requests")
+}
+
+// ── PAYMENT RECEIPTS (installment ledger) ──────────────────
+// One row per payment actually received against a case, so a trusted
+// partner can settle a bill in several instalments and Finance can see who
+// recorded what, when, and against which bank/cash reference.
+//
+// `amount` is the GROSS credit applied to the case's balance: cash received
+// plus any tax the clinic withheld on that instalment (the clinic files
+// withholding to the government directly, so it settles what they owe us
+// exactly as cash would). Payment.amountReceived is the running sum of
+// these; Payment.taxWithheld is the running sum of `taxWithheld`.
+model PaymentReceipt {
+  id           String   @id @default(uuid())
+  paymentId    String
+  payment      Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount       Float
+  taxWithheld  Float    @default(0)
+  reference    String?
+  notes        String?
+  receivedById String?
+  receivedBy   User?    @relation("PaymentReceiptsBy", fields: [receivedById], references: [id])
+  receivedByName String?
+  receivedAt   DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([receivedAt])
+  @@map("payment_receipts")
 }
 
 // ── WORK TYPE PRICES ───────────────────────────────────

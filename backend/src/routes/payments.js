@@ -544,8 +544,64 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
   }
 });
 
+// ── Shared collection logic ─────────────────────────────
+// One case's collection, used by BOTH the single-case endpoint and the
+// bulk endpoint below so the two can never drift on what "collected" means
+// (invoice numbering, the audit-trail stage row, tax-withholding notes).
+// `db` is either the plain prisma client or a transaction client, so bulk
+// can make a whole batch all-or-nothing while single stays a plain write.
+async function collectCase(db, caseData, user, { amount, notes, taxWithheldAmount, amountReceived }) {
+  const resolvedAmount = amount != null ? amount : (caseData.payment?.amount ?? caseData.totalAmount);
+
+  const paymentData = {
+    status: 'VERIFIED',
+    verifiedById: user.id,
+    verifiedAt: new Date(),
+    rejectionReason: null,
+  };
+  if (amount != null) paymentData.amount = amount;
+  if (taxWithheldAmount != null) paymentData.taxWithheld = taxWithheldAmount;
+  if (amountReceived != null) paymentData.amountReceived = amountReceived;
+  let noteText = notes || '';
+  if (taxWithheldAmount != null) {
+    noteText += `${noteText ? ' | ' : ''}Withholding tax: Br ${taxWithheldAmount} deducted by clinic`;
+  }
+  if (noteText) paymentData.invoiceNotes = noteText;
+
+  // Issue a real invoice on collection (if one wasn't already issued).
+  // Real invoices only exist after payment — this is what Billing & Invoicing lists.
+  if (!caseData.payment?.invoiceNumber) {
+    paymentData.invoiceNumber   = `INV-${caseData.caseNumber}`;
+    paymentData.invoiceIssuedAt = new Date();
+  }
+
+  const payment = await db.payment.upsert({
+    where:  { caseId: caseData.id },
+    update: paymentData,
+    create: { caseId: caseData.id, ...paymentData },
+  });
+
+  const caseUpdate = { paymentStatus: 'VERIFIED' };
+  if (amount != null) caseUpdate.totalAmount = amount;
+  await db.case.update({ where: { id: caseData.id }, data: caseUpdate });
+
+  // Timeline accountability — this is the only "who actually collected
+  // the money" record for trusted-partner settlements (they skip the
+  // per-case request/verify flow entirely and are collected later in a
+  // batch, case by case, through this same logic) as well as any
+  // cash case collected in person rather than via the upload/verify flow.
+  await db.caseStage.create({
+    data: {
+      caseId: caseData.id, stageName: caseData.status, scannedBy: user.name,
+      notes: `Payment collected by ${user.name}${resolvedAmount != null ? ` — Br ${resolvedAmount.toLocaleString('en-US')}` : ''}`,
+    },
+  });
+
+  return payment;
+}
+
 // ── POST /api/payments/:caseId/collect ──────────────────
-// Admin manually marks payment as collected (cash, bank transfer, etc.) — no screenshot needed
+// Manual collection of ONE case (cash / bank transfer received directly).
 router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASHIER', 'FINANCE_AP'), async (req, res) => {
   try {
     const { amount, notes, taxWithheld } = req.body;
@@ -560,7 +616,8 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
     // directly) before paying the remainder — that deducted amount is NOT
     // owed to us, so it must never be conflated with amount/totalAmount (the
     // true invoice value) or amountReceived (a genuine still-owed shortfall).
-    const resolvedAmount = amount ? parseFloat(amount) : (caseData.payment?.amount ?? caseData.totalAmount);
+    const amountNum = amount ? parseFloat(amount) : null;
+    const resolvedAmount = amountNum != null ? amountNum : (caseData.payment?.amount ?? caseData.totalAmount);
     let taxWithheldAmount = null;
     if (taxWithheld) {
       taxWithheldAmount = parseFloat(taxWithheld);
@@ -572,49 +629,7 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
       }
     }
 
-    const paymentData = {
-      status: 'VERIFIED',
-      verifiedById: req.user.id,
-      verifiedAt: new Date(),
-      rejectionReason: null,
-    };
-    if (amount) paymentData.amount = parseFloat(amount);
-    if (taxWithheldAmount != null) paymentData.taxWithheld = taxWithheldAmount;
-    let noteText = notes || '';
-    if (taxWithheldAmount != null) {
-      noteText += `${noteText ? ' | ' : ''}Withholding tax: Br ${taxWithheldAmount} deducted by clinic`;
-    }
-    if (noteText) paymentData.invoiceNotes = noteText;
-
-    // Issue a real invoice on collection (if one wasn't already issued).
-    // Real invoices only exist after payment — this is what Billing & Invoicing lists.
-    if (!caseData.payment?.invoiceNumber) {
-      paymentData.invoiceNumber   = `INV-${caseData.caseNumber}`;
-      paymentData.invoiceIssuedAt = new Date();
-    }
-
-    const payment = await prisma.payment.upsert({
-      where:  { caseId: req.params.caseId },
-      update: paymentData,
-      create: { caseId: req.params.caseId, ...paymentData }
-    });
-
-    const caseUpdate = { paymentStatus: 'VERIFIED' };
-    if (amount) caseUpdate.totalAmount = parseFloat(amount);
-
-    await prisma.case.update({ where: { id: req.params.caseId }, data: caseUpdate });
-
-    // Timeline accountability — this is the only "who actually collected
-    // the money" record for trusted-partner settlements (they skip the
-    // per-case request/verify flow entirely and are collected later in a
-    // batch, case by case, through this same endpoint) as well as any
-    // cash case collected in person rather than via the upload/verify flow.
-    await prisma.caseStage.create({
-      data: {
-        caseId: req.params.caseId, stageName: caseData.status, scannedBy: req.user.name,
-        notes: `Payment collected by ${req.user.name}${resolvedAmount != null ? ` — Br ${resolvedAmount.toLocaleString('en-US')}` : ''}`,
-      },
-    });
+    const payment = await collectCase(prisma, caseData, req.user, { amount: amountNum, notes, taxWithheldAmount });
 
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
@@ -630,6 +645,192 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not collect payment.' });
+  }
+});
+
+// ── Instalment payments (trusted partners) ──────────────
+// Trusted partners settle bills in whatever amounts they send, over as many
+// payments as it takes. Each payment adds to a running balance on the case
+// (Payment.amountReceived) and is logged as a PaymentReceipt. A case stays
+// outstanding — and stays on the clinic's statement — until the payments
+// add up to what it is owed; the payment that reaches that point is what
+// marks it collected, issues its invoice and records who closed it out.
+//
+// `credit` is the GROSS amount applied to the balance: cash received plus
+// any tax the clinic withheld on that payment (withholding is filed to the
+// government directly, so it settles what the clinic owes us exactly as
+// cash does). Completion runs through collectCase so an instalment-settled
+// case ends up identical to one collected in a single go.
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const MONEY_EPS = 0.005;
+
+function balanceOf(caseData) {
+  const due = caseData.payment?.amount ?? caseData.totalAmount ?? 0;
+  const received = caseData.payment?.amountReceived || 0;
+  return { due, received, remaining: round2(due - received) };
+}
+
+async function recordInstallment(db, caseData, user, { credit, taxAmount, reference, notes }) {
+  const { due, received } = balanceOf(caseData);
+  const newReceived = round2(received + credit);
+  const newTax = round2((caseData.payment?.taxWithheld || 0) + (taxAmount || 0));
+  const complete = newReceived >= due - MONEY_EPS;
+
+  // The payment row may not exist yet (a trusted partner's delivered case
+  // has no payment request), and a receipt needs something to hang off.
+  const payment = await db.payment.upsert({
+    where: { caseId: caseData.id },
+    update: { amountReceived: newReceived, taxWithheld: newTax > 0 ? newTax : null, ...(caseData.payment?.amount == null ? { amount: due } : {}) },
+    create: { caseId: caseData.id, amount: due, amountReceived: newReceived, taxWithheld: newTax > 0 ? newTax : null, status: 'PENDING' },
+  });
+
+  await db.paymentReceipt.create({
+    data: {
+      paymentId: payment.id, amount: credit, taxWithheld: taxAmount || 0,
+      reference: reference || null, notes: notes || null,
+      receivedById: user.id, receivedByName: user.name || null,
+    },
+  });
+
+  if (complete) {
+    await collectCase(db, { ...caseData, payment }, user, {
+      amount: null,
+      notes: [reference ? `Ref ${reference}` : null, notes || null, received > 0 ? 'Final instalment - balance settled' : null].filter(Boolean).join(' | ') || undefined,
+      taxWithheldAmount: newTax > 0 ? newTax : null,
+      amountReceived: due,
+    });
+    return { complete: true, remaining: 0, received: due };
+  }
+
+  const remaining = round2(due - newReceived);
+  await db.caseStage.create({
+    data: {
+      caseId: caseData.id, stageName: caseData.status, scannedBy: user.name,
+      notes: `Part payment Br ${credit.toLocaleString('en-US')} received by ${user.name} — Br ${remaining.toLocaleString('en-US')} still outstanding`,
+    },
+  });
+  return { complete: false, remaining, received: newReceived };
+}
+
+// ── POST /api/payments/collect-bulk ─────────────────────
+// Record payments against SEVERAL of one trusted clinic's cases at once.
+// Body: { clinicId, items: [{ caseId, amount? }], reference?, notes?, taxWithheldPct? }
+//   - amount omitted  -> that case's whole remaining balance
+//   - amount < balance -> a part payment; the case stays outstanding
+//   - amount = balance -> completes the case (marks it collected)
+// The clinic normally pays one lump sum against a bill spanning many
+// cases, so this is how Finance records it rather than case by case.
+//
+// All-or-nothing: one transaction, so a failure part-way can never leave a
+// bill half-recorded with no way to tell which cases were done. Any item
+// that is not eligible (wrong clinic, not delivered, already paid, more
+// than is owed) rejects the WHOLE request and names the offenders - most
+// often because someone else collected it a moment ago, and silently
+// skipping it would let the total Finance is reconciling disagree with
+// what was recorded.
+//
+// Deliberately NOT supported: closing a case with money still owing
+// ("write-off"). Overpayment and short-payment are different accounting
+// events from a part payment and shouldn't be one click away.
+//
+// Withholding is a percentage of each payment applied (rounded to 2dp),
+// because the model stores tax per payment and a single lump sum would
+// need an arbitrary allocation rule across cases.
+const BULK_COLLECT_MAX = 200;
+router.post('/collect-bulk', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASHIER', 'FINANCE_AP'), async (req, res) => {
+  try {
+    const { clinicId, items, notes, reference, taxWithheldPct } = req.body || {};
+    if (!clinicId) return res.status(400).json({ error: 'clinicId is required.' });
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'Select at least one case.' });
+    if (items.length > BULK_COLLECT_MAX) return res.status(400).json({ error: `Select ${BULK_COLLECT_MAX} cases or fewer at a time.` });
+
+    const ids = items.map(i => i?.caseId);
+    if (ids.some(id => !id)) return res.status(400).json({ error: 'Every item needs a caseId.' });
+    if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'A case appears more than once in this payment.' });
+
+    let pct = null;
+    if (taxWithheldPct !== undefined && taxWithheldPct !== null && taxWithheldPct !== '') {
+      pct = parseFloat(taxWithheldPct);
+      if (isNaN(pct) || pct < 0 || pct > 100) return res.status(400).json({ error: 'Withholding must be between 0 and 100 percent.' });
+      if (pct === 0) pct = null;
+    }
+
+    const cases = await prisma.case.findMany({
+      where: { id: { in: ids } },
+      include: { clinic: { select: { id: true, name: true, isExcluded: true } }, payment: true },
+    });
+    const found = new Map(cases.map(c => [c.id, c]));
+
+    const problems = [];
+    const plan = [];
+    for (const item of items) {
+      const c = found.get(item.caseId);
+      if (!c) { problems.push({ id: item.caseId, reason: 'not found' }); continue; }
+      const label = c.caseNumber || c.id;
+      if (c.clinicId !== clinicId) { problems.push({ id: c.id, caseNumber: label, reason: 'belongs to a different clinic' }); continue; }
+      if (!c.clinic?.isExcluded) { problems.push({ id: c.id, caseNumber: label, reason: 'not a trusted partner' }); continue; }
+      if (c.status !== 'DELIVERED') { problems.push({ id: c.id, caseNumber: label, reason: 'not delivered yet' }); continue; }
+      if (c.paymentStatus === 'VERIFIED') { problems.push({ id: c.id, caseNumber: label, reason: 'already paid' }); continue; }
+
+      const { remaining } = balanceOf(c);
+      if (remaining <= MONEY_EPS) { problems.push({ id: c.id, caseNumber: label, reason: 'nothing left to collect' }); continue; }
+
+      let credit;
+      if (item.amount === undefined || item.amount === null || item.amount === '') {
+        credit = remaining;
+      } else {
+        credit = round2(parseFloat(item.amount));
+        if (isNaN(credit) || credit <= 0) { problems.push({ id: c.id, caseNumber: label, reason: 'amount must be greater than 0' }); continue; }
+        if (credit > remaining + MONEY_EPS) { problems.push({ id: c.id, caseNumber: label, reason: `Br ${credit} is more than the Br ${remaining} owed` }); continue; }
+      }
+      plan.push({ c, credit });
+    }
+    if (problems.length) {
+      return res.status(409).json({
+        error: `${problems.length} selected case(s) can't be collected: ${problems.slice(0, 5).map(p => `${p.caseNumber || p.id} (${p.reason})`).join(', ')}${problems.length > 5 ? '…' : ''}. Nothing was recorded.`,
+        problems,
+      });
+    }
+
+    const ref = (reference || '').toString().trim();
+    const userNote = (notes || '').toString().trim();
+    const batchNote = plan.length > 1 ? `Bulk settlement (${plan.length} cases)` : '';
+    const noteText = [userNote, batchNote].filter(Boolean).join(' | ');
+
+    let totalCredit = 0, totalTax = 0, completed = 0, partial = 0;
+    await prisma.$transaction(async (tx) => {
+      for (const { c, credit } of plan) {
+        const tax = pct != null ? round2(credit * pct / 100) : 0;
+        const r = await recordInstallment(tx, c, req.user, { credit, taxAmount: tax, reference: ref, notes: noteText });
+        totalCredit += credit; totalTax += tax;
+        if (r.complete) completed++; else partial++;
+      }
+    }, { timeout: 30_000 });
+
+    await invalidate(...plan.map(p => `case:${p.c.id}`), 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+
+    // Only a completed case is "payment confirmed" as far as the clinic app
+    // is concerned; a part payment leaves it outstanding.
+    const io = req.app.get('io');
+    // (completion is recomputed from the same plan rather than re-read)
+    for (const { c, credit } of plan) {
+      if (credit >= balanceOf(c).remaining - MONEY_EPS) {
+        io.to(`clinic_${c.clinic.id}`).emit('payment_verified', {
+          caseId: c.id, caseNumber: c.caseNumber, action: 'APPROVE', message: 'Payment has been confirmed by the lab.',
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      count: plan.length, completed, partial,
+      totalApplied: round2(totalCredit),
+      totalTaxWithheld: round2(totalTax),
+      netCashReceived: round2(totalCredit - totalTax),
+    });
+  } catch (err) {
+    console.error('[payments collect-bulk]', err);
+    res.status(500).json({ error: 'Could not record the payments - nothing was changed.' });
   }
 });
 
@@ -992,7 +1193,7 @@ async function getClinicStatement(clinicId, { dateFrom, dateTo } = {}) {
     where,
     include: {
       clinic: { select: { name: true, phone: true, address: true } },
-      payment: { select: { invoiceNumber: true, amount: true, fsNumber: true, amountReceived: true } },
+      payment: { select: { invoiceNumber: true, amount: true, fsNumber: true, amountReceived: true, receipts: { select: { amount: true, taxWithheld: true, reference: true, receivedByName: true, receivedAt: true }, orderBy: { receivedAt: 'asc' } } } },
     },
     orderBy: { createdAt: 'asc' },
   });
