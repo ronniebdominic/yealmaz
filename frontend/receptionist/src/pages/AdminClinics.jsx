@@ -1,6 +1,7 @@
 // Ye-Almaz — Admin Clinic Management
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import AdminLayout from '../components/AdminLayout';
 import ExportMenu from '../components/ExportMenu';
 import api from '../api';
@@ -20,9 +21,9 @@ import {
 // ── Row action menu ───────────────────────────────────────
 // The table used to render five action buttons inline per row, which forced
 // a 1,385px minimum width and pushed the actions off-screen. They now live
-// in a menu. It is position:fixed (measured from the button) rather than
-// absolutely positioned, because the table sits in an overflow container
-// that would clip an absolute popover on the last rows.
+// in a menu, portalled to document.body and positioned from the button's
+// viewport rect so neither the table's overflow nor a glass card's
+// backdrop-filter (which re-anchors position:fixed) can clip or offset it.
 function RowMenu({ items }) {
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
@@ -58,7 +59,7 @@ function RowMenu({ items }) {
       <button ref={btnRef} className="btn btn-ghost btn-sm" onClick={toggle} title="More actions" aria-haspopup="menu" aria-expanded={!!pos} style={{ padding: '4px 6px' }}>
         <MdMoreVert size={17} />
       </button>
-      {pos && (
+      {pos && createPortal(
         <>
           <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
           <div role="menu" style={{
@@ -82,7 +83,12 @@ function RowMenu({ items }) {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        // Rendered on document.body, not inside the table. Position:fixed is
+        // relative to the viewport ONLY when no ancestor has a transform,
+        // filter or backdrop-filter — and this app's glass cards do, which
+        // made the menu open ~200px below its button on rows near the top.
+        document.body
       )}
     </>
   );
