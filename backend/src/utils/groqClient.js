@@ -13,10 +13,10 @@ if (!process.env.GROQ_API_KEY) {
 }
 
 const BASE_URL = process.env.GROQ_BASE_URL || 'https://api.groq.com/openai';
-// openai/gpt-oss-120b: Groq's recommended replacement for the now-retired
-// llama-3.3-70b-versatile — strong tool-use (built for it, unlike a
-// general chat model retrofitted with function calling), 131072 context.
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+// openai/gpt-oss-20b: the only model this Groq project is permitted to use
+// (gpt-oss-120b is rejected). Same gpt-oss family, so tool-use and the
+// 131072 context are unchanged; set GROQ_MODEL to override.
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
 // Low but non-zero — this is a business-data reporting bot, not a
 // creative-writing one, so favor the model picking the same, most-likely
 // tool calls and phrasing for the same question every time over
