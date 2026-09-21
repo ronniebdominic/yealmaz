@@ -9,11 +9,12 @@ import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
 import { todayLocal } from '../utils/date';
-import { printOnboardingSheet } from '../utils/printOnboarding';
+import { renderOnboardingCard, printCardImage, downloadCardImage, whatsAppUrl } from '../utils/onboardingCard';
 import { printCredentialsCard } from '../utils/printCredentialsCard';
 import {
   MdEdit, MdLocalHospital, MdAutoAwesome, MdVpnKey, MdCheckCircle, MdSearch,
-  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge, MdMoreVert,
+  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge,
+  MdSend, MdShare, MdDownload, MdPrint, MdContentCopy, MdMoreVert,
 } from 'react-icons/md';
 
 // ── Row action menu ───────────────────────────────────────
@@ -440,12 +441,97 @@ function CredsCard({ clinic, password, onClose }) {
   );
 }
 
+// ── Onboarding Card (preview + print / download / WhatsApp) ─
+function OnboardingCardModal({ card, onClose }) {
+  const [img, setImg] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    renderOnboardingCard(card).then(d => alive && setImg(d)).catch(() => toast.error('Could not render the card'));
+    return () => { alive = false; };
+  }, [card]);
+
+  const copyLink = () => navigator.clipboard.writeText(card.url).then(() => toast.success('Link copied'));
+
+  const shareImage = async () => {
+    try {
+      const blob = await (await fetch(img)).blob();
+      const file = new File([blob], `yealmaz-onboarding.png`, { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: `Complete your Ye-Almaz clinic setup: ${card.url}` });
+      } else {
+        downloadCardImage(img, card.clinic.name);
+        toast('Image downloaded — attach it in WhatsApp', { icon: '📎' });
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') toast.error('Could not share the image');
+    }
+  };
+
+  const btn = (bg, color, border) => ({
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    background: bg, color, border: `1px solid ${border}`, borderRadius: 8,
+    padding: '9px 12px', fontSize: 13, fontWeight: 700, cursor: img ? 'pointer' : 'not-allowed',
+    opacity: img ? 1 : 0.5,
+  });
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 760 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <MdQrCode2 className="mi" size={16} /> Onboarding Card — {card.clinic.name}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              Print it, or send the image + link on WhatsApp. The link works once and expires in 14 days.
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          <div style={{ flex: '0 0 auto', width: 260, maxWidth: '100%' }}>
+            {img
+              ? <img src={img} alt="Onboarding card" style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border)', display: 'block' }} />
+              : <div style={{ aspectRatio: '1080 / 1527', borderRadius: 12, background: 'var(--surface-2)', display: 'grid', placeItems: 'center', color: 'var(--text-3)', fontSize: 13 }}>Rendering…</div>}
+          </div>
+          <div style={{ flex: 1, minWidth: 220, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button disabled={!img} onClick={() => whatsAppOpen()} style={btn('#16A34A', '#fff', '#16A34A')}>
+              <MdSend size={16} /> Send on WhatsApp{card.clinic.phone ? ` (${card.clinic.phone})` : ''}
+            </button>
+            <button disabled={!img} onClick={shareImage} style={btn('var(--surface-2)', 'var(--text-1)', 'var(--border)')}>
+              <MdShare size={16} /> Share image
+            </button>
+            <button disabled={!img} onClick={() => downloadCardImage(img, card.clinic.name)} style={btn('var(--surface-2)', 'var(--text-1)', 'var(--border)')}>
+              <MdDownload size={16} /> Download image
+            </button>
+            <button disabled={!img} onClick={() => printCardImage(img, card.clinic.name)} style={btn('var(--surface-2)', 'var(--text-1)', 'var(--border)')}>
+              <MdPrint size={16} /> Print (A5)
+            </button>
+            <button onClick={copyLink} style={btn('var(--surface-2)', 'var(--text-1)', 'var(--border)')}>
+              <MdContentCopy size={16} /> Copy link
+            </button>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.5, marginTop: 4 }}>
+              WhatsApp opens a chat with the message and link ready. To include the card, tap the paperclip and attach the downloaded image, or use “Share image” on a phone.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  function whatsAppOpen() {
+    window.open(whatsAppUrl({ phone: card.clinic.phone, clinicName: card.clinic.name, url: card.url, expiresAt: card.expiresAt }), '_blank', 'noopener');
+  }
+}
+
 // ── Main Page ─────────────────────────────────────────────
 export default function AdminClinics() {
   const queryClient = useQueryClient();
   const [showForm,   setShowForm]   = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [newCreds,   setNewCreds]   = useState(null); // { clinic, password }
+  const [onboardCard, setOnboardCard] = useState(null); // { clinic, url, qrCodeUrl, expiresAt }
   const [search,     setSearch]     = useState('');
 
   const { data: clinics = [], isLoading } = useQuery({
@@ -470,7 +556,7 @@ export default function AdminClinics() {
     setGeneratingQr(clinic.id);
     try {
       const { data } = await api.post(`/clinics/${clinic.id}/onboarding-link`);
-      printOnboardingSheet({ clinic: data.clinic, url: data.url, qrCodeUrl: data.qrCodeUrl, expiresAt: data.expiresAt });
+      setOnboardCard({ clinic: { ...data.clinic, phone: clinic.phone }, url: data.url, qrCodeUrl: data.qrCodeUrl, expiresAt: data.expiresAt });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not generate onboarding QR');
     } finally {
@@ -724,6 +810,9 @@ export default function AdminClinics() {
           onClose={() => setEditTarget(null)}
         />
       )}
+
+      {/* Onboarding card preview */}
+      {onboardCard && <OnboardingCardModal card={onboardCard} onClose={() => setOnboardCard(null)} />}
 
       {/* Credentials reveal */}
       {newCreds && (
