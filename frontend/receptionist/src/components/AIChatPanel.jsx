@@ -215,7 +215,10 @@ export default function AIChatPanel() {
         </div>
 
         <div className="card" style={{ padding: 10, flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          {/* Wraps: on a narrow panel the four 40px buttons left the message box ~55px
+              wide ("Ask a…"). Its flex-basis (140px) makes it claim a full row of its
+              own when it can't have that beside them, and the buttons drop below. */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <textarea
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -224,7 +227,7 @@ export default function AIChatPanel() {
               rows={1}
               disabled={sending}
               style={{
-                flex: 1, resize: 'none', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+                flex: '1 1 180px', minWidth: 0, resize: 'none', padding: '10px 12px', borderRadius: 'var(--radius-sm)',
                 minHeight: 40, maxHeight: 120,
                 border: `1px solid ${listening ? 'var(--brand)' : 'var(--border)'}`,
                 boxShadow: listening ? '0 0 0 3px var(--brand-ring)' : 'none',

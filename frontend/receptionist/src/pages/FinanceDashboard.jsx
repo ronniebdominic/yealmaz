@@ -2819,7 +2819,7 @@ export default function FinanceDashboard() {
       {/* ── Main content ────────────────────────────────── */}
       <main className="main">
         {/* Topbar */}
-        <div className="topbar">
+        <div className="topbar topbar--desktop-only">
           <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {(() => { const Icon = MAIN_TABS.find(t => t.id === tab)?.icon; return Icon ? <Icon className="mi" size={17} /> : null; })()}
             {MAIN_TABS.find(t => t.id === tab)?.label}

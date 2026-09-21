@@ -1649,7 +1649,7 @@ export default function Dashboard() {
 
       {/* Main content */}
       <main className="main">
-        <div className="topbar">
+        <div className="topbar topbar--actions-only">
           <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {(() => { const Icon = SECTIONS.find(s => s.id === section)?.icon; return Icon ? <Icon className="mi" size={17} /> : null; })()}
             {SECTIONS.find(s => s.id === section)?.label ?? 'Dashboard'}

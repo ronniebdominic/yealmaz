@@ -677,7 +677,7 @@ export default function AdminClinics() {
                     <th>Phone</th>
                     <th>Partner</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+                    <th className="sticky-actions" style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -743,7 +743,7 @@ export default function AdminClinics() {
                           {format(new Date(c.createdAt), 'dd MMM yyyy')}
                         </div>
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                      <td className="sticky-actions" style={{ padding: '8px 12px', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                           <button className="btn btn-ghost btn-sm" style={{ whiteSpace: 'nowrap' }} onClick={() => setEditTarget(c)}>
                             <MdEdit className="mi" size={14} /> Edit

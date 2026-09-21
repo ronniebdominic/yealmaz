@@ -1040,7 +1040,7 @@ export default function DispatchDashboard() {
 
       <main className="main">
         {/* Topbar */}
-        <div className="topbar">
+        <div className="topbar topbar--desktop-only">
           <button className="hamburger-topbar" style={{ display: 'none' }} onClick={() => setOpen(true)}>☰</button>
           <div className="topbar-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {(() => { const Icon = TABS.find(t => t.id === tab)?.icon; return Icon ? <Icon className="mi" size={18} /> : null; })()}
