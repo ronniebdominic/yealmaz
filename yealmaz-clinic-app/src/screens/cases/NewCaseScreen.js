@@ -9,6 +9,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../../api/client';
 import { Colors, Spacing, Radius, Shadow, FontFamily } from '../../utils/theme';
 import GlassCard from '../../components/GlassCard';
+import { useLanguage } from '../../context/LanguageContext';
 
 const SHADE_GROUPS = [
   { group: 'Vita A',  shades: ['A1', 'A2', 'A3', 'A3.5', 'A4'] },
@@ -131,6 +132,7 @@ function Odontogram({ selected, onToggle }) {
 // moment "Redo / Replacement" is checked, so searching happens right away
 // instead of the clinic having to notice a field further down the form.
 function OriginalCasePickerModal({ visible, onClose, onSelect }) {
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -156,17 +158,17 @@ function OriginalCasePickerModal({ visible, onClose, onSelect }) {
       <View style={styles.modalBackdrop}>
         <SafeAreaView style={styles.modalSheet}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Search Original Case</Text>
+            <Text style={styles.modalTitle}>{t('newCase.searchOriginalCaseModalTitle')}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <MaterialCommunityIcons name="close" size={22} color={Colors.text2} />
             </TouchableOpacity>
           </View>
           <Text style={styles.modalHint}>
-            Find the case this redo/replacement is for — by patient name or scan number.
+            {t('newCase.searchOriginalCaseHint')}
           </Text>
           <TextInput
             style={[styles.input, { marginTop: Spacing.md }]}
-            placeholder="Search patient name or scan number…"
+            placeholder={t('newCase.searchOriginalCasePlaceholder')}
             placeholderTextColor={Colors.textMuted}
             value={query}
             onChangeText={setQuery}
@@ -178,14 +180,14 @@ function OriginalCasePickerModal({ visible, onClose, onSelect }) {
                 <ActivityIndicator size="small" color={Colors.primary} />
               </View>
             ) : !query.trim() ? (
-              <Text style={styles.modalEmptyText}>Start typing to search this clinic's past cases.</Text>
+              <Text style={styles.modalEmptyText}>{t('newCase.startTypingToSearch')}</Text>
             ) : results.length === 0 ? (
-              <Text style={styles.modalEmptyText}>No matching cases found.</Text>
+              <Text style={styles.modalEmptyText}>{t('newCase.noMatchingCases')}</Text>
             ) : results.map(rc => (
               <TouchableOpacity key={rc.id} style={styles.modalResultRow} onPress={() => onSelect(rc)}>
                 <MaterialCommunityIcons name="clipboard-text-outline" size={18} color={Colors.primary} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.dropdownText}>{rc.caseNumber || 'No scan #'} · {rc.patientName}</Text>
+                  <Text style={styles.dropdownText}>{rc.caseNumber || t('newCase.noScanNumber')} · {rc.patientName}</Text>
                   <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 1 }}>
                     {rc.workType || ''}{rc.units ? ` · ${rc.units}u` : ''}{rc.shade ? ` · Shade ${rc.shade}` : ''}
                   </Text>
@@ -202,6 +204,7 @@ function OriginalCasePickerModal({ visible, onClose, onSelect }) {
 // Read-only summary of the linked case once one's been picked — tap to
 // reopen the popup and pick a different one.
 function SelectedOriginalCase({ selected, onPress, onClear }) {
+  const { t } = useLanguage();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -215,7 +218,7 @@ function SelectedOriginalCase({ selected, onPress, onClear }) {
       <MaterialCommunityIcons name="clipboard-text-outline" size={16} color={Colors.text2} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.text1 }} numberOfLines={1}>
-          {selected.caseNumber || 'No scan #'}
+          {selected.caseNumber || t('newCase.noScanNumber')}
         </Text>
         <Text style={{ fontSize: 11, color: Colors.text3 }} numberOfLines={1}>
           {selected.patientName}{selected.workType ? ` · ${selected.workType}` : ''}
@@ -249,6 +252,7 @@ function WorkItemCard({
   item, index, onChange, onRemove, canRemove,
   priceMap, durationMap, expressDurationMap, deliveryType, onFillFromOriginal,
 }) {
+  const { t } = useLanguage();
   const [showWorkTypes, setShowWorkTypes] = useState(false);
   const [showShades, setShowShades] = useState(false);
   const [customShade, setCustomShade] = useState(false);
@@ -316,16 +320,16 @@ function WorkItemCard({
   return (
     <GlassCard strong style={styles.itemCard}>
       <View style={styles.itemCardHeader}>
-        <Text style={styles.itemCardTitle}>ITEM {index + 1}</Text>
+        <Text style={styles.itemCardTitle}>{t('newCase.item', { n: index + 1 })}</Text>
         {canRemove && (
           <TouchableOpacity onPress={onRemove}>
-            <Text style={styles.itemRemove}>Remove</Text>
+            <Text style={styles.itemRemove}>{t('newCase.remove')}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* Tooth Selection */}
-      <Text style={styles.subHint}>Tap teeth to mark affected tooth/teeth (FDI numbering)</Text>
+      <Text style={styles.subHint}>{t('newCase.toothHint')}</Text>
       <View style={{ marginTop: 10 }}>
         <Odontogram selected={item.selectedTeeth} onToggle={toggleTooth} />
       </View>
@@ -334,25 +338,25 @@ function WorkItemCard({
         {item.selectedTeeth.length > 0 ? (
           <>
             <Text style={styles.teethSelected}>
-              Selected: <Text style={{ color: Colors.primary, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
+              {t('newCase.selected', { teeth: '' })}<Text style={{ color: Colors.primary, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
             </Text>
             <TouchableOpacity onPress={() => onChange({ selectedTeeth: [] })}>
-              <Text style={styles.clearBtn}>Clear all</Text>
+              <Text style={styles.clearBtn}>{t('common.clearAll')}</Text>
             </TouchableOpacity>
           </>
         ) : (
-          <Text style={styles.teethNone}>No teeth selected</Text>
+          <Text style={styles.teethNone}>{t('newCase.noTeethSelected')}</Text>
         )}
       </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>
-          Units{item.selectedTeeth.length > 0 ? ' (auto)' : ''}
+          {item.selectedTeeth.length > 0 ? t('newCase.unitsAuto') : t('newCase.units')}
         </Text>
         <TextInput
           style={[styles.input, item.selectedTeeth.length > 0 && { opacity: 0.6 }]}
           keyboardType="numeric"
-          placeholder="Enter number of units"
+          placeholder={t('newCase.unitsPlaceholder')}
           placeholderTextColor={Colors.textMuted}
           value={item.selectedTeeth.length > 0 ? String(item.selectedTeeth.length) : item.manualUnits}
           onChangeText={v => { if (item.selectedTeeth.length === 0) onChange({ manualUnits: v }); }}
@@ -362,13 +366,13 @@ function WorkItemCard({
 
       {/* Work Details */}
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Work Type *</Text>
+        <Text style={styles.label}>{t('newCase.workType')}</Text>
         <TouchableOpacity
           style={[styles.input, styles.selectInput]}
           onPress={() => setShowWorkTypes(!showWorkTypes)}
         >
           <Text style={item.workType ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
-            {item.workType || 'Select work type…'}
+            {item.workType || t('newCase.selectWorkType')}
           </Text>
           <MaterialCommunityIcons name={showWorkTypes ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.text3} />
         </TouchableOpacity>
@@ -376,7 +380,7 @@ function WorkItemCard({
           <View style={styles.dropdown}>
             {Object.keys(priceMap).length === 0 ? (
               <Text style={{ padding: Spacing.md, fontSize: 13, color: Colors.text3, fontStyle: 'italic' }}>
-                No work types available yet — please contact the lab.
+                {t('newCase.noWorkTypes')}
               </Text>
             ) : (
               <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
@@ -399,21 +403,21 @@ function WorkItemCard({
 
         {selectedPrice && (
           <View style={styles.priceBox}>
-            <Text style={styles.priceBoxLabel}>Estimated Amount</Text>
+            <Text style={styles.priceBoxLabel}>{t('newCase.estimatedAmount')}</Text>
             <Text style={styles.priceBoxValue}>
               Br {selectedPrice.total.toLocaleString('en-US')}
               {!selectedPrice.isFlat && selectedPrice.count > 1 && (
                 <Text style={styles.priceBoxSub}>  ·  Br {selectedPrice.unit.toLocaleString('en-US')} × {selectedPrice.count}</Text>
               )}
-              {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ express</Text>}
+              {selectedPrice.isExpress && <Text style={styles.priceBoxSub}>  ·  ⚡ {t('newCase.express')}</Text>}
             </Text>
           </View>
         )}
         {item.remake && (
           <View style={[styles.priceBox, { backgroundColor: Colors.amberDim, borderColor: Colors.amber + '40' }]}>
-            <Text style={[styles.priceBoxLabel, { color: Colors.amber }]}>Pending Review</Text>
+            <Text style={[styles.priceBoxLabel, { color: Colors.amber }]}>{t('newCase.pendingReview')}</Text>
             <Text style={{ fontSize: 12.5, color: Colors.text2, marginTop: 2 }}>
-              Priced after the lab reviews the linked case — free remake or 50% of its amount.
+              {t('newCase.pendingReviewSub')}
             </Text>
           </View>
         )}
@@ -421,13 +425,13 @@ function WorkItemCard({
 
       {!/aligner/i.test(item.workType || '') && (
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Shade *</Text>
+          <Text style={styles.label}>{t('newCase.shade')}</Text>
           <TouchableOpacity
             style={[styles.input, styles.selectInput]}
             onPress={() => { setShowShades(prev => !prev); setCustomShade(false); }}
           >
             <Text style={item.shade ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
-              {item.shade || 'Select shade…'}
+              {item.shade || t('newCase.selectShade')}
             </Text>
             <MaterialCommunityIcons name={showShades ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.text3} />
           </TouchableOpacity>
@@ -454,7 +458,7 @@ function WorkItemCard({
                   style={[styles.dropdownItem, { marginTop: 4 }]}
                   onPress={() => { setShowShades(false); setCustomShade(true); if (ALL_SHADES.includes(item.shade)) onChange({ shade: '' }); }}
                 >
-                  <Text style={[styles.dropdownText, { color: Colors.primary }]}>✏️  Custom shade…</Text>
+                  <Text style={[styles.dropdownText, { color: Colors.primary }]}>✏️  {t('newCase.customShade')}</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -462,7 +466,7 @@ function WorkItemCard({
           {customShade && (
             <TextInput
               style={[styles.input, { marginTop: 6 }]}
-              placeholder="Type shade (e.g. OM3, 3M2)…"
+              placeholder={t('newCase.customShadePlaceholder')}
               placeholderTextColor={Colors.text3}
               value={item.shade}
               onChangeText={v => onChange({ shade: v })}
@@ -473,7 +477,7 @@ function WorkItemCard({
       )}
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Redo / Replacement</Text>
+        <Text style={styles.label}>{t('newCase.redoReplacement')}</Text>
         <TouchableOpacity
           onPress={() => {
             const turningOn = !item.remake;
@@ -495,17 +499,17 @@ function WorkItemCard({
           <Text style={{ fontSize: 18 }}>{item.remake ? '☑' : '☐'}</Text>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 13, fontWeight: '700', color: item.remake ? Colors.amber : Colors.text1 }}>
-              This is a redo / replacement
+              {t('newCase.redoCheckboxLabel')}
             </Text>
             <Text style={{ fontSize: 11, color: Colors.text3 }}>
-              Remaking or replacing a previous case — the lab decides free vs. 50% charge after review
+              {t('newCase.redoCheckboxSub')}
             </Text>
           </View>
         </TouchableOpacity>
 
         {item.remake && (
           <>
-            <Text style={[styles.label, { marginTop: Spacing.md }]}>Original Case *</Text>
+            <Text style={[styles.label, { marginTop: Spacing.md }]}>{t('newCase.originalCase')}</Text>
             {item.originalCase ? (
               <SelectedOriginalCase
                 selected={item.originalCase}
@@ -520,7 +524,7 @@ function WorkItemCard({
               >
                 <MaterialCommunityIcons name="magnify" size={18} color={Colors.primary} />
                 <Text style={{ fontSize: 13.5, color: Colors.primary, fontWeight: '700' }}>
-                  Search for the original case…
+                  {t('newCase.searchOriginalCase')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -529,10 +533,10 @@ function WorkItemCard({
               onClose={() => setOriginalCasePickerOpen(false)}
               onSelect={selectOriginalCase}
             />
-            <Text style={[styles.label, { marginTop: Spacing.md }]}>Reason (optional)</Text>
+            <Text style={[styles.label, { marginTop: Spacing.md }]}>{t('newCase.reasonOptional')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Fractured on delivery, wrong shade…"
+              placeholder={t('newCase.reasonPlaceholder')}
               placeholderTextColor={Colors.textMuted}
               value={item.remakeReason}
               onChangeText={v => onChange({ remakeReason: v })}
@@ -542,7 +546,7 @@ function WorkItemCard({
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Due Date</Text>
+        <Text style={styles.label}>{t('newCase.dueDate')}</Text>
         {autoCalcDays ? (
           <View style={{
             backgroundColor: Colors.primary + '10',
@@ -553,12 +557,12 @@ function WorkItemCard({
               📅 {formatDueDate(item.dueDate)}
             </Text>
             <Text style={{ fontSize: 11, color: Colors.text3, marginTop: 2 }}>
-              Auto-calculated · {autoCalcDays} day{autoCalcDays !== 1 ? 's' : ''} for {item.workType}
+              {t('newCase.autoCalculated', { days: autoCalcDays, plural: autoCalcDays !== 1 ? 's' : '', workType: item.workType })}
             </Text>
           </View>
         ) : (
           <Text style={{ fontSize: 12, color: Colors.text3, fontStyle: 'italic' }}>
-            Select a work type to auto-calculate the due date
+            {t('newCase.selectWorkTypeForDueDate')}
           </Text>
         )}
       </View>
@@ -568,6 +572,7 @@ function WorkItemCard({
 
 // ── Screen ────────────────────────────────────────────────
 export default function NewCaseScreen({ navigation }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     patientName: '', patientAge: '', doctorName: '', doctorPhone: '',
     patientGender: '', notes: '',
@@ -617,22 +622,23 @@ export default function NewCaseScreen({ navigation }) {
   const removeItem = (index) => setItems(prev => prev.filter((_, i) => i !== index));
 
   const validate = () => {
-    if (!form.patientName.trim()) { Alert.alert('Required', 'Please enter the patient name.'); return false; }
-    if (items.some(it => !it.workType)) { Alert.alert('Required', 'Please select a work type for every item.'); return false; }
+    const required = t('common.required');
+    if (!form.patientName.trim()) { Alert.alert(required, t('newCase.requiredPatientName')); return false; }
+    if (items.some(it => !it.workType)) { Alert.alert(required, t('newCase.requiredWorkType')); return false; }
     if (form.intakeMethod === 'EMAIL_3D_FILE' && !form.archUpper && !form.archLower) {
-      Alert.alert('Required', 'Select at least one arch (Upper/Lower) that was scanned.');
+      Alert.alert(required, t('newCase.requiredArch'));
       return false;
     }
     // Doctor name/contact/shade are mandatory for new orders.
-    if (!form.doctorName.trim())  { Alert.alert('Required', "Please enter the doctor's name."); return false; }
-    if (!form.doctorPhone.trim()) { Alert.alert('Required', "Please enter the doctor's contact number."); return false; }
+    if (!form.doctorName.trim())  { Alert.alert(required, t('newCase.requiredDoctorName')); return false; }
+    if (!form.doctorPhone.trim()) { Alert.alert(required, t('newCase.requiredDoctorPhone')); return false; }
     for (const it of items) {
       if (!/aligner/i.test(it.workType) && !it.shade.trim()) {
-        Alert.alert('Required', 'Please select a shade for every non-aligner item.');
+        Alert.alert(required, t('newCase.requiredShade'));
         return false;
       }
       if (it.remake && !it.originalCase) {
-        Alert.alert('Required', 'Search for and select the original case being redone/replaced.');
+        Alert.alert(required, t('newCase.requiredOriginalCase'));
         return false;
       }
     }
@@ -696,15 +702,15 @@ export default function NewCaseScreen({ navigation }) {
 
       Toast.show({
         type: 'success',
-        text1: items.length > 1 ? `${items.length} Cases Submitted!` : 'Case Submitted!',
+        text1: items.length > 1 ? t('newCase.submittedTitlePlural', { count: items.length }) : t('newCase.submittedTitle'),
         text2: dropOffAtLab
-          ? 'No pickup needed — the lab will review and confirm receipt shortly.'
-          : 'Dispatch will assign a driver to collect the impression.',
+          ? t('newCase.submittedNoPickup')
+          : t('newCase.submittedPickup'),
         visibilityTime: 4000,
       });
       navigation.navigate('Main', { screen: 'Cases' });
     } catch (err) {
-      Alert.alert('Submission Failed', err.response?.data?.error || 'Please try again.');
+      Alert.alert(t('newCase.submissionFailed'), err.response?.data?.error || t('common.genericError'));
     } finally {
       setSubmitting(false);
     }
@@ -719,9 +725,9 @@ export default function NewCaseScreen({ navigation }) {
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>{t('newCase.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Case</Text>
+        <Text style={styles.headerTitle}>{t('newCase.headerTitle')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -732,13 +738,13 @@ export default function NewCaseScreen({ navigation }) {
       >
         {/* ── Patient Information ── */}
         <GlassCard strong style={styles.section}>
-          <Text style={styles.sectionTitle}>PATIENT INFORMATION</Text>
+          <Text style={styles.sectionTitle}>{t('newCase.patientInfo')}</Text>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Patient Name *</Text>
+            <Text style={styles.label}>{t('newCase.patientName')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Ahmed Al-Rashid"
+              placeholder={t('newCase.patientNamePlaceholder')}
               placeholderTextColor={Colors.text3}
               value={form.patientName}
               onChangeText={set('patientName')}
@@ -746,10 +752,10 @@ export default function NewCaseScreen({ navigation }) {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Doctor Name *</Text>
+            <Text style={styles.label}>{t('newCase.doctorName')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Dr. Sarah Ahmed"
+              placeholder={t('newCase.doctorNamePlaceholder')}
               placeholderTextColor={Colors.text3}
               value={form.doctorName}
               onChangeText={set('doctorName')}
@@ -758,7 +764,7 @@ export default function NewCaseScreen({ navigation }) {
 
           <View style={styles.row}>
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Doctor Phone *</Text>
+              <Text style={styles.label}>{t('newCase.doctorPhone')}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="+251 911 000 000"
@@ -770,14 +776,17 @@ export default function NewCaseScreen({ navigation }) {
             </View>
             <View style={{ width: 12 }} />
             <View style={[styles.formGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Patient Gender</Text>
+              <Text style={styles.label}>{t('newCase.patientGender')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                {['Male', 'Female'].map(g => {
-                  const active = form.patientGender === g;
+                {[
+                  { value: 'Male', label: t('newCase.genderMale') },
+                  { value: 'Female', label: t('newCase.genderFemale') },
+                ].map(g => {
+                  const active = form.patientGender === g.value;
                   return (
                     <TouchableOpacity
-                      key={g}
-                      onPress={() => set('patientGender')(g)}
+                      key={g.value}
+                      onPress={() => set('patientGender')(g.value)}
                       activeOpacity={0.8}
                       style={{
                         flex: 1, height: 48, alignItems: 'center', justifyContent: 'center',
@@ -787,7 +796,7 @@ export default function NewCaseScreen({ navigation }) {
                       }}
                     >
                       <Text style={{ fontSize: 13, fontWeight: '700', color: active ? Colors.primary : Colors.text2 }}>
-                        {g}
+                        {g.label}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -797,10 +806,10 @@ export default function NewCaseScreen({ navigation }) {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Age</Text>
+            <Text style={styles.label}>{t('newCase.age')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. 34"
+              placeholder={t('newCase.agePlaceholder')}
               placeholderTextColor={Colors.text3}
               value={form.patientAge}
               onChangeText={set('patientAge')}
@@ -811,7 +820,7 @@ export default function NewCaseScreen({ navigation }) {
 
         {/* ── Work Items — one per work type; add more for a multi-item
             order (e.g. 2 Zirconia + a PFM crown) for the same visit ── */}
-        <Text style={styles.itemsHeading}>WORK ORDER{items.length > 1 ? `S (${items.length})` : ''}</Text>
+        <Text style={styles.itemsHeading}>{items.length > 1 ? t('newCase.workOrders', { count: items.length }) : t('newCase.workOrder')}</Text>
         {items.map((item, i) => (
           <WorkItemCard
             key={item.key}
@@ -835,18 +844,18 @@ export default function NewCaseScreen({ navigation }) {
           />
         ))}
         <TouchableOpacity style={styles.addItemBtn} onPress={addItem} activeOpacity={0.8}>
-          <Text style={styles.addItemBtnText}>＋ Add another work item</Text>
+          <Text style={styles.addItemBtnText}>{t('newCase.addItem')}</Text>
         </TouchableOpacity>
 
         {/* ── Intake Method ── */}
         <GlassCard strong style={styles.section}>
-          <Text style={styles.sectionTitle}>INTAKE METHOD</Text>
+          <Text style={styles.sectionTitle}>{t('newCase.intakeMethod')}</Text>
 
           <View style={{ gap: 10 }}>
             {[
-              { value: 'PICKUP',        label: 'To Be Picked Up',   icon: 'moped',                  desc: 'A delivery exec will collect the impression from you' },
-              { value: 'DROP_OFF',      label: 'Dropped at Lab',    icon: 'package-variant-closed',  desc: 'You’re bringing the impression to the lab yourself' },
-              { value: 'EMAIL_3D_FILE', label: '3D File (Digital Scan)', icon: 'laptop',              desc: 'You’re sending an intraoral scan file instead of a physical impression' },
+              { value: 'PICKUP',        label: t('newCase.intakePickupLabel'),   icon: 'moped',                  desc: t('newCase.intakePickupDesc') },
+              { value: 'DROP_OFF',      label: t('newCase.intakeDropOffLabel'),    icon: 'package-variant-closed',  desc: t('newCase.intakeDropOffDesc') },
+              { value: 'EMAIL_3D_FILE', label: t('newCase.intakeEmailLabel'), icon: 'laptop',              desc: t('newCase.intakeEmailDesc') },
             ].map(opt => {
               const active = form.intakeMethod === opt.value;
               return (
@@ -876,12 +885,12 @@ export default function NewCaseScreen({ navigation }) {
           {form.intakeMethod === 'EMAIL_3D_FILE' && (
             <View style={{ marginTop: 12, padding: 12, borderRadius: Radius.md, backgroundColor: Colors.primary + '10', borderWidth: 1.5, borderColor: Colors.primary + '40' }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.primary, marginBottom: 8 }}>
-                Arch(es) Scanned — Br {ARCH_FEE.toLocaleString('en-US')} per arch
+                {t('newCase.archesScanned', { fee: ARCH_FEE.toLocaleString('en-US') })}
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {[
-                  { field: 'archUpper', label: 'Upper Arch', checked: form.archUpper },
-                  { field: 'archLower', label: 'Lower Arch', checked: form.archLower },
+                  { field: 'archUpper', label: t('newCase.archUpper'), checked: form.archUpper },
+                  { field: 'archLower', label: t('newCase.archLower'), checked: form.archLower },
                 ].map(opt => (
                   <TouchableOpacity
                     key={opt.field}
@@ -901,7 +910,7 @@ export default function NewCaseScreen({ navigation }) {
               </View>
               {archFee > 0 && (
                 <Text style={{ fontSize: 12, color: Colors.primary, marginTop: 8, fontWeight: '600' }}>
-                  Scan fee: Br {archFee.toLocaleString('en-US')} — added on top of the {items.length > 1 ? 'first item’s' : 'work-type'} price.
+                  {t('newCase.scanFeeNote', { fee: archFee.toLocaleString('en-US'), which: items.length > 1 ? t('newCase.scanFeeWhichFirst') : t('newCase.scanFeeWhichSingle') })}
                 </Text>
               )}
             </View>
@@ -910,14 +919,14 @@ export default function NewCaseScreen({ navigation }) {
 
         {/* ── Delivery ── */}
         <GlassCard strong style={styles.section}>
-          <Text style={styles.sectionTitle}>DELIVERY</Text>
+          <Text style={styles.sectionTitle}>{t('newCase.delivery')}</Text>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Delivery Type</Text>
+            <Text style={styles.label}>{t('newCase.deliveryType')}</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {[
-                { value: 'NORMAL',  label: 'Normal Delivery',  icon: 'truck-delivery-outline', desc: 'Standard turnaround' },
-                { value: 'EXPRESS', label: 'Express Delivery', icon: 'lightning-bolt-outline',  desc: 'Priority / urgent' },
+                { value: 'NORMAL',  label: t('newCase.deliveryNormalLabel'),  icon: 'truck-delivery-outline', desc: t('newCase.deliveryNormalDesc') },
+                { value: 'EXPRESS', label: t('newCase.deliveryExpressLabel'), icon: 'lightning-bolt-outline',  desc: t('newCase.deliveryExpressDesc') },
               ].map(opt => {
                 const active = form.deliveryType === opt.value;
                 const activeColor = opt.value === 'EXPRESS' ? Colors.amber : Colors.primary;
@@ -948,10 +957,10 @@ export default function NewCaseScreen({ navigation }) {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Notes / Special Instructions</Text>
+            <Text style={styles.label}>{t('newCase.notesLabel')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Any special instructions for the lab…"
+              placeholder={t('newCase.notesPlaceholder')}
               placeholderTextColor={Colors.text3}
               value={form.notes}
               onChangeText={set('notes')}
@@ -972,11 +981,11 @@ export default function NewCaseScreen({ navigation }) {
           >
             {submitting
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.submitText}>{items.length > 1 ? `Submit ${items.length} Cases` : 'Submit Case'}</Text>
+              : <Text style={styles.submitText}>{items.length > 1 ? t('newCase.submitCases', { count: items.length }) : t('newCase.submitCase')}</Text>
             }
           </TouchableOpacity>
           <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={styles.cancelText}>{t('newCase.cancel')}</Text>
           </TouchableOpacity>
         </View>
 

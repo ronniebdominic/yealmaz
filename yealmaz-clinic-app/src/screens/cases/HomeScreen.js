@@ -10,6 +10,7 @@ import { Colors, Spacing, Radius, FontFamily } from '../../utils/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import GlassCard from '../../components/GlassCard';
 import CaseListCard from '../../components/CaseListCard';
+import { useLanguage } from '../../context/LanguageContext';
 
 function StatCard({ value, label, color, icon, onPress }) {
   return (
@@ -27,6 +28,7 @@ function StatCard({ value, label, color, icon, onPress }) {
 
 export default function HomeScreen({ navigation }) {
   const { clinic } = useAuth();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
 
   const { data, isLoading, isRefetching, error, refetch } = useQuery({
@@ -54,9 +56,9 @@ export default function HomeScreen({ navigation }) {
 
   const greeting = () => {
     const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (h < 12) return t('home.goodMorning');
+    if (h < 17) return t('home.goodAfternoon');
+    return t('home.goodEvening');
   };
 
   return (
@@ -93,45 +95,45 @@ export default function HomeScreen({ navigation }) {
         {error ? (
           <View style={styles.errorBanner}>
             <MaterialCommunityIcons name="wifi-off" size={15} color="#ef9a9a" />
-            <Text style={styles.errorBannerText}>Cannot reach server — check your network.</Text>
+            <Text style={styles.errorBannerText}>{t('common.networkError')}</Text>
           </View>
         ) : null}
 
         {/* ── Stats ── */}
         <View style={styles.statsRow}>
-          <StatCard value={active.length} label="Active" color={Colors.primary} icon="progress-clock"
+          <StatCard value={active.length} label={t('home.statActive')} color={Colors.primary} icon="progress-clock"
             onPress={() => navigation.navigate('Cases', { filter: 'active' })} />
-          <StatCard value={pending.length} label="Pending Pay" color={Colors.amber} icon="credit-card-clock-outline"
+          <StatCard value={pending.length} label={t('home.statPendingPay')} color={Colors.amber} icon="credit-card-clock-outline"
             onPress={() => navigation.navigate('Cases', { filter: 'payment' })} />
-          <StatCard value={delivered.length} label="Delivered" color={Colors.green} icon="check-circle-outline"
+          <StatCard value={delivered.length} label={t('home.statDelivered')} color={Colors.green} icon="check-circle-outline"
             onPress={() => navigation.navigate('Cases', { filter: 'delivered' })} />
         </View>
 
         {/* ── Quick Actions ── */}
-        <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
+        <Text style={styles.sectionTitle}>{t('home.quickActions')}</Text>
         <View style={styles.actionsRow}>
           <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.primary }]}
             onPress={() => navigation.navigate('NewCase')} activeOpacity={0.85}>
             <MaterialCommunityIcons name="plus-circle-outline" size={22} color="#fff" />
-            <Text style={styles.actionLabel}>New Case</Text>
+            <Text style={styles.actionLabel}>{t('home.actionNewCase')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.accent }]}
             onPress={() => navigation.navigate('Cases')} activeOpacity={0.85}>
             <MaterialCommunityIcons name="clipboard-text-outline" size={22} color="#fff" />
-            <Text style={styles.actionLabel}>My Cases</Text>
+            <Text style={styles.actionLabel}>{t('home.actionMyCases')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.ink }]}
             onPress={() => navigation.navigate('Cases', { filter: 'payment' })} activeOpacity={0.85}>
             <MaterialCommunityIcons name="cash-multiple" size={22} color="#fff" />
-            <Text style={styles.actionLabel}>Payments</Text>
+            <Text style={styles.actionLabel}>{t('home.actionPayments')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── Recent Cases ── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>RECENT CASES</Text>
+          <Text style={styles.sectionTitle}>{t('home.recentCases')}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Cases')} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Text style={styles.seeAll}>See all</Text>
+            <Text style={styles.seeAll}>{t('home.seeAll')}</Text>
             <MaterialCommunityIcons name="chevron-right" size={16} color={Colors.primary} />
           </TouchableOpacity>
         </View>
@@ -141,11 +143,11 @@ export default function HomeScreen({ navigation }) {
         ) : recent.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="tooth-outline" size={48} color={Colors.primary} style={{ marginBottom: 12 }} />
-            <Text style={styles.emptyTitle}>No cases yet</Text>
-            <Text style={styles.emptySub}>Submit your first case to get started</Text>
+            <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+            <Text style={styles.emptySub}>{t('home.emptySub')}</Text>
             <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('NewCase')}>
               <MaterialCommunityIcons name="plus" size={16} color="#fff" />
-              <Text style={styles.emptyBtnText}>Submit New Case</Text>
+              <Text style={styles.emptyBtnText}>{t('home.emptyBtn')}</Text>
             </TouchableOpacity>
           </View>
         ) : (

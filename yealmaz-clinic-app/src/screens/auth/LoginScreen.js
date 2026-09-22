@@ -10,9 +10,12 @@ import { useAuth } from '../../context/AuthContext';
 import { version } from '../../../package.json';
 import { Colors, Spacing, Radius, FontFamily } from '../../utils/theme';
 import GlassCard from '../../components/GlassCard';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,7 +24,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setError('Please enter your email and password.');
+      setError(t('login.errorRequired'));
       return;
     }
     setLoading(true);
@@ -47,17 +50,18 @@ export default function LoginScreen() {
             style={styles.logoImage}
             resizeMode="cover"
           />
-          <Text style={styles.labName}>Ye-Almaz</Text>
-          <Text style={styles.labSub}>Dental Laboratory</Text>
+          <Text style={styles.labName}>{t('login.labName')}</Text>
+          <Text style={styles.labSub}>{t('login.labSub')}</Text>
           <View style={styles.tagline}>
-            <Text style={styles.taglineText}>Clinic Portal</Text>
+            <Text style={styles.taglineText}>{t('login.tagline')}</Text>
           </View>
+          <LanguageSwitcher variant="ghost" style={{ marginTop: 16 }} />
         </View>
 
         {/* ── Card ── */}
         <GlassCard strong radius={24} style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome back</Text>
-          <Text style={styles.cardSub}>Sign in to your clinic account</Text>
+          <Text style={styles.cardTitle}>{t('login.welcomeTitle')}</Text>
+          <Text style={styles.cardSub}>{t('login.welcomeSub')}</Text>
 
           {error ? (
             <View style={styles.errorBox}>
@@ -67,12 +71,12 @@ export default function LoginScreen() {
           ) : null}
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>EMAIL ADDRESS</Text>
+            <Text style={styles.label}>{t('login.emailLabel')}</Text>
             <View style={styles.inputWrap}>
               <MaterialCommunityIcons name="email-outline" size={18} color={Colors.text3} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="clinic@example.com"
+                placeholder={t('login.emailPlaceholder')}
                 placeholderTextColor={Colors.text3}
                 value={email}
                 onChangeText={setEmail}
@@ -84,7 +88,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>PASSWORD</Text>
+            <Text style={styles.label}>{t('login.passwordLabel')}</Text>
             <View style={styles.inputWrap}>
               <MaterialCommunityIcons name="lock-outline" size={18} color={Colors.text3} style={styles.inputIcon} />
               <TextInput
@@ -112,18 +116,18 @@ export default function LoginScreen() {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
-                <Text style={styles.loginBtnText}>Sign In</Text>
+                <Text style={styles.loginBtnText}>{t('login.signIn')}</Text>
                 <MaterialCommunityIcons name="arrow-right" size={18} color="#fff" />
               </>
             )}
           </TouchableOpacity>
 
           <Text style={styles.footerText}>
-            Don't have an account? Contact Ye-Almaz lab to get set up.
+            {t('login.footerText')}
           </Text>
         </GlassCard>
 
-        <Text style={styles.version}>Ye-Almaz Clinic App v{version}</Text>
+        <Text style={styles.version}>{t('login.version', { version })}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
     </LinearGradient>

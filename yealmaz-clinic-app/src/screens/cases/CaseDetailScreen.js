@@ -15,6 +15,7 @@ import { Colors, Spacing, Radius, FontFamily, STAGES, PAYMENT_STATUS } from '../
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import GlassCard from '../../components/GlassCard';
+import { useLanguage } from '../../context/LanguageContext';
 
 const STAGE_ORDER = [
   'CASE_ACCEPTED',
@@ -136,6 +137,7 @@ function InfoRow({ label, value, valueColor }) {
 
 export default function CaseDetailScreen({ navigation, route }) {
   const { caseId } = route.params;
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -155,7 +157,7 @@ export default function CaseDetailScreen({ navigation, route }) {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow access to your photos to upload payment screenshot.');
+      Alert.alert(t('caseDetail.permissionNeededTitle'), t('caseDetail.permissionPhotos'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -171,7 +173,7 @@ export default function CaseDetailScreen({ navigation, route }) {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow camera access to take a photo.');
+      Alert.alert(t('caseDetail.permissionNeededTitle'), t('caseDetail.permissionCamera'));
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -188,7 +190,7 @@ export default function CaseDetailScreen({ navigation, route }) {
     setUploading(true);
     try {
       const token = await AsyncStorage.getItem('ya_clinic_token');
-      if (!token) throw new Error('Not logged in. Please log out and log back in.');
+      if (!token) throw new Error(t('caseDetail.notLoggedIn'));
 
       const formData = new FormData();
 
@@ -233,13 +235,13 @@ export default function CaseDetailScreen({ navigation, route }) {
         throw new Error(data.error || `Server error ${res.status}`);
       }
 
-      Alert.alert('✅ Uploaded!', 'Your payment screenshot has been submitted for verification.');
+      Alert.alert(t('caseDetail.uploadedTitle'), t('caseDetail.uploadedMsg'));
       setScreenshot(null);
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
     } catch (err) {
       console.error('[Upload] failed:', err);
-      Alert.alert('Upload Failed', err.message || 'Please try again.');
+      Alert.alert(t('caseDetail.uploadFailedTitle'), err.message || t('common.genericError'));
     } finally {
       setUploading(false);
     }
@@ -272,7 +274,7 @@ export default function CaseDetailScreen({ navigation, route }) {
       // already-used checkout — the common cause of Chapa's "CSRF token mismatch" page.
       const res = await api.post(`/payments/${caseId}/chapa/initialize`);
       const checkoutUrl = res.data?.checkoutUrl;
-      if (!checkoutUrl) throw new Error('Could not start online payment.');
+      if (!checkoutUrl) throw new Error(t('caseDetail.couldNotStartPayment'));
 
       if (Platform.OS === 'web') {
         // Open in a new tab; the user returns to this tab manually afterwards
@@ -282,7 +284,7 @@ export default function CaseDetailScreen({ navigation, route }) {
       }
     } catch (err) {
       console.error('[Chapa] payment failed:', err);
-      Alert.alert('Payment Failed', err.response?.data?.error || err.message || 'Please try again.');
+      Alert.alert(t('caseDetail.paymentFailedTitle'), err.response?.data?.error || err.message || t('common.genericError'));
       return;
     } finally {
       // Stop the spinner as soon as the checkout is open/closed — don't make the user
@@ -293,7 +295,7 @@ export default function CaseDetailScreen({ navigation, route }) {
     // Reconcile in the background and surface the result when it lands.
     confirmChapaPayment().then((verified) => {
       if (verified) {
-        Alert.alert('✅ Payment Successful', 'Your payment has been received. Thank you!');
+        Alert.alert(t('caseDetail.paymentSuccessTitle'), t('caseDetail.paymentSuccessMsg'));
       }
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
       queryClient.invalidateQueries({ queryKey: ['cases'] });
@@ -314,10 +316,10 @@ export default function CaseDetailScreen({ navigation, route }) {
           UTI: 'com.adobe.pdf',
         });
       } else {
-        Alert.alert('Saved', `Invoice saved to: ${uri}`);
+        Alert.alert(t('caseDetail.invoiceSavedTo'), t('caseDetail.invoiceSavedMsg', { uri }));
       }
     } catch (err) {
-      Alert.alert('Error', 'Could not generate invoice PDF. Please try again.');
+      Alert.alert(t('common.genericError'), t('caseDetail.invoicePdfError'));
       console.error('[Invoice PDF]', err);
     } finally {
       setGeneratingPdf(false);
@@ -337,19 +339,23 @@ export default function CaseDetailScreen({ navigation, route }) {
       <View style={styles.loadingContainer}>
         <MaterialCommunityIcons name="alert-circle-outline" size={32} color={Colors.red} style={{ marginBottom: 12 }} />
         <Text style={{ color: Colors.text1, fontFamily: FontFamily.bold, fontSize: 16, marginBottom: 8 }}>
-          {loadError ? 'Failed to load case' : 'Case not found'}
+          {loadError ? t('caseDetail.failedToLoad') : t('caseDetail.notFound')}
         </Text>
         {loadError ? (
           <Text style={{ color: '#ef9a9a', fontSize: 12, fontFamily: FontFamily.regular, textAlign: 'center', paddingHorizontal: 32 }}>
-            Cannot reach server — check your network.
+            {t('common.networkError')}
           </Text>
         ) : null}
       </View>
     );
   }
 
-  const stage = STAGES[caseData.status] || { label: caseData.status, color: Colors.text3, icon: 'file-outline' };
-  const pay = PAYMENT_STATUS[caseData.paymentStatus];
+  const stageKey = STAGES[caseData.status] ? caseData.status : null;
+  const stage = stageKey
+    ? { ...STAGES[stageKey], label: t(`stages.${stageKey}`) }
+    : { label: caseData.status, color: Colors.text3, icon: 'file-outline' };
+  const payRaw = PAYMENT_STATUS[caseData.paymentStatus];
+  const pay = payRaw ? { ...payRaw, label: t(`paymentStatus.${caseData.paymentStatus}`) } : payRaw;
   const canUploadPayment = ['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus);
   const hasPaymentRequest = ['PAYMENT_REQUESTED', 'REJECTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(caseData.paymentStatus);
   const amountDue = caseData.payment?.amount ?? caseData.totalAmount ?? 0;
@@ -377,28 +383,28 @@ export default function CaseDetailScreen({ navigation, route }) {
         <GlassCard dark radius={0} style={[styles.statusHero, { backgroundColor: stage.color + 'CC' }]}>
           <MaterialCommunityIcons name={stage.icon} size={38} color="#fff" style={{ marginBottom: 8 }} />
           <Text style={styles.statusHeroLabel}>{stage.label}</Text>
-          <Text style={styles.statusHeroCase}>{caseData.caseNumber || 'Awaiting Scan #'}</Text>
+          <Text style={styles.statusHeroCase}>{caseData.caseNumber || t('caseDetail.awaitingScanNumber')}</Text>
         </GlassCard>
 
 
         {/* ── Case Info ── */}
         <GlassCard strong style={styles.card}>
-          <Text style={styles.cardTitle}>Case Details</Text>
-          <InfoRow label="Patient" value={caseData.patientName} />
-          <InfoRow label="Work Type" value={caseData.workType} />
-          <InfoRow label="Tooth Numbers" value={caseData.toothNumbers} />
-          {caseData.units != null && <InfoRow label="Units" value={String(caseData.units)} />}
-          <InfoRow label="Shade" value={caseData.shade} />
+          <Text style={styles.cardTitle}>{t('caseDetail.cardTitle')}</Text>
+          <InfoRow label={t('caseDetail.patient')} value={caseData.patientName} />
+          <InfoRow label={t('caseDetail.workType')} value={caseData.workType} />
+          <InfoRow label={t('caseDetail.toothNumbers')} value={caseData.toothNumbers} />
+          {caseData.units != null && <InfoRow label={t('caseDetail.units')} value={String(caseData.units)} />}
+          <InfoRow label={t('caseDetail.shade')} value={caseData.shade} />
           <InfoRow
-            label="Due Date"
+            label={t('caseDetail.dueDate')}
             value={caseData.dueDate ? format(new Date(caseData.dueDate), 'dd MMMM yyyy') : null}
           />
-          <InfoRow label="Doctor" value={caseData.doctorName} />
-          <InfoRow label="Doctor Phone" value={caseData.doctorPhone} />
-          <InfoRow label="Patient Gender" value={caseData.patientGender} />
+          <InfoRow label={t('caseDetail.doctor')} value={caseData.doctorName} />
+          <InfoRow label={t('caseDetail.doctorPhone')} value={caseData.doctorPhone} />
+          <InfoRow label={t('caseDetail.patientGender')} value={caseData.patientGender} />
           {caseData.notes && (
             <View style={styles.notesBox}>
-              <Text style={styles.notesLabel}>Notes</Text>
+              <Text style={styles.notesLabel}>{t('caseDetail.notes')}</Text>
               <Text style={styles.notesText}>{caseData.notes}</Text>
             </View>
           )}
@@ -406,13 +412,13 @@ export default function CaseDetailScreen({ navigation, route }) {
 
         {/* ── Payment Section ── */}
         <GlassCard strong style={styles.card}>
-          <Text style={styles.cardTitle}>Payment</Text>
+          <Text style={styles.cardTitle}>{t('caseDetail.paymentTitle')}</Text>
 
           {/* No payment request yet */}
           {!hasPaymentRequest && (
             <View style={[styles.invoiceNotesBox, { backgroundColor: Colors.surface2 }]}>
               <Text style={{ fontSize: 13, fontFamily: FontFamily.regular, color: Colors.text3, textAlign: 'center', lineHeight: 19 }}>
-                The lab will send you a payment request once your work is ready for collection.
+                {t('caseDetail.noPaymentRequestYet')}
               </Text>
             </View>
           )}
@@ -428,7 +434,7 @@ export default function CaseDetailScreen({ navigation, route }) {
                 flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <View>
-                  <Text style={{ fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>Amount Due</Text>
+                  <Text style={{ fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{t('caseDetail.amountDue')}</Text>
                   <Text style={{ fontSize: 24, fontFamily: FontFamily.extrabold, color: Colors.primaryDark }}>
                     Br {amountDue.toLocaleString('en-US')}
                   </Text>
@@ -441,7 +447,7 @@ export default function CaseDetailScreen({ navigation, route }) {
               {/* Payment instructions */}
               {caseData.payment?.invoiceNotes ? (
                 <View style={[styles.invoiceNotesBox, { marginBottom: Spacing.md }]}>
-                  <Text style={{ fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, marginBottom: 4 }}>Payment Instructions</Text>
+                  <Text style={{ fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3, marginBottom: 4 }}>{t('caseDetail.paymentInstructions')}</Text>
                   <Text style={styles.invoiceNotesText}>{caseData.payment.invoiceNotes}</Text>
                 </View>
               ) : null}
@@ -449,7 +455,7 @@ export default function CaseDetailScreen({ navigation, route }) {
               {/* Rejection reason */}
               {caseData.paymentStatus === 'REJECTED' && caseData.payment?.rejectionReason && (
                 <View style={[styles.rejectionBox, { marginBottom: Spacing.md }]}>
-                  <Text style={styles.rejectionTitle}>Receipt Rejected:</Text>
+                  <Text style={styles.rejectionTitle}>{t('caseDetail.receiptRejected')}</Text>
                   <Text style={styles.rejectionText}>{caseData.payment.rejectionReason}</Text>
                 </View>
               )}
@@ -457,7 +463,7 @@ export default function CaseDetailScreen({ navigation, route }) {
               {/* Uploaded screenshot preview */}
               {caseData.payment?.screenshotUrl && caseData.paymentStatus === 'SCREENSHOT_UPLOADED' && (
                 <View style={[styles.screenshotWrap, { marginBottom: Spacing.md }]}>
-                  <Text style={styles.screenshotLabel}>Submitted Receipt — Awaiting Verification</Text>
+                  <Text style={styles.screenshotLabel}>{t('caseDetail.submittedReceipt')}</Text>
                   <Image source={{ uri: caseData.payment.screenshotUrl }} style={styles.screenshotImg} resizeMode="cover" />
                 </View>
               )}
@@ -475,7 +481,7 @@ export default function CaseDetailScreen({ navigation, route }) {
                   ) : (
                     <>
                       <MaterialCommunityIcons name="credit-card-outline" size={18} color="#fff" />
-                      <Text style={styles.chapaBtnText}>Pay Online with Chapa</Text>
+                      <Text style={styles.chapaBtnText}>{t('caseDetail.payOnlineChapa')}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -485,7 +491,7 @@ export default function CaseDetailScreen({ navigation, route }) {
               {canUploadPayment && !showManualUpload && (
                 <TouchableOpacity onPress={() => setShowManualUpload(true)} style={styles.secondaryOptionBtn}>
                   <Text style={styles.secondaryOptionText}>
-                    {caseData.paymentStatus === 'REJECTED' ? 'Re-upload receipt manually instead' : 'Or upload payment receipt manually'}
+                    {caseData.paymentStatus === 'REJECTED' ? t('caseDetail.reuploadReceiptManually') : t('caseDetail.uploadReceiptManually')}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -495,18 +501,18 @@ export default function CaseDetailScreen({ navigation, route }) {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <MaterialCommunityIcons name={caseData.paymentStatus === 'REJECTED' ? 'restore' : 'tray-arrow-up'} size={16} color={Colors.text1} />
                     <Text style={styles.uploadTitle}>
-                      {caseData.paymentStatus === 'REJECTED' ? 'Re-upload Receipt' : 'Upload Payment Receipt'}
+                      {caseData.paymentStatus === 'REJECTED' ? t('caseDetail.reuploadReceipt') : t('caseDetail.uploadReceipt')}
                     </Text>
                   </View>
                   <Text style={styles.uploadSub}>
-                    Upload a screenshot of your bank transfer or payment receipt.
+                    {t('caseDetail.uploadHint')}
                   </Text>
                   {screenshot ? (
                     <View style={styles.previewWrap}>
                       <Image source={{ uri: screenshot.uri }} style={styles.previewImg} resizeMode="cover" />
                       <View style={styles.previewActions}>
                         <TouchableOpacity style={styles.changeBtn} onPress={() => setScreenshot(null)}>
-                          <Text style={styles.changeBtnText}>Change</Text>
+                          <Text style={styles.changeBtnText}>{t('common.change')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.uploadBtn, uploading && { opacity: 0.6 }]}
@@ -518,7 +524,7 @@ export default function CaseDetailScreen({ navigation, route }) {
                             : (
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <MaterialCommunityIcons name="check" size={16} color="#fff" />
-                                <Text style={styles.uploadBtnText}>Submit</Text>
+                                <Text style={styles.uploadBtnText}>{t('caseDetail.submit')}</Text>
                               </View>
                             )
                           }
@@ -529,11 +535,11 @@ export default function CaseDetailScreen({ navigation, route }) {
                     <View style={styles.uploadBtns}>
                       <TouchableOpacity style={styles.photoBtn} onPress={takePhoto} activeOpacity={0.85}>
                         <MaterialCommunityIcons name="camera-outline" size={26} color={Colors.text2} />
-                        <Text style={styles.photoBtnText}>Take Photo</Text>
+                        <Text style={styles.photoBtnText}>{t('caseDetail.takePhoto')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.photoBtn} onPress={pickImage} activeOpacity={0.85}>
                         <MaterialCommunityIcons name="image-outline" size={26} color={Colors.text2} />
-                        <Text style={styles.photoBtnText}>Gallery</Text>
+                        <Text style={styles.photoBtnText}>{t('caseDetail.gallery')}</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -547,11 +553,11 @@ export default function CaseDetailScreen({ navigation, route }) {
             <>
               <View style={styles.invoiceHeader}>
                 <View>
-                  <Text style={styles.invoiceTitle}>Invoice</Text>
+                  <Text style={styles.invoiceTitle}>{t('caseDetail.invoice')}</Text>
                   <Text style={styles.invoiceNumber}>{caseData.payment.invoiceNumber}</Text>
                 </View>
                 <View style={[styles.invoiceAmountBadge, { backgroundColor: Colors.green + '15' }]}>
-                  <Text style={styles.invoiceAmountLabel}>Amount Paid</Text>
+                  <Text style={styles.invoiceAmountLabel}>{t('caseDetail.amountPaid')}</Text>
                   <Text style={[styles.invoiceAmount, { color: Colors.green }]}>
                     Br {amountDue.toLocaleString('en-US')}
                   </Text>
@@ -560,12 +566,12 @@ export default function CaseDetailScreen({ navigation, route }) {
               <View style={styles.invoiceDivider} />
               <View style={styles.invoiceRows}>
                 <View style={styles.invoiceRow}>
-                  <Text style={styles.invoiceRowLabel}>Work Type</Text>
+                  <Text style={styles.invoiceRowLabel}>{t('caseDetail.workType')}</Text>
                   <Text style={styles.invoiceRowValue}>{caseData.workType}</Text>
                 </View>
                 {caseData.payment.invoiceIssuedAt ? (
                   <View style={styles.invoiceRow}>
-                    <Text style={styles.invoiceRowLabel}>Invoice Date</Text>
+                    <Text style={styles.invoiceRowLabel}>{t('caseDetail.invoiceDate')}</Text>
                     <Text style={styles.invoiceRowValue}>
                       {format(new Date(caseData.payment.invoiceIssuedAt), 'dd MMM yyyy')}
                     </Text>
@@ -583,7 +589,7 @@ export default function CaseDetailScreen({ navigation, route }) {
                   activeOpacity={0.8}
                 >
                   {!generatingPdf && <MaterialCommunityIcons name="file-pdf-box" size={16} color="#fff" />}
-                  <Text style={styles.pdfBtnText}>{generatingPdf ? 'Generating…' : 'View PDF'}</Text>
+                  <Text style={styles.pdfBtnText}>{generatingPdf ? t('caseDetail.generatingPdf') : t('caseDetail.viewPdf')}</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -592,12 +598,15 @@ export default function CaseDetailScreen({ navigation, route }) {
 
         {/* ── Stage Timeline ── */}
         <GlassCard strong style={styles.card}>
-          <Text style={styles.cardTitle}>Stage History</Text>
+          <Text style={styles.cardTitle}>{t('caseDetail.stageHistory')}</Text>
           {caseData.stages?.length === 0 ? (
-            <Text style={{ color: Colors.text3, fontSize: 13, fontFamily: FontFamily.regular }}>No stage scans yet.</Text>
+            <Text style={{ color: Colors.text3, fontSize: 13, fontFamily: FontFamily.regular }}>{t('caseDetail.noStageScans')}</Text>
           ) : (
             caseData.stages?.map((s, i) => {
-              const st = STAGES[s.stageName] || { label: s.stageName, color: Colors.text3, icon: 'file-outline' };
+              const stKey = STAGES[s.stageName] ? s.stageName : null;
+              const st = stKey
+                ? { ...STAGES[stKey], label: t(`stages.${stKey}`) }
+                : { label: s.stageName, color: Colors.text3, icon: 'file-outline' };
               return (
                 <View key={s.id} style={styles.timelineItem}>
                   <View style={styles.timelineDotWrap}>

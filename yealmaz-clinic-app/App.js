@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFonts, Sora_400Regular, Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold } from '@expo-google-fonts/sora';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { LanguageProvider, useLanguage } from './src/context/LanguageContext';
 import { Colors, Gradients, GLASS_BLUR_WEB, GLASS_BLUR_NATIVE } from './src/utils/theme';
 import { usePushNotifications } from './src/hooks/usePushNotifications';
 import SplashScreen from './src/screens/SplashScreen';
@@ -76,6 +77,7 @@ function GlassTabBackground() {
 }
 
 function MainTabs() {
+  const { t } = useLanguage();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -88,11 +90,11 @@ function MainTabs() {
         tabBarLabelStyle: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Cases" component={CasesScreen} options={{ tabBarLabel: 'My Cases' }} />
-      <Tab.Screen name="NewCase" component={NewCaseScreen} options={{ tabBarLabel: 'New Case' }} />
-      <Tab.Screen name="Rewards" component={RewardsScreen} options={{ tabBarLabel: 'Rewards' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: t('tabs.home') }} />
+      <Tab.Screen name="Cases" component={CasesScreen} options={{ tabBarLabel: t('tabs.cases') }} />
+      <Tab.Screen name="NewCase" component={NewCaseScreen} options={{ tabBarLabel: t('tabs.newCase') }} />
+      <Tab.Screen name="Rewards" component={RewardsScreen} options={{ tabBarLabel: t('tabs.rewards') }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: t('tabs.profile') }} />
     </Tab.Navigator>
   );
 }
@@ -131,6 +133,7 @@ function AppNavigator() {
 
 // ── Offline banner (web + native) ────────────────────────────────────────────
 function OfflineBanner() {
+  const { t } = useLanguage();
   const [offline, setOffline] = useState(false);
   const slideAnim = useRef(new Animated.Value(-48)).current;
 
@@ -155,7 +158,7 @@ function OfflineBanner() {
   if (!offline) return null;
   return (
     <Animated.View style={[offlineStyles.bar, { transform: [{ translateY: slideAnim }] }]}>
-      <Text style={offlineStyles.text}>⚡ You're offline — showing cached data</Text>
+      <Text style={offlineStyles.text}>{t('app.offline')}</Text>
     </Animated.View>
   );
 }
@@ -177,6 +180,7 @@ const offlineStyles = StyleSheet.create({
 // own address-bar icon. iOS Safari never fires that event — there's no
 // programmatic install there, so it gets one-time instructions instead.
 function InstallAppBanner() {
+  const { t } = useLanguage();
   const [installEvent, setInstallEvent] = useState(null);
   const [mode, setMode] = useState(null); // 'chrome' | 'ios'
   const [visible, setVisible] = useState(false);
@@ -236,12 +240,12 @@ function InstallAppBanner() {
       <MaterialCommunityIcons name="cellphone-arrow-down" size={20} color={Colors.textWhite} />
       <Text style={installStyles.text} numberOfLines={2}>
         {mode === 'ios'
-          ? 'Install this app: tap Share, then "Add to Home Screen"'
-          : 'Install Ye-Almaz Clinic for quicker, full-screen access'}
+          ? t('app.installIos')
+          : t('app.installAndroid')}
       </Text>
       {mode === 'chrome' && (
         <TouchableOpacity onPress={install} style={installStyles.installBtn}>
-          <Text style={installStyles.installBtnText}>Install</Text>
+          <Text style={installStyles.installBtnText}>{t('app.install')}</Text>
         </TouchableOpacity>
       )}
       <TouchableOpacity onPress={() => hide(true)} style={installStyles.closeBtn} hitSlop={8}>
@@ -268,20 +272,25 @@ export default function App() {
     Sora_400Regular, Sora_500Medium, Sora_600SemiBold, Sora_700Bold, Sora_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
-    return <SplashScreen />;
-  }
-
+  // LanguageProvider wraps both the pre-fonts splash and the real app — the
+  // splash screen's own text (App name / tagline) is translated too, so it
+  // must never render outside this provider, on either path.
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <LinearGradient colors={Gradients.screen} style={{ flex: 1 }}>
-          <OfflineBanner />
-          <InstallAppBanner />
-          <AppNavigator />
-          <Toast />
-        </LinearGradient>
-      </AuthProvider>
-    </QueryClientProvider>
+    <LanguageProvider>
+      {!fontsLoaded ? (
+        <SplashScreen />
+      ) : (
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <LinearGradient colors={Gradients.screen} style={{ flex: 1 }}>
+              <OfflineBanner />
+              <InstallAppBanner />
+              <AppNavigator />
+              <Toast />
+            </LinearGradient>
+          </AuthProvider>
+        </QueryClientProvider>
+      )}
+    </LanguageProvider>
   );
 }

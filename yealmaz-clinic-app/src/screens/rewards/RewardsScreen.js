@@ -11,10 +11,14 @@ import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import GlassCard from '../../components/GlassCard';
 import ConfirmDialog from '../../components/ConfirmDialog';
-
-const TABS = ['Rewards', 'History'];
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function RewardsScreen() {
+  const { t } = useLanguage();
+  const TABS = [
+    { key: 'Rewards', label: t('rewards.tabRewards') },
+    { key: 'History', label: t('rewards.tabHistory') },
+  ];
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('Rewards');
   const [redeeming, setRedeeming] = useState(null);
@@ -40,7 +44,7 @@ export default function RewardsScreen() {
   // react-native-web does support.
   const handleRedeem = (item) => {
     if (available < item.pointsCost) {
-      Toast.show({ type: 'error', text1: 'Not enough points', text2: `You need ${item.pointsCost} pts but have ${available} pts.` });
+      Toast.show({ type: 'error', text1: t('rewards.notEnoughPointsTitle'), text2: t('rewards.notEnoughPointsMsg', { cost: item.pointsCost, available }) });
       return;
     }
     setRedeemTarget(item);
@@ -54,9 +58,9 @@ export default function RewardsScreen() {
     try {
       await api.post('/rewards/redeem', { rewardItemId: item.id });
       queryClient.invalidateQueries({ queryKey: ['rewards', 'my'] });
-      Toast.show({ type: 'success', text1: 'Redeemed!', text2: 'Your redemption request has been sent to the lab. They will confirm shortly.' });
+      Toast.show({ type: 'success', text1: t('rewards.redeemedToastTitle'), text2: t('rewards.redeemedToastMsg') });
     } catch (err) {
-      Toast.show({ type: 'error', text1: 'Could not redeem', text2: err.response?.data?.error || 'Please try again.' });
+      Toast.show({ type: 'error', text1: t('rewards.redeemFailedTitle'), text2: err.response?.data?.error || t('common.genericError') });
     } finally {
       setRedeeming(null);
     }
@@ -77,34 +81,34 @@ export default function RewardsScreen() {
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <MaterialCommunityIcons name="gift-outline" size={22} color="#fff" />
-          <Text style={styles.headerTitle}>Rewards</Text>
+          <Text style={styles.headerTitle}>{t('rewards.title')}</Text>
         </View>
 
         {/* Points balance card */}
         <GlassCard dark radius={Radius.lg} style={styles.balanceRow}>
           <View style={styles.balanceStat}>
-            <Text style={styles.balanceStatLabel}>Available</Text>
+            <Text style={styles.balanceStatLabel}>{t('rewards.available')}</Text>
             <Text style={[styles.balanceStatValue, { color: '#fff' }]}>{available}</Text>
           </View>
           <View style={styles.balanceDivider} />
           <View style={styles.balanceStat}>
-            <Text style={styles.balanceStatLabel}>Earned</Text>
+            <Text style={styles.balanceStatLabel}>{t('rewards.earned')}</Text>
             <Text style={[styles.balanceStatValue, { color: Colors.primaryLight }]}>{my?.totalEarned ?? 0}</Text>
           </View>
           <View style={styles.balanceDivider} />
           <View style={styles.balanceStat}>
-            <Text style={styles.balanceStatLabel}>Redeemed</Text>
+            <Text style={styles.balanceStatLabel}>{t('rewards.redeemed')}</Text>
             <Text style={[styles.balanceStatValue, { color: 'rgba(255,255,255,0.6)' }]}>{my?.totalRedeemed ?? 0}</Text>
           </View>
         </GlassCard>
-        <Text style={styles.balanceHint}>Earn points with every new case you submit</Text>
+        <Text style={styles.balanceHint}>{t('rewards.hint')}</Text>
       </View>
 
       {/* Tab bar */}
       <View style={styles.tabBar}>
-        {TABS.map(t => (
-          <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabBtnActive]} onPress={() => setTab(t)}>
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t}</Text>
+        {TABS.map(tb => (
+          <TouchableOpacity key={tb.key} style={[styles.tabBtn, tab === tb.key && styles.tabBtnActive]} onPress={() => setTab(tb.key)}>
+            <Text style={[styles.tabText, tab === tb.key && styles.tabTextActive]}>{tb.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -120,8 +124,8 @@ export default function RewardsScreen() {
             {items.length === 0 ? (
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="gift-outline" size={36} color={Colors.text3} style={{ marginBottom: 12 }} />
-                <Text style={styles.emptyTitle}>No rewards available yet</Text>
-                <Text style={styles.emptySub}>The lab will add rewards soon. Keep earning points!</Text>
+                <Text style={styles.emptyTitle}>{t('rewards.emptyTitle')}</Text>
+                <Text style={styles.emptySub}>{t('rewards.emptySub')}</Text>
               </View>
             ) : items.map(item => {
               const canRedeem = available >= item.pointsCost;
@@ -137,7 +141,7 @@ export default function RewardsScreen() {
                     </View>
                     <View style={styles.costBadge}>
                       <Text style={styles.costValue}>{item.pointsCost}</Text>
-                      <Text style={styles.costLabel}>pts</Text>
+                      <Text style={styles.costLabel}>{t('rewards.pts')}</Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -152,7 +156,7 @@ export default function RewardsScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           {canRedeem && <MaterialCommunityIcons name="gift-outline" size={15} color="#fff" />}
                           <Text style={[styles.redeemBtnText, !canRedeem && styles.redeemBtnTextDisabled]}>
-                            {canRedeem ? 'Redeem' : `Need ${item.pointsCost - available} more pts`}
+                            {canRedeem ? t('rewards.redeem') : t('rewards.needMorePts', { n: item.pointsCost - available })}
                           </Text>
                         </View>
                       )
@@ -170,7 +174,7 @@ export default function RewardsScreen() {
             {/* Redemption requests */}
             {(my?.redemptions?.length ?? 0) > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>REDEMPTION REQUESTS</Text>
+                <Text style={styles.sectionTitle}>{t('rewards.redemptionRequests')}</Text>
                 {my.redemptions.map(r => {
                   const statusColor = r.status === 'APPROVED' ? Colors.green : r.status === 'REJECTED' ? Colors.red : Colors.amber;
                   return (
@@ -181,7 +185,7 @@ export default function RewardsScreen() {
                       </View>
                       <View>
                         <Text style={{ fontSize: 12, fontFamily: FontFamily.bold, color: statusColor }}>{r.status}</Text>
-                        <Text style={{ fontSize: 12, fontFamily: FontFamily.bold, color: Colors.red, textAlign: 'right' }}>-{r.pointsSpent} pts</Text>
+                        <Text style={{ fontSize: 12, fontFamily: FontFamily.bold, color: Colors.red, textAlign: 'right' }}>-{r.pointsSpent} {t('rewards.pts')}</Text>
                       </View>
                     </GlassCard>
                   );
@@ -191,9 +195,9 @@ export default function RewardsScreen() {
 
             {/* Transactions */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>POINT TRANSACTIONS</Text>
+              <Text style={styles.sectionTitle}>{t('rewards.pointTransactions')}</Text>
               {(my?.transactions?.length ?? 0) === 0 ? (
-                <Text style={styles.emptyText}>No transactions yet. Submit a case to earn your first points!</Text>
+                <Text style={styles.emptyText}>{t('rewards.noTransactionsYet')}</Text>
               ) : my.transactions.map(tx => (
                 <GlassCard strong key={tx.id} style={styles.txRow}>
                   <View style={{ flex: 1 }}>
@@ -201,7 +205,7 @@ export default function RewardsScreen() {
                     <Text style={styles.txDate}>{format(new Date(tx.createdAt), 'dd MMM yyyy, h:mm a')}</Text>
                   </View>
                   <Text style={[styles.txPoints, { color: tx.points > 0 ? Colors.green : Colors.red }]}>
-                    {tx.points > 0 ? '+' : ''}{tx.points} pts
+                    {tx.points > 0 ? '+' : ''}{tx.points} {t('rewards.pts')}
                   </Text>
                 </GlassCard>
               ))}
@@ -212,9 +216,9 @@ export default function RewardsScreen() {
 
       <ConfirmDialog
         visible={!!redeemTarget}
-        title="Redeem Reward"
-        message={redeemTarget ? `Redeem "${redeemTarget.name}" for ${redeemTarget.pointsCost} points?` : ''}
-        confirmLabel="Redeem"
+        title={t('rewards.redeemDialogTitle')}
+        message={redeemTarget ? t('rewards.redeemDialogMsg', { name: redeemTarget.name, cost: redeemTarget.pointsCost }) : ''}
+        confirmLabel={t('rewards.redeem')}
         onCancel={() => setRedeemTarget(null)}
         onConfirm={confirmRedeem}
       />

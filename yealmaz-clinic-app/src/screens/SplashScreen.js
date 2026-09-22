@@ -2,8 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, Image, Animated, StyleSheet, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, FontFamily } from '../utils/theme';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function SplashScreen() {
+  const { t } = useLanguage();
   const logoScale  = useRef(new Animated.Value(0.6)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
@@ -68,10 +70,10 @@ export default function SplashScreen() {
 
       {/* Branding */}
       <Animated.View style={[styles.textBlock, { opacity: textOpacity }]}>
-        <Text style={styles.appName}>Ye-Almaz</Text>
-        <Text style={styles.appSub}>Dental Laboratory</Text>
+        <Text style={styles.appName}>{t('splash.appName')}</Text>
+        <Text style={styles.appSub}>{t('splash.appSub')}</Text>
         <View style={styles.divider} />
-        <Text style={styles.tagline}>Clinic Management Portal</Text>
+        <Text style={styles.tagline}>{t('splash.tagline')}</Text>
       </Animated.View>
 
       {/* Loading dots */}
@@ -82,7 +84,7 @@ export default function SplashScreen() {
       </View>
 
       {/* Footer */}
-      <Text style={styles.footer}>Ye-Almaz Dental Lab · Addis Ababa</Text>
+      <Text style={styles.footer}>{t('splash.footer')}</Text>
     </LinearGradient>
   );
 }

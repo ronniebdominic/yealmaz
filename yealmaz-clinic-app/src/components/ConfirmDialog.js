@@ -2,14 +2,18 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors, Spacing, Radius, FontFamily } from '../utils/theme';
 import GlassCard from './GlassCard';
+import { useLanguage } from '../context/LanguageContext';
 
 // RN's Alert.alert() only renders on native — it's a silent no-op on web,
 // so any confirmation flow that relies on it (redeeming a reward, signing
 // out) just does nothing when tapped in the PWA. This is a themed dialog
 // built on RN's <Modal>, which react-native-web does support, so it works
 // identically on both.
-export default function ConfirmDialog({ visible, title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', destructive, onConfirm, onCancel }) {
+export default function ConfirmDialog({ visible, title, message, confirmLabel, cancelLabel, destructive, onConfirm, onCancel }) {
+  const { t } = useLanguage();
   if (!visible) return null;
+  const confirm = confirmLabel ?? t('common.confirm');
+  const cancel = cancelLabel ?? t('common.cancel');
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
       <View style={styles.overlay}>
@@ -18,10 +22,10 @@ export default function ConfirmDialog({ visible, title, message, confirmLabel = 
           {message ? <Text style={styles.message}>{message}</Text> : null}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
-              <Text style={styles.cancelText}>{cancelLabel}</Text>
+              <Text style={styles.cancelText}>{cancel}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.confirmBtn, destructive && styles.confirmBtnDanger]} onPress={onConfirm} activeOpacity={0.85}>
-              <Text style={styles.confirmText}>{confirmLabel}</Text>
+              <Text style={styles.confirmText}>{confirm}</Text>
             </TouchableOpacity>
           </View>
         </GlassCard>

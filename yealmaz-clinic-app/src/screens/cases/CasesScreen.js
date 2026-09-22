@@ -9,17 +9,18 @@ import { Colors, Spacing, Radius, FontFamily } from '../../utils/theme';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import GlassCard from '../../components/GlassCard';
 import CaseListCard from '../../components/CaseListCard';
-
-const FILTERS = [
-  { label: 'All',      value: '' },
-  { label: 'Active',   value: 'active' },
-  { label: 'Payment',  value: 'payment' },
-  { label: 'Delivered',value: 'delivered' },
-];
+import { useLanguage } from '../../context/LanguageContext';
 
 const PAGE_SIZE = 20;
 
 export default function CasesScreen({ navigation, route }) {
+  const { t } = useLanguage();
+  const FILTERS = [
+    { label: t('cases.filterAll'),       value: '' },
+    { label: t('cases.filterActive'),    value: 'active' },
+    { label: t('cases.filterPayment'),   value: 'payment' },
+    { label: t('cases.filterDelivered'), value: 'delivered' },
+  ];
   const initialFilter = route.params?.filter || '';
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState(initialFilter);
@@ -66,10 +67,10 @@ export default function CasesScreen({ navigation, route }) {
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Cases</Text>
+        <Text style={styles.headerTitle}>{t('cases.title')}</Text>
         <TouchableOpacity style={styles.newBtn} onPress={() => navigation.navigate('NewCase')}>
           <MaterialCommunityIcons name="plus" size={15} color={Colors.primaryDark} />
-          <Text style={styles.newBtnText}>New</Text>
+          <Text style={styles.newBtnText}>{t('cases.newBtn')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -77,7 +78,7 @@ export default function CasesScreen({ navigation, route }) {
         <MaterialCommunityIcons name="magnify" size={18} color={Colors.text3} style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search patient or case number…"
+          placeholder={t('cases.searchPlaceholder')}
           placeholderTextColor={Colors.text3}
           value={search}
           onChangeText={changeSearch}
@@ -106,7 +107,7 @@ export default function CasesScreen({ navigation, route }) {
       {error ? (
         <View style={styles.errorBanner}>
           <MaterialCommunityIcons name="wifi-off" size={15} color="#ef9a9a" />
-          <Text style={styles.errorBannerText}>Cannot reach server — check your network.</Text>
+          <Text style={styles.errorBannerText}>{t('common.networkError')}</Text>
         </View>
       ) : null}
 
@@ -130,8 +131,8 @@ export default function CasesScreen({ navigation, route }) {
             ListEmptyComponent={
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="inbox-outline" size={40} color={Colors.text3} style={{ marginBottom: 12 }} />
-                <Text style={{ fontSize: 16, fontFamily: FontFamily.bold, color: Colors.text1 }}>No cases found</Text>
-                <Text style={{ fontSize: 13, fontFamily: FontFamily.regular, color: Colors.text3, marginTop: 4 }}>Try a different filter or search</Text>
+                <Text style={{ fontSize: 16, fontFamily: FontFamily.bold, color: Colors.text1 }}>{t('cases.emptyTitle')}</Text>
+                <Text style={{ fontSize: 13, fontFamily: FontFamily.regular, color: Colors.text3, marginTop: 4 }}>{t('cases.emptySub')}</Text>
               </View>
             }
           />
@@ -145,15 +146,15 @@ export default function CasesScreen({ navigation, route }) {
                 disabled={page === 1}
               >
                 <MaterialCommunityIcons name="chevron-left" size={16} color="#fff" />
-                <Text style={styles.pageBtnText}>Prev</Text>
+                <Text style={styles.pageBtnText}>{t('cases.prev')}</Text>
               </TouchableOpacity>
-              <Text style={styles.pageInfo}>{page} / {pagination.totalPages}</Text>
+              <Text style={styles.pageInfo}>{t('cases.pageInfo', { page, totalPages: pagination.totalPages })}</Text>
               <TouchableOpacity
                 style={[styles.pageBtn, page === pagination.totalPages && styles.pageBtnDisabled]}
                 onPress={() => setPage(p => p + 1)}
                 disabled={page === pagination.totalPages}
               >
-                <Text style={styles.pageBtnText}>Next</Text>
+                <Text style={styles.pageBtnText}>{t('cases.next')}</Text>
                 <MaterialCommunityIcons name="chevron-right" size={16} color="#fff" />
               </TouchableOpacity>
             </GlassCard>

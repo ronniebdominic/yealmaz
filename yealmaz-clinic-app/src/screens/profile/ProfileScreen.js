@@ -8,6 +8,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Colors, Spacing, Radius, FontFamily } from '../../utils/theme';
 import GlassCard from '../../components/GlassCard';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
+import { useLanguage } from '../../context/LanguageContext';
 
 const LAB_PHONE = '+251911000000';
 
@@ -27,6 +29,7 @@ function MenuItem({ icon, label, onPress, danger, isLast }) {
 
 export default function ProfileScreen({ navigation }) {
   const { clinic, logout } = useAuth();
+  const { t } = useLanguage();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -58,49 +61,57 @@ export default function ProfileScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ACCOUNT</Text>
+          <Text style={styles.sectionTitle}>{t('profile.accountSection')}</Text>
           <GlassCard strong style={styles.menuCard}>
-            <MenuItem icon="clipboard-text-outline" label="My Cases" onPress={() => navigation.navigate('Cases')} />
-            <MenuItem icon="credit-card-outline" label="Payment History" onPress={() => navigation.navigate('Cases', { filter: 'payment' })} />
-            <MenuItem icon="plus-circle-outline" label="Submit New Case" onPress={() => navigation.navigate('NewCase')} isLast />
+            <MenuItem icon="clipboard-text-outline" label={t('profile.myCases')} onPress={() => navigation.navigate('Cases')} />
+            <MenuItem icon="credit-card-outline" label={t('profile.paymentHistory')} onPress={() => navigation.navigate('Cases', { filter: 'payment' })} />
+            <MenuItem icon="plus-circle-outline" label={t('profile.submitNewCase')} onPress={() => navigation.navigate('NewCase')} isLast />
           </GlassCard>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SUPPORT</Text>
+          <Text style={styles.sectionTitle}>{t('profile.appearanceSection')}</Text>
+          <GlassCard strong style={[styles.menuCard, styles.languageRow]}>
+            <Text style={styles.languageLabel}>{t('profile.language')}</Text>
+            <LanguageSwitcher />
+          </GlassCard>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('profile.supportSection')}</Text>
           <GlassCard strong style={styles.menuCard}>
-            <MenuItem icon="phone-outline" label="Contact Ye-Almaz Lab" onPress={() => Linking.openURL(`tel:${LAB_PHONE}`)} />
-            <MenuItem icon="help-circle-outline" label="Help & FAQ" onPress={() => setShowHelp(true)} isLast />
+            <MenuItem icon="phone-outline" label={t('profile.contactLab')} onPress={() => Linking.openURL(`tel:${LAB_PHONE}`)} />
+            <MenuItem icon="help-circle-outline" label={t('profile.helpFaq')} onPress={() => setShowHelp(true)} isLast />
           </GlassCard>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={() => setConfirmLogout(true)} activeOpacity={0.8}>
           <MaterialCommunityIcons name="logout" size={18} color={Colors.red} />
-          <Text style={styles.logoutText}>Sign Out</Text>
+          <Text style={styles.logoutText}>{t('profile.signOut')}</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
-          <Text style={styles.footerLogo}>🦷 Ye-Almaz Dental Lab</Text>
-          <Text style={styles.footerVersion}>Clinic App v1.0</Text>
+          <Text style={styles.footerLogo}>{t('profile.footerLogo')}</Text>
+          <Text style={styles.footerVersion}>{t('profile.footerVersion')}</Text>
         </View>
 
       </ScrollView>
 
       <ConfirmDialog
         visible={confirmLogout}
-        title="Sign Out"
-        message="Are you sure you want to sign out of Ye-Almaz Clinic?"
-        confirmLabel="Sign Out"
+        title={t('profile.signOutTitle')}
+        message={t('profile.signOutMsg')}
+        confirmLabel={t('profile.signOut')}
         destructive
         onCancel={() => setConfirmLogout(false)}
         onConfirm={() => { setConfirmLogout(false); logout(); }}
       />
       <ConfirmDialog
         visible={showHelp}
-        title="Help & FAQ"
-        message="For help with your account, orders, or anything else, call or message the lab directly — we're happy to walk you through it."
-        confirmLabel="Call Lab"
-        cancelLabel="Close"
+        title={t('profile.helpTitle')}
+        message={t('profile.helpMsg')}
+        confirmLabel={t('profile.callLab')}
+        cancelLabel={t('common.close')}
         onCancel={() => setShowHelp(false)}
         onConfirm={() => { setShowHelp(false); Linking.openURL(`tel:${LAB_PHONE}`); }}
       />
@@ -139,6 +150,11 @@ const styles = StyleSheet.create({
   menuCard: {
     overflow: 'hidden',
   },
+  languageRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, paddingVertical: 14,
+  },
+  languageLabel: { fontSize: 15, fontFamily: FontFamily.medium, color: Colors.text1 },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: Spacing.lg, paddingVertical: 15,

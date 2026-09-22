@@ -4,14 +4,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { Colors, Spacing, Radius, FontFamily, STAGES, PAYMENT_STATUS } from '../utils/theme';
 import GlassCard from './GlassCard';
+import { useLanguage } from '../context/LanguageContext';
 
 // Shared case-row card — used by both HomeScreen (Recent Cases) and
 // CasesScreen (the full list), which used to render two visually
 // different card designs (icon-block vs. colored-left-bar). One card,
 // one place to change it.
 export default function CaseListCard({ c, onPress }) {
-  const stage = STAGES[c.status] || STAGES.CASE_ACCEPTED;
-  const pay = PAYMENT_STATUS[c.paymentStatus];
+  const { t } = useLanguage();
+  const stageKey = STAGES[c.status] ? c.status : 'CASE_ACCEPTED';
+  const stage = { ...STAGES[stageKey], label: t(`stages.${stageKey}`) };
+  const payRaw = PAYMENT_STATUS[c.paymentStatus];
+  const pay = payRaw ? { ...payRaw, label: t(`paymentStatus.${c.paymentStatus}`) } : payRaw;
   const isOverdue = c.dueDate && new Date(c.dueDate) < new Date() && !['DELIVERED', 'CANCELLED'].includes(c.status);
 
   return (
@@ -27,7 +31,7 @@ export default function CaseListCard({ c, onPress }) {
               <Text style={[styles.stagePillText, { color: stage.color }]}>{stage.label}</Text>
             </View>
           </View>
-          <Text style={styles.caseNumber}>{c.caseNumber || 'Scan # Pending'} · {c.workType}</Text>
+          <Text style={styles.caseNumber}>{c.caseNumber || t('caseList.scanPending')} · {c.workType}</Text>
           <View style={styles.bottom}>
             {pay && (
               <View style={[styles.payPill, { backgroundColor: pay.bg }]}>
@@ -37,10 +41,10 @@ export default function CaseListCard({ c, onPress }) {
             {isOverdue && (
               <View style={styles.overduePill}>
                 <MaterialCommunityIcons name="alert-outline" size={11} color={Colors.red} />
-                <Text style={styles.overdueText}>Overdue</Text>
+                <Text style={styles.overdueText}>{t('caseList.overdue')}</Text>
               </View>
             )}
-            {c.dueDate && <Text style={styles.dueDate}>Due {format(new Date(c.dueDate), 'dd MMM')}</Text>}
+            {c.dueDate && <Text style={styles.dueDate}>{t('caseList.due', { date: format(new Date(c.dueDate), 'dd MMM') })}</Text>}
           </View>
         </View>
       </GlassCard>
