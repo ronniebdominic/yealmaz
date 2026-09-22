@@ -1483,6 +1483,25 @@ function TrustedPartnersTab({ queryClient }) {
   const [clinicCases, setClinicCases] = useState({}); // { [clinicId]: cases[] }
   const [loadingClinic, setLoadingClinic] = useState(null);
   const [search, setSearch] = useState('');
+  const [quickCollect, setQuickCollect] = useState(null); // { clinic, cases } → BulkPaymentModal, all outstanding pre-loaded
+  const [quickCollectLoading, setQuickCollectLoading] = useState(null); // clinic id currently fetching
+
+  // One-click payment collection from the row itself — skips opening
+  // "Generate Bill" just to tick every box, by fetching this clinic's whole
+  // outstanding balance (same data the Bill modal's "All Outstanding" preset
+  // uses) straight into BulkPaymentModal.
+  const openQuickCollect = async (c) => {
+    setQuickCollectLoading(c.id);
+    try {
+      const res = await api.get(`/payments/statement/${c.id}`);
+      if (!res.data?.length) { toast.error(`${c.name} has no outstanding cases.`); return; }
+      setQuickCollect({ clinic: c, cases: res.data });
+    } catch {
+      toast.error('Could not load outstanding cases');
+    } finally {
+      setQuickCollectLoading(null);
+    }
+  };
 
   const cycleBadge = (cyc) => {
     if (!cyc || cyc === 'NONE') return null;
@@ -1676,6 +1695,13 @@ function TrustedPartnersTab({ queryClient }) {
                           {c.billOverdue && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--red)', display: 'inline-flex', alignItems: 'center', gap: 2 }}><MdWarning size={10} /> due</span>}
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
+                          {c.outstanding > 0 && (
+                            <button onClick={() => openQuickCollect(c)} disabled={quickCollectLoading === c.id}
+                              title="Record a payment against this clinic's outstanding cases"
+                              style={{ background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: quickCollectLoading === c.id ? 'default' : 'pointer', opacity: quickCollectLoading === c.id ? 0.7 : 1, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              <MdPaid size={11} /> {quickCollectLoading === c.id ? '…' : 'Collect'}
+                            </button>
+                          )}
                           <button onClick={() => setStatement({ clinicId: c.id, clinic: c })}
                             style={{ background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 9px', fontSize: 10, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                             <MdReceipt size={11} /> Bill
@@ -1776,6 +1802,20 @@ function TrustedPartnersTab({ queryClient }) {
             setClinicCases({});
           }}
           onClose={() => setCollect(null)}
+        />
+      )}
+      {quickCollect && (
+        <BulkPaymentModal
+          clinic={quickCollect.clinic}
+          clinicId={quickCollect.clinic.id}
+          cases={quickCollect.cases}
+          onClose={() => setQuickCollect(null)}
+          onDone={() => {
+            setQuickCollect(null);
+            queryClient.invalidateQueries({ queryKey: ['trusted-partners-summary'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            setClinicCases({});
+          }}
         />
       )}
       {statement && (
