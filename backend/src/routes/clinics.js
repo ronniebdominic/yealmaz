@@ -259,14 +259,20 @@ router.post('/:id/onboarding-link', protect, restrict('ADMIN'), async (req, res)
 // ── GET /api/clinics/onboarding/:token — public, for the intake form ──
 router.get('/onboarding/:token', async (req, res) => {
   try {
-    const clinic = await prisma.clinic.findUnique({ where: { onboardingToken: req.params.token } });
+    const clinic = await prisma.clinic.findUnique({
+      where: { onboardingToken: req.params.token },
+      include: { zone: { select: { name: true } } },
+    });
     if (!clinic) return res.status(404).json({ error: 'This onboarding link is invalid.' });
     if (!clinic.onboardingTokenExpiresAt || clinic.onboardingTokenExpiresAt < new Date()) {
       return res.status(410).json({ error: 'This onboarding link has expired. Please ask Ye-Almaz to send a new one.' });
     }
 
     res.json({
-      name: clinic.name, code: clinic.code, station: clinic.station,
+      // name/station/zone are set by Ye-Almaz when the clinic is created and are
+      // shown read-only below — the intake form cannot change them (see the
+      // POST handler, which ignores any of these three sent by the client).
+      name: clinic.name, code: clinic.code, station: clinic.station, zone: clinic.zone?.name || null,
       email: clinic.email, phone: clinic.phone, address: clinic.address,
       alreadyOnboarded: !!clinic.onboardedAt,
     });
@@ -285,8 +291,11 @@ router.post('/onboarding/:token', async (req, res) => {
       return res.status(410).json({ error: 'This onboarding link has expired. Please ask Ye-Almaz to send a new one.' });
     }
 
-    const { name, station, email, phone, address, password } = req.body || {};
-    if (!name?.trim())     return res.status(400).json({ error: 'Clinic name is required.' });
+    // name/station/zoneId are intentionally NOT read from req.body here — they
+    // are set by Ye-Almaz when the clinic is created (station/zone drive case
+    // routing) and must stay whatever an admin set, however this form is
+    // filled in. The intake form only shows them read-only.
+    const { email, phone, address, password } = req.body || {};
     if (!password?.trim() || password.trim().length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters.' });
     }
@@ -301,8 +310,6 @@ router.post('/onboarding/:token', async (req, res) => {
     const updated = await prisma.clinic.update({
       where: { id: clinic.id },
       data: {
-        name:    name.trim(),
-        station: station?.trim() || null,
         email:   email?.trim()   || null,
         phone:   phone?.trim()   || null,
         address: address?.trim() || null,

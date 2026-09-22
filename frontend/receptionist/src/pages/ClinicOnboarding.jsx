@@ -11,7 +11,24 @@ import { inputStyle, labelStyle, Field, PasswordInput, generatePassword } from '
 const CLINIC_APP_URL = import.meta.env.VITE_CLINIC_APP_URL || 'https://yealmazdentallab.odontofusion.com';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-const EMPTY_FORM = { name: '', station: '', email: '', phone: '', address: '', password: '', confirm: '' };
+const EMPTY_FORM = { name: '', station: '', zone: '', email: '', phone: '', address: '', password: '', confirm: '' };
+
+// Clinic name, station and zone are set by Ye-Almaz and shown read-only below —
+// they drive case routing, so the intake form must not let a clinic change
+// them (the backend ignores these three even if sent; see routes/clinics.js).
+const readOnlyRowStyle = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10,
+  padding: '9px 12px', borderRadius: 8, background: '#F4F7FB', border: '1px solid #E2E8F0',
+  marginBottom: 10, fontSize: 13,
+};
+function ReadOnlyField({ label, value }) {
+  return (
+    <div style={readOnlyRowStyle}>
+      <span style={{ color: '#6B7280', fontWeight: 600 }}>{label}</span>
+      <span style={{ color: '#1F2937', fontWeight: 700, textAlign: 'right' }}>{value || '—'}</span>
+    </div>
+  );
+}
 
 export default function ClinicOnboarding() {
   const { token } = useParams();
@@ -29,6 +46,7 @@ export default function ClinicOnboarding() {
           ...f,
           name:    data.name    || '',
           station: data.station || '',
+          zone:    data.zone    || '',
           email:   data.email   || '',
           phone:   data.phone   || '',
           address: data.address || '',
@@ -42,15 +60,14 @@ export default function ClinicOnboarding() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error('Clinic name is required'); return; }
     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     if (form.password !== form.confirm) { toast.error('Passwords do not match'); return; }
 
     setSubmitting(true);
     try {
+      // name/station/zone are fixed by Ye-Almaz and not sent — see ReadOnlyField above.
       await axios.post(`${API_URL}/clinics/onboarding/${token}`, {
-        name: form.name, station: form.station, email: form.email,
-        phone: form.phone, address: form.address, password: form.password,
+        email: form.email, phone: form.phone, address: form.address, password: form.password,
       });
       setDone(true);
     } catch (err) {
@@ -96,14 +113,15 @@ export default function ClinicOnboarding() {
           </div>
         ) : (
           <form onSubmit={submit}>
-            <Field label="Clinic Name" hint="required">
-              <input style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} autoFocus />
-            </Field>
-            <Field label="Station / Area" hint="optional">
-              <input style={inputStyle} value={form.station} onChange={e => set('station', e.target.value)} />
-            </Field>
+            <ReadOnlyField label="Clinic Name" value={form.name} />
+            <ReadOnlyField label="Station / Area" value={form.station} />
+            <ReadOnlyField label="Zone" value={form.zone} />
+            <div style={{ fontSize: 11.5, color: '#9CA3AF', margin: '-2px 0 14px' }}>
+              Set by Ye-Almaz — contact us if any of these need to change.
+            </div>
+
             <Field label="Email" hint="used to log in">
-              <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+              <input style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} autoFocus />
             </Field>
             <Field label="Phone" hint="optional">
               <input style={inputStyle} value={form.phone} onChange={e => set('phone', e.target.value)} />
