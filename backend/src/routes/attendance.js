@@ -1,8 +1,10 @@
 // Ye-Almaz — Attendance Routes
 // POST /events is PUBLIC: biometric-device callback, own secret auth
 // (mirrors webhooks.js's case-sync posture — hard-fails if the secret is
-// missing or wrong, never silently skips verification). No device is wired
-// up yet; every row today comes from HR's manual entry via POST /manual.
+// missing or wrong, never silently skips verification). The Hikvision bridge
+// (attendance-bridge/hikvision-bridge.js) posts real device punches here;
+// POST /devices/heartbeat shares the same auth and lets HR see from the LMS
+// whether that bridge/terminal is actually online (GET /devices).
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
@@ -72,13 +74,17 @@ async function recordEvent({ userId, timestamp, type, source, deviceId, recorded
   });
 }
 
+// Shared by every endpoint the bridge itself calls (never a browser) —
+// the device secret is the only proof these came from the bridge.
+function deviceAuthorized(req) {
+  const secret = req.headers['x-attendance-device-secret'];
+  return !!process.env.ATTENDANCE_DEVICE_SECRET && secret === process.env.ATTENDANCE_DEVICE_SECRET;
+}
+
 // ── POST /api/attendance/events — public device callback ──
 router.post('/events', async (req, res) => {
   try {
-    const secret = req.headers['x-attendance-device-secret'];
-    if (!process.env.ATTENDANCE_DEVICE_SECRET || secret !== process.env.ATTENDANCE_DEVICE_SECRET) {
-      return res.status(401).end();
-    }
+    if (!deviceAuthorized(req)) return res.status(401).end();
     const { employeeCode, timestamp, type, deviceId } = req.body || {};
     if (!employeeCode || !timestamp || !['CLOCK_IN', 'CLOCK_OUT'].includes(type)) {
       return res.status(400).json({ error: 'employeeCode, timestamp and type (CLOCK_IN/CLOCK_OUT) are required.' });
@@ -93,6 +99,71 @@ router.post('/events', async (req, res) => {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('[attendance events]', err);
     res.status(500).json({ error: 'Could not record attendance event.' });
+  }
+});
+
+// A bridge is considered offline once it's missed roughly 3 heartbeats in a
+// row rather than just 1 — a single dropped request over a flaky link
+// shouldn't page anyone.
+const DEVICE_OFFLINE_AFTER_MS = 15 * 60 * 1000;
+
+// ── POST /api/attendance/devices/heartbeat — public bridge callback ──
+// The bridge (attendance-bridge/hikvision-bridge.js) posts this on an
+// interval, independent of whether any punches occurred, so a quiet
+// terminal (nobody badged in) is never confused with a dead bridge.
+router.post('/devices/heartbeat', async (req, res) => {
+  try {
+    if (!deviceAuthorized(req)) return res.status(401).end();
+    const { deviceId, label, bridgeVersion, queueDepth, lastEventAt, pollEnabled, lastPollAt, lastPollOk, lastPollError } = req.body || {};
+    if (!deviceId) return res.status(400).json({ error: 'deviceId is required.' });
+
+    const device = await prisma.attendanceDevice.upsert({
+      where: { deviceId },
+      create: {
+        deviceId,
+        label: label || null,
+        bridgeVersion: bridgeVersion || null,
+        lastSeenAt: new Date(),
+        lastEventAt: lastEventAt ? new Date(lastEventAt) : null,
+        queueDepth: Number.isFinite(queueDepth) ? queueDepth : null,
+        pollEnabled: !!pollEnabled,
+        lastPollAt: lastPollAt ? new Date(lastPollAt) : null,
+        lastPollOk: typeof lastPollOk === 'boolean' ? lastPollOk : null,
+        lastPollError: lastPollError || null,
+      },
+      update: {
+        ...(label ? { label } : {}),
+        bridgeVersion: bridgeVersion || null,
+        lastSeenAt: new Date(),
+        lastEventAt: lastEventAt ? new Date(lastEventAt) : undefined,
+        queueDepth: Number.isFinite(queueDepth) ? queueDepth : null,
+        pollEnabled: !!pollEnabled,
+        lastPollAt: lastPollAt ? new Date(lastPollAt) : undefined,
+        lastPollOk: typeof lastPollOk === 'boolean' ? lastPollOk : null,
+        lastPollError: lastPollError || null,
+      },
+    });
+    res.json({ ok: true, deviceId: device.deviceId });
+  } catch (err) {
+    console.error('[attendance devices heartbeat]', err);
+    res.status(500).json({ error: 'Could not record heartbeat.' });
+  }
+});
+
+// ── GET /api/attendance/devices — HR visibility into bridge health ──
+router.get('/devices', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
+  try {
+    const devices = await prisma.attendanceDevice.findMany({ orderBy: { deviceId: 'asc' } });
+    const now = Date.now();
+    res.json({
+      devices: devices.map(d => ({
+        ...d,
+        online: !!d.lastSeenAt && (now - new Date(d.lastSeenAt).getTime()) < DEVICE_OFFLINE_AFTER_MS,
+      })),
+    });
+  } catch (err) {
+    console.error('[attendance devices list]', err);
+    res.status(500).json({ error: 'Could not load device status.' });
   }
 });
 

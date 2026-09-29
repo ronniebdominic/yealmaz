@@ -10,6 +10,8 @@ import { MdAdd, MdCheckCircle, MdCancel, MdEventBusy, MdSchedule, MdLogout, MdWa
 import { inputStyle } from '../../../utils/adminForms';
 import AttendanceCorrectionModal from '../components/AttendanceCorrectionModal';
 import AttendanceOverview from './AttendanceOverview';
+import DeviceStatusBar from '../components/DeviceStatusBar';
+import SourceDot from '../components/SourceDot';
 
 const STATUS_LABELS = {
   PRESENT: 'Present', IN_PROGRESS: 'In Progress', ABSENT: 'Absent', ON_LEAVE: 'On Leave',
@@ -67,6 +69,7 @@ export default function AttendanceTab({ employees, onOpenClockEvent }) {
     return (
       <div>
         {viewToggle}
+        <DeviceStatusBar />
         <AttendanceOverview employees={employees} />
       </div>
     );
@@ -75,6 +78,7 @@ export default function AttendanceTab({ employees, onOpenClockEvent }) {
   return (
     <div>
       {viewToggle}
+      <DeviceStatusBar />
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>DATE</div>
@@ -129,8 +133,8 @@ export default function AttendanceTab({ employees, onOpenClockEvent }) {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 600 }}>{r.name}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.shift?.name || '—'}</td>
-                  <td>{r.clockIn ? format(new Date(r.clockIn), 'h:mm a') : '—'}</td>
-                  <td>{r.clockOut ? format(new Date(r.clockOut), 'h:mm a') : '—'}</td>
+                  <td>{r.clockIn ? <>{format(new Date(r.clockIn), 'h:mm a')}<SourceDot source={r.clockInSource} /></> : '—'}</td>
+                  <td>{r.clockOut ? <>{format(new Date(r.clockOut), 'h:mm a')}<SourceDot source={r.clockOutSource} /></> : '—'}</td>
                   <td style={{ textAlign: 'center' }}>{r.breakMinutes}m</td>
                   <td style={{ textAlign: 'center' }}>{r.workingHours}h</td>
                   <td style={{ textAlign: 'center' }}>{r.regularHours}h</td>

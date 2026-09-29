@@ -32,6 +32,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+const BRIDGE_VERSION = '1.1.0';
+
 const CONFIG = {
   PORT: parseInt(process.env.BRIDGE_PORT, 10) || 9000,
   API_BASE: process.env.API_BASE || 'https://yealmaz-production.up.railway.app',
@@ -45,7 +47,20 @@ const CONFIG = {
   DEDUPE_WINDOW_MS: 60 * 1000,
   RETRY_BASE_MS: 5000,
   MAX_RETRY_MS: 5 * 60 * 1000,
+  // Independent of push/poll - lets HR see from the LMS itself that this
+  // bridge is alive, even on a day nobody badges in at all.
+  HEARTBEAT_INTERVAL_MS: parseInt(process.env.HEARTBEAT_INTERVAL_MS, 10) || 5 * 60 * 1000,
 };
+
+// Some employees were enrolled on the terminal before the EMP0xx convention
+// (see README "Before anything else") was adopted, so the terminal still
+// reports its own auto-assigned number for them. Translate those here
+// rather than re-enrolling on the terminal itself, which would risk
+// touching their stored face/fingerprint templates for no benefit.
+let EMPLOYEE_CODE_MAP = {};
+try {
+  EMPLOYEE_CODE_MAP = JSON.parse(fs.readFileSync(path.join(__dirname, 'employee-code-map.json'), 'utf8'));
+} catch { /* optional - falls back to passing codes through unchanged */ }
 
 fs.mkdirSync(CONFIG.DATA_DIR, { recursive: true });
 const QUEUE_FILE = path.join(CONFIG.DATA_DIR, 'queue.jsonl');
@@ -63,6 +78,43 @@ let state = { lastPunch: {} };
 try { state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch { /* first run */ }
 function saveState() {
   try { fs.writeFileSync(STATE_FILE, JSON.stringify(state)); } catch (e) { log('WARN could not save state:', e.message); }
+}
+
+// ── Health reporting ─────────────────────────────────────────
+// In-memory only (not persisted) - these describe THIS process's current
+// run, and a restart legitimately resets them. Sent to the API on a
+// heartbeat so HR can see bridge/terminal health from inside the LMS
+// instead of only noticing it later as a gap in attendance data.
+let lastEventAt = null;
+let lastPoll = { at: null, ok: null, error: null };
+
+async function sendHeartbeat() {
+  try {
+    await fetch(`${CONFIG.API_BASE}/api/attendance/devices/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-attendance-device-secret': CONFIG.DEVICE_SECRET },
+      body: JSON.stringify({
+        deviceId: CONFIG.DEVICE_ID,
+        bridgeVersion: BRIDGE_VERSION,
+        queueDepth: readQueue().length,
+        lastEventAt,
+        pollEnabled: POLL.enabled,
+        lastPollAt: lastPoll.at,
+        lastPollOk: lastPoll.ok,
+        lastPollError: lastPoll.error,
+      }),
+    });
+  } catch (err) {
+    // Never fatal - a missed heartbeat just means HR's dashboard shows
+    // this bridge as offline a little longer than it actually was.
+    log('heartbeat failed (will retry next interval):', err.message);
+  }
+}
+
+function startHeartbeat() {
+  const run = () => sendHeartbeat();
+  setTimeout(run, 5000);
+  setInterval(run, CONFIG.HEARTBEAT_INTERVAL_MS);
 }
 
 // ── Parsing ─────────────────────────────────────────────────
@@ -114,8 +166,9 @@ function parseEvent(payload) {
   // Hikvision T&A mode reports check-in/check-out directly when the
   // terminal is configured for attendance; honour it when present.
   const attendanceStatus = deepFind(payload, ['attendanceStatus', 'checkInOut']);
+  const rawEmployeeNo = employeeNo != null ? String(employeeNo).trim() : null;
   return {
-    employeeNo: employeeNo != null ? String(employeeNo).trim() : null,
+    employeeNo: rawEmployeeNo != null ? (EMPLOYEE_CODE_MAP[rawEmployeeNo] || rawEmployeeNo) : null,
     dateTime: dateTime || new Date().toISOString(),
     name: name || null,
     attendanceStatus: attendanceStatus != null ? String(attendanceStatus).toLowerCase() : null,
@@ -332,6 +385,11 @@ function isapiTime(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${oh}:${om}`;
 }
 
+// employeeNo -> timestamp of their last accepted read. Shared with the push
+// handler below so a duplicate recovered by polling (e.g. after a restart)
+// gets the same rapid-fire guard as a live push.
+const recentReads = new Map();
+
 let firstPollDone = false;
 
 async function pollOnce() {
@@ -364,6 +422,18 @@ async function pollOnce() {
       const key = `${ev.employeeNo}|${new Date(ev.dateTime).toISOString()}`;
       if (state.seenEvents && state.seenEvents[key]) continue;
 
+      // Same rapid-duplicate-read guard as the live push path below - face
+      // terminals commonly fire twice in quick succession for one actual
+      // badge, which would otherwise become a fake instant IN->OUT pair.
+      const evTime = new Date(ev.dateTime).getTime();
+      const lastRead = recentReads.get(ev.employeeNo);
+      if (lastRead && Math.abs(evTime - lastRead) < CONFIG.DEDUPE_WINDOW_MS) {
+        state.seenEvents = state.seenEvents || {};
+        state.seenEvents[key] = Date.now();
+        continue;
+      }
+      recentReads.set(ev.employeeNo, evTime);
+
       const type = deriveType(ev);
       state.lastPunch[`${ev.employeeNo}|${dayKey(ev.dateTime)}`] = type;
       state.seenEvents = state.seenEvents || {};
@@ -378,10 +448,14 @@ async function pollOnce() {
         viaPoll: true,
       });
       queued++;
+      if (!lastEventAt || new Date(ev.dateTime) > new Date(lastEventAt)) lastEventAt = new Date(ev.dateTime).toISOString();
     }
 
     position += list.length;
-    if (list.length < POLL.maxResults || result.responseStatusStrg === 'OK') break;
+    // The terminal caps each response batch well below the maxResults we
+    // request, so a short batch does NOT mean "no more data" - only
+    // responseStatusStrg tells us that ("MORE" = keep paging).
+    if (list.length === 0 || result.responseStatusStrg !== 'MORE') break;
     if (position > 5000) break; // sanity stop
   }
 
@@ -406,19 +480,25 @@ function startPolling() {
     return;
   }
   log(`ISAPI polling every ${Math.round(POLL.intervalMs / 60000)}min against ${POLL.ip} (backstop for missed pushes)`);
-  const run = () => pollOnce().catch(e => log('poll failed (will retry):', e.message));
+  const run = () => pollOnce()
+    .then(() => { lastPoll = { at: new Date().toISOString(), ok: true, error: null }; })
+    .catch(e => {
+      lastPoll = { at: new Date().toISOString(), ok: false, error: e.message };
+      log('poll failed (will retry):', e.message);
+    });
   setTimeout(run, 10000);
   setInterval(run, POLL.intervalMs);
 }
 
 // ── HTTP server the terminal posts to ───────────────────────
-const recentReads = new Map(); // employeeNo -> timestamp
-
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url.startsWith('/health')) {
     const queued = readQueue().length;
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ ok: true, queued, device: CONFIG.DEVICE_ID, api: CONFIG.API_BASE }));
+    return res.end(JSON.stringify({
+      ok: true, queued, device: CONFIG.DEVICE_ID, api: CONFIG.API_BASE, version: BRIDGE_VERSION,
+      lastEventAt, pollEnabled: POLL.enabled, lastPoll,
+    }));
   }
 
   if (req.method !== 'POST') {
@@ -460,6 +540,10 @@ const server = http.createServer((req, res) => {
 
     const type = deriveType(ev);
     state.lastPunch[`${ev.employeeNo}|${dayKey(ev.dateTime)}`] = type;
+    // Mark as seen so the polling backstop doesn't re-process this punch
+    // (and flip lastPunch) when it later finds it in the terminal's log.
+    state.seenEvents = state.seenEvents || {};
+    state.seenEvents[`${ev.employeeNo}|${new Date(ev.dateTime).toISOString()}`] = Date.now();
     saveState();
 
     enqueue({
@@ -469,6 +553,7 @@ const server = http.createServer((req, res) => {
       name: ev.name,
       receivedAt: new Date().toISOString(),
     });
+    lastEventAt = new Date(ev.dateTime).toISOString();
     log(`queued ${ev.employeeNo}${ev.name ? ` (${ev.name})` : ''} ${type}`);
     drain();
   });
@@ -487,4 +572,5 @@ server.listen(CONFIG.PORT, () => {
   const pending = readQueue().length;
   if (pending) { log(`  ${pending} punch(es) queued from a previous run — draining`); drain(); }
   startPolling();
+  startHeartbeat();
 });

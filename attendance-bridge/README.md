@@ -30,6 +30,14 @@ hours by default, which is what covers an overnight or weekend shutdown.
 
 Leaving the PC on is still better. Polling is the safety net, not the plan.
 
+## Updating an already-deployed bridge
+
+Copy the new `hikvision-bridge.js` over the old one on the bridge PC and
+restart it (or let the scheduled task's next boot pick it up). It's a
+single file with no dependencies to reinstall. An older bridge without the
+heartbeat (pre-`v1.1.0`) keeps working exactly as before — it just won't
+show up on **HR → Attendance**'s device status strip until updated.
+
 ---
 
 ## Before anything else: employee numbers
@@ -187,6 +195,21 @@ punch should show against that person with source `BIOMETRIC`.
   terminal already pushed; the API's duplicate guard returns `409` for
   those, which costs nothing. That is why the poll window can be generous —
   a duplicate is free, a gap loses someone's attendance.
+- **A heartbeat posts every 5 minutes** (`HEARTBEAT_INTERVAL_MS` to change
+  it) to `/api/attendance/devices/heartbeat`, independent of whether anyone
+  badges in — deviceId, queue depth, last punch time, and poll status. This
+  is what lets **HR → Attendance** show whether this bridge is actually
+  online instead of only finding out later as a gap in the data. A missed
+  heartbeat is never fatal to the bridge itself.
+
+## Checking it's alive from the LMS
+
+**HR → Attendance** shows a status strip once this bridge has connected at
+least once: online/offline, time since the last punch, time since the last
+heartbeat, and any queue backlog. If it shows **"Never connected"**, the
+bridge either isn't running, can't reach `API_BASE`, or has the wrong
+`ATTENDANCE_DEVICE_SECRET` — check `data/raw-events.log` and the console
+output on the bridge PC itself first.
 
 ## Troubleshooting
 
@@ -199,3 +222,5 @@ punch should show against that person with source `BIOMETRIC`.
 | Missing punches after the PC was off | Expected for push; the catch-up poll on next start recovers them if `DEVICE_*` is set |
 | `poll failed` in the log | Wrong device password, or ISAPI is on a non-default port — test with the `deviceInfo` curl first |
 | Everyone shows as CLOCK_IN | Terminal isn't sending attendance status and someone missed a punch; HR can correct the day |
+| HR → Attendance shows "Never connected" | Bridge isn't running, can't reach `API_BASE` (no internet), or `ATTENDANCE_DEVICE_SECRET` is wrong — `heartbeat failed` in the console log points at the same causes as a `401`/network error on a punch |
+| HR → Attendance shows "Offline" | Bridge was running but hasn't heartbeated in 15+ minutes — check whether the process/PC is still up |

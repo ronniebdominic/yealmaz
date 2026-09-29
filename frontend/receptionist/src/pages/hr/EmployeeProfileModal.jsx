@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { MdEdit, MdEventBusy, MdDialpad } from 'react-icons/md';
 import ProfileModal from './components/ProfileModal';
 import LeaveModal from './components/LeaveModal';
+import SourceDot from './components/SourceDot';
 
 const LIVE_TABS = [
   'Overview', 'Attendance', 'Timesheets', 'Leave', 'Overtime',
@@ -206,8 +207,8 @@ function AttendanceTabInner({ employeeId, hasPin, onPinChanged }) {
             ) : days.map(d => (
               <tr key={d.date}>
                 <td>{d.date}</td>
-                <td>{d.clockIn ? format(new Date(d.clockIn), 'h:mm a') : '—'}</td>
-                <td>{d.clockOut ? format(new Date(d.clockOut), 'h:mm a') : '—'}</td>
+                <td>{d.clockIn ? <>{format(new Date(d.clockIn), 'h:mm a')}<SourceDot source={d.clockInSource} /></> : '—'}</td>
+                <td>{d.clockOut ? <>{format(new Date(d.clockOut), 'h:mm a')}<SourceDot source={d.clockOutSource} /></> : '—'}</td>
                 <td style={{ textAlign: 'center' }}>{d.workingHours}h</td>
                 <td style={{ textAlign: 'center', color: d.overtimeHours > 0 ? 'var(--amber)' : undefined }}>{d.overtimeHours || '—'}</td>
                 <td style={{ textAlign: 'center' }}><span className="badge">{d.status}</span></td>

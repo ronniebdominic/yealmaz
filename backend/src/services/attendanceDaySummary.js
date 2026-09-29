@@ -57,34 +57,44 @@ const minutesBetween = (a, b) => (b.getTime() - a.getTime()) / 60000;
 function computeDaySummary({ date, events, shift, holiday, leaveRecord, correction }) {
   const sorted = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // Pair CLOCK_IN/OUT and BREAK_START/END into closed segments. Unpaired
-  // trailing opens (e.g. a CLOCK_IN with no CLOCK_OUT yet) are left open,
-  // not dropped or auto-closed — the caller decides what an open segment
-  // means (IN_PROGRESS today, MISSING_PUNCH for a past day).
-  let workOpen = null, breakOpen = null;
-  const workSegments = [], breakSegments = [];
+  // Working time is the span from the day's FIRST CLOCK_IN to its LAST
+  // CLOCK_OUT. IN/OUT pairs in between (lunch runs, re-badges) don't
+  // subtract anything; only explicitly recorded breaks do.
   let clockIn = null, clockOut = null;
+  // Which source produced the punch that became clockIn/clockOut — lets the
+  // UI show a device/manual/kiosk/geofence badge without a second query.
+  let clockInSource = null, clockOutSource = null;
 
-  for (const e of sorted) {
-    const ts = new Date(e.timestamp);
-    if (e.type === 'CLOCK_IN') {
-      if (!clockIn) clockIn = ts;
-      if (!workOpen) workOpen = ts;
-    } else if (e.type === 'BREAK_START') {
-      if (workOpen) { workSegments.push([workOpen, ts]); workOpen = null; }
-      if (!breakOpen) breakOpen = ts;
-    } else if (e.type === 'BREAK_END') {
-      if (breakOpen) { breakSegments.push([breakOpen, ts]); breakOpen = null; }
-      if (!workOpen) workOpen = ts;
-    } else if (e.type === 'CLOCK_OUT') {
-      if (workOpen) { workSegments.push([workOpen, ts]); workOpen = null; }
-      clockOut = ts;
+  const firstIn = sorted.find(e => e.type === 'CLOCK_IN');
+  if (firstIn) {
+    clockIn = new Date(firstIn.timestamp);
+    clockInSource = firstIn.source;
+    const lastOut = [...sorted].reverse().find(e => e.type === 'CLOCK_OUT');
+    if (lastOut && new Date(lastOut.timestamp) > clockIn) {
+      clockOut = new Date(lastOut.timestamp);
+      clockOutSource = lastOut.source;
     }
   }
 
-  let workingMinutes = workSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
+  let breakOpen = null;
+  const breakSegments = [];
+  for (const e of sorted) {
+    const ts = new Date(e.timestamp);
+    if (e.type === 'BREAK_START') {
+      if (!breakOpen) breakOpen = ts;
+    } else if (e.type === 'BREAK_END') {
+      if (breakOpen) { breakSegments.push([breakOpen, ts]); breakOpen = null; }
+    }
+  }
   const breakMinutes = breakSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
-  const hasOpenSegment = !!workOpen;
+  let workingMinutes = clockIn && clockOut ? Math.max(0, minutesBetween(clockIn, clockOut) - breakMinutes) : 0;
+
+  // No CLOCK_IN, or no CLOCK_OUT after it, means the day has no end yet
+  // (today) or is missing a punch (a past day). Today, a CLOCK_IN after the
+  // last CLOCK_OUT also means the person is presumably back on site.
+  const lastType = sorted.length ? sorted[sorted.length - 1].type : null;
+  const hasOpenSegment = sorted.length > 0 && (!clockIn || !clockOut ||
+    (lastType === 'CLOCK_IN' && localDayKey(date) === localDayKey(new Date())));
 
   // An approved correction overrides the raw-derived clock-in/out and
   // working-minutes for every downstream calculation — the raw events
@@ -96,6 +106,8 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
     const co = correction.correctedClockOut ? new Date(correction.correctedClockOut) : clockOut;
     clockIn = ci;
     clockOut = co;
+    if (correction.correctedClockIn) clockInSource = 'CORRECTED';
+    if (correction.correctedClockOut) clockOutSource = 'CORRECTED';
     if (ci && co) workingMinutes = Math.max(0, minutesBetween(ci, co) - breakMinutes);
   }
 
@@ -117,7 +129,7 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
     status = 'HALF_DAY_LEAVE';
   } else if (sorted.length === 0) {
     status = 'ABSENT';
-  } else if (hasOpenSegment && !clockOut) {
+  } else if (hasOpenSegment) {
     status = localDayKey(date) === localDayKey(new Date()) ? 'IN_PROGRESS' : 'MISSING_PUNCH';
   } else {
     status = 'PRESENT';
@@ -155,6 +167,8 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
     earlyDepartureMinutes,
     clockIn,
     clockOut,
+    clockInSource,
+    clockOutSource,
     breakMinutes: Math.round(breakMinutes),
     workingHours: Math.round(workingMinutes / 6) / 10,
     regularHours,

@@ -846,11 +846,12 @@ enum AttendanceSource {
   KIOSK // shared PIN terminal at reception — for staff with no smartphone, who cannot use the geofenced self-service flow. Deliberately distinct from GEOFENCE: a PIN on a shared device is a weaker identity claim than a geofenced personal login, and the data should say which it was.
 }
 
-// Caseless, caseless-adjacent ledger of raw clock events. Biometric-device
-// integration is not live yet — POST /api/attendance/events is built and
-// secured, ready to receive real device pushes once one is chosen; most
-// rows today come from HR's manual entry (source: MANUAL) or delivery
-// agents' self-service geofenced clock-in/out (source: GEOFENCE).
+// Caseless, caseless-adjacent ledger of raw clock events. POST
+// /api/attendance/events is live — the Hikvision bridge (see
+// attendance-bridge/) forwards real device punches here with source:
+// BIOMETRIC. Other rows come from HR's manual entry (MANUAL), delivery
+// agents' self-service geofenced clock-in/out (GEOFENCE), or the reception
+// PIN kiosk (KIOSK).
 model AttendanceEvent {
   id             String              @id @default(uuid())
   userId         String
@@ -872,6 +873,29 @@ model AttendanceEvent {
   @@index([userId])
   @@index([timestamp])
   @@map("attendance_events")
+}
+
+// One row per physical device/bridge, kept current by a heartbeat the
+// bridge posts on an interval (see attendance-bridge/hikvision-bridge.js).
+// Lets HR see from the LMS itself whether a terminal has gone quiet —
+// without this, an offline bridge only shows up indirectly, as a gap in
+// attendance data days later.
+model AttendanceDevice {
+  id            String    @id @default(uuid())
+  deviceId      String    @unique
+  label         String?
+  bridgeVersion String?
+  lastSeenAt    DateTime?
+  lastEventAt   DateTime?
+  queueDepth    Int?
+  pollEnabled   Boolean   @default(false)
+  lastPollAt    DateTime?
+  lastPollOk    Boolean?
+  lastPollError String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("attendance_devices")
 }
 
 enum LeaveStatus {
