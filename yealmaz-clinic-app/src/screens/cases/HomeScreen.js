@@ -50,7 +50,13 @@ export default function HomeScreen({ navigation }) {
   }, [navigation, queryClient]);
 
   const active    = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
-  const pending   = cases.filter(c => c.paymentStatus === 'SCREENSHOT_UPLOADED');
+  // Anything still needing the clinic's attention on payment — a request sent
+  // and not yet paid, a receipt awaiting the lab's review, or one the lab sent
+  // back. Matches CasesScreen's own 'payment' filter so the count on this tile
+  // and the list it opens (navigate('Cases', {filter:'payment'}) below) always
+  // agree — this used to only count SCREENSHOT_UPLOADED, so a clinic with an
+  // unpaid payment request saw 0 here even though money was actually owed.
+  const pending   = cases.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
   const delivered = cases.filter(c => c.status === 'DELIVERED');
   const recent    = [...cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
