@@ -1118,7 +1118,14 @@ router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), a
 // amount is deliberately left alone — silently rewriting a verified payment
 // would corrupt the financial record. The response flags this so the UI can
 // tell the receptionist to loop in Finance/Admin for a manual adjustment.
-router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
+// LAB_TECH included so Quality Control can correct what was actually
+// produced — units, tooth numbers, shade — right before confirming the scan
+// that sends a case on to dispatch. The frontend only surfaces this editing
+// at the QC department's scan-confirmation step (see LabDashboard.jsx), but
+// the permission itself isn't department-scoped (the schema has no per-field
+// "which department may touch this" concept), so any lab tech account can
+// call it — same trust level RECEPTIONIST already has here.
+router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST', 'LAB_TECH'), async (req, res) => {
   try {
     const existing = await prisma.case.findUnique({ where: { id: req.params.id }, include: { payment: true } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
@@ -1127,12 +1134,20 @@ router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
     if (!Number.isInteger(units) || units < 1) {
       return res.status(400).json({ error: 'Units must be a whole number of at least 1.' });
     }
+    // Optional — only QC's confirm screen sends these today. Trimmed,
+    // and `undefined` (not sent) is left alone rather than blanked to ''.
+    const toothNumbers = typeof req.body.toothNumbers === 'string' ? req.body.toothNumbers.trim() : undefined;
+    const shade = typeof req.body.shade === 'string' ? req.body.shade.trim() : undefined;
 
     const oldUnits = existing.units ?? 0;
     const unitsChanged = units !== oldUnits;
+    const toothChanged = toothNumbers !== undefined && toothNumbers !== (existing.toothNumbers || '');
+    const shadeChanged = shade !== undefined && shade !== (existing.shade || '');
 
     let priceAdjustment = { changed: false, reason: 'unchanged', oldAmount: existing.totalAmount ?? null, newAmount: existing.totalAmount ?? null };
     const caseData = { units };
+    if (toothChanged) caseData.toothNumbers = toothNumbers || null;
+    if (shadeChanged) caseData.shade = shade || null;
 
     if (unitsChanged) {
       if (existing.payment?.status === 'VERIFIED') {
@@ -1166,23 +1181,30 @@ router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       return c;
     });
 
-    if (unitsChanged) {
-      const priceNote = priceAdjustment.changed
+    if (unitsChanged || toothChanged || shadeChanged) {
+      const priceNote = !unitsChanged ? '' : priceAdjustment.changed
         ? ` — billed amount adjusted from Br ${priceAdjustment.oldAmount?.toLocaleString('en-US')} to Br ${priceAdjustment.newAmount.toLocaleString('en-US')}`
         : priceAdjustment.reason === 'payment_verified'
           ? ' — amount left unchanged (payment already verified)'
           : '';
+      const changes = [
+        unitsChanged && `units ${existing.units ?? '—'} → ${units}`,
+        toothChanged && `tooth numbers "${existing.toothNumbers || '—'}" → "${toothNumbers || '—'}"`,
+        shadeChanged && `shade "${existing.shade || '—'}" → "${shade || '—'}"`,
+      ].filter(Boolean).join(', ');
       await prisma.caseStage.create({
         data: {
           caseId: req.params.id,
           stageName: existing.status,
           scannedBy: req.user.name,
-          notes: `Units changed from ${existing.units ?? '—'} to ${units} by ${req.user.name}${priceNote}`,
+          notes: `Corrected by ${req.user.name}: ${changes}${priceNote}`,
         }
       });
     }
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+    // case:lab:* too — QC reads this same case through GET /lab/case/:id
+    // (the scan-confirm screen), which caches separately under that key.
+    await invalidate(`case:${req.params.id}`, `case:lab:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });

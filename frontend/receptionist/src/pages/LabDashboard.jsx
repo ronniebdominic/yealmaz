@@ -413,10 +413,18 @@ function ManualEntryModal({ onSubmit, onClose }) {
 // stage notes from clinic-facing case responses).
 const COMMENT_DEPARTMENTS = new Set(['MILLING', 'MARGIN']);
 
-function ScanResultModal({ result, onConfirm, onClose, loading, department, comment, onCommentChange }) {
+function ScanResultModal({
+  result, onConfirm, onClose, loading, department, comment, onCommentChange,
+  qcUnits, onQcUnitsChange, qcToothNumbers, onQcToothNumbersChange, qcShade, onQcShadeChange,
+}) {
   if (!result) return null;
   const dept = DEPARTMENTS.find(d => d.code === department);
   const showComment = COMMENT_DEPARTMENTS.has(department);
+  // QC is the last human check before a case leaves for dispatch, so this is
+  // where a wrong unit count, tooth range or shade gets caught and fixed —
+  // not after it's already on its way out. Saved via PATCH /cases/:id/units
+  // in confirmScan, before the scan itself advances the case.
+  const isQC = department === 'QC';
 
   return (
     <div className="tp-sheet-scrim">
@@ -446,6 +454,44 @@ function ScanResultModal({ result, onConfirm, onClose, loading, department, comm
             </div>
           )}
         </div>
+
+        {/* QC correction — units / tooth numbers / shade, last chance before dispatch */}
+        {isQC && (
+          <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', padding: '14px 16px', marginBottom: 16 }}>
+            <div className="tp-field-l" style={{ textTransform: 'none', letterSpacing: 0, marginBottom: 10 }}>
+              Verify before dispatch — correct anything that doesn't match the physical case
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Units</div>
+                <input
+                  type="number" min={1} inputMode="numeric"
+                  value={qcUnits}
+                  onChange={e => onQcUnitsChange(e.target.value)}
+                  className="tp-input"
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Shade</div>
+                <input
+                  value={qcShade}
+                  onChange={e => onQcShadeChange(e.target.value)}
+                  placeholder="e.g. A2"
+                  className="tp-input"
+                />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>Tooth Numbers</div>
+              <input
+                value={qcToothNumbers}
+                onChange={e => onQcToothNumbersChange(e.target.value)}
+                placeholder="e.g. 14, 15, 16"
+                className="tp-input"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Stage history */}
         {result.stages?.length > 0 && (
@@ -834,6 +880,11 @@ export default function LabDashboard() {
   const [showMillingYield, setShowMillingYield] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanComment, setScanComment] = useState('');
+  // QC-only corrections, made right at the scan-confirm step before the case
+  // moves on to dispatch — see ScanResultModal's "department === 'QC'" branch.
+  const [qcUnits, setQcUnits] = useState('');
+  const [qcToothNumbers, setQcToothNumbers] = useState('');
+  const [qcShade, setQcShade] = useState('');
   const [processing, setProcessing] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
   const [scanOk, setScanOk] = useState(false); // brief visual scan-success flash
@@ -869,6 +920,9 @@ export default function LabDashboard() {
     try {
       const res = await api.get(`/lab/case/${caseId}`);
       setScanResult(res.data);
+      setQcUnits(res.data.units != null ? String(res.data.units) : '');
+      setQcToothNumbers(res.data.toothNumbers || '');
+      setQcShade(res.data.shade || '');
     } catch (err) {
       toast.error('Case not found. Invalid QR code.');
     }
@@ -880,6 +934,27 @@ export default function LabDashboard() {
     confirmingRef.current = true;
     setProcessing(true);
     try {
+      // QC gets one last chance to correct what was actually produced —
+      // units, tooth numbers, shade — before the case moves on to dispatch.
+      // Saved first (and only if something actually changed) so a failure
+      // here stops the scan rather than silently going through unedited.
+      if (activeDept === 'QC') {
+        const unitsNum = parseInt(qcUnits, 10);
+        if (!Number.isInteger(unitsNum) || unitsNum < 1) {
+          toast.error('Units must be a whole number of at least 1.');
+          return;
+        }
+        const changed = unitsNum !== (scanResult.units ?? 0)
+          || qcToothNumbers.trim() !== (scanResult.toothNumbers || '')
+          || qcShade.trim() !== (scanResult.shade || '');
+        if (changed) {
+          await api.patch(`/cases/${scanResult.id}/units`, {
+            units: unitsNum,
+            toothNumbers: qcToothNumbers.trim(),
+            shade: qcShade.trim(),
+          });
+        }
+      }
       const res = await api.post(`/scan/${scanResult.id}`, {
         department: activeDept,
         techName: user?.name,
@@ -1118,6 +1193,12 @@ export default function LabDashboard() {
           loading={processing}
           comment={scanComment}
           onCommentChange={setScanComment}
+          qcUnits={qcUnits}
+          onQcUnitsChange={setQcUnits}
+          qcToothNumbers={qcToothNumbers}
+          onQcToothNumbersChange={setQcToothNumbers}
+          qcShade={qcShade}
+          onQcShadeChange={setQcShade}
         />
       )}
     </div>
