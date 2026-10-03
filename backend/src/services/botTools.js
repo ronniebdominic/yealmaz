@@ -25,12 +25,24 @@ const insights = require('./botInsights');
 // UI-only detail — they never change a total, a count, or an amount.
 
 function trimAdminAnalytics(data) {
+  // kpi.pendingPayments is a global, never-date-scoped count of payment
+  // SCREENSHOTS awaiting Finance's review — it does NOT include trusted-
+  // partner clinics (whose delivered cases sit at paymentStatus PENDING,
+  // unbilled, until Finance generates a statement) or ordinary clinics with
+  // a payment request still unpaid. Left under its original name next to
+  // outstandingAmount/outstandingCount — real money still owed, for THIS
+  // date range — the model read "pendingPayments" as "money owed" and
+  // reported Br 0 for a day with real unbilled trusted-partner deliveries.
+  // Renamed here (the dashboard UI keeps the original field; only the
+  // model's copy changes) so the two can't be confused again.
+  const { pendingPayments, ...restKpi } = data.kpi || {};
+  const kpi = { ...restKpi, paymentScreenshotsAwaitingVerification: pendingPayments };
   return {
-    kpi: data.kpi,
+    kpi,
     monthlyTrendLast6Months: (data.monthlyTrend || []).slice(-6),
     topClinicsByRevenue: (data.revenueByClinic || []).slice(0, 10),
     topWorkTypesByRevenue: (data.revenueByWorkType || []).slice(0, 10),
-    note: 'clinicList and the full per-clinic/work-type breakdown are omitted here — use search_cases or get_clinic_statement for clinic-specific detail.',
+    note: "For \"pending/unpaid payments\" or money still owed (including trusted partners not yet billed), use outstandingAmount/outstandingCount — NOT paymentScreenshotsAwaitingVerification, which is only the small, date-independent queue of uploaded receipts Finance hasn't reviewed yet. clinicList and the full per-clinic/work-type breakdown are omitted here — use search_cases or get_clinic_statement for clinic-specific detail.",
   };
 }
 
