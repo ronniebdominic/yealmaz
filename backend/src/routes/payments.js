@@ -1208,6 +1208,40 @@ router.get('/statement/:clinicId', protect, restrict('ADMIN', 'FINANCE', 'FINANC
   }
 });
 
+// ── GET /api/payments/statement ──────────────────────────
+// Same query as getClinicStatement, but across EVERY trusted-partner clinic
+// at once instead of one — backs the Trusted Partner Clinics table's
+// "Pending Payments" export (date range -> every outstanding case for every
+// trusted clinic in that range, one flat list). dateFrom/dateTo are
+// required here (unlike the single-clinic version, where an unbounded "all
+// outstanding" is a deliberate default) — an unbounded all-clinics pull
+// has no natural size cap and isn't what "export this period" means anyway.
+router.get('/statement', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
+  try {
+    const { dateFrom, dateTo } = req.query;
+    if (!dateFrom || !dateTo) return res.status(400).json({ error: 'dateFrom and dateTo are required.' });
+    const cases = await prisma.case.findMany({
+      where: {
+        clinic: { isExcluded: true },
+        paymentStatus: 'PENDING',
+        status: 'DELIVERED',
+        deliveryDate: { gte: startOfDay(dateFrom), lte: endOfDay(dateTo) },
+      },
+      include: {
+        clinic: { select: { name: true, phone: true, address: true } },
+        payment: { select: { invoiceNumber: true, amount: true, fsNumber: true, amountReceived: true } },
+      },
+      // Clinic first, then oldest-first within each clinic — reads like one
+      // clinic's section after another, not interleaved by date.
+      orderBy: [{ clinic: { name: 'asc' } }, { createdAt: 'asc' }],
+    });
+    res.json(cases);
+  } catch (err) {
+    console.error('[payments statement all]', err);
+    res.status(500).json({ error: 'Could not fetch statements.' });
+  }
+});
+
 // ── POST /api/payments/:caseId/fs-number ─────────────────
 // Manually recorded FS number (the clinic's paper sales-invoice/fiscal
 // receipt number) — Finance types this in while reconciling a Trusted

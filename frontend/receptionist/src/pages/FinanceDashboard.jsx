@@ -1485,6 +1485,11 @@ function TrustedPartnersTab({ queryClient }) {
   const [search, setSearch] = useState('');
   const [quickCollect, setQuickCollect] = useState(null); // { clinic, cases } → BulkPaymentModal, all outstanding pre-loaded
   const [quickCollectLoading, setQuickCollectLoading] = useState(null); // clinic id currently fetching
+  // "Pending Payments" export — every trusted clinic's outstanding cases
+  // delivered within [pendingFrom, pendingTo], one row per case. Defaults to
+  // this month to date, same as the rest of the app's date-range pickers.
+  const [pendingFrom, setPendingFrom] = useState(() => toLocalDateString(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [pendingTo, setPendingTo]     = useState(() => toLocalDateString(new Date()));
 
   // One-click payment collection from the row itself — skips opening
   // "Generate Bill" just to tick every box, by fetching this clinic's whole
@@ -1636,6 +1641,51 @@ function TrustedPartnersTab({ queryClient }) {
             title="Trusted Partners Summary"
           />
         </div>
+
+        {/* Pending Payments export — every trusted clinic's outstanding cases
+            delivered in a chosen date range, one row per case. Distinct from
+            the summary Export above (current per-clinic totals, no date
+            filter, one row per clinic). */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
+            <MdPendingActions size={15} /> Pending Payments
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>FROM</div>
+            <input type="date" value={pendingFrom} onChange={e => setPendingFrom(e.target.value)}
+              style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 3 }}>TO</div>
+            <input type="date" value={pendingTo} onChange={e => setPendingTo(e.target.value)}
+              style={{ padding: '7px 10px', fontSize: 13, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-1)' }} />
+          </div>
+          <ExportMenu
+            fetchData={async () => {
+              if (!pendingFrom || !pendingTo) { toast.error('Pick a from and to date first'); return []; }
+              const { data } = await api.get('/payments/statement', { params: { dateFrom: pendingFrom, dateTo: pendingTo } });
+              return data;
+            }}
+            columns={[
+              { header: 'Clinic',          value: c => c.clinic?.name },
+              { header: 'Phone',           value: c => c.clinic?.phone || '' },
+              { header: 'Case #',          value: c => c.caseNumber },
+              { header: 'Patient',         value: c => c.patientName },
+              { header: 'Work Type',       value: c => c.workType },
+              { header: 'Units',           value: c => c.units ?? '' },
+              { header: 'Created On',      value: c => c.createdAt ? format(new Date(c.createdAt), 'dd MMM yyyy') : '' },
+              { header: 'Delivered On',    value: c => c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '' },
+              { header: 'Invoice #',       value: c => c.payment?.invoiceNumber || '' },
+              { header: 'FS #',            value: c => c.payment?.fsNumber || '' },
+              { header: 'Amount Billed (Br)',   value: c => (c.payment?.amount ?? c.totalAmount ?? 0).toFixed(2) },
+              { header: 'Amount Received (Br)', value: c => (c.payment?.amountReceived || 0).toFixed(2) },
+              { header: 'Amount Outstanding (Br)', value: c => ((c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0)).toFixed(2) },
+            ]}
+            filename={`pending-payments_${pendingFrom}_to_${pendingTo}`}
+            title={`Pending Payments — ${pendingFrom} to ${pendingTo}`}
+          />
+        </div>
+
         {filteredSummary.length === 0 ? (
           <div className="empty-state" style={{ padding: '40px 20px' }}>
             <div className="empty-icon mi"><MdSearch size={28} /></div>
