@@ -60,7 +60,112 @@ async function computeAttendanceRollup(from, to, employeeFilter = {}) {
   return rollup;
 }
 
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const hhmm = (d) => d ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+
+// Per-employee, per-day attendance detail — one row per working day, not a
+// rolled-up count. Shares computeAttendanceRollup's batched fetch (one query
+// per data source for the whole range, not per day/employee) so adding this
+// didn't cost a second round of N+1 queries.
+//
+// "Hours Present" is the raw clock-in-to-clock-out span minus only explicitly
+// punched breaks (BREAK_START/BREAK_END) — what the gate actually saw.
+// "Regular Hours"/"Overtime Hours" are the POLICY figures HR actually pays
+// against: capped at the shift's expected hours (end − start − the shift's
+// configured breakMinutes), so the company-wide rule — a 9-hour shift span
+// with a 1-hour lunch provided at the office, netting 8 paid hours — is
+// applied whether or not someone separately punches a lunch break. Getting
+// that policy right is a Shift row's startTime/endTime/breakMinutes setting
+// (HR > Shifts), not something this report can fix on its own; see this
+// report's own 'note' column below if a shift's expected hours look wrong.
+async function computeAttendanceDetailRows(from, to, employeeFilter = {}) {
+  const employees = await prisma.user.findMany({ where: { isSharedAccount: false, isActive: true, ...employeeFilter }, select: { id: true, name: true } });
+  const [events, leaveRecords, holidays, assignments] = await Promise.all([
+    prisma.attendanceEvent.findMany({ where: { timestamp: { gte: from, lte: to } } }),
+    prisma.leaveRecord.findMany({ where: { status: 'APPROVED', fromDate: { lte: to }, toDate: { gte: from } } }),
+    prisma.holiday.findMany({ where: { date: { gte: from, lte: to } } }),
+    prisma.shiftAssignment.findMany({ where: { effectiveFrom: { lte: to }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: from } }] }, include: { shift: true }, orderBy: { effectiveFrom: 'asc' } }),
+  ]);
+  const eventsByUser = new Map();
+  for (const e of events) { if (!eventsByUser.has(e.userId)) eventsByUser.set(e.userId, []); eventsByUser.get(e.userId).push(e); }
+  const holidayByDay = new Map(holidays.map(h => [localDayKey(h.date), h]));
+  const assignmentsByUser = new Map();
+  for (const a of assignments) { if (!assignmentsByUser.has(a.userId)) assignmentsByUser.set(a.userId, []); assignmentsByUser.get(a.userId).push(a); }
+
+  const rows = [];
+  for (const emp of employees) {
+    const empEvents = eventsByUser.get(emp.id) || [];
+    const empAssignments = assignmentsByUser.get(emp.id) || [];
+    const empLeave = leaveRecords.filter(l => l.userId === emp.id);
+
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
+      const dayEvents = empEvents.filter(e => e.timestamp >= dayStart && e.timestamp <= dayEnd);
+      const shift = [...empAssignments].reverse().find(a => a.effectiveFrom <= dayEnd && (!a.effectiveTo || a.effectiveTo >= dayStart))?.shift || null;
+      const leave = empLeave.find(l => l.fromDate <= dayEnd && l.toDate >= dayStart) || null;
+      const summary = computeDaySummary({ date: dayStart, events: dayEvents, shift, holiday: holidayByDay.get(localDayKey(dayStart)) || null, leaveRecord: leave, correction: null });
+
+      // Skip days with nothing to report for an unassigned/non-working day —
+      // keeps the sheet to actual working days, leave, holidays and absences
+      // rather than padding it with blank weekends for every employee.
+      if (summary.status === 'OFF') continue;
+
+      const expectedHours = shift
+        ? round2(Math.max(0, (shift.overtimeThresholdMinutes ??
+            (new Date(`1970-01-01T${shift.endTime}:00`) - new Date(`1970-01-01T${shift.startTime}:00`)) / 60000 - shift.breakMinutes)) / 60)
+        : null;
+
+      rows.push({
+        employee: emp.name,
+        date: localDayKey(dayStart),
+        day: WEEKDAY_SHORT[dayStart.getDay()],
+        status: summary.status,
+        shift: shift?.name || '—',
+        clockIn: hhmm(summary.clockIn),
+        clockOut: hhmm(summary.clockOut),
+        breakMinutes: summary.breakMinutes,
+        hoursPresent: summary.workingHours,
+        expectedHours,
+        regularHours: summary.regularHours,
+        overtimeHours: summary.overtimeHours,
+        late: summary.late ? 'Yes' : 'No',
+        lateMinutes: summary.lateMinutes,
+        earlyDepartureMinutes: summary.earlyDepartureMinutes,
+        corrected: summary.hasCorrection ? 'Yes' : 'No',
+        source: [summary.clockInSource, summary.clockOutSource].filter(Boolean).join(' / ') || '—',
+      });
+    }
+  }
+  // Employee, then chronological — reads like a per-person timesheet.
+  rows.sort((a, b) => a.employee.localeCompare(b.employee) || a.date.localeCompare(b.date));
+  return rows;
+}
+
 const REPORTS = {
+  'attendance-detail': {
+    label: 'Attendance Detail (per day)',
+    columns: [
+      { header: 'Employee', value: r => r.employee },
+      { header: 'Date', value: r => r.date },
+      { header: 'Day', value: r => r.day },
+      { header: 'Status', value: r => r.status },
+      { header: 'Shift', value: r => r.shift },
+      { header: 'Clock In', value: r => r.clockIn },
+      { header: 'Clock Out', value: r => r.clockOut },
+      { header: 'Break (min)', value: r => r.breakMinutes },
+      { header: 'Hours Present', value: r => r.hoursPresent },
+      { header: 'Expected Hours', value: r => r.expectedHours ?? '—' },
+      { header: 'Regular Hours', value: r => r.regularHours },
+      { header: 'Overtime Hours', value: r => r.overtimeHours },
+      { header: 'Late', value: r => r.late },
+      { header: 'Late (min)', value: r => r.lateMinutes },
+      { header: 'Early Departure (min)', value: r => r.earlyDepartureMinutes },
+      { header: 'Corrected', value: r => r.corrected },
+      { header: 'Source', value: r => r.source },
+    ],
+    rows: async ({ from, to }) => computeAttendanceDetailRows(from, to),
+  },
   attendance: {
     label: 'Attendance Summary',
     columns: [

@@ -1493,7 +1493,7 @@ const BOOL_FIELDS  = new Set(['remake', 'redo', 'isRedo']);
 
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.case.findUnique({ where: { id: req.params.id }, include: { payment: true } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
 
     const data = {};
@@ -1527,18 +1527,39 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       }
     }
 
-    const updated = await prisma.case.update({ where: { id: req.params.id }, data });
+    // A Payment row's own `amount` is a separate column from case.totalAmount
+    // (it's what every "Ready for Delivery"/"Awaiting Payment" screen and the
+    // clinic app actually display — see payments.js: `payment.amount ??
+    // case.totalAmount`). Editing totalAmount here used to leave an existing
+    // Payment's amount untouched, so a corrected price kept showing the old
+    // figure everywhere except the raw case list, which reads totalAmount
+    // directly. Synced here the same way PATCH /:id/units already does:
+    // skipped once a payment is VERIFIED (a settled invoice is never quietly
+    // rewritten), and only when totalAmount was actually part of this edit.
+    let amountNote = '';
+    const syncPaymentAmount = 'totalAmount' in data && data.totalAmount != null
+      && existing.payment && existing.payment.status !== 'VERIFIED'
+      && data.totalAmount !== existing.payment.amount;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const c = await tx.case.update({ where: { id: req.params.id }, data });
+      if (syncPaymentAmount) {
+        await tx.payment.update({ where: { caseId: req.params.id }, data: { amount: data.totalAmount } });
+        amountNote = ` — payment amount updated from Br ${existing.payment.amount?.toLocaleString('en-US')} to Br ${data.totalAmount.toLocaleString('en-US')} to match`;
+      }
+      return c;
+    });
 
     await prisma.caseStage.create({
       data: {
         caseId: req.params.id,
         stageName: existing.status,
         scannedBy: req.user.name,
-        notes: `Case details edited by ${req.user.name} (admin)${clinicChangeNote}`,
+        notes: `Case details edited by ${req.user.name} (admin)${clinicChangeNote}${amountNote}`,
       }
     });
 
-    await invalidate(`case:${req.params.id}`, `case:lab:${req.params.id}`, 'cases:*', 'lab:active:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate(`case:${req.params.id}`, `case:lab:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*', 'lab:active:*', 'dispatch:queue');
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
