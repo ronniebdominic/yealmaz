@@ -24,9 +24,9 @@ function StatCard({ icon: Icon, label, value }) {
 
 const SECTIONS = ['Requests', 'Balance', 'Types'];
 
-export default function LeaveTab({ employees, onOpenLeaveModal }) {
+export default function LeaveTab({ employees, onOpenLeaveModal, initialSection }) {
   const qc = useQueryClient();
-  const [section, setSection] = useState('Requests');
+  const [section, setSection] = useState(initialSection || 'Requests');
   const [employeeId, setEmployeeId] = useState('');
 
   const { data: leaveRecords = [] } = useQuery({

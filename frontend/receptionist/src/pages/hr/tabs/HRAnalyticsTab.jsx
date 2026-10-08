@@ -27,20 +27,24 @@ const TONES = {
   neutral:{ bg: 'var(--surface-2)',  fg: 'var(--text-3)' },
 };
 
-function StatCard({ icon: Icon, label, value, tone = 'neutral', emphasise }) {
+// Every tile here jumps to the tab that actually has the detail behind it,
+// pre-filtered to this exact slice (see HRWorkspace's goTo/navFocus) — a
+// dashboard number should never be a dead end.
+function StatCard({ icon: Icon, label, value, tone = 'neutral', emphasise, onClick }) {
   const t = TONES[tone] || TONES.neutral;
   return (
-    <div className="stat-card">
+    <button type="button" className="stat-card" onClick={onClick}
+      style={{ textAlign: 'left', cursor: onClick ? 'pointer' : undefined }}>
       <div className="stat-icon" style={{ background: t.bg, color: t.fg }}><Icon size={16} /></div>
       <div className="stat-value" style={emphasise && value > 0 ? { color: t.fg } : undefined}>
         <CountUp value={value} />
       </div>
       <div className="stat-label">{label}</div>
-    </div>
+    </button>
   );
 }
 
-export default function HRAnalyticsTab() {
+export default function HRAnalyticsTab({ onNavigate }) {
   const reducedMotion = usePrefersReducedMotion();
   const chartAnim = { isAnimationActive: !reducedMotion, animationDuration: 550, animationEasing: 'ease-out' };
   const [pieRef, pieWidth] = useElementWidth();
@@ -68,19 +72,29 @@ export default function HRAnalyticsTab() {
   }
   const { counts, charts, alerts } = data;
   const pendingTotal = Object.values(alerts.pendingApprovals).reduce((s, n) => s + n, 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const nav = (label, focus) => onNavigate?.(label, focus);
 
   return (
     <div>
       {/* Workforce overview → today's attendance → things needing attention */}
       <div className="stats-grid stagger-in" style={{ marginBottom: 20 }}>
-        <StatCard icon={MdGroups} label="Total Employees" value={counts.totalEmployees} tone="blue" />
-        <StatCard icon={MdCheckCircle} label="Active" value={counts.active} tone="green" />
-        <StatCard icon={MdEventBusy} label="On Leave Today" value={counts.onLeaveToday} tone="amber" />
-        <StatCard icon={MdCancel} label="Absent Today" value={counts.absentToday} tone="red" emphasise />
-        <StatCard icon={MdSchedule} label="Late Today" value={counts.lateToday} tone="amber" emphasise />
-        <StatCard icon={MdTimer} label="Overtime Today" value={counts.overtimeToday} tone="blue" />
-        <StatCard icon={MdPendingActions} label="Pending Leave" value={counts.pendingLeave} tone="amber" emphasise />
-        <StatCard icon={MdPaid} label="Pending Payroll" value={counts.pendingPayroll} tone="blue" emphasise />
+        <StatCard icon={MdGroups} label="Total Employees" value={counts.totalEmployees} tone="blue"
+          onClick={() => nav('Employees')} />
+        <StatCard icon={MdCheckCircle} label="Active" value={counts.active} tone="green"
+          onClick={() => nav('Employees', { statusFilter: 'ACTIVE' })} />
+        <StatCard icon={MdEventBusy} label="On Leave Today" value={counts.onLeaveToday} tone="amber"
+          onClick={() => nav('Attendance', { date: today, statusFilter: 'onLeave' })} />
+        <StatCard icon={MdCancel} label="Absent Today" value={counts.absentToday} tone="red" emphasise
+          onClick={() => nav('Attendance', { date: today, statusFilter: 'absent' })} />
+        <StatCard icon={MdSchedule} label="Late Today" value={counts.lateToday} tone="amber" emphasise
+          onClick={() => nav('Attendance', { date: today, statusFilter: 'late' })} />
+        <StatCard icon={MdTimer} label="Overtime Today" value={counts.overtimeToday} tone="blue"
+          onClick={() => nav('Attendance', { date: today, statusFilter: 'overtime' })} />
+        <StatCard icon={MdPendingActions} label="Pending Leave" value={counts.pendingLeave} tone="amber" emphasise
+          onClick={() => nav('Leave', { section: 'Requests' })} />
+        <StatCard icon={MdPaid} label="Pending Payroll" value={counts.pendingPayroll} tone="blue" emphasise
+          onClick={() => nav('Payroll Runs')} />
       </div>
 
       <div className="grid-wide-narrow" style={{ marginBottom: 20 }}>

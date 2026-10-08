@@ -22,25 +22,45 @@ const STATUS_BADGE = {
   HALF_DAY_LEAVE: '', HOLIDAY: '', OFF: '', MISSING_PUNCH: 'badge-rejected',
 };
 
-function StatCard({ icon: Icon, label, value }) {
+// Clickable — filters the table below to just this card's slice of today
+// (matches the exact predicate the server used to produce its count, so the
+// number on the card and the rows that appear for it can never disagree).
+// Click the active card again to clear back to everyone.
+function StatCard({ icon: Icon, label, value, active, onClick }) {
   return (
-    <div className="stat-card">
+    <button type="button" className="stat-card" data-on={active || undefined} onClick={onClick}
+      style={{ textAlign: 'left', cursor: 'pointer', border: active ? '1px solid var(--brand)' : undefined }}>
       <div className="stat-icon"><Icon size={16} /></div>
       <div className="stat-value">{value}</div>
       <div className="stat-label">{label}</div>
-    </div>
+    </button>
   );
 }
 
-export default function AttendanceTab({ employees, onOpenClockEvent }) {
+const STATUS_FILTER_MATCH = {
+  present: r => r.status === 'PRESENT' || r.status === 'IN_PROGRESS',
+  absent: r => r.status === 'ABSENT',
+  onLeave: r => r.status === 'ON_LEAVE' || r.status === 'HALF_DAY_LEAVE',
+  late: r => r.late,
+  earlyDeparture: r => r.earlyDepartureMinutes > 0,
+  missingPunch: r => r.status === 'MISSING_PUNCH',
+  overtime: r => r.overtimeHours > 0,
+};
+
+export default function AttendanceTab({ employees, onOpenClockEvent, initialFocus }) {
   // Two lenses on the same server-side day summaries: a single day across
   // everyone, or a date range across everyone. Kept in one tab because they
   // answer the same question at different zoom levels.
   const [view, setView] = useState('day');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  // initialFocus arrives once, from the HR Dashboard's own "Absent Today" /
+  // "Late Today" / "Overtime Today" cards (see HRWorkspace -> HRAnalyticsTab)
+  // — jump straight to today, pre-filtered, instead of landing here and
+  // having to re-find the same slice by hand.
+  const [date, setDate] = useState(() => initialFocus?.date || new Date().toISOString().slice(0, 10));
   const [department, setDepartment] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [correctionTarget, setCorrectionTarget] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(initialFocus?.statusFilter || null);
 
   const departments = useMemo(() => [...new Set(employees.flatMap(e => e.departments || []))].sort(), [employees]);
 
@@ -50,7 +70,10 @@ export default function AttendanceTab({ employees, onOpenClockEvent }) {
   });
 
   const counts = data?.counts || { present: 0, absent: 0, onLeave: 0, late: 0, earlyDeparture: 0, missingPunch: 0, overtime: 0 };
-  const rows = (data?.employees || []).filter(e => !employeeId || e.id === employeeId);
+  const rows = (data?.employees || [])
+    .filter(e => !employeeId || e.id === employeeId)
+    .filter(e => !statusFilter || STATUS_FILTER_MATCH[statusFilter](e));
+  const toggleFilter = (key) => setStatusFilter(f => (f === key ? null : key));
 
   const viewToggle = (
     <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
@@ -104,16 +127,22 @@ export default function AttendanceTab({ employees, onOpenClockEvent }) {
       </div>
 
       <div className="stats-grid" style={{ marginBottom: 16 }}>
-        <StatCard icon={MdCheckCircle} label="Present Today" value={counts.present} />
-        <StatCard icon={MdCancel} label="Absent" value={counts.absent} />
-        <StatCard icon={MdEventBusy} label="On Leave" value={counts.onLeave} />
-        <StatCard icon={MdSchedule} label="Late" value={counts.late} />
-        <StatCard icon={MdLogout} label="Early Departure" value={counts.earlyDeparture} />
-        <StatCard icon={MdWarning} label="Missing Punch" value={counts.missingPunch} />
-        <StatCard icon={MdTimer} label="Overtime" value={counts.overtime} />
+        <StatCard icon={MdCheckCircle} label="Present Today" value={counts.present} active={statusFilter === 'present'} onClick={() => toggleFilter('present')} />
+        <StatCard icon={MdCancel} label="Absent" value={counts.absent} active={statusFilter === 'absent'} onClick={() => toggleFilter('absent')} />
+        <StatCard icon={MdEventBusy} label="On Leave" value={counts.onLeave} active={statusFilter === 'onLeave'} onClick={() => toggleFilter('onLeave')} />
+        <StatCard icon={MdSchedule} label="Late" value={counts.late} active={statusFilter === 'late'} onClick={() => toggleFilter('late')} />
+        <StatCard icon={MdLogout} label="Early Departure" value={counts.earlyDeparture} active={statusFilter === 'earlyDeparture'} onClick={() => toggleFilter('earlyDeparture')} />
+        <StatCard icon={MdWarning} label="Missing Punch" value={counts.missingPunch} active={statusFilter === 'missingPunch'} onClick={() => toggleFilter('missingPunch')} />
+        <StatCard icon={MdTimer} label="Overtime" value={counts.overtime} active={statusFilter === 'overtime'} onClick={() => toggleFilter('overtime')} />
       </div>
 
       <div className="card">
+        {statusFilter && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-2)' }}>
+            Showing only <strong>{rows.length}</strong> matching the selected card.
+            <button className="btn btn-ghost btn-sm" onClick={() => setStatusFilter(null)}>Clear filter</button>
+          </div>
+        )}
         <div className="table-wrap">
           <table>
             <thead>

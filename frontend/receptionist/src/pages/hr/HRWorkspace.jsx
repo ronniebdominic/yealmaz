@@ -184,7 +184,17 @@ function AddEmployeeModal({ onClose, onCreated }) {
 export default function HRWorkspace({ role = 'ADMIN' }) {
   const qc = useQueryClient();
   const [tab, setTab] = useState('Dashboard');
+  // Set by a Dashboard summary card (see HRAnalyticsTab's onNavigate prop) to
+  // land on another tab pre-filtered to that card's exact slice — e.g.
+  // "Absent Today" opens Attendance already scoped to today's absences,
+  // instead of landing on the tab and having to re-find the same thing by
+  // hand. navSeq forces the target tab to remount even when a card is
+  // clicked again while already on that tab (same `tab` string alone
+  // wouldn't retrigger the filter — tabs keep their own state once mounted).
+  const [navFocus, setNavFocus] = useState(null);
+  const [navSeq, setNavSeq] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const goTo = (label, focus = null) => { setTab(label); setNavFocus(focus); setNavSeq(n => n + 1); setMoreOpen(false); };
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [showClockEvent, setShowClockEvent] = useState(false);
@@ -204,7 +214,7 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
       <nav className="hrw-nav">
         {MAIN_TABS.map(t => (
           <button key={t.label} className="hrw-tab" data-on={tab === t.label}
-            onClick={() => { setTab(t.label); setMoreOpen(false); }}>
+            onClick={() => goTo(t.label)}>
             <t.icon className="mi" size={15} /> {t.label}
           </button>
         ))}
@@ -222,7 +232,7 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
                     <div className="hrw-more-h">{g.title}</div>
                     {g.items.map(t => (
                       <button key={t.label} className="hrw-more-item" role="menuitem" data-on={tab === t.label}
-                        onClick={() => { setTab(t.label); setMoreOpen(false); }}>
+                        onClick={() => goTo(t.label)}>
                         <t.icon className="mi" size={15} /> {t.label}
                       </button>
                     ))}
@@ -234,19 +244,20 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
         </div>
       </nav>
 
-      <ErrorBoundary key={tab}>
+      <ErrorBoundary key={`${tab}-${navSeq}`}>
         <div className="hrw-body">
-        {tab === 'Dashboard' && <HRAnalyticsTab />}
+        {tab === 'Dashboard' && <HRAnalyticsTab onNavigate={goTo} />}
         {tab === 'Employees' && (
           <EmployeesTab
             employees={employees}
             onSelectEmployee={e => setSelectedEmployeeId(e.id)}
             onAddEmployee={() => setShowAddEmployee(true)}
             refresh={refresh}
+            initialStatusFilter={navFocus?.statusFilter}
           />
         )}
-        {tab === 'Attendance' && <AttendanceTab employees={employees} onOpenClockEvent={() => setShowClockEvent(true)} />}
-        {tab === 'Leave' && <LeaveTab employees={employees} onOpenLeaveModal={() => setShowLeave(true)} />}
+        {tab === 'Attendance' && <AttendanceTab employees={employees} onOpenClockEvent={() => setShowClockEvent(true)} initialFocus={navFocus} />}
+        {tab === 'Leave' && <LeaveTab employees={employees} onOpenLeaveModal={() => setShowLeave(true)} initialSection={navFocus?.section} />}
         {tab === 'Payroll Runs' && <PayrollRunsTab canManage={role === 'HR_MANAGER' || role === 'ADMIN'} />}
         {tab === 'Timesheets' && <TimesheetsPanel employees={employees} />}
         {tab === 'Overtime' && <OvertimePanel />}

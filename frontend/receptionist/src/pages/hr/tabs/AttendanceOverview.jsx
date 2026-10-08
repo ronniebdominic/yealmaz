@@ -13,6 +13,7 @@ import {
   MdWarning, MdHelpOutline, MdInfoOutline,
 } from 'react-icons/md';
 import { inputStyle } from '../../../utils/adminForms';
+import AttendanceLogExport from '../components/AttendanceLogExport';
 
 function firstOfThisMonth() {
   const d = new Date();
@@ -22,13 +23,28 @@ function today() {
   return new Date().toLocaleDateString('en-CA');
 }
 
-function StatCard({ icon: Icon, label, value, tone }) {
+// Clickable where there's a matching column to sort by — sorts the table
+// below worst-first for that metric (e.g. "Late Arrivals" -> most late
+// arrivals on top), so the card doubles as a shortcut to "who needs
+// attention" instead of just a static total.
+function StatCard({ icon: Icon, label, value, tone, sortKey, active, onClick }) {
+  const clickable = !!sortKey;
+  const Tag = clickable ? 'button' : 'div';
   return (
-    <div className="stat-card">
+    <Tag
+      type={clickable ? 'button' : undefined}
+      className="stat-card"
+      onClick={clickable ? onClick : undefined}
+      style={{
+        textAlign: 'left',
+        cursor: clickable ? 'pointer' : undefined,
+        border: active ? '1px solid var(--brand)' : undefined,
+      }}
+    >
       <div className="stat-icon"><Icon size={16} /></div>
       <div className="stat-value" style={tone ? { color: tone } : undefined}>{value}</div>
       <div className="stat-label">{label}</div>
-    </div>
+    </Tag>
   );
 }
 
@@ -72,6 +88,16 @@ export default function AttendanceOverview({ employees }) {
       list.sort((a, b) => b.lateCount - a.lateCount);
     } else if (sortBy === 'hours') {
       list.sort((a, b) => b.totalWorkingHours - a.totalWorkingHours);
+    } else if (sortBy === 'present') {
+      list.sort((a, b) => (b.daysPresent + (b.daysInProgress || 0)) - (a.daysPresent + (a.daysInProgress || 0)));
+    } else if (sortBy === 'absent') {
+      list.sort((a, b) => b.daysAbsent - a.daysAbsent);
+    } else if (sortBy === 'leave') {
+      list.sort((a, b) => b.daysOnLeave - a.daysOnLeave);
+    } else if (sortBy === 'missingPunch') {
+      list.sort((a, b) => b.daysMissingPunch - a.daysMissingPunch);
+    } else if (sortBy === 'overtime') {
+      list.sort((a, b) => b.totalOvertimeHours - a.totalOvertimeHours);
     } else {
       list.sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -103,9 +129,17 @@ export default function AttendanceOverview({ employees }) {
           <select style={{ ...inputStyle, width: 170 }} value={sortBy} onChange={e => setSortBy(e.target.value)}>
             <option value="name">Name</option>
             <option value="rate">Lowest attendance</option>
+            <option value="present">Most days present</option>
+            <option value="absent">Most absent/no record</option>
+            <option value="leave">Most leave days</option>
             <option value="late">Most late arrivals</option>
+            <option value="missingPunch">Most missing punches</option>
             <option value="hours">Most hours worked</option>
+            <option value="overtime">Most overtime hours</option>
           </select>
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <AttendanceLogExport from={from} to={to} />
         </div>
       </div>
 
@@ -144,14 +178,26 @@ export default function AttendanceOverview({ employees }) {
           label={lowCoverage ? 'Recorded Attendance' : 'Attendance Rate'}
           value={totals?.attendanceRatePct != null ? `${totals.attendanceRatePct}%` : '—'}
           tone={rateColor(totals?.attendanceRatePct, !lowCoverage)}
+          sortKey="rate" active={sortBy === 'rate'} onClick={() => setSortBy('rate')}
         />
-        <StatCard icon={MdCheckCircle} label="Days Present" value={totals?.daysPresent ?? '—'} />
-        <StatCard icon={MdHelpOutline} label="Absent / No Record" value={totals?.daysAbsent ?? '—'} />
-        <StatCard icon={MdEventBusy} label="Leave Days" value={totals?.daysOnLeave ?? '—'} />
-        <StatCard icon={MdSchedule} label="Late Arrivals" value={totals?.lateCount ?? '—'} />
-        <StatCard icon={MdWarning} label="Missing Punch" value={totals?.daysMissingPunch ?? '—'} />
-        <StatCard icon={MdTimer} label="Overtime Hrs" value={totals?.totalOvertimeHours ?? '—'} />
+        <StatCard icon={MdCheckCircle} label="Days Present" value={totals?.daysPresent ?? '—'}
+          sortKey="present" active={sortBy === 'present'} onClick={() => setSortBy('present')} />
+        <StatCard icon={MdHelpOutline} label="Absent / No Record" value={totals?.daysAbsent ?? '—'}
+          sortKey="absent" active={sortBy === 'absent'} onClick={() => setSortBy('absent')} />
+        <StatCard icon={MdEventBusy} label="Leave Days" value={totals?.daysOnLeave ?? '—'}
+          sortKey="leave" active={sortBy === 'leave'} onClick={() => setSortBy('leave')} />
+        <StatCard icon={MdSchedule} label="Late Arrivals" value={totals?.lateCount ?? '—'}
+          sortKey="late" active={sortBy === 'late'} onClick={() => setSortBy('late')} />
+        <StatCard icon={MdWarning} label="Missing Punch" value={totals?.daysMissingPunch ?? '—'}
+          sortKey="missingPunch" active={sortBy === 'missingPunch'} onClick={() => setSortBy('missingPunch')} />
+        <StatCard icon={MdTimer} label="Overtime Hrs" value={totals?.totalOvertimeHours ?? '—'}
+          sortKey="overtime" active={sortBy === 'overtime'} onClick={() => setSortBy('overtime')} />
       </div>
+      {sortBy !== 'name' && (
+        <div style={{ fontSize: 12, color: 'var(--text-3)', margin: '-8px 0 12px' }}>
+          Sorted by the selected card — worst-first. <button className="btn btn-ghost btn-sm" onClick={() => setSortBy('name')} style={{ padding: '2px 8px' }}>Reset to name</button>
+        </div>
+      )}
 
       <div className="card">
         <div className="table-wrap">

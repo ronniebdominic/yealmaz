@@ -149,6 +149,13 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
       if (clockOut < earlyCutoff) earlyDepartureMinutes = Math.round(minutesBetween(clockOut, earlyCutoff));
     }
 
+    // Company policy: a 9-hour paid workday with a 1-hour office lunch
+    // PROVIDED ON TOP of it — i.e. a 10-hour shift span (e.g. 8:00-18:00)
+    // minus the 1-hour lunch nets the 9 paid hours. This is exactly the
+    // formula below (span − breakMinutes); getting "9, not 8" right is a Shift
+    // row's configured span, not this calculation — a shift must be set up
+    // as a full 10-hour span (not 9) with breakMinutes: 60 for this to
+    // net 9, since 9 span − 1h break would net only 8.
     const expectedMinutes = shift.overtimeThresholdMinutes ??
       Math.max(0, minutesBetween(shiftStart, shiftEnd) - shift.breakMinutes);
     regularHours = Math.round(Math.min(workingMinutes, expectedMinutes) / 6) / 10;

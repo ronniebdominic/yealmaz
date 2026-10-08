@@ -111,6 +111,11 @@ async function computeAttendanceDetailRows(from, to, employeeFilter = {}) {
       // rather than padding it with blank weekends for every employee.
       if (summary.status === 'OFF') continue;
 
+      // Mirrors computeDaySummary's own expectedMinutes exactly (see
+      // attendanceDaySummary.js): 9 paid hours = a 10-hour shift SPAN minus
+      // the 1-hour lunch — the Shift row needs a 10-hour startTime/endTime
+      // span (e.g. 8:00-18:00) with breakMinutes: 60 for this to show 9;
+      // a 9-hour span would (correctly, by this same formula) show 8.
       const expectedHours = shift
         ? round2(Math.max(0, (shift.overtimeThresholdMinutes ??
             (new Date(`1970-01-01T${shift.endTime}:00`) - new Date(`1970-01-01T${shift.startTime}:00`)) / 60000 - shift.breakMinutes)) / 60)

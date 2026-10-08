@@ -12,6 +12,7 @@ import { MdAdd, MdArrowForward, MdPrint, MdAutoAwesome } from 'react-icons/md';
 import { printPayslip } from '../../../utils/printPayslip';
 import { inputStyle } from '../../../utils/adminForms';
 import AdjustmentModal from '../components/AdjustmentModal';
+import AttendanceLogExport from '../components/AttendanceLogExport';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WORKFLOW = ['DRAFT', 'PROCESSING', 'REVIEW', 'APPROVED', 'PAID', 'FINALIZED'];
@@ -29,6 +30,13 @@ export default function PayrollRunsTab({ canManage }) {
   const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
   const [activeRunId, setActiveRunId] = useState(null);
   const [adjustmentEntry, setAdjustmentEntry] = useState(null);
+  const [entrySort, setEntrySort] = useState(null); // 'gross' | 'deductions' | 'net' — clicking a summary card again clears it
+  // Attendance log export — defaults to the Month/Year picked above (the
+  // same period a payroll run would cover), independently adjustable.
+  const monthStart = (y, m) => new Date(y, m - 1, 1).toISOString().slice(0, 10);
+  const monthEnd = (y, m) => new Date(y, m, 0).toISOString().slice(0, 10);
+  const [logFrom, setLogFrom] = useState(() => monthStart(periodYear, periodMonth));
+  const [logTo, setLogTo] = useState(() => monthEnd(periodYear, periodMonth));
 
   const { data: runs = [] } = useQuery({
     queryKey: ['hr', 'payroll', 'runs'],
@@ -41,6 +49,16 @@ export default function PayrollRunsTab({ canManage }) {
   });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['hr', 'payroll'] });
+
+  const deductionsOf = (entry) => entry.adjustments.filter(a => a.amount < 0).reduce((s, a) => s + a.amount, 0);
+  const sortedEntries = (() => {
+    const list = activeRun ? [...activeRun.entries] : [];
+    if (entrySort === 'gross') list.sort((a, b) => b.baseSalarySnapshot - a.baseSalarySnapshot);
+    else if (entrySort === 'deductions') list.sort((a, b) => deductionsOf(a) - deductionsOf(b)); // most negative (largest deduction) first
+    else if (entrySort === 'net') list.sort((a, b) => b.netPay - a.netPay);
+    return list;
+  })();
+  const toggleEntrySort = (key) => setEntrySort(s => (s === key ? null : key));
 
   const createRun = async () => {
     try {
@@ -79,6 +97,9 @@ export default function PayrollRunsTab({ canManage }) {
           <button className="btn btn-primary btn-sm" onClick={createRun} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <MdAdd size={15} /> Create Run
           </button>
+          <div style={{ marginLeft: 'auto' }}>
+            <AttendanceLogExport from={logFrom} to={logTo} onFromChange={setLogFrom} onToChange={setLogTo} label="Attendance Log" />
+          </div>
         </div>
       )}
 
@@ -125,9 +146,27 @@ export default function PayrollRunsTab({ canManage }) {
 
           {activeRun.totals && (
             <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', padding: 16, marginBottom: 0 }}>
-              <div className="stat-card"><div className="stat-value">Br {activeRun.totals.grossEarnings.toLocaleString('en-US')}</div><div className="stat-label">Gross Earnings</div></div>
-              <div className="stat-card"><div className="stat-value" style={{ color: 'var(--red)' }}>Br {Math.abs(activeRun.totals.deductions).toLocaleString('en-US')}</div><div className="stat-label">Deductions</div></div>
-              <div className="stat-card"><div className="stat-value" style={{ color: 'var(--blue)' }}>Br {activeRun.totals.netPay.toLocaleString('en-US')}</div><div className="stat-label">Total Net Pay</div></div>
+              <button type="button" className="stat-card" onClick={() => toggleEntrySort('gross')}
+                style={{ textAlign: 'left', cursor: 'pointer', border: entrySort === 'gross' ? '1px solid var(--brand)' : undefined }}>
+                <div className="stat-value">Br {activeRun.totals.grossEarnings.toLocaleString('en-US')}</div>
+                <div className="stat-label">Gross Earnings</div>
+              </button>
+              <button type="button" className="stat-card" onClick={() => toggleEntrySort('deductions')}
+                style={{ textAlign: 'left', cursor: 'pointer', border: entrySort === 'deductions' ? '1px solid var(--brand)' : undefined }}>
+                <div className="stat-value" style={{ color: 'var(--red)' }}>Br {Math.abs(activeRun.totals.deductions).toLocaleString('en-US')}</div>
+                <div className="stat-label">Deductions</div>
+              </button>
+              <button type="button" className="stat-card" onClick={() => toggleEntrySort('net')}
+                style={{ textAlign: 'left', cursor: 'pointer', border: entrySort === 'net' ? '1px solid var(--brand)' : undefined }}>
+                <div className="stat-value" style={{ color: 'var(--blue)' }}>Br {activeRun.totals.netPay.toLocaleString('en-US')}</div>
+                <div className="stat-label">Total Net Pay</div>
+              </button>
+            </div>
+          )}
+          {entrySort && (
+            <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '8px 16px 0' }}>
+              Entries sorted by {entrySort === 'gross' ? 'highest base salary' : entrySort === 'deductions' ? 'largest deduction' : 'highest net pay'} first.
+              <button className="btn btn-ghost btn-sm" onClick={() => setEntrySort(null)} style={{ marginLeft: 8, padding: '2px 8px' }}>Clear</button>
             </div>
           )}
 
@@ -137,7 +176,7 @@ export default function PayrollRunsTab({ canManage }) {
                 <tr><th>Employee</th><th style={{ textAlign: 'center' }}>Base Salary</th><th>Adjustments</th><th style={{ textAlign: 'center' }}>Net Pay</th><th style={{ textAlign: 'right' }}>Actions</th></tr>
               </thead>
               <tbody>
-                {activeRun.entries.map(entry => (
+                {sortedEntries.map(entry => (
                   <tr key={entry.id}>
                     <td style={{ fontWeight: 600 }}>{entry.user?.name}</td>
                     <td style={{ textAlign: 'center' }}>Br {entry.baseSalarySnapshot.toLocaleString('en-US')}</td>

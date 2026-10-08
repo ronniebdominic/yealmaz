@@ -17,9 +17,12 @@ const STATUS_FILTERS = [
 ];
 const PAGE_SIZE = 15;
 
-export default function EmployeesTab({ employees, onSelectEmployee, onAddEmployee, refresh }) {
+export default function EmployeesTab({ employees, onSelectEmployee, onAddEmployee, refresh, initialStatusFilter }) {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  // Seeded once from the HR Dashboard's "Active" card (see HRWorkspace) — a
+  // plain useState default, not an effect, since this component remounts
+  // fresh every time that card is clicked (HRWorkspace keys on it).
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter || '');
   const [roleFilter, setRoleFilter] = useState('');
   const [employmentTypeFilter, setEmploymentTypeFilter] = useState('');
   const [page, setPage] = useState(1);
