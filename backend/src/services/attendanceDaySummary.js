@@ -86,7 +86,25 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
       if (breakOpen) { breakSegments.push([breakOpen, ts]); breakOpen = null; }
     }
   }
-  const breakMinutes = breakSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
+  const punchedBreakMinutes = breakSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
+
+  // Lunch here is a standing benefit staff don't individually punch
+  // Start Break/End Break for — it's just understood, not clocked. Without
+  // this, a plain clock-in-to-clock-out span for a normal full day already
+  // includes that hour, which then reads as WORKED time once compared
+  // against the shift's (lunch-excluded) expected hours — inflating every
+  // ordinary day by one phantom "overtime" hour nobody actually worked.
+  // So: assume the shift's configured lunch was taken whenever nobody
+  // punched an actual break AND the raw clocked span is long enough to
+  // plausibly have contained one (>= 5 hours — long enough for a real lunch
+  // to fall within it, short enough that a half-day leaver under 5 hours
+  // isn't docked a lunch they plainly didn't take). A real punched break
+  // always wins over this assumption and the two are never added together.
+  const MIN_SPAN_FOR_ASSUMED_LUNCH_MINUTES = 5 * 60;
+  const rawSpanMinutes = clockIn && clockOut ? minutesBetween(clockIn, clockOut) : 0;
+  const assumedBreakMinutes = (punchedBreakMinutes === 0 && shift?.breakMinutes > 0 && rawSpanMinutes >= MIN_SPAN_FOR_ASSUMED_LUNCH_MINUTES)
+    ? shift.breakMinutes : 0;
+  const breakMinutes = punchedBreakMinutes || assumedBreakMinutes;
   let workingMinutes = clockIn && clockOut ? Math.max(0, minutesBetween(clockIn, clockOut) - breakMinutes) : 0;
 
   // No CLOCK_IN, or no CLOCK_OUT after it, means the day has no end yet
