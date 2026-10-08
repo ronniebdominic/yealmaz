@@ -86,25 +86,12 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
       if (breakOpen) { breakSegments.push([breakOpen, ts]); breakOpen = null; }
     }
   }
-  const punchedBreakMinutes = breakSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
-
-  // Lunch here is a standing benefit staff don't individually punch
-  // Start Break/End Break for — it's just understood, not clocked. Without
-  // this, a plain clock-in-to-clock-out span for a normal full day already
-  // includes that hour, which then reads as WORKED time once compared
-  // against the shift's (lunch-excluded) expected hours — inflating every
-  // ordinary day by one phantom "overtime" hour nobody actually worked.
-  // So: assume the shift's configured lunch was taken whenever nobody
-  // punched an actual break AND the raw clocked span is long enough to
-  // plausibly have contained one (>= 5 hours — long enough for a real lunch
-  // to fall within it, short enough that a half-day leaver under 5 hours
-  // isn't docked a lunch they plainly didn't take). A real punched break
-  // always wins over this assumption and the two are never added together.
-  const MIN_SPAN_FOR_ASSUMED_LUNCH_MINUTES = 5 * 60;
-  const rawSpanMinutes = clockIn && clockOut ? minutesBetween(clockIn, clockOut) : 0;
-  const assumedBreakMinutes = (punchedBreakMinutes === 0 && shift?.breakMinutes > 0 && rawSpanMinutes >= MIN_SPAN_FOR_ASSUMED_LUNCH_MINUTES)
-    ? shift.breakMinutes : 0;
-  const breakMinutes = punchedBreakMinutes || assumedBreakMinutes;
+  // Company policy (confirmed): a shift's configured span IS the working
+  // hours, full stop — e.g. a 9-hour shift (09:00-18:00) means 9 paid hours,
+  // lunch included in that span rather than added on top of it or carved out
+  // of it. So working time is only ever reduced by a break actually PUNCHED
+  // (Start Break/End Break) — there is no assumed/automatic lunch deduction.
+  const breakMinutes = breakSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
   let workingMinutes = clockIn && clockOut ? Math.max(0, minutesBetween(clockIn, clockOut) - breakMinutes) : 0;
 
   // No CLOCK_IN, or no CLOCK_OUT after it, means the day has no end yet
@@ -167,15 +154,14 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
       if (clockOut < earlyCutoff) earlyDepartureMinutes = Math.round(minutesBetween(clockOut, earlyCutoff));
     }
 
-    // Company policy: a 9-hour paid workday with a 1-hour office lunch
-    // PROVIDED ON TOP of it — i.e. a 10-hour shift span (e.g. 8:00-18:00)
-    // minus the 1-hour lunch nets the 9 paid hours. This is exactly the
-    // formula below (span − breakMinutes); getting "9, not 8" right is a Shift
-    // row's configured span, not this calculation — a shift must be set up
-    // as a full 10-hour span (not 9) with breakMinutes: 60 for this to
-    // net 9, since 9 span − 1h break would net only 8.
+    // Company policy (confirmed): a shift's configured span IS the expected
+    // working hours, inclusive of lunch — a 9-hour shift (e.g. 09:00-18:00)
+    // means 9 expected hours, full stop. breakMinutes is not subtracted here
+    // (see the matching note on workingMinutes above); getting a shift's
+    // expected hours right is purely its own startTime/endTime span
+    // (HR > Shifts), not this calculation.
     const expectedMinutes = shift.overtimeThresholdMinutes ??
-      Math.max(0, minutesBetween(shiftStart, shiftEnd) - shift.breakMinutes);
+      Math.max(0, minutesBetween(shiftStart, shiftEnd));
     regularHours = Math.round(Math.min(workingMinutes, expectedMinutes) / 6) / 10;
     overtimeHours = Math.round(Math.max(0, workingMinutes - expectedMinutes) / 6) / 10;
   } else if (computeHours && clockIn) {
