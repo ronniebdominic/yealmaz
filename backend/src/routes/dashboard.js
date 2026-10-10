@@ -152,7 +152,7 @@ async function computeFinanceReport({ from, to, search } = {}) {
     const [
       revenueDaily, revenueMTD, revenueYTD, revenueRange,
       unitsDaily, unitsMTD, unitsYTD,
-      paidToday, pendingCount, pendingAmount,
+      paidToday, pendingCases,
       taxWithheldAgg,
       recentVerified, recentPending,
     ] = await Promise.all([
@@ -164,16 +164,32 @@ async function computeFinanceReport({ from, to, search } = {}) {
       prisma.case.aggregate({ where: { deliveryDate: { gte: startOfMonth } }, _sum: { units: true } }),
       prisma.case.aggregate({ where: { deliveryDate: { gte: startOfYear } }, _sum: { units: true } }),
       prisma.payment.count({ where: { status: 'VERIFIED', verifiedAt: { gte: startOfToday } } }),
-      // Only count payments that actually have a Br amount owed, so the count matches
-      // the amount below (and the Clinic Balances view). Pending-but-unpriced payments
-      // aren't billable outstanding, so they don't belong in this figure. Outstanding is
-      // ALWAYS exclusive of in-progress cases — only money owed after delivery counts;
-      // an unpaid case still in the lab isn't "outstanding" (nothing's been delivered yet).
-      prisma.payment.count({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 }, case: { status: 'DELIVERED' } } }),
-      // Sum of amount still OWED (amount minus any partial amountReceived) — can't be
-      // expressed as a Prisma aggregate (no cross-field subtraction), so sum in JS.
-      prisma.payment.findMany({ where: { status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] }, amount: { gt: 0 }, case: { status: 'DELIVERED' } }, select: { amount: true, amountReceived: true } })
-        .then(rows => rows.reduce((s, p) => s + (p.amount || 0) - (p.amountReceived || 0), 0)),
+      // Driven by Case, not Payment — a delivered case this lab is genuinely
+      // owed for doesn't always have a Payment.amount set (it can be left
+      // null, or stale from before a later price edit; Case.totalAmount is
+      // the reliable one — same reasoning as computeAdminAnalytics's
+      // outstandingAmount and computeTrustedPartnersSummary's outstanding,
+      // which this now matches instead of disagreeing with). Querying
+      // Payment directly and requiring amount > 0 (the previous approach)
+      // silently dropped every such case from this KPI, undercounting it.
+      // Deliberately NOT filtered by `payment: { status: {...} }` at the
+      // Prisma level either — Payment is an optional 1:1 on Case, and a
+      // nested relation filter like that excludes any case whose Payment
+      // row doesn't exist at all, same failure mode as the amount filter it
+      // replaces. Fetch every delivered, non-remake case instead and treat
+      // a missing payment as PENDING in JS below, exactly like
+      // computeAdminAnalytics does. Outstanding is ALWAYS exclusive of
+      // in-progress cases — only money owed after delivery counts — and
+      // excludes remakes, whose billed amount is decided after review and
+      // would otherwise double-count the original case's value.
+      prisma.case.findMany({
+        where: { status: 'DELIVERED', remake: false, ...(search ? { OR: [
+          { clinic: { name: { contains: search, mode: 'insensitive' } } },
+          { patientName: { contains: search, mode: 'insensitive' } },
+          { caseNumber: { contains: search, mode: 'insensitive' } },
+        ] } : {}) },
+        select: { totalAmount: true, payment: { select: { status: true, amount: true, amountReceived: true } } },
+      }),
       // Reconciliation figure for Finance — total withheld by clinics for direct
       // government tax filing, for the selected period. These payments are
       // VERIFIED (fully settled), not outstanding — this is purely informational.
@@ -194,6 +210,17 @@ async function computeFinanceReport({ from, to, search } = {}) {
         take: 50,
       }),
     ]);
+
+    const UNPAID_PAYMENT_STATUSES = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'];
+    let pendingCount = 0, pendingAmount = 0;
+    for (const c of pendingCases) {
+      const payStatus = c.payment?.status || 'PENDING'; // no Payment row at all reads as never-billed, i.e. PENDING
+      if (!UNPAID_PAYMENT_STATUSES.includes(payStatus)) continue;
+      const billed = c.payment?.amount ?? c.totalAmount ?? 0;
+      if (billed <= 0) continue; // nothing priced yet isn't billable outstanding
+      pendingAmount += billed - (c.payment?.amountReceived || 0);
+      pendingCount += 1;
+    }
 
     return {
       revenue: {
