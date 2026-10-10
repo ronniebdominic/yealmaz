@@ -178,6 +178,89 @@ router.patch('/:id/billing', protect, restrict('ADMIN', 'FINANCE'), async (req, 
   }
 });
 
+// ── POST /api/clinics/:id/merge — merge a duplicate clinic into this one ──
+// :id is the SURVIVOR. body: { loserId }. Reassigns every row that points at
+// the loser (cases, push subscriptions, reward transactions/redemptions) onto
+// the survivor, folds the loser's ClinicPoints totals into the survivor's,
+// and soft-disables the loser (isActive: false) — never hard-deleted, same
+// convention as Shifts, since historical rows may still reference it.
+router.post('/:id/merge', protect, restrict('ADMIN'), async (req, res) => {
+  const survivorId = req.params.id;
+  const { loserId } = req.body;
+
+  if (!loserId) return res.status(400).json({ error: 'loserId is required.' });
+  if (loserId === survivorId) return res.status(400).json({ error: 'A clinic cannot be merged into itself.' });
+
+  try {
+    const [survivor, loser] = await Promise.all([
+      prisma.clinic.findUnique({ where: { id: survivorId } }),
+      prisma.clinic.findUnique({ where: { id: loserId } }),
+    ]);
+    if (!survivor) return res.status(404).json({ error: 'Survivor clinic not found.' });
+    if (!loser) return res.status(404).json({ error: 'Loser clinic not found.' });
+
+    const result = await prisma.$transaction(async (tx) => {
+      const [cases, pushSubs, rewardTx, rewardRedemptions] = await Promise.all([
+        tx.case.updateMany({ where: { clinicId: loserId }, data: { clinicId: survivorId } }),
+        tx.pushSubscription.updateMany({ where: { clinicId: loserId }, data: { clinicId: survivorId } }),
+        tx.rewardTransaction.updateMany({ where: { clinicId: loserId }, data: { clinicId: survivorId } }),
+        tx.rewardRedemption.updateMany({ where: { clinicId: loserId }, data: { clinicId: survivorId } }),
+      ]);
+
+      const [survivorPoints, loserPoints] = await Promise.all([
+        tx.clinicPoints.findUnique({ where: { clinicId: survivorId } }),
+        tx.clinicPoints.findUnique({ where: { clinicId: loserId } }),
+      ]);
+      if (loserPoints) {
+        if (survivorPoints) {
+          await tx.clinicPoints.update({
+            where: { clinicId: survivorId },
+            data: {
+              totalEarned: survivorPoints.totalEarned + loserPoints.totalEarned,
+              totalRedeemed: survivorPoints.totalRedeemed + loserPoints.totalRedeemed,
+            },
+          });
+        } else {
+          await tx.clinicPoints.update({
+            where: { clinicId: loserId },
+            data: { clinicId: survivorId },
+          });
+        }
+        if (survivorPoints) await tx.clinicPoints.delete({ where: { clinicId: loserId } });
+      }
+
+      // Fill in contact fields the survivor is missing, from the loser —
+      // never overwrites something the survivor already has.
+      const fillData = {};
+      if (!survivor.phone && loser.phone) fillData.phone = loser.phone;
+      if (!survivor.address && loser.address) fillData.address = loser.address;
+      if (Object.keys(fillData).length) {
+        await tx.clinic.update({ where: { id: survivorId }, data: fillData });
+      }
+
+      await tx.clinic.update({
+        where: { id: loserId },
+        data: { isActive: false, name: `${loser.name} [Merged into ${survivor.name}]` },
+      });
+
+      return {
+        casesMoved: cases.count,
+        pushSubscriptionsMoved: pushSubs.count,
+        rewardTransactionsMoved: rewardTx.count,
+        rewardRedemptionsMoved: rewardRedemptions.count,
+        contactFieldsFilled: Object.keys(fillData),
+      };
+    });
+
+    await appCache.del('clinics');
+    await invalidate(`case:*`);
+    res.json({ survivorId, loserId, ...result });
+  } catch (err) {
+    console.error('[clinics/:id/merge]', err);
+    res.status(500).json({ error: 'Could not merge clinics.' });
+  }
+});
+
 // Server-side counterpart of the frontend's generatePassword() in
 // utils/adminForms.jsx — same shape (12 chars, upper/lower/digit, no
 // ambiguous chars), used wherever we must generate a password without a
