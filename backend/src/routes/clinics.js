@@ -207,6 +207,17 @@ router.post('/:id/merge', protect, restrict('ADMIN'), async (req, res) => {
         tx.rewardRedemption.updateMany({ where: { clinicId: loserId }, data: { clinicId: survivorId } }),
       ]);
 
+      const loserWallet = await tx.clinicWallet.findUnique({ where: { clinicId: loserId } });
+      if (loserWallet) {
+        await tx.clinicWallet.upsert({
+          where: { clinicId: survivorId },
+          update: { balance: { increment: loserWallet.balance } },
+          create: { clinicId: survivorId, balance: loserWallet.balance },
+        });
+        await tx.clinicWallet.delete({ where: { clinicId: loserId } });
+      }
+      await tx.walletTransaction.updateMany({ where: { clinicId: loserId }, data: { clinicId: survivorId } });
+
       const [survivorPoints, loserPoints] = await Promise.all([
         tx.clinicPoints.findUnique({ where: { clinicId: survivorId } }),
         tx.clinicPoints.findUnique({ where: { clinicId: loserId } }),

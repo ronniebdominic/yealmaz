@@ -1,0 +1,73 @@
+// Ye-Almaz — apply a clinic's advance-payment balance to a case.
+//
+// Called when a case reaches delivery (and when payment is requested for a
+// pay-per-case clinic). Takes min(balance, amount still owed), records it as
+// an instalment through the same logic Finance uses for part payments, so a
+// fully covered case ends up identical to one collected by hand (VERIFIED,
+// invoice issued) and a partly covered one stays outstanding for the rest.
+
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+async function applyWalletToCase(prisma, caseId, actor = { id: null, name: 'Advance balance' }) {
+  const payments = require('../routes/payments'); // lazy: avoids a require cycle
+
+  return prisma.$transaction(async (tx) => {
+    const caseData = await tx.case.findUnique({ where: { id: caseId }, include: { payment: true } });
+    if (!caseData) return { applied: 0 };
+
+    const payStatus = caseData.payment?.status || caseData.paymentStatus || 'PENDING';
+    // A receipt awaiting Finance's review or a settled case must not be paid twice.
+    if (payStatus === 'VERIFIED' || payStatus === 'SCREENSHOT_UPLOADED') return { applied: 0 };
+
+    const { remaining } = payments.balanceOf(caseData);
+    if (remaining <= 0) return { applied: 0 };
+
+    const wallet = await tx.clinicWallet.findUnique({ where: { clinicId: caseData.clinicId } });
+    const available = wallet?.balance || 0;
+    if (available <= 0) return { applied: 0 };
+
+    const take = round2(Math.min(available, remaining));
+    // Conditional decrement: if a concurrent deduction already spent it, bail out.
+    const dec = await tx.clinicWallet.updateMany({
+      where: { clinicId: caseData.clinicId, balance: { gte: take } },
+      data: { balance: { decrement: take } },
+    });
+    if (dec.count === 0) return { applied: 0 };
+
+    await tx.walletTransaction.create({
+      data: {
+        clinicId: caseData.clinicId, type: 'DEDUCTION', status: 'APPROVED', amount: take,
+        caseId, note: `Applied to case ${caseData.caseNumber}`, approvedAt: new Date(),
+      },
+    });
+
+    const result = await payments.recordInstallment(tx, caseData, actor, {
+      credit: take, taxAmount: 0, reference: 'ADVANCE-BALANCE', notes: 'Paid from advance balance',
+    });
+    return { applied: take, complete: result.complete, remaining: result.remaining, clinicId: caseData.clinicId };
+  });
+}
+
+// Settle a clinic's delivered, unpaid cases oldest-first from its balance.
+async function applyWalletToClinicOutstanding(prisma, clinicId, actor) {
+  const cases = await prisma.case.findMany({
+    where: { clinicId, status: 'DELIVERED', remake: false, paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED'] } },
+    orderBy: { deliveryDate: 'asc' },
+    select: { id: true },
+  });
+  const results = [];
+  for (const c of cases) {
+    const r = await applyWalletToCase(prisma, c.id, actor);
+    if (!r.applied) break; // wallet is empty
+    results.push({ caseId: c.id, ...r });
+  }
+  return results;
+}
+
+// Never let a wallet problem fail the delivery/payment request that triggered it.
+async function applyWalletSafely(prisma, caseId) {
+  try { return await applyWalletToCase(prisma, caseId); }
+  catch (err) { console.error('[wallet] auto-deduct failed for case', caseId, err.message); return { applied: 0 }; }
+}
+
+module.exports = { applyWalletToCase, applyWalletToClinicOutstanding, applyWalletSafely };

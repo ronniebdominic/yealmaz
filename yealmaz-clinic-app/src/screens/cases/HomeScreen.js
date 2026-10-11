@@ -38,6 +38,12 @@ export default function HomeScreen({ navigation }) {
     refetchInterval: 60_000,
   });
 
+  const { data: wallet } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: () => api.get('/wallet').then(r => r.data),
+    staleTime: 30_000,
+  });
+
   const cases = data || [];
   const refreshing = isRefetching && !isLoading;
 
@@ -105,6 +111,22 @@ export default function HomeScreen({ navigation }) {
           </View>
         ) : null}
 
+        {/* ── Advance payment balance ── */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('Wallet')}>
+          <GlassCard strong style={styles.walletCard}>
+            <View style={[styles.statIconWrap, { backgroundColor: Colors.primary + '18' }]}>
+              <MaterialCommunityIcons name="wallet-outline" size={20} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.statLabel}>{t('wallet.title')}</Text>
+              <Text style={[styles.statValue, { color: Colors.primary }]}>
+                Br {Number(wallet?.balance || 0).toLocaleString('en-US')}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={Colors.primary} />
+          </GlassCard>
+        </TouchableOpacity>
+
         {/* ── Stats ── */}
         <View style={styles.statsRow}>
           <StatCard value={active.length} label={t('home.statActive')} color={Colors.primary} icon="progress-clock"
@@ -168,6 +190,7 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
+  walletCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: Spacing.md, marginBottom: Spacing.md },
 
   header: {
     backgroundColor: Colors.primary,

@@ -179,6 +179,8 @@ model Clinic {
   clinicPoints       ClinicPoints?
   rewardTransactions RewardTransaction[]
   rewardRedemptions  RewardRedemption[]
+  wallet             ClinicWallet?
+  walletTransactions WalletTransaction[]
 
   @@map("clinics")
 }
@@ -591,6 +593,42 @@ model RewardSetting {
   updatedAt     DateTime @updatedAt
 
   @@map("reward_settings")
+}
+
+// Advance-payment balance a clinic tops up and the lab draws down against cases.
+model ClinicWallet {
+  id        String   @id @default(uuid())
+  clinicId  String   @unique
+  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("clinic_wallets")
+}
+
+// Append-only ledger. The balance only moves when a row is APPROVED.
+model WalletTransaction {
+  id           String    @id @default(uuid())
+  clinicId     String
+  clinic       Clinic    @relation(fields: [clinicId], references: [id])
+  type         String // TOPUP | DEDUCTION | REFUND | ADJUSTMENT
+  method       String? // CASH | CHAPA
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  amount       Float // always positive; type decides the direction
+  chapaTxRef   String?   @unique
+  screenshotUrl String?
+  reference    String?
+  caseId       String?
+  note         String?
+  rejectionReason String?
+  createdById  String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([clinicId, createdAt])
+  @@index([status, type])
+  @@map("wallet_transactions")
 }
 
 model ClinicPoints {

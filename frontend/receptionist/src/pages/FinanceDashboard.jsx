@@ -810,9 +810,90 @@ function InvoicesPanel() {
 const BILLING_VIEWS = [
   { id: 'invoices', label: 'Invoices', icon: MdDescription },
   { id: 'verify',   label: 'Verify Payments', icon: MdCreditCard },
+  { id: 'topups',   label: 'Advance Top-ups', icon: MdPaid },
 ];
+
+// Cash top-ups clinics submitted from the app; Chapa top-ups credit themselves.
+function TopUpsTab({ queryClient }) {
+  const [processing, setProcessing] = useState(null);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['payments', 'topups'],
+    queryFn: () => api.get('/wallet/topups/pending').then(r => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const act = useMutation({
+    mutationFn: ({ id, action, reason }) => api.post(`/wallet/topups/${id}/${action}`, { reason }),
+    onSuccess: (_, { action }) => {
+      toast.success(action === 'approve' ? 'Top-up approved — balance credited.' : 'Top-up rejected.');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Action failed. Please try again.'),
+    onSettled: () => setProcessing(null),
+  });
+
+  const run = (id, action) => {
+    let reason;
+    if (action === 'reject') {
+      reason = prompt('Reason for rejection (will be shown to the clinic):');
+      if (!reason) return;
+    }
+    setProcessing(id);
+    act.mutate({ id, action, reason });
+  };
+
+  if (isLoading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 60 }}>Loading top-ups…</div>;
+  if (isError) return <ErrorState message="Could not load top-ups." onRetry={refetch} />;
+
+  const rows = data || [];
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdPaid className="mi" size={15} /> Cash Top-ups Awaiting Approval</div>
+      </div>
+      <div className="table-wrap">
+        {rows.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-title">Nothing waiting</div>
+            <p>Cash advance-payment top-ups submitted from the clinic app appear here for approval.</p>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr><th>Clinic</th><th>Phone</th><th style={{ textAlign: 'right' }}>Amount</th><th>Reference</th><th>Submitted</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600 }}>{r.clinic?.name || '—'}</td>
+                  <td>{r.clinic?.phone || '—'}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>Br {r.amount.toLocaleString('en-US')}</td>
+                  <td>{r.reference || '—'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(r.createdAt), 'dd MMM, h:mm a')}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button className="btn btn-success btn-sm" disabled={!!processing} onClick={() => run(r.id, 'approve')}><MdCheck className="mi" size={14} /> Approve</button>
+                      <button className="btn btn-danger btn-sm" disabled={!!processing} onClick={() => run(r.id, 'reject')}><MdClose className="mi" size={14} /></button>
+                      {r.screenshotUrl && <button className="btn btn-ghost btn-sm" onClick={() => window.open(r.screenshotUrl, '_blank')}><MdImage className="mi" size={14} /></button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BillingTab({ view = 'invoices', onView, scope = 'FULL' }) {
   const queryClient = useQueryClient();
+  const { data: pendingTopups } = useQuery({
+    queryKey: ['payments', 'topups'],
+    queryFn: () => api.get('/wallet/topups/pending').then(r => r.data),
+    refetchInterval: 30_000,
+  });
   // Cashier has no backend access to /payments/invoices or /clinics (not
   // scoped by caller yet — see docs/enhancements-plan.md §9) — hide that
   // view rather than let them click into a 403.
@@ -822,11 +903,13 @@ function BillingTab({ view = 'invoices', onView, scope = 'FULL' }) {
       <div className="filters" style={{ margin: '0 0 18px', flexWrap: 'wrap' }}>
         {views.map(v => (
           <button key={v.id} className={`filter-chip ${view === v.id ? 'active' : ''}`} onClick={() => onView?.(v.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            <v.icon size={14} /> {v.label}
+            <v.icon size={14} /> {v.label}{v.id === 'topups' && pendingTopups?.length ? ` (${pendingTopups.length})` : ''}
           </button>
         ))}
       </div>
-      {view === 'verify' ? <ScreenshotsTab queryClient={queryClient} /> : <InvoicesPanel />}
+      {view === 'verify' ? <ScreenshotsTab queryClient={queryClient} />
+        : view === 'topups' ? <TopUpsTab queryClient={queryClient} />
+        : <InvoicesPanel />}
     </>
   );
 }
@@ -2169,6 +2252,23 @@ function ClinicBalancesTab() {
     refetchInterval: 60_000,
   });
 
+  const queryClient = useQueryClient();
+  const { data: walletBalances = {} } = useQuery({
+    queryKey: ['payments', 'wallet-balances'],
+    queryFn: () => api.get('/wallet/balances').then(r => r.data),
+    refetchInterval: 60_000,
+  });
+  const applyWallet = useMutation({
+    mutationFn: (clinicId) => api.post(`/wallet/clinic/${clinicId}/apply`).then(r => r.data),
+    onSuccess: (d) => {
+      toast.success(d.casesAffected ? `Applied Br ${d.applied.toLocaleString('en-US')} across ${d.casesAffected} case(s).` : 'Nothing to apply.');
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['clinic-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (err) => toast.error(err.response?.data?.error || 'Could not apply balance.'),
+  });
+
   // Filter out clinics with no outstanding amount (no payment amount set yet)
   const balances = rawBalances.filter(b => b.pendingAmount > 0);
 
@@ -2238,6 +2338,7 @@ function ClinicBalancesTab() {
                   <th>Clinic</th>
                   <th>Unpaid Cases</th>
                   <th>Outstanding Amount</th>
+                  <th>Advance Balance</th>
                   <th></th>
                 </tr>
               </thead>
@@ -2261,11 +2362,20 @@ function ClinicBalancesTab() {
                       <td style={{ fontWeight: 700, color: 'var(--red)', fontSize: 15 }}>
                         Br {b.pendingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
+                      <td onClick={e => e.stopPropagation()}>
+                        {walletBalances[b.id] > 0 ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontWeight: 700, color: 'var(--green)' }}>Br {walletBalances[b.id].toLocaleString('en-US')}</span>
+                            <button className="btn btn-success btn-sm" disabled={applyWallet.isPending}
+                              onClick={() => applyWallet.mutate(b.id)}>Apply</button>
+                          </div>
+                        ) : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                      </td>
                       <td style={{ fontSize: 13, color: 'var(--text-3)' }}>{expanded === b.id ? '▲' : '▼'}</td>
                     </tr>
                     {expanded === b.id && (
                       <tr style={{ background: 'var(--surface-2)' }}>
-                        <td colSpan={4} style={{ padding: '6px 16px 0 52px' }}>
+                        <td colSpan={5} style={{ padding: '6px 16px 0 52px' }}>
                           <div onClick={e => e.stopPropagation()}>
                             <ExportMenu
                               data={b.cases}

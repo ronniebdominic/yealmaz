@@ -1460,6 +1460,10 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
       }
     });
 
+    if (status === 'DELIVERED') {
+      await require('../services/walletDeduction').applyWalletSafely(prisma, req.params.id);
+    }
+
     invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'lab:active');
 
     const io = req.app.get('io');

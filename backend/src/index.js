@@ -107,6 +107,7 @@ app.use('/api/zones',         require('./routes/zones'));
 app.use('/api/cases',         require('./routes/cases'));
 app.use('/api/stages',        require('./routes/stages'));
 app.use('/api/payments',      require('./routes/payments'));
+app.use('/api/wallet',        require('./routes/wallet'));
 app.use('/api/delivery',      require('./routes/delivery'));
 app.use('/api/dispatch',      require('./routes/dispatch'));
 app.use('/api/dashboard',     require('./routes/dashboard'));

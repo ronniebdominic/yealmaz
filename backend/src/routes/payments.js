@@ -146,7 +146,8 @@ router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
       return res.status(403).json({ error: 'Access denied.' });
     }
 
-    const amount = caseData.payment?.amount ?? caseData.totalAmount;
+    // Charge only what's still owed — part of it may already have been paid from the advance balance.
+    const amount = (caseData.payment?.amount ?? caseData.totalAmount) - (caseData.payment?.amountReceived || 0);
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'No amount due for this case.' });
     }
@@ -211,7 +212,10 @@ router.post('/chapa/webhook', async (req, res) => {
     }
 
     const txRef = req.body?.tx_ref;
-    if (txRef) await finalizeChapaPayment(txRef, req.app.get('io'));
+    if (txRef) {
+      if (String(txRef).startsWith('YDLW')) await require('./wallet').finalizeWalletTopup(txRef, req.app.get('io'));
+      else await finalizeChapaPayment(txRef, req.app.get('io'));
+    }
 
     res.status(200).end();
   } catch (err) {
@@ -519,6 +523,17 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
       },
     });
 
+    // Draw down the clinic's advance balance first; if it covers everything, no request needs sending.
+    const wallet = await require('../services/walletDeduction').applyWalletSafely(prisma, req.params.caseId);
+    if (wallet.applied && wallet.complete) {
+      await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+      req.app.get('io').to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
+        caseId: caseData.id, caseNumber: caseData.caseNumber, action: 'APPROVE',
+        message: 'Paid from your advance balance.',
+      });
+      return res.json({ success: true, paidFromBalance: true });
+    }
+
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*');
 
     const io = req.app.get('io');
@@ -711,6 +726,9 @@ async function recordInstallment(db, caseData, user, { credit, taxAmount, refere
   });
   return { complete: false, remaining, received: newReceived };
 }
+
+router.balanceOf = balanceOf;
+router.recordInstallment = recordInstallment;
 
 // ── POST /api/payments/collect-bulk ─────────────────────
 // Record payments against SEVERAL of one trusted clinic's cases at once.

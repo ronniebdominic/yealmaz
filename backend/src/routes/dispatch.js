@@ -588,6 +588,8 @@ router.post('/:caseId/self-pickup', protect, restrict('DISPATCH', 'ADMIN'), asyn
       }
     });
 
+    await require('../services/walletDeduction').applyWalletSafely(prisma, req.params.caseId);
+
     await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');

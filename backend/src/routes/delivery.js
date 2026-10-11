@@ -245,6 +245,8 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
 
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
 
+    await require('../services/walletDeduction').applyWalletSafely(prisma, req.params.caseId);
+
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'delivery:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
