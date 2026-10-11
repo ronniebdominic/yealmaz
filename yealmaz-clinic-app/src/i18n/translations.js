@@ -70,6 +70,22 @@ export const translations = {
       errorRequired: 'Please enter your email and password.',
     },
 
+    pending: {
+      title: 'Pending Payments',
+      summary: '{count} unpaid · {total}',
+      selectAll: 'Select all',
+      selected: '{count} selected · {total}',
+      payChapa: 'Pay with Chapa',
+      payBalance: 'Pay from balance ({amount})',
+      payThis: 'Pay this case',
+      awaitingReview: 'Receipt awaiting review',
+      paidTitle: 'Payment received',
+      paidMsg: 'Your payment was successful.',
+      paidFromBalance: '{amount} was paid from your advance balance.',
+      emptyTitle: 'All paid up',
+      emptySub: 'You have no pending payments.',
+    },
+
     wallet: {
       title: 'Advance Payment',
       balance: 'Available balance',
@@ -425,6 +441,22 @@ export const translations = {
       footerText: 'መለያ የለዎትም? ለማዘጋጀት የ-አልማዝ ላብራቶሪን ያግኙ።',
       version: 'የ-አልማዝ ክሊኒክ መተግበሪያ v{version}',
       errorRequired: 'እባክዎ ኢሜይልዎን እና የይለፍ ቃልዎን ያስገቡ።',
+    },
+
+    pending: {
+      title: 'የሚቀሩ ክፍያዎች',
+      summary: '{count} ያልተከፈለ · {total}',
+      selectAll: 'ሁሉንም ምረጥ',
+      selected: '{count} ተመርጧል · {total}',
+      payChapa: 'በቻፓ ክፈል',
+      payBalance: 'ከቀሪ ሂሳብ ክፈል ({amount})',
+      payThis: 'ይህን ጉዳይ ክፈል',
+      awaitingReview: 'ደረሰኝ በመገምገም ላይ',
+      paidTitle: 'ክፍያ ተቀብለናል',
+      paidMsg: 'ክፍያዎ ተሳክቷል።',
+      paidFromBalance: '{amount} ከቅድመ ክፍያ ሂሳብዎ ተከፍሏል።',
+      emptyTitle: 'ሁሉም ተከፍሏል',
+      emptySub: 'ምንም የሚቀር ክፍያ የለዎትም።',
     },
 
     wallet: {

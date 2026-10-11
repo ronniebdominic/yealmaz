@@ -38,6 +38,13 @@ export default function HomeScreen({ navigation }) {
     refetchInterval: 60_000,
   });
 
+  const { data: pendingData } = useQuery({
+    queryKey: ['payments', 'my-pending'],
+    queryFn: () => api.get('/payments/my-pending').then(r => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: () => api.get('/wallet').then(r => r.data),
@@ -62,7 +69,9 @@ export default function HomeScreen({ navigation }) {
   // and the list it opens (navigate('Cases', {filter:'payment'}) below) always
   // agree — this used to only count SCREENSHOT_UPLOADED, so a clinic with an
   // unpaid payment request saw 0 here even though money was actually owed.
-  const pending   = cases.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
+  // What the clinic actually owes (delivered-unpaid + requested), from the server —
+  // the list loaded here is only the latest 50 cases and would miss older unpaid ones.
+  const pending   = { length: pendingData?.count ?? 0 };
   const delivered = cases.filter(c => c.status === 'DELIVERED');
   const recent    = [...cases].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
@@ -132,7 +141,7 @@ export default function HomeScreen({ navigation }) {
           <StatCard value={active.length} label={t('home.statActive')} color={Colors.primary} icon="progress-clock"
             onPress={() => navigation.navigate('Cases', { filter: 'active' })} />
           <StatCard value={pending.length} label={t('home.statPendingPay')} color={Colors.amber} icon="credit-card-clock-outline"
-            onPress={() => navigation.navigate('Cases', { filter: 'payment' })} />
+            onPress={() => navigation.navigate('PendingPayments')} />
           <StatCard value={delivered.length} label={t('home.statDelivered')} color={Colors.green} icon="check-circle-outline"
             onPress={() => navigation.navigate('Cases', { filter: 'delivered' })} />
         </View>
@@ -151,7 +160,7 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.actionLabel}>{t('home.actionMyCases')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.ink }]}
-            onPress={() => navigation.navigate('Cases', { filter: 'payment' })} activeOpacity={0.85}>
+            onPress={() => navigation.navigate('PendingPayments')} activeOpacity={0.85}>
             <MaterialCommunityIcons name="cash-multiple" size={22} color="#fff" />
             <Text style={styles.actionLabel}>{t('home.actionPayments')}</Text>
           </TouchableOpacity>

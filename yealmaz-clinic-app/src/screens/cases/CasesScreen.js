@@ -37,7 +37,7 @@ export default function CasesScreen({ navigation, route }) {
       const res = await api.get('/cases', { params });
       let cases = res.data.cases || [];
       if (filter === 'active')   cases = cases.filter(c => !['DELIVERED', 'ON_HOLD', 'CANCELLED'].includes(c.status));
-      if (filter === 'payment')  cases = cases.filter(c => c.paymentStatus !== 'VERIFIED' && c.paymentStatus !== 'PENDING');
+      if (filter === 'payment')  cases = cases.filter(c => c.paymentStatus !== 'VERIFIED' && (c.paymentStatus !== 'PENDING' || c.status === 'DELIVERED'));
       return { cases, pagination: res.data.pagination };
     },
     staleTime: 30_000,

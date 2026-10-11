@@ -35,6 +35,7 @@ import NewCaseScreen from './src/screens/cases/NewCaseScreen';
 import ProfileScreen from './src/screens/profile/ProfileScreen';
 import RewardsScreen from './src/screens/rewards/RewardsScreen';
 import WalletScreen from './src/screens/wallet/WalletScreen';
+import PendingPaymentsScreen from './src/screens/payments/PendingPaymentsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -125,6 +126,7 @@ function AppNavigator() {
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="CaseDetail" component={CaseDetailScreen} />
             <Stack.Screen name="Wallet" component={WalletScreen} />
+            <Stack.Screen name="PendingPayments" component={PendingPaymentsScreen} />
             <Stack.Screen name="NewCase" component={NewCaseScreen} options={{ animation: 'slide_from_bottom' }} />
           </>
         )}

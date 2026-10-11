@@ -6,7 +6,7 @@ const cloudinary = require('cloudinary').v2;
 const { Chapa } = require('chapa-nodejs');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
-const { applyWalletToClinicOutstanding } = require('../services/walletDeduction');
+const { applyWalletToClinicOutstanding, applyWalletToCase } = require('../services/walletDeduction');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -51,6 +51,30 @@ async function approveTopup(txId, approvedById) {
   });
 }
 
+const PAYCASES_PREFIX = 'PAYCASES:';
+
+async function spendOnCases(clinicId, caseIds) {
+  const results = [];
+  for (const id of caseIds) {
+    const c = await prisma.case.findUnique({ where: { id }, select: { clinicId: true } });
+    if (!c || c.clinicId !== clinicId) continue;
+    results.push(await applyWalletToCase(prisma, id));
+  }
+  return results;
+}
+
+// The cases a clinic may settle in one go: its own, unpaid, with no receipt awaiting review.
+async function payableCases(clinicId, caseIds) {
+  if (!Array.isArray(caseIds) || caseIds.length === 0 || caseIds.length > 200) return null;
+  const cases = await prisma.case.findMany({
+    where: { id: { in: caseIds }, clinicId, remake: false, paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
+    select: { id: true, totalAmount: true, payment: { select: { amount: true, amountReceived: true } } },
+  });
+  return cases
+    .map(c => ({ id: c.id, due: round2((c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0)) }))
+    .filter(c => c.due > 0);
+}
+
 // Shared with the public Chapa webhook in payments.js.
 async function finalizeWalletTopup(txRef, io) {
   const t = await prisma.walletTransaction.findUnique({ where: { chapaTxRef: txRef } });
@@ -61,7 +85,9 @@ async function finalizeWalletTopup(txRef, io) {
   if (verification.status !== 'success' || verification.data?.status !== 'success') return null;
   const credited = await approveTopup(t.id, null);
   if (credited) {
-    await invalidate('payments:*');
+    // A "pay these cases" checkout: the top-up is spent straight away on the chosen cases.
+    if (t.note?.startsWith(PAYCASES_PREFIX)) await spendOnCases(t.clinicId, t.note.slice(PAYCASES_PREFIX.length).split(','));
+    await invalidate('payments:*', 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
     io?.to(`clinic_${t.clinicId}`).emit('wallet_updated', { message: `Br ${t.amount.toLocaleString('en-US')} added to your advance balance.` });
   }
   return credited || t;
@@ -133,6 +159,63 @@ router.get('/chapa/status/:txRef', protect, restrict('CLINIC'), async (req, res)
   } catch (err) {
     console.error('[wallet chapa status]', err);
     res.status(500).json({ error: 'Could not check top-up status.' });
+  }
+});
+
+// ── Clinic: pay several cases at once (bulk) ─────────────
+// From the advance balance...
+router.post('/pay-cases', protect, restrict('CLINIC'), async (req, res) => {
+  try {
+    const cases = await payableCases(req.user.id, req.body.caseIds);
+    if (!cases?.length) return res.status(400).json({ error: 'Select at least one unpaid case.' });
+    const results = await spendOnCases(req.user.id, cases.map(c => c.id));
+    await invalidate('payments:*', 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
+    const applied = round2(results.reduce((s, r) => s + (r.applied || 0), 0));
+    if (!applied) return res.status(400).json({ error: 'Your advance balance is empty.' });
+    res.json({ success: true, applied, fullyPaid: results.filter(r => r.complete).length });
+  } catch (err) {
+    console.error('[wallet pay-cases]', err);
+    res.status(500).json({ error: 'Could not pay from your balance.' });
+  }
+});
+
+// ...or one Chapa checkout for the lot (credited, then spent on those cases).
+router.post('/pay-cases/chapa/initialize', protect, restrict('CLINIC'), async (req, res) => {
+  try {
+    if (!chapa) return res.status(503).json({ error: 'Online payments are not configured yet.' });
+    const cases = await payableCases(req.user.id, req.body.caseIds);
+    if (!cases?.length) return res.status(400).json({ error: 'Select at least one unpaid case.' });
+
+    const clinic = await prisma.clinic.findUnique({ where: { id: req.user.id } });
+    const wallet = await prisma.clinicWallet.findUnique({ where: { clinicId: clinic.id } });
+    const total = round2(cases.reduce((s, c) => s + c.due, 0));
+    const amount = round2(total - Math.min(wallet?.balance || 0, total)); // existing balance covers its share
+    if (amount <= 0) return res.status(400).json({ error: 'Your advance balance already covers these cases. Use Pay from balance.' });
+
+    const txRef = chapa.genTxRef({ prefix: WALLET_TX_PREFIX });
+    const [firstName, ...rest] = (clinic.name || 'Clinic').split(' ');
+    const response = await chapa.initialize({
+      amount: String(amount), currency: 'ETB', tx_ref: txRef,
+      first_name: firstName || 'Clinic', last_name: rest.join(' ') || clinic.name || '-',
+      email: clinic.email || 'clinic.payments@gmail.com',
+      phone_number: clinic.phone || undefined,
+      callback_url: `${process.env.APP_URL}/api/payments/chapa/webhook`,
+      return_url: `${process.env.APP_URL}/api/wallet/chapa/return/${txRef}`,
+      customization: { title: 'Ye-Almaz Lab', description: `Payment for ${cases.length} case(s)` },
+    });
+    if (response.status !== 'success' || !response.data?.checkout_url) {
+      return res.status(502).json({ error: 'Could not start online payment. Please try again.' });
+    }
+    await prisma.walletTransaction.create({
+      data: {
+        clinicId: clinic.id, type: 'TOPUP', method: 'CHAPA', status: 'PENDING', amount, chapaTxRef: txRef,
+        note: `${PAYCASES_PREFIX}${cases.map(c => c.id).join(',')}`, createdById: clinic.id,
+      },
+    });
+    res.json({ success: true, checkoutUrl: response.data.checkout_url, txRef, amount, cases: cases.length });
+  } catch (err) {
+    console.error('[wallet pay-cases chapa]', err.message);
+    res.status(500).json({ error: 'Could not start online payment. Please try again.' });
   }
 });
 

@@ -356,9 +356,11 @@ export default function CaseDetailScreen({ navigation, route }) {
     : { label: caseData.status, color: Colors.text3, icon: 'file-outline' };
   const payRaw = PAYMENT_STATUS[caseData.paymentStatus];
   const pay = payRaw ? { ...payRaw, label: t(`paymentStatus.${caseData.paymentStatus}`) } : payRaw;
-  const canUploadPayment = ['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus);
-  const hasPaymentRequest = ['PAYMENT_REQUESTED', 'REJECTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(caseData.paymentStatus);
-  const amountDue = caseData.payment?.amount ?? caseData.totalAmount ?? 0;
+  // Delivered on credit terms (e.g. trusted partners): never "requested", but still owed.
+  const owedAfterDelivery = caseData.paymentStatus === 'PENDING' && caseData.status === 'DELIVERED';
+  const canUploadPayment = owedAfterDelivery || ['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus);
+  const hasPaymentRequest = owedAfterDelivery || ['PAYMENT_REQUESTED', 'REJECTED', 'SCREENSHOT_UPLOADED', 'VERIFIED'].includes(caseData.paymentStatus);
+  const amountDue = (caseData.payment?.amount ?? caseData.totalAmount ?? 0) - (caseData.payment?.amountReceived || 0);
 
   return (
     <View style={styles.container}>

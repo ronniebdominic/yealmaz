@@ -38,6 +38,41 @@ const uploadToCloudinary = (buffer, caseNumber) => {
   });
 };
 
+// ── GET /api/payments/my-pending ─────────────────────────
+// What the logged-in clinic still owes: every unpaid, non-remake case that has
+// been delivered (credit / trusted-partner terms) or had a payment requested.
+// Amount is the remaining balance after any part payments.
+router.get('/my-pending', protect, restrict('CLINIC'), async (req, res) => {
+  try {
+    const cases = await prisma.case.findMany({
+      where: {
+        clinicId: req.user.id, remake: false, paymentStatus: { not: 'VERIFIED' },
+        OR: [{ status: 'DELIVERED' }, { paymentStatus: { in: ['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'REJECTED'] } }],
+      },
+      select: {
+        id: true, caseNumber: true, patientName: true, workType: true, units: true, status: true,
+        paymentStatus: true, totalAmount: true, deliveryDate: true, createdAt: true,
+        payment: { select: { amount: true, amountReceived: true, status: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    const items = cases
+      .map(c => {
+        const due = (c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0);
+        return { ...c, amountDue: Math.round((due + Number.EPSILON) * 100) / 100 };
+      })
+      .filter(c => c.amountDue > 0);
+    res.json({
+      count: items.length,
+      total: Math.round(items.reduce((s, c) => s + c.amountDue, 0) * 100) / 100,
+      cases: items,
+    });
+  } catch (err) {
+    console.error('[my-pending]', err);
+    res.status(500).json({ error: 'Could not load pending payments.' });
+  }
+});
+
 // ── POST /api/payments/:caseId/upload ────────────────────
 router.post('/:caseId/upload', protect, upload.single('screenshot'), async (req, res) => {
   try {
@@ -105,17 +140,21 @@ async function finalizeChapaPayment(txRef, io) {
     }
   });
 
+  // A case already out for delivery / delivered is just being paid late — don't move it back.
+  const alreadyDispatched = ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(caseData.status);
   const updatedCase = await prisma.case.update({
     where: { id: caseData.id },
-    data: { paymentStatus: 'VERIFIED', status: 'READY_TO_DISPATCH' }
+    data: alreadyDispatched ? { paymentStatus: 'VERIFIED' } : { paymentStatus: 'VERIFIED', status: 'READY_TO_DISPATCH' }
   });
 
   await prisma.caseStage.create({
     data: {
       caseId: caseData.id,
-      stageName: 'READY_TO_DISPATCH',
+      stageName: alreadyDispatched ? caseData.status : 'READY_TO_DISPATCH',
       scannedBy: 'Chapa (Online Payment)',
-      notes: `Payment verified via Chapa — invoice ${updatedPayment.invoiceNumber} issued — case ready for dispatch`
+      notes: alreadyDispatched
+        ? `Payment received via Chapa — invoice ${updatedPayment.invoiceNumber} issued`
+        : `Payment verified via Chapa — invoice ${updatedPayment.invoiceNumber} issued — case ready for dispatch`
     }
   });
 
@@ -151,7 +190,8 @@ router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'No amount due for this case.' });
     }
-    if (!['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus)) {
+    const owedAfterDelivery = caseData.paymentStatus === 'PENDING' && caseData.status === 'DELIVERED';
+    if (!owedAfterDelivery && !['PAYMENT_REQUESTED', 'REJECTED'].includes(caseData.paymentStatus)) {
       return res.status(400).json({ error: 'This case is not awaiting payment.' });
     }
 
@@ -271,12 +311,13 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
 
     const caseData = await prisma.case.findUnique({
       where: { id: req.params.caseId },
-      select: { caseNumber: true, clinicId: true }
+      select: { caseNumber: true, clinicId: true, status: true }
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
 
     const newPaymentStatus = action === 'APPROVE' ? 'VERIFIED' : 'REJECTED';
-    const newCaseStatus = action === 'APPROVE' ? 'READY_TO_DISPATCH' : undefined;
+    const alreadyDispatched = ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(caseData.status);
+    const newCaseStatus = action === 'APPROVE' && !alreadyDispatched ? 'READY_TO_DISPATCH' : undefined;
 
     // On approval: auto-issue the invoice
     const invoicePatch = action === 'APPROVE' ? {
@@ -307,9 +348,11 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
       await prisma.caseStage.create({
         data: {
           caseId: req.params.caseId,
-          stageName: 'READY_TO_DISPATCH',
+          stageName: alreadyDispatched ? caseData.status : 'READY_TO_DISPATCH',
           scannedBy: req.user.name,
-          notes: `Payment verified — invoice ${invoicePatch.invoiceNumber} issued — case ready for dispatch`
+          notes: alreadyDispatched
+            ? `Payment verified — invoice ${invoicePatch.invoiceNumber} issued`
+            : `Payment verified — invoice ${invoicePatch.invoiceNumber} issued — case ready for dispatch`
         }
       });
     }
