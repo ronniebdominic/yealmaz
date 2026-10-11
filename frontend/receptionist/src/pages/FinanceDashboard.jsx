@@ -2269,6 +2269,12 @@ function ClinicBalancesTab() {
     onError: (err) => toast.error(err.response?.data?.error || 'Could not apply balance.'),
   });
 
+  const sendReminders = useMutation({
+    mutationFn: () => api.post('/payments/send-reminders').then(r => r.data),
+    onSuccess: (d) => toast.success(`Reminder sent to ${d.clinicsNotified} clinic(s).`),
+    onError: (err) => toast.error(err.response?.data?.error || 'Could not send reminders.'),
+  });
+
   // Filter out clinics with no outstanding amount (no payment amount set yet)
   const balances = rawBalances.filter(b => b.pendingAmount > 0);
 
@@ -2307,6 +2313,10 @@ function ClinicBalancesTab() {
           <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MdPendingActions className="mi" size={15} /> Outstanding Balance by Clinic</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button className="btn btn-ghost btn-sm" onClick={refetch}>↺ Refresh</button>
+            <button className="btn btn-ghost btn-sm" disabled={sendReminders.isPending}
+              onClick={() => { if (window.confirm('Send a payment reminder push notification to every clinic that owes money?')) sendReminders.mutate(); }}>
+              🔔 Send reminders
+            </button>
             <ExportMenu
               data={balances}
               columns={[

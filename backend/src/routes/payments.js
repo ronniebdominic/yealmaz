@@ -73,6 +73,37 @@ router.get('/my-pending', protect, restrict('CLINIC'), async (req, res) => {
   }
 });
 
+// ── POST /api/payments/send-reminders ────────────────────
+// Push every clinic that still owes money a reminder with its own total
+// (same "owed" definition as /my-pending). Optional body.clinicIds narrows it.
+router.post('/send-reminders', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), async (req, res) => {
+  try {
+    const only = Array.isArray(req.body.clinicIds) && req.body.clinicIds.length ? { clinicId: { in: req.body.clinicIds } } : {};
+    const cases = await prisma.case.findMany({
+      where: { ...only, remake: false, status: 'DELIVERED', paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
+      select: { clinicId: true, totalAmount: true, payment: { select: { amount: true, amountReceived: true } } },
+    });
+    const byClinic = {};
+    for (const c of cases) {
+      const due = (c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0);
+      if (due <= 0) continue;
+      const e = (byClinic[c.clinicId] ||= { count: 0, total: 0 });
+      e.count += 1; e.total += due;
+    }
+    const { sendPushToClinic } = require('../utils/webpush');
+    const ids = Object.keys(byClinic);
+    await Promise.allSettled(ids.map(id => sendPushToClinic(prisma, id, {
+      title: '💳 Payment Reminder — Ye-Almaz Lab',
+      body: `You have ${byClinic[id].count} unpaid case${byClinic[id].count > 1 ? 's' : ''} totalling Br ${Math.round(byClinic[id].total).toLocaleString('en-US')}. Open Pending Payments to pay.`,
+      data: { type: 'payment_reminder', screen: 'PendingPayments' },
+    })));
+    res.json({ success: true, clinicsNotified: ids.length });
+  } catch (err) {
+    console.error('[send-reminders]', err);
+    res.status(500).json({ error: 'Could not send reminders.' });
+  }
+});
+
 // ── POST /api/payments/:caseId/upload ────────────────────
 router.post('/:caseId/upload', protect, upload.single('screenshot'), async (req, res) => {
   try {
@@ -165,6 +196,10 @@ async function finalizeChapaPayment(txRef, io) {
     caseNumber: caseData.caseNumber,
     action: 'APPROVE',
     message: 'Your online payment was successful. Your case is ready for dispatch!'
+  });
+  require('../utils/webpush').sendPushToClinic(prisma, caseData.clinic.id, {
+    title: '✅ Payment Successful', body: `Case ${caseData.caseNumber}: your online payment was received.`,
+    data: { caseId: caseData.id, type: 'payment_verified' },
   });
 
   return updatedPayment;
@@ -369,6 +404,10 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
         ? 'Your payment has been verified. Your case is ready for dispatch!'
         : `Payment rejected: ${rejectionReason || 'Please re-upload your payment screenshot.'}`
     });
+
+    require('../utils/webpush').sendPushToClinic(prisma, updatedCase.clinicId, action === 'APPROVE'
+      ? { title: '✅ Payment Verified', body: `Case ${updatedCase.caseNumber}: your payment was verified.`, data: { caseId: updatedCase.id, type: 'payment_verified' } }
+      : { title: '⚠️ Payment Rejected', body: `Case ${updatedCase.caseNumber}: ${rejectionReason || 'please re-upload your receipt.'}`, data: { caseId: updatedCase.id, type: 'payment_rejected' } });
 
     res.json({ success: true, payment, case: updatedCase });
   } catch (err) {
@@ -697,6 +736,10 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
       caseNumber: caseData.caseNumber,
       action:  'APPROVE',
       message: 'Payment has been confirmed by the lab.'
+    });
+    require('../utils/webpush').sendPushToClinic(prisma, caseData.clinic.id, {
+      title: '✅ Payment Received', body: `Case ${caseData.caseNumber}: your payment was confirmed by the lab.`,
+      data: { caseId: caseData.id, type: 'payment_verified' },
     });
 
     res.json({ success: true, payment });

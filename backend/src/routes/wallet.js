@@ -6,6 +6,7 @@ const cloudinary = require('cloudinary').v2;
 const { Chapa } = require('chapa-nodejs');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
+const { sendPushToClinic } = require('../utils/webpush');
 const { applyWalletToClinicOutstanding, applyWalletToCase } = require('../services/walletDeduction');
 
 const router = express.Router();
@@ -89,6 +90,7 @@ async function finalizeWalletTopup(txRef, io) {
     if (t.note?.startsWith(PAYCASES_PREFIX)) await spendOnCases(t.clinicId, t.note.slice(PAYCASES_PREFIX.length).split(','));
     await invalidate('payments:*', 'cases:*', 'dashboard:summary', 'dashboard:analytics:*');
     io?.to(`clinic_${t.clinicId}`).emit('wallet_updated', { message: `Br ${t.amount.toLocaleString('en-US')} added to your advance balance.` });
+    sendPushToClinic(prisma, t.clinicId, { title: '✅ Advance Payment Received', body: `Br ${t.amount.toLocaleString('en-US')} was added to your advance balance.`, data: { type: 'wallet_topup', screen: 'Wallet' } });
   }
   return credited || t;
 }
@@ -265,6 +267,7 @@ router.post('/topups/:id/approve', protect, restrict(...FINANCE), async (req, re
     if (!credited) return res.status(409).json({ error: 'This top-up was already processed.' });
     await invalidate('payments:*');
     req.app.get('io')?.to(`clinic_${t.clinicId}`).emit('wallet_updated', { message: `Br ${t.amount.toLocaleString('en-US')} added to your advance balance.` });
+    sendPushToClinic(prisma, t.clinicId, { title: '✅ Top-up Approved', body: `Br ${t.amount.toLocaleString('en-US')} was added to your advance balance.`, data: { type: 'wallet_topup', screen: 'Wallet' } });
     res.json({ success: true });
   } catch (err) {
     console.error('[wallet approve]', err);
@@ -284,6 +287,7 @@ router.post('/topups/:id/reject', protect, restrict(...FINANCE), async (req, res
     await invalidate('payments:*');
     const t = await prisma.walletTransaction.findUnique({ where: { id: req.params.id } });
     req.app.get('io')?.to(`clinic_${t.clinicId}`).emit('wallet_updated', { message: 'Your top-up was not approved.' });
+    sendPushToClinic(prisma, t.clinicId, { title: '⚠️ Top-up Not Approved', body: `Your Br ${t.amount.toLocaleString('en-US')} top-up was not approved: ${reason}`, data: { type: 'wallet_topup', screen: 'Wallet' } });
     res.json({ success: true });
   } catch (err) {
     console.error('[wallet reject]', err);

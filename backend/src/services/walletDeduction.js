@@ -11,7 +11,7 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 async function applyWalletToCase(prisma, caseId, actor = { id: null, name: 'Advance balance' }) {
   const payments = require('../routes/payments'); // lazy: avoids a require cycle
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const caseData = await tx.case.findUnique({ where: { id: caseId }, include: { payment: true } });
     if (!caseData) return { applied: 0 };
 
@@ -44,8 +44,17 @@ async function applyWalletToCase(prisma, caseId, actor = { id: null, name: 'Adva
     const result = await payments.recordInstallment(tx, caseData, actor, {
       credit: take, taxAmount: 0, reference: 'ADVANCE-BALANCE', notes: 'Paid from advance balance',
     });
-    return { applied: take, complete: result.complete, remaining: result.remaining, clinicId: caseData.clinicId };
+    return { applied: take, complete: result.complete, remaining: result.remaining, clinicId: caseData.clinicId, caseNumber: caseData.caseNumber };
   });
+
+  if (result.applied) {
+    require('../utils/webpush').sendPushToClinic(prisma, result.clinicId, {
+      title: '💳 Paid from Advance Balance',
+      body: `Br ${result.applied.toLocaleString('en-US')} was deducted for case ${result.caseNumber}${result.complete ? '' : ` — Br ${result.remaining.toLocaleString('en-US')} still due`}.`,
+      data: { caseId, type: 'wallet_deduction' },
+    });
+  }
+  return result;
 }
 
 // Settle a clinic's delivered, unpaid cases oldest-first from its balance.
