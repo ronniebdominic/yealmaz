@@ -1802,3 +1802,25 @@ model SheetSyncRow {
 
   @@map("sheet_sync_rows")
 }
+
+// Every successful create/update/delete a signed-in user makes, written by the
+// audit middleware (src/middleware/audit.js) — the admin dashboard's Audit page.
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userName  String?
+  userRole  String?
+  method    String // POST | PUT | PATCH | DELETE
+  path      String
+  module    String // first path segment after /api, e.g. cases, payments
+  entityId  String? // first uuid found in the path
+  status    Int
+  ip        String?
+  body      String? // sanitized request body (secrets removed, truncated)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([module, createdAt])
+  @@map("audit_logs")
+}

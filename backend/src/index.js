@@ -98,6 +98,7 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 app.use('/api/', apiLimiter);
+app.use('/api/', require('./middleware/audit'));
 
 // ── Routes ───────────────────────────────────────────────
 app.use('/api/auth',          require('./routes/auth'));
@@ -108,6 +109,7 @@ app.use('/api/cases',         require('./routes/cases'));
 app.use('/api/stages',        require('./routes/stages'));
 app.use('/api/payments',      require('./routes/payments'));
 app.use('/api/wallet',        require('./routes/wallet'));
+app.use('/api/audit',         require('./routes/audit'));
 app.use('/api/delivery',      require('./routes/delivery'));
 app.use('/api/dispatch',      require('./routes/dispatch'));
 app.use('/api/dashboard',     require('./routes/dashboard'));

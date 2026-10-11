@@ -5,7 +5,7 @@ import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
   MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge, MdWarehouse, MdGroups,
   MdDesk, MdPointOfSale, MdLocalShipping, MdTwoWheeler, MdScience, MdSupervisorAccount, MdInventory,
-  MdPeopleAlt, MdDelete,
+  MdPeopleAlt, MdDelete, MdHistory,
 } from 'react-icons/md';
 import FloatingAIAssistant from './FloatingAIAssistant';
 import ThemeToggle from './ThemeToggle';
@@ -52,6 +52,9 @@ function NavItems({ active, onNav }) {
       </button>
       <button className={active('/admin/trash')} onClick={() => onNav('/admin/trash')}>
         <MdDelete className="mi" size={17} /> Trash
+      </button>
+      <button className={active('/admin/audit')} onClick={() => onNav('/admin/audit')}>
+        <MdHistory className="mi" size={17} /> Audit Log
       </button>
       <button className={active('/admin/clinics')} onClick={() => onNav('/admin/clinics')}>
         <MdLocalHospital className="mi" size={17} /> Clinics
