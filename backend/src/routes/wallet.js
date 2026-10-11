@@ -328,6 +328,41 @@ router.post('/clinic/:clinicId/apply', protect, restrict(...FINANCE), async (req
   }
 });
 
+// Cash received in person for a clinic's advance payment: credited straight away
+// (already received by staff, so no separate approval step).
+router.post('/clinic/:clinicId/cash', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASHIER'), async (req, res) => {
+  try {
+    const amount = parseAmount(req.body.amount);
+    if (!amount) return res.status(400).json({ error: 'Enter a valid amount.' });
+    const clinic = await prisma.clinic.findUnique({ where: { id: req.params.clinicId }, select: { id: true, name: true } });
+    if (!clinic) return res.status(404).json({ error: 'Clinic not found.' });
+
+    const t = await prisma.$transaction(async (tx) => {
+      await tx.clinicWallet.upsert({
+        where: { clinicId: clinic.id },
+        update: { balance: { increment: amount } },
+        create: { clinicId: clinic.id, balance: amount },
+      });
+      return tx.walletTransaction.create({
+        data: {
+          clinicId: clinic.id, type: 'TOPUP', method: 'CASH', status: 'APPROVED', amount,
+          reference: req.body.reference?.trim() || null,
+          note: `Cash received by ${req.user.name}${req.body.note?.trim() ? ` — ${req.body.note.trim()}` : ''}`,
+          createdById: req.user.id, approvedById: req.user.id, approvedAt: new Date(),
+        },
+      });
+    });
+    await invalidate('payments:*');
+    req.app.get('io')?.to(`clinic_${clinic.id}`).emit('wallet_updated', { message: `Br ${amount.toLocaleString('en-US')} added to your advance balance.` });
+    sendPushToClinic(prisma, clinic.id, { title: '✅ Advance Payment Received', body: `Br ${amount.toLocaleString('en-US')} cash was added to your advance balance.`, data: { type: 'wallet_topup', screen: 'Wallet' } });
+    const wallet = await prisma.clinicWallet.findUnique({ where: { clinicId: clinic.id } });
+    res.status(201).json({ success: true, transaction: t, balance: wallet.balance });
+  } catch (err) {
+    console.error('[wallet cash]', err);
+    res.status(500).json({ error: 'Could not record the cash payment.' });
+  }
+});
+
 // Manual correction (ADMIN / FINANCE): positive adds, negative removes. Needs a note.
 router.post('/clinic/:clinicId/adjust', protect, restrict('ADMIN', 'FINANCE'), async (req, res) => {
   try {

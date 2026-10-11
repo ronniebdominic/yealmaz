@@ -14,9 +14,73 @@ import { renderOnboardingCard, printCardImage, downloadCardImage, whatsAppUrl } 
 import { printCredentialsCard } from '../utils/printCredentialsCard';
 import {
   MdEdit, MdLocalHospital, MdAutoAwesome, MdVpnKey, MdCheckCircle, MdSearch,
-  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge,
+  MdPause, MdPlayArrow, MdHandshake, MdQrCode2, MdBadge, MdPaid,
   MdSend, MdShare, MdDownload, MdPrint, MdContentCopy, MdMoreVert,
 } from 'react-icons/md';
+
+// ── Advance funds (cash received from a clinic) ───────────
+function AdvanceFundsModal({ clinic, onClose }) {
+  const queryClient = useQueryClient();
+  const [amount, setAmount] = useState('');
+  const [reference, setReference] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: wallet } = useQuery({
+    queryKey: ['admin', 'wallet', clinic.id],
+    queryFn: () => api.get(`/wallet/clinic/${clinic.id}`).then(r => r.data),
+  });
+
+  const amt = parseFloat(amount);
+  const valid = Number.isFinite(amt) && amt > 0;
+
+  const save = async () => {
+    if (!valid || saving) return;
+    if (!window.confirm(`Add Br ${amt.toLocaleString('en-US')} cash to ${clinic.name}'s advance balance?`)) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post(`/wallet/clinic/${clinic.id}/cash`, { amount: amt, reference, note });
+      toast.success(`Added. New balance: Br ${data.balance.toLocaleString('en-US')}`);
+      queryClient.invalidateQueries({ queryKey: ['admin', 'wallet', clinic.id] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not record the payment.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 440, padding: 22 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>Add Advance Funds</div>
+        <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 14 }}>
+          {clinic.name} · current balance <b style={{ color: 'var(--green)' }}>Br {(wallet?.balance ?? 0).toLocaleString('en-US')}</b>
+        </div>
+
+        <label style={labelStyle}>Cash received (Br)</label>
+        <input style={inputStyle} type="number" min="0" autoFocus value={amount} onChange={e => setAmount(e.target.value)} placeholder="e.g. 50000" />
+
+        <label style={{ ...labelStyle, marginTop: 12 }}>Receipt / reference no. (optional)</label>
+        <input style={inputStyle} value={reference} onChange={e => setReference(e.target.value)} />
+
+        <label style={{ ...labelStyle, marginTop: 12 }}>Note (optional)</label>
+        <input style={inputStyle} value={note} onChange={e => setNote(e.target.value)} />
+
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10 }}>
+          Credited immediately; the clinic gets a notification. It is then deducted from their cases automatically.
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-success" disabled={!valid || saving} onClick={save}>{saving ? 'Saving…' : 'Add to balance'}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 // ── Row action menu ───────────────────────────────────────
 // The table used to render five action buttons inline per row, which forced
@@ -539,6 +603,7 @@ export default function AdminClinics() {
   const [newCreds,   setNewCreds]   = useState(null); // { clinic, password }
   const [onboardCard, setOnboardCard] = useState(null); // { clinic, url, qrCodeUrl, expiresAt }
   const [search,     setSearch]     = useState('');
+  const [fundsTarget, setFundsTarget] = useState(null);
 
   const { data: clinics = [], isLoading } = useQuery({
     queryKey: ['admin', 'clinics', 'all'],
@@ -750,6 +815,11 @@ export default function AdminClinics() {
                           </button>
                           <RowMenu items={[
                             {
+                              label: 'Add Advance Funds', icon: <MdPaid size={15} />, color: 'var(--green)',
+                              title: 'Record cash received from this clinic as advance payment',
+                              onClick: () => setFundsTarget(c),
+                            },
+                            {
                               label: generatingQr === c.id ? 'Generating…' : 'Setup QR',
                               icon: <MdQrCode2 size={15} />, color: 'var(--blue)', disabled: generatingQr === c.id,
                               title: 'Print an onboarding form + QR for this clinic to fill in their details and set their own password',
@@ -799,6 +869,8 @@ export default function AdminClinics() {
           </div>
         </div>
       </div>
+
+      {fundsTarget && <AdvanceFundsModal clinic={fundsTarget} onClose={() => setFundsTarget(null)} />}
 
       {/* Create modal */}
       {showForm && (
