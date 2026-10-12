@@ -8,6 +8,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
+const { billedOf } = require('../services/financeRules');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -58,7 +59,7 @@ router.get('/my-pending', protect, restrict('CLINIC'), async (req, res) => {
     });
     const items = cases
       .map(c => {
-        const due = (c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0);
+        const due = billedOf(c) - (c.payment?.amountReceived || 0);
         return { ...c, amountDue: Math.round((due + Number.EPSILON) * 100) / 100 };
       })
       .filter(c => c.amountDue > 0);
@@ -85,7 +86,7 @@ router.post('/send-reminders', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP
     });
     const byClinic = {};
     for (const c of cases) {
-      const due = (c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0);
+      const due = billedOf(c) - (c.payment?.amountReceived || 0);
       if (due <= 0) continue;
       const e = (byClinic[c.clinicId] ||= { count: 0, total: 0 });
       e.count += 1; e.total += due;
@@ -221,7 +222,7 @@ router.post('/:caseId/chapa/initialize', protect, async (req, res) => {
     }
 
     // Charge only what's still owed — part of it may already have been paid from the advance balance.
-    const amount = (caseData.payment?.amount ?? caseData.totalAmount) - (caseData.payment?.amountReceived || 0);
+    const amount = billedOf(caseData) - (caseData.payment?.amountReceived || 0);
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'No amount due for this case.' });
     }
@@ -527,7 +528,7 @@ router.get('/daily-reconciliation', protect, restrict('ADMIN', 'FINANCE', 'FINAN
     const creditSales = emptyBucket();
 
     const rows = cases.map(c => {
-      const billed = c.payment?.amount ?? c.totalAmount ?? 0;
+      const billed = billedOf(c);
       const payStatus = c.payment?.status || 'PENDING';
       const isCredit = !!c.clinic?.isExcluded;
       const collected = payStatus === 'VERIFIED' ? billed : (c.payment?.amountReceived || 0);
@@ -648,7 +649,7 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
 // `db` is either the plain prisma client or a transaction client, so bulk
 // can make a whole batch all-or-nothing while single stays a plain write.
 async function collectCase(db, caseData, user, { amount, notes, taxWithheldAmount, amountReceived }) {
-  const resolvedAmount = amount != null ? amount : (caseData.payment?.amount ?? caseData.totalAmount);
+  const resolvedAmount = amount != null ? amount : billedOf(caseData);
 
   const paymentData = {
     status: 'VERIFIED',
@@ -714,7 +715,7 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
     // owed to us, so it must never be conflated with amount/totalAmount (the
     // true invoice value) or amountReceived (a genuine still-owed shortfall).
     const amountNum = amount ? parseFloat(amount) : null;
-    const resolvedAmount = amountNum != null ? amountNum : (caseData.payment?.amount ?? caseData.totalAmount);
+    const resolvedAmount = amountNum != null ? amountNum : billedOf(caseData);
     let taxWithheldAmount = null;
     if (taxWithheld) {
       taxWithheldAmount = parseFloat(taxWithheld);
@@ -766,7 +767,7 @@ const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const MONEY_EPS = 0.005;
 
 function balanceOf(caseData) {
-  const due = caseData.payment?.amount ?? caseData.totalAmount ?? 0;
+  const due = billedOf(caseData);
   const received = caseData.payment?.amountReceived || 0;
   return { due, received, remaining: round2(due - received) };
 }

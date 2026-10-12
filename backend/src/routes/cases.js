@@ -5,6 +5,7 @@ const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { checkCaseDate } = require('../services/financeRules');
 const { awardCasePoints } = require('./rewards');
 const { clawBackCasePoints } = require('../utils/rewards');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
@@ -102,6 +103,11 @@ async function createSingleCase(db, fields, actorUser) {
   }
   if (discountType === 'PERCENT' && parseFloat(discountValue) > 100) {
     throw { status: 400, message: 'A percentage discount cannot exceed 100.' };
+  }
+
+  if (deliveryDate) {
+    const dateError = checkCaseDate('Delivery date', deliveryDate);
+    if (dateError) throw { status: 400, message: dateError };
   }
 
   // Shade, doctor name, and doctor contact are mandatory for new orders.
@@ -1088,6 +1094,12 @@ router.post('/:id/comments', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINANCE
 router.patch('/:id/delivery-date', protect, restrict('ADMIN', 'RECEPTIONIST'), async (req, res) => {
   try {
     const { deliveryDate } = req.body;
+    if (deliveryDate) {
+      const existingCase = await prisma.case.findUnique({ where: { id: req.params.id }, select: { createdAt: true } });
+      if (!existingCase) return res.status(404).json({ error: 'Case not found.' });
+      const dateError = checkCaseDate('Delivery date', deliveryDate, { createdAt: existingCase.createdAt });
+      if (dateError) return res.status(400).json({ error: dateError });
+    }
     const updated = await prisma.case.update({
       where: { id: req.params.id },
       data: { deliveryDate: deliveryDate ? new Date(deliveryDate) : null },
@@ -1509,6 +1521,15 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       else if (DATE_FIELDS.has(field))  data[field] = raw ? new Date(raw) : null;
       else if (BOOL_FIELDS.has(field))  data[field] = Boolean(raw);
       else                              data[field] = raw === '' ? null : raw;
+    }
+
+    if (data.deliveryDate) {
+      const dateError = checkCaseDate('Delivery date', data.deliveryDate, { createdAt: existing.createdAt });
+      if (dateError) return res.status(400).json({ error: dateError });
+    }
+    if (data.dueDate) {
+      const dateError = checkCaseDate('Due date', data.dueDate);
+      if (dateError) return res.status(400).json({ error: dateError });
     }
 
     if ('patientName' in data && !data.patientName) {

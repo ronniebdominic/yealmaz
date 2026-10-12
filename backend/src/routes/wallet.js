@@ -6,6 +6,7 @@ const cloudinary = require('cloudinary').v2;
 const { Chapa } = require('chapa-nodejs');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
+const { billedOf } = require('../services/financeRules');
 const { sendPushToClinic } = require('../utils/webpush');
 const { applyWalletToClinicOutstanding, applyWalletToCase } = require('../services/walletDeduction');
 
@@ -72,7 +73,7 @@ async function payableCases(clinicId, caseIds) {
     select: { id: true, totalAmount: true, payment: { select: { amount: true, amountReceived: true } } },
   });
   return cases
-    .map(c => ({ id: c.id, due: round2((c.payment?.amount ?? c.totalAmount ?? 0) - (c.payment?.amountReceived || 0)) }))
+    .map(c => ({ id: c.id, due: round2(billedOf(c) - (c.payment?.amountReceived || 0)) }))
     .filter(c => c.due > 0);
 }
 

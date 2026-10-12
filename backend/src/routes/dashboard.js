@@ -1,5 +1,6 @@
 // Ye-Almaz — Dashboard / Analytics Routes
 const express = require('express');
+const { outstandingOwed, paidOf } = require('../services/financeRules');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
@@ -132,20 +133,6 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
 // Returns revenue + pending summaries for Finance dashboard (daily/MTD/YTD)
 // Body factored into computeFinanceReport() — see computeDashboardSummary()'s
 // comment above for why (shared by the route and the Telegram bot's tools).
-// ONE definition of "outstanding" for every dashboard (Finance Pending, Admin
-// Outstanding Payment, Trusted Partners): a DELIVERED case whose payment isn't
-// VERIFIED, valued at what it is billed for now. Case.totalAmount is the source
-// of truth (Payment.amount can be stale after a later price edit); a rejected
-// receipt is still owed. A remake only counts when it actually carries a charge.
-// Returns the still-owed amount (billed minus part payments), or 0 if none.
-function outstandingOwed(c) {
-  if (c.status != null && c.status !== 'DELIVERED') return 0;
-  if ((c.payment?.status || 'PENDING') === 'VERIFIED') return 0;
-  const billed = c.totalAmount > 0 ? c.totalAmount : (c.payment?.amount ?? 0);
-  if (!(billed > 0)) return 0;
-  return Math.max(billed - (c.payment?.amountReceived || 0), 0);
-}
-
 async function computeFinanceReport({ from, to, search } = {}) {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -958,10 +945,7 @@ async function computeTrustedPartnersSummary() {
       const totalRevenue    = cases.reduce((s, c) => s + (c.totalAmount || 0), 0);
       // Paid so far = full amount for VERIFIED cases + any partial amountReceived
       // collected on cases still awaiting the rest of their balance.
-      const paymentsReceived = cases.reduce((s, c) => {
-        if (c.payment?.status === 'VERIFIED') return s + (c.payment?.amount || 0);
-        return s + (c.payment?.amountReceived || 0);
-      }, 0);
+      const paymentsReceived = cases.reduce((s, c) => s + paidOf(c), 0);
       // Only count outstanding where an amount has actually been billed —
       // cases with no totalAmount yet would inflate the count with Br 0
       // entries. Outstanding = what's still owed (billed amount minus any
@@ -1239,6 +1223,113 @@ Object.assign(router, {
   computeDeliveryPerformance,
   computeClinicBalances,
   computeTrustedPartnersSummary,
+});
+
+// ── Data health: do the dashboards agree, and is the data they read sane? ──
+// GET /api/dashboard/reconcile   (ADMIN)
+// Computes "outstanding" straight from the cases with the shared rule, then
+// compares every screen that reports it. Also lists data problems that make
+// figures drift (impossible delivery dates, payment amounts that no longer
+// match their case, case/payment status out of step).
+const UNPAID_PAY = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'REJECTED'];
+
+async function findAmountMismatches() {
+  const rows = await prisma.case.findMany({
+    where: { totalAmount: { gt: 0 }, payment: { is: { status: { in: UNPAID_PAY } } } },
+    select: { id: true, caseNumber: true, totalAmount: true, status: true, clinic: { select: { name: true } }, payment: { select: { amount: true } } },
+  });
+  return rows.filter(r => r.payment && r.payment.amount !== r.totalAmount);
+}
+
+router.get('/reconcile', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    // Drop cached figures first so a stale cache is never reported as a mismatch.
+    await invalidate('payments:*', 'dashboard:analytics:*');
+    const today = new Date().toISOString().slice(0, 10);
+    const [delivered, finance, trusted, balances, admin] = await Promise.all([
+      prisma.case.findMany({
+        where: { status: 'DELIVERED' },
+        select: { status: true, totalAmount: true, payment: { select: { status: true, amount: true, amountReceived: true } } },
+      }),
+      computeFinanceReport({}),
+      computeTrustedPartnersSummary(),
+      computeClinicBalances(),
+      computeAdminAnalytics({ from: '2020-01-01', to: today }),
+    ]);
+
+    let expectedCount = 0, expectedAmount = 0;
+    for (const c of delivered) {
+      const owed = outstandingOwed(c);
+      if (owed > 0) { expectedCount += 1; expectedAmount += owed; }
+    }
+    const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+    const figures = [
+      { name: 'Finance Dashboard — Pending', count: finance.pending.count, amount: finance.pending.amount },
+      { name: 'Admin Dashboard — Outstanding (All Time)', count: admin.kpi.outstandingCount, amount: admin.kpi.outstandingAmount },
+      { name: 'Trusted Partners — Outstanding', count: sum(trusted, c => c.outstandingCount), amount: sum(trusted, c => c.outstanding) },
+      { name: 'Finance — Clinic Balances', count: sum(balances, b => b.pendingCount), amount: sum(balances, b => b.pendingAmount) },
+    ].map(f => ({ ...f, ok: f.count === expectedCount && Math.abs(f.amount - expectedAmount) < 0.01 }));
+
+    const now = new Date();
+    const [badDates, mismatches, statusRows] = await Promise.all([
+      prisma.case.findMany({
+        where: { status: 'DELIVERED', OR: [{ deliveryDate: null }, { deliveryDate: { lt: new Date('2020-01-01') } }, { deliveryDate: { gt: new Date(now.getTime() + 2 * 86_400_000) } }] },
+        select: { id: true, caseNumber: true, deliveryDate: true, clinic: { select: { name: true } } },
+        take: 200,
+      }),
+      findAmountMismatches(),
+      prisma.case.findMany({
+        where: { payment: { isNot: null }, status: { not: 'CANCELLED' } },
+        select: { id: true, caseNumber: true, paymentStatus: true, payment: { select: { status: true } }, clinic: { select: { name: true } } },
+      }),
+    ]);
+    const statusMismatch = statusRows.filter(r => r.payment && r.payment.status !== r.paymentStatus);
+
+    const sample = (arr, f) => arr.slice(0, 15).map(f);
+    res.json({
+      checkedAt: new Date(),
+      expected: { count: expectedCount, amount: expectedAmount },
+      figures,
+      allAgree: figures.every(f => f.ok),
+      anomalies: [
+        {
+          key: 'badDeliveryDates', title: 'Delivered cases with an impossible delivery date',
+          hint: 'Missing, before 2020, or in the future — these drop out of date-filtered dashboards. Fix the date on the case.',
+          count: badDates.length,
+          samples: sample(badDates, r => ({ caseNumber: r.caseNumber, clinic: r.clinic?.name, detail: r.deliveryDate ? new Date(r.deliveryDate).toISOString().slice(0, 10) : 'no date' })),
+        },
+        {
+          key: 'amountMismatch', title: 'Unpaid cases whose payment amount differs from the case total',
+          hint: 'The case total is treated as correct. "Sync amounts" sets the payment amount to match.',
+          count: mismatches.length, fixable: true,
+          samples: sample(mismatches, r => ({ caseNumber: r.caseNumber, clinic: r.clinic?.name, detail: `case Br ${r.totalAmount} vs payment Br ${r.payment.amount}` })),
+        },
+        {
+          key: 'statusMismatch', title: 'Case payment status out of step with its payment record',
+          hint: 'The case and its payment disagree about whether it is paid. Review each one.',
+          count: statusMismatch.length,
+          samples: sample(statusMismatch, r => ({ caseNumber: r.caseNumber, clinic: r.clinic?.name, detail: `case ${r.paymentStatus} vs payment ${r.payment.status}` })),
+        },
+      ],
+    });
+  } catch (err) {
+    console.error('[reconcile]', err);
+    res.status(500).json({ error: 'Could not run the data check.' });
+  }
+});
+
+// POST /api/dashboard/reconcile/sync-amounts  (ADMIN)
+// Sets an unpaid case's payment amount to its case total where they differ.
+router.post('/reconcile/sync-amounts', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const rows = await findAmountMismatches();
+    await prisma.$transaction(rows.map(r => prisma.payment.update({ where: { caseId: r.id }, data: { amount: r.totalAmount } })));
+    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+    res.json({ success: true, fixed: rows.length });
+  } catch (err) {
+    console.error('[reconcile sync-amounts]', err);
+    res.status(500).json({ error: 'Could not sync amounts.' });
+  }
 });
 
 module.exports = router;
