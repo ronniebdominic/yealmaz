@@ -332,13 +332,21 @@ router.post('/:id/onboarding-link', protect, restrict('ADMIN'), async (req, res)
     const clinic = await prisma.clinic.findUnique({ where: { id: req.params.id } });
     if (!clinic) return res.status(404).json({ error: 'Clinic not found.' });
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + ONBOARDING_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+    // Re-opening Setup QR for a clinic whose link is still valid hands back the SAME link.
+    // Issuing a new token every time silently killed any card or WhatsApp message already
+    // sent to that clinic ("This onboarding link is invalid").
+    const stillValid = clinic.onboardingToken && clinic.onboardingTokenExpiresAt && clinic.onboardingTokenExpiresAt > new Date();
+    const token = stillValid ? clinic.onboardingToken : crypto.randomBytes(32).toString('hex');
+    const expiresAt = stillValid
+      ? clinic.onboardingTokenExpiresAt
+      : new Date(Date.now() + ONBOARDING_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-    await prisma.clinic.update({
-      where: { id: clinic.id },
-      data: { onboardingToken: token, onboardingTokenExpiresAt: expiresAt },
-    });
+    if (!stillValid) {
+      await prisma.clinic.update({
+        where: { id: clinic.id },
+        data: { onboardingToken: token, onboardingTokenExpiresAt: expiresAt },
+      });
+    }
 
     const url = `${onboardingBaseUrl(req)}/${token}`;
     const qrCodeUrl = await QRCode.toDataURL(url, { width: 320, margin: 2, color: { dark: '#1A56A0', light: '#FFFFFF' } });
