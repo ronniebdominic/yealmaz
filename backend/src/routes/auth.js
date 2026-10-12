@@ -130,34 +130,4 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
-// ── POST /api/auth/seed-admin ────────────────────────────
-// ONE-TIME USE: Creates the first admin account
-// Delete or comment out after first use
-router.post('/seed-admin', async (req, res) => {
-  try {
-    const exists = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-    if (exists) {
-      return res.status(400).json({ error: 'Admin already exists.' });
-    }
-
-    const hashed = await bcrypt.hash('YeAlmaz@Admin2024', 10);
-    const admin = await prisma.user.create({
-      data: {
-        name: 'Ye-Almaz Admin',
-        email: 'admin@yealmaz.com',
-        password: hashed,
-        role: 'ADMIN'
-      }
-    });
-
-    res.json({
-      message: 'Admin created successfully. Change the password immediately.',
-      email: admin.email,
-      tempPassword: 'YeAlmaz@Admin2024'
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Could not create admin.' });
-  }
-});
-
 module.exports = router;

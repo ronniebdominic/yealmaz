@@ -44,6 +44,11 @@ router.post('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
     const day = new Date(`${date}T00:00:00`);
     if (isNaN(day.getTime())) return res.status(400).json({ error: 'Invalid date.' });
 
+    const already = await prisma.overtimeRecord.findUnique({ where: { userId_date: { userId, date: day } }, select: { approvalStatus: true } });
+    if (already && already.approvalStatus !== 'PENDING') {
+      return res.status(409).json({ error: `This day's overtime is already ${String(already.approvalStatus).toLowerCase()} and can no longer be changed here.` });
+    }
+
     const record = await prisma.overtimeRecord.upsert({
       where: { userId_date: { userId, date: day } },
       create: {
@@ -100,6 +105,9 @@ router.post('/detect', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res
         leaveRecord: leaveByUser.get(emp.id) || null, correction: null,
       });
       if (summary.overtimeHours > 0) {
+        // Detection is safe to re-run: leave anything HR already approved/rejected/paid untouched.
+        const already = await prisma.overtimeRecord.findUnique({ where: { userId_date: { userId: emp.id, date: day } }, select: { approvalStatus: true } });
+        if (already && already.approvalStatus !== 'PENDING') continue;
         const record = await prisma.overtimeRecord.upsert({
           where: { userId_date: { userId: emp.id, date: day } },
           create: {

@@ -7,7 +7,7 @@ const router = express.Router();
 const prisma = new PrismaClient();
 
 // GET /api/prices
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const cached = await appCache.get('prices');
     if (cached) return res.json(cached);
@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 });
 
 // PUT /api/prices  — body: [{ workType, price }, ...]
-router.put('/', async (req, res) => {
+router.put('/', protect, restrict('ADMIN'), async (req, res) => {
   try {
     const updates = req.body;
     if (!Array.isArray(updates) || updates.length === 0) {

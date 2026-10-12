@@ -12,6 +12,8 @@ async function applyWalletToCase(prisma, caseId, actor = { id: null, name: 'Adva
   const payments = require('../routes/payments'); // lazy: avoids a require cycle
 
   const result = await prisma.$transaction(async (tx) => {
+    // Serialise concurrent deductions on this case (delivery, payment request, bulk pay can all fire at once).
+    await tx.$queryRaw`SELECT id FROM payments WHERE "caseId" = ${caseId} FOR UPDATE`;
     const caseData = await tx.case.findUnique({ where: { id: caseId }, include: { payment: true } });
     if (!caseData) return { applied: 0 };
 
@@ -60,14 +62,18 @@ async function applyWalletToCase(prisma, caseId, actor = { id: null, name: 'Adva
 // Settle a clinic's delivered, unpaid cases oldest-first from its balance.
 async function applyWalletToClinicOutstanding(prisma, clinicId, actor) {
   const cases = await prisma.case.findMany({
-    where: { clinicId, status: 'DELIVERED', remake: false, paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED'] } },
+    where: { clinicId, status: 'DELIVERED', totalAmount: { gt: 0 }, paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
     orderBy: { deliveryDate: 'asc' },
     select: { id: true },
   });
   const results = [];
   for (const c of cases) {
     const r = await applyWalletToCase(prisma, c.id, actor);
-    if (!r.applied) break; // wallet is empty
+    if (!r.applied) {
+      const w = await prisma.clinicWallet.findUnique({ where: { clinicId } });
+      if (!w || w.balance <= 0) break; // wallet is empty — stop
+      continue; // this case couldn't take anything (e.g. a receipt is awaiting review) — try the next
+    }
     results.push({ caseId: c.id, ...r });
   }
   return results;

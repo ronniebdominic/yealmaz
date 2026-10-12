@@ -59,11 +59,12 @@ export default function WalletScreen({ navigation }) {
   const payChapa = async () => {
     if (!amountOk || busy) { if (!amountOk) Alert.alert(t('wallet.failed'), t('wallet.invalidAmount')); return; }
     setBusy(true);
+    const popup = Platform.OS === 'web' ? window.open('', '_blank') : null; // must open inside the tap
     try {
       const res = await api.post('/wallet/topup/chapa/initialize', { amount: parsedAmount });
       const { checkoutUrl, txRef } = res.data || {};
       if (!checkoutUrl) throw new Error(t('common.genericError'));
-      if (Platform.OS === 'web') window.open(checkoutUrl, '_blank', 'noopener');
+      if (Platform.OS === 'web') { if (popup) popup.location.href = checkoutUrl; else window.location.href = checkoutUrl; }
       else await WebBrowser.openBrowserAsync(checkoutUrl);
       reset();
       confirmChapa(txRef).then((ok) => {
@@ -71,6 +72,7 @@ export default function WalletScreen({ navigation }) {
         refresh();
       });
     } catch (err) {
+      if (popup) popup.close();
       Alert.alert(t('wallet.failed'), err.response?.data?.error || err.message || t('common.genericError'));
     } finally {
       setBusy(false);

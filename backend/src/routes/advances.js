@@ -49,10 +49,17 @@ router.post('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
 
 router.patch('/:id/approve', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {
-    const advance = await prisma.employeeAdvance.update({
-      where: { id: req.params.id },
+    // Only a PENDING request can be approved — approving a rejected/completed advance would put
+    // it back into salary deductions.
+    const { count } = await prisma.employeeAdvance.updateMany({
+      where: { id: req.params.id, status: 'PENDING' },
       data: { status: 'ACTIVE', approvedById: req.user.id, approvedAt: new Date() },
     });
+    if (count === 0) {
+      const exists = await prisma.employeeAdvance.findUnique({ where: { id: req.params.id }, select: { status: true } });
+      return res.status(exists ? 409 : 404).json({ error: exists ? `This advance is already ${exists.status.toLowerCase()}.` : 'Advance not found.' });
+    }
+    const advance = await prisma.employeeAdvance.findUnique({ where: { id: req.params.id } });
     await invalidate('advances:*');
     res.json(advance);
   } catch (err) {
@@ -64,10 +71,15 @@ router.patch('/:id/approve', protect, restrict('HR_MANAGER', 'ADMIN'), async (re
 
 router.patch('/:id/reject', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {
-    const advance = await prisma.employeeAdvance.update({
-      where: { id: req.params.id },
+    const { count } = await prisma.employeeAdvance.updateMany({
+      where: { id: req.params.id, status: 'PENDING' },
       data: { status: 'REJECTED', approvedById: req.user.id, approvedAt: new Date() },
     });
+    if (count === 0) {
+      const exists = await prisma.employeeAdvance.findUnique({ where: { id: req.params.id }, select: { status: true } });
+      return res.status(exists ? 409 : 404).json({ error: exists ? `This advance is already ${exists.status.toLowerCase()}.` : 'Advance not found.' });
+    }
+    const advance = await prisma.employeeAdvance.findUnique({ where: { id: req.params.id } });
     await invalidate('advances:*');
     res.json(advance);
   } catch (err) {

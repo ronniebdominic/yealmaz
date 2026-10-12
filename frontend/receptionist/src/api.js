@@ -16,7 +16,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // A wrong password on the login form is also a 401 — don't treat it as an expired session
+    // (the reload would wipe the error message before the user ever sees it).
+    const isLoginAttempt = /\/auth\/(clinic\/)?login/.test(err.config?.url || '');
+    if (err.response?.status === 401 && !isLoginAttempt) {
       localStorage.removeItem('ya_token');
       localStorage.removeItem('ya_user');
       window.location.href = '/login';

@@ -55,11 +55,13 @@ export default function PendingPaymentsScreen({ navigation }) {
   const payChapa = async () => {
     if (!chosen.length || busy) return;
     setBusy(true);
+    // Open the tab NOW, inside the tap — browsers block a window opened after an await.
+    const popup = Platform.OS === 'web' ? window.open('', '_blank') : null;
     try {
       const res = await api.post('/wallet/pay-cases/chapa/initialize', { caseIds: chosen.map(c => c.id) });
       const { checkoutUrl, txRef } = res.data || {};
       if (!checkoutUrl) throw new Error(t('common.genericError'));
-      if (Platform.OS === 'web') window.open(checkoutUrl, '_blank', 'noopener');
+      if (Platform.OS === 'web') { if (popup) popup.location.href = checkoutUrl; else window.location.href = checkoutUrl; }
       else await WebBrowser.openBrowserAsync(checkoutUrl);
       setSelected({});
       (async () => {
@@ -73,6 +75,7 @@ export default function PendingPaymentsScreen({ navigation }) {
         refreshAll();
       })();
     } catch (err) {
+      if (popup) popup.close();
       Alert.alert(t('wallet.failed'), err.response?.data?.error || err.message || t('common.genericError'));
     } finally {
       setBusy(false);

@@ -13,6 +13,7 @@ import { printPayslip } from '../../../utils/printPayslip';
 import { inputStyle } from '../../../utils/adminForms';
 import AdjustmentModal from '../components/AdjustmentModal';
 import AttendanceLogExport from '../components/AttendanceLogExport';
+import { toLocalDateString } from '../../../utils/date';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WORKFLOW = ['DRAFT', 'PROCESSING', 'REVIEW', 'APPROVED', 'PAID', 'FINALIZED'];
@@ -33,8 +34,8 @@ export default function PayrollRunsTab({ canManage }) {
   const [entrySort, setEntrySort] = useState(null); // 'gross' | 'deductions' | 'net' — clicking a summary card again clears it
   // Attendance log export — defaults to the Month/Year picked above (the
   // same period a payroll run would cover), independently adjustable.
-  const monthStart = (y, m) => new Date(y, m - 1, 1).toISOString().slice(0, 10);
-  const monthEnd = (y, m) => new Date(y, m, 0).toISOString().slice(0, 10);
+  const monthStart = (y, m) => toLocalDateString(new Date(y, m - 1, 1));
+  const monthEnd = (y, m) => toLocalDateString(new Date(y, m, 0));
   const [logFrom, setLogFrom] = useState(() => monthStart(periodYear, periodMonth));
   const [logTo, setLogTo] = useState(() => monthEnd(periodYear, periodMonth));
 

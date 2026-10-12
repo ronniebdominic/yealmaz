@@ -69,7 +69,7 @@ async function spendOnCases(clinicId, caseIds) {
 async function payableCases(clinicId, caseIds) {
   if (!Array.isArray(caseIds) || caseIds.length === 0 || caseIds.length > 200) return null;
   const cases = await prisma.case.findMany({
-    where: { id: { in: caseIds }, clinicId, remake: false, paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
+    where: { id: { in: caseIds }, clinicId, paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
     select: { id: true, totalAmount: true, payment: { select: { amount: true, amountReceived: true } } },
   });
   return cases

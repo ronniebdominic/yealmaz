@@ -145,7 +145,7 @@ router.post('/runs', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) 
         }
       }
       return created;
-    });
+    }, { timeout: 120000, maxWait: 15000 }); // a full run does many sequential queries — Prisma's 5s default aborts it
 
     await invalidate('payroll:runs*', 'dashboard:hr-summary', 'advances:*', 'expenses:*', 'incentives:*');
     res.status(201).json({ run, employeeCount: employees.length, missingSalaryCount });

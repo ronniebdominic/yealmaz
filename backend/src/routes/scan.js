@@ -116,6 +116,9 @@ router.post('/:caseId', protect, async (req, res) => {
     const { caseId } = req.params;
     const { department, techName, comment } = req.body;
 
+    // Scanning moves a case through the lab — staff only. A clinic login must never do this.
+    if (req.user.role === 'CLINIC') return res.status(403).json({ error: 'Access denied.' });
+
     if (!department || !DEPT_TO_STAGE[department]) {
       return res.status(400).json({ error: 'Invalid department code.' });
     }
@@ -261,6 +264,8 @@ router.post('/:caseId', protect, async (req, res) => {
   }
 });
 
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
 // ── GET /api/scan/:caseId ─────────────────────────────────
 // QR code browser scan — returns case info (for camera-based QR scanning)
 router.get('/:caseId', async (req, res) => {
@@ -313,9 +318,9 @@ router.get('/:caseId', async (req, res) => {
         <div class="card">
           <div style="font-size:36px;margin-bottom:8px">🦷</div>
           <div class="logo">Ye-Almaz Dental Lab</div>
-          <div class="cn">${caseData.caseNumber}</div>
-          <div class="patient">${caseData.patientName}</div>
-          <div class="work">${caseData.workType} · ${caseData.clinic.name}</div>
+          <div class="cn">${escapeHtml(caseData.caseNumber)}</div>
+          <div class="patient">${escapeHtml(caseData.patientName)}</div>
+          <div class="work">${escapeHtml(caseData.workType)} · ${escapeHtml(caseData.clinic.name)}</div>
           <div class="stage">
             <div class="stage-lbl">Current: ${STAGE_LABELS[caseData.status]}</div>
           </div>

@@ -47,7 +47,7 @@ router.get('/my-pending', protect, restrict('CLINIC'), async (req, res) => {
   try {
     const cases = await prisma.case.findMany({
       where: {
-        clinicId: req.user.id, remake: false, paymentStatus: { not: 'VERIFIED' },
+        clinicId: req.user.id, paymentStatus: { not: 'VERIFIED' },
         OR: [{ status: 'DELIVERED' }, { paymentStatus: { in: ['PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED', 'REJECTED'] } }],
       },
       select: {
@@ -81,7 +81,7 @@ router.post('/send-reminders', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP
   try {
     const only = Array.isArray(req.body.clinicIds) && req.body.clinicIds.length ? { clinicId: { in: req.body.clinicIds } } : {};
     const cases = await prisma.case.findMany({
-      where: { ...only, remake: false, status: 'DELIVERED', paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
+      where: { ...only, status: 'DELIVERED', paymentStatus: { in: ['PENDING', 'PAYMENT_REQUESTED', 'REJECTED'] } },
       select: { clinicId: true, totalAmount: true, payment: { select: { amount: true, amountReceived: true } } },
     });
     const byClinic = {};
@@ -115,6 +115,8 @@ router.post('/:caseId/upload', protect, upload.single('screenshot'), async (req,
     if (req.user.role === 'CLINIC' && caseData.clinicId !== req.user.id) {
       return res.status(403).json({ error: 'Access denied.' });
     }
+
+    if (caseData.paymentStatus === 'VERIFIED') return res.status(409).json({ error: 'This case is already paid.' });
 
     const screenshotUrl = await uploadToCloudinary(req.file.buffer, caseData.caseNumber);
 
@@ -162,31 +164,38 @@ async function finalizeChapaPayment(txRef, io) {
   }
 
   const caseData = payment.case;
-  const updatedPayment = await prisma.payment.update({
-    where: { caseId: caseData.id },
+  // Claim the payment atomically: the webhook and the app's status poll both land here, and only
+  // the one that flips it to VERIFIED may issue the invoice, write the stage row and send pushes.
+  const claimed = await prisma.payment.updateMany({
+    where: { caseId: caseData.id, status: { not: 'VERIFIED' } },
     data: {
       status: 'VERIFIED',
       verifiedAt: new Date(),
       invoiceNumber: payment.invoiceNumber || `INV-${caseData.caseNumber}`,
       invoiceIssuedAt: payment.invoiceIssuedAt || new Date(),
+      // Revenue is summed from Payment.amount — never leave it empty on a paid payment.
+      ...(payment.amount == null ? { amount: billedOf(caseData) } : {}),
     }
   });
+  if (claimed.count === 0) return payment; // the other caller already finalised it
+  const updatedPayment = await prisma.payment.findUnique({ where: { caseId: caseData.id } });
 
-  // A case already out for delivery / delivered is just being paid late — don't move it back.
-  const alreadyDispatched = ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(caseData.status);
+  // Paying must not drag a case around the pipeline: only a case waiting at invoicing moves on to
+  // dispatch. A case in production, out for delivery, delivered or cancelled keeps its stage.
+  const moveToReady = caseData.status === 'PAYMENT_INVOICING';
   const updatedCase = await prisma.case.update({
     where: { id: caseData.id },
-    data: alreadyDispatched ? { paymentStatus: 'VERIFIED' } : { paymentStatus: 'VERIFIED', status: 'READY_TO_DISPATCH' }
+    data: moveToReady ? { paymentStatus: 'VERIFIED', status: 'READY_TO_DISPATCH' } : { paymentStatus: 'VERIFIED' }
   });
 
   await prisma.caseStage.create({
     data: {
       caseId: caseData.id,
-      stageName: alreadyDispatched ? caseData.status : 'READY_TO_DISPATCH',
+      stageName: moveToReady ? 'READY_TO_DISPATCH' : caseData.status,
       scannedBy: 'Chapa (Online Payment)',
-      notes: alreadyDispatched
-        ? `Payment received via Chapa — invoice ${updatedPayment.invoiceNumber} issued`
-        : `Payment verified via Chapa — invoice ${updatedPayment.invoiceNumber} issued — case ready for dispatch`
+      notes: moveToReady
+        ? `Payment verified via Chapa — invoice ${updatedPayment.invoiceNumber} issued — case ready for dispatch`
+        : `Payment received via Chapa — invoice ${updatedPayment.invoiceNumber} issued`
     }
   });
 
@@ -351,8 +360,15 @@ router.post('/:caseId/verify', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINAN
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
 
+    // Only a receipt that is actually waiting for review can be approved or rejected — re-verifying a
+    // settled payment, or rejecting a paid one, would corrupt the books.
+    const current = await prisma.payment.findUnique({ where: { caseId: req.params.caseId }, select: { status: true } });
+    if (!current || current.status !== 'SCREENSHOT_UPLOADED') {
+      return res.status(409).json({ error: `This payment is ${current ? current.status.toLowerCase().replace('_', ' ') : 'missing'} — there is no receipt waiting for review.` });
+    }
+
     const newPaymentStatus = action === 'APPROVE' ? 'VERIFIED' : 'REJECTED';
-    const alreadyDispatched = ['OUT_FOR_DELIVERY', 'DELIVERED'].includes(caseData.status);
+    const alreadyDispatched = caseData.status !== 'PAYMENT_INVOICING'; // only a case waiting at invoicing moves on
     const newCaseStatus = action === 'APPROVE' && !alreadyDispatched ? 'READY_TO_DISPATCH' : undefined;
 
     // On approval: auto-issue the invoice
@@ -583,6 +599,7 @@ router.post('/:caseId/request', protect, restrict('ADMIN', 'RECEPTIONIST', 'FINA
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
 
     const amt = parseFloat(amount);
+    if (caseData.paymentStatus === 'VERIFIED') return res.status(409).json({ error: 'This case is already paid.' });
 
     await prisma.payment.upsert({
       where: { caseId: req.params.caseId },
@@ -715,6 +732,7 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
     // owed to us, so it must never be conflated with amount/totalAmount (the
     // true invoice value) or amountReceived (a genuine still-owed shortfall).
     const amountNum = amount ? parseFloat(amount) : null;
+    if (amountNum != null && !(amountNum > 0)) return res.status(400).json({ error: 'Amount must be a positive number.' });
     const resolvedAmount = amountNum != null ? amountNum : billedOf(caseData);
     let taxWithheldAmount = null;
     if (taxWithheld) {

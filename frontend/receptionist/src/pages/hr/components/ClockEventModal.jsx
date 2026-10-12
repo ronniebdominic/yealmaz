@@ -15,7 +15,12 @@ const TYPES = [
 export default function ClockEventModal({ employees, onClose, onSaved }) {
   const [userId, setUserId] = useState('');
   const [type, setType] = useState('CLOCK_IN');
-  const [timestamp, setTimestamp] = useState(() => new Date().toISOString().slice(0, 16));
+  // datetime-local wants LOCAL wall-clock time; toISOString() is UTC and made the default "now" 3 hours early.
+  const [timestamp, setTimestamp] = useState(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  });
   const [saving, setSaving] = useState(false);
 
   const save = async () => {

@@ -269,6 +269,7 @@ export default function CaseDetailScreen({ navigation, route }) {
   const payOnline = async () => {
     if (payingOnline) return; // guard: a double-tap would open a second Chapa session and strand the first (a CSRF-mismatch trigger)
     setPayingOnline(true);
+    const popup = Platform.OS === 'web' ? window.open('', '_blank') : null; // must open inside the tap, not after the await
     try {
       // Always start a brand-new Chapa session so the user never lands on a stale or
       // already-used checkout — the common cause of Chapa's "CSRF token mismatch" page.
@@ -277,12 +278,13 @@ export default function CaseDetailScreen({ navigation, route }) {
       if (!checkoutUrl) throw new Error(t('caseDetail.couldNotStartPayment'));
 
       if (Platform.OS === 'web') {
-        // Open in a new tab; the user returns to this tab manually afterwards
-        window.open(checkoutUrl, '_blank', 'noopener');
+        // Open in the tab opened above; the user returns to this tab manually afterwards
+        if (popup) popup.location.href = checkoutUrl; else window.location.href = checkoutUrl;
       } else {
         await WebBrowser.openBrowserAsync(checkoutUrl);
       }
     } catch (err) {
+      if (popup) popup.close();
       console.error('[Chapa] payment failed:', err);
       Alert.alert(t('caseDetail.paymentFailedTitle'), err.response?.data?.error || err.message || t('common.genericError'));
       return;
