@@ -43,7 +43,7 @@ export default function AdminDataHealth() {
         </button>
       </div>
 
-      <div className="page-content" style={{ padding: 20, display: 'grid', gap: 16 }}>
+      <div className="content" style={{ display: "grid", gap: 16, alignContent: "start" }}>
         {isLoading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>Checking every dashboard against the cases…</div>
         ) : isError ? (

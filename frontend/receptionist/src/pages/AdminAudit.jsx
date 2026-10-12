@@ -90,7 +90,7 @@ export default function AdminAudit() {
         />
       </div>
 
-      <div className="page-content" style={{ padding: 20 }}>
+      <div className="content">
         <div className="card" style={{ padding: 14, marginBottom: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="search-input" style={{ minWidth: 220, flex: 1 }}>
             <span className="icon mi"><MdSearch size={16} /></span>
