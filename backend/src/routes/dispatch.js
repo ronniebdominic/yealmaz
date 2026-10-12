@@ -142,6 +142,10 @@ router.post('/:caseId/assign', protect, restrict('DISPATCH', 'ADMIN'), async (re
       return res.status(400).json({ error: 'Invalid delivery executive.' });
     }
 
+    const before = await prisma.case.findUnique({ where: { id: req.params.caseId }, select: { status: true } });
+    if (!before) return res.status(404).json({ error: 'Case not found.' });
+    if (!['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'].includes(before.status)) return res.status(409).json({ error: 'Only a case that is ready for dispatch can be assigned to a delivery executive.' });
+
     const updated = await prisma.case.update({
       where: { id: req.params.caseId },
       data: { assignedDeliveryId: executiveId },
@@ -234,6 +238,10 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
     if (!executive || executive.role !== 'DELIVERY') {
       return res.status(400).json({ error: 'Invalid delivery executive.' });
     }
+
+    const before = await prisma.case.findUnique({ where: { id: req.params.caseId }, select: { status: true } });
+    if (!before) return res.status(404).json({ error: 'Case not found.' });
+    if (!['PENDING_PICKUP', 'PICKUP_ASSIGNED'].includes(before.status)) return res.status(409).json({ error: 'Only a case awaiting impression pickup can be assigned a pickup executive.' });
 
     const updated = await prisma.case.update({
       where: { id: req.params.caseId },
@@ -509,6 +517,10 @@ router.post('/:caseId/send-out', protect, restrict('DISPATCH', 'ADMIN'), async (
     if (!executive || executive.role !== 'DELIVERY') {
       return res.status(400).json({ error: 'Invalid delivery executive.' });
     }
+
+    const before = await prisma.case.findUnique({ where: { id: req.params.caseId }, select: { status: true } });
+    if (!before) return res.status(404).json({ error: 'Case not found.' });
+    if (!['READY_TO_DISPATCH', 'OUT_FOR_DELIVERY'].includes(before.status)) return res.status(409).json({ error: 'Only a case that is ready for dispatch can be sent out.' });
 
     const updated = await prisma.case.update({
       where: { id: req.params.caseId },

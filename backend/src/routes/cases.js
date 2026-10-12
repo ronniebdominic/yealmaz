@@ -662,6 +662,10 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
+    // Accepting resets a case to the start of production, so it is only valid before the lab has it.
+    if (!['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'UNDER_REVIEW', 'REJECTED'].includes(existing.status)) {
+      return res.status(409).json({ error: `This case is already ${existing.status.replace(/_/g, ' ').toLowerCase()} and cannot be accepted again.` });
+    }
 
     const extraItems = Array.isArray(additionalItems) ? additionalItems.filter(it => it && it.workType) : [];
     for (const it of extraItems) {
@@ -1433,6 +1437,15 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
+
+    const VALID_STATUSES = ['PENDING_PICKUP','PICKUP_ASSIGNED','CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING','MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING','OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING','THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING','READY_TO_DISPATCH','OUT_FOR_DELIVERY','DELIVERED','ON_HOLD','REMAKE','CANCELLED','UNDER_REVIEW','REJECTED'];
+    if (!VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status.' });
+    if (status === existing.status) return res.json(existing); // nothing to change — never re-stamp deliveryDate
+    // A delivered or cancelled case is final. Moving it back would hide its debt from every dashboard,
+    // so only an admin may do it.
+    if (['DELIVERED', 'CANCELLED'].includes(existing.status) && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: `A ${existing.status.toLowerCase()} case can only be changed by an admin.` });
+    }
 
     // Any status past PENDING_PICKUP needs a scan/case number. The dedicated /accept
     // endpoint assigns one, but this generic status override (used for manual

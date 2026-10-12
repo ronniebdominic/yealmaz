@@ -32,51 +32,40 @@ const io = new Server(server, {
 // Make io accessible in routes
 app.set('io', io);
 
+// Identify the client from its login token. A connection without a valid token is still allowed
+// (older cached app versions) but can't join any room, so it never receives anything.
+const jwt = require('jsonwebtoken');
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (token) {
+    try { socket.user = jwt.verify(token, process.env.JWT_SECRET); } catch { /* bad/expired token: stay anonymous */ }
+  }
+  next();
+});
+
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+  const user = socket.user;
+  const isStaff = !!user && user.role !== 'CLINIC';
+  const isOps = !!user && ['ADMIN', 'DISPATCH'].includes(user.role);
+  const join = (allowed, room) => { if (allowed) socket.join(room); };
 
-  // Clinic joins a room for their cases
-  socket.on('join_clinic', (clinicId) => {
-    socket.join(`clinic_${clinicId}`);
-    console.log(`Clinic ${clinicId} joined their room`);
-  });
+  // A clinic joins only its own room.
+  socket.on('join_clinic', (clinicId) => join(user?.role === 'CLINIC' && user.id === clinicId, `clinic_${clinicId}`));
 
-  // Staff joins the main lab room
-  socket.on('join_lab', () => {
-    socket.join('lab_staff');
-    console.log('Staff member joined lab room');
-  });
+  // Staff join the main lab room.
+  socket.on('join_lab', () => join(isStaff, 'lab_staff'));
 
-  // Delivery executive joins their personal room
-  socket.on('join_delivery', (userId) => {
-    socket.join(`delivery_${userId}`);
-    console.log(`Delivery exec ${userId} joined their room`);
-  });
+  // A delivery executive joins their own room (dispatch/admin may join any, to follow a driver).
+  socket.on('join_delivery', (userId) => join(!!user && (user.id === userId || isOps), `delivery_${userId}`));
 
-  // Inventory manager joins the goods-request notification room
-  socket.on('join_inventory', () => {
-    socket.join('inventory_staff');
-    console.log('Inventory manager joined inventory room');
-  });
+  // Inventory goods-request notifications — staff only.
+  socket.on('join_inventory', () => join(isStaff, 'inventory_staff'));
 
-  // Dispatch/Admin joins the live delivery-location room — receives
-  // driver_location/driver_location_stopped broadcasts (see delivery.js's
-  // POST /location, /location/stop).
-  socket.on('join_dispatch_ops', () => {
-    socket.join('dispatch_ops');
-    console.log('Dispatch/Admin joined dispatch_ops room');
-  });
+  // Live driver GPS — dispatch and admin only.
+  socket.on('join_dispatch_ops', () => join(isOps, 'dispatch_ops'));
 
-  // Generic per-user room — any authenticated client joins their own,
-  // used for direct notification delivery (see notifications.js's
-  // POST /broadcast) without needing a role-specific room.
-  socket.on('join_user', (userId) => {
-    socket.join(`user_${userId}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
+  // Each signed-in user's own notification room.
+  socket.on('join_user', (userId) => join(!!user && user.id === userId, `user_${userId}`));
 });
 
 // ── Middleware ───────────────────────────────────────────

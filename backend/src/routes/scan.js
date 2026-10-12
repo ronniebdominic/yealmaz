@@ -141,6 +141,10 @@ router.post('/:caseId', protect, async (req, res) => {
     if (['DELIVERED', 'CANCELLED'].includes(caseData.status)) {
       return res.status(400).json({ error: `This case is already ${caseData.status.toLowerCase()}.` });
     }
+    // With the driver — a lab scan would pull it back into the pipeline while it is on the road.
+    if (caseData.status === 'OUT_FOR_DELIVERY') {
+      return res.status(409).json({ error: 'This case is out for delivery and can no longer be scanned in the lab.' });
+    }
 
     const newStatus = DEPT_TO_STAGE[department];
     const dept = DEPARTMENTS[department];

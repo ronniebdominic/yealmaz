@@ -15,4 +15,15 @@ import { io } from 'socket.io-client';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const SOCKET_URL = API_URL.replace(/\/api\/?$/, '');
 
-export const socket = io(SOCKET_URL, { autoConnect: true });
+// The server only lets a connection join rooms when it can see who it is, so send the login token
+// (read fresh on every connect — the socket is created before anyone has logged in).
+export const socket = io(SOCKET_URL, {
+  autoConnect: true,
+  auth: (cb) => cb({ token: localStorage.getItem('ya_token') }),
+});
+
+// Call after login/logout so the connection is re-established with the new identity.
+export function reconnectSocket() {
+  socket.disconnect();
+  socket.connect();
+}
