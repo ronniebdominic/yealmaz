@@ -147,12 +147,39 @@ export default function PendingPaymentsScreen({ navigation }) {
           renderItem={renderItem}
           contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 190 }}
           refreshControl={<RefreshControl refreshing={isRefetching && !isLoading} onRefresh={refetch} tintColor={Colors.primary} />}
-          ListHeaderComponent={payable.length > 1 ? (
-            <TouchableOpacity onPress={toggleAll} style={styles.selectAll}>
-              <MaterialCommunityIcons name={allSelected ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={Colors.primary} />
-              <Text style={styles.selectAllText}>{t('pending.selectAll')}</Text>
-            </TouchableOpacity>
-          ) : null}
+          ListHeaderComponent={
+            <>
+              {cases.length > 0 && (
+                <GlassCard strong style={styles.summaryCard}>
+                  <View style={styles.summaryRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.summaryLabel}>{t('pending.totalOwed')}</Text>
+                      <Text style={styles.summaryTotal}>{br(data?.total)}</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={styles.summaryLabel}>{t('pending.unpaidCases')}</Text>
+                      <Text style={styles.summaryCount}>{data?.count || 0}</Text>
+                    </View>
+                  </View>
+                  {balance > 0 && (
+                    <View style={styles.summaryBalance}>
+                      <MaterialCommunityIcons name="wallet-outline" size={16} color={Colors.green} />
+                      <Text style={styles.summaryBalanceText}>
+                        {t('pending.advanceAvailable', { amount: br(balance) })}
+                      </Text>
+                    </View>
+                  )}
+                </GlassCard>
+              )}
+              {payable.length > 1 ? (
+                <TouchableOpacity onPress={toggleAll} style={styles.selectAll}>
+                  <MaterialCommunityIcons name={allSelected ? 'checkbox-marked' : 'checkbox-blank-outline'} size={22} color={Colors.primary} />
+                  <Text style={styles.selectAllText}>{t('pending.selectAll')}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          }
           ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 60 }}>
               <MaterialCommunityIcons name="check-circle-outline" size={44} color={Colors.green} />
@@ -191,6 +218,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontFamily: FontFamily.extrabold, color: '#fff' },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  summaryCard: { padding: Spacing.lg, marginBottom: Spacing.md },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  summaryDivider: { width: 1, alignSelf: 'stretch', backgroundColor: Colors.border },
+  summaryLabel: { fontSize: 12, fontFamily: FontFamily.medium, color: Colors.text3 },
+  summaryTotal: { fontSize: 24, fontFamily: FontFamily.extrabold, color: Colors.red, marginTop: 2 },
+  summaryCount: { fontSize: 24, fontFamily: FontFamily.extrabold, color: Colors.text1, marginTop: 2 },
+  summaryBalance: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
+  summaryBalanceText: { fontSize: 12, fontFamily: FontFamily.semibold, color: Colors.green, flexShrink: 1 },
   selectAll: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, marginBottom: 4 },
   selectAllText: { fontSize: 14, fontFamily: FontFamily.semibold, color: Colors.primary },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: Spacing.md, marginBottom: Spacing.sm },

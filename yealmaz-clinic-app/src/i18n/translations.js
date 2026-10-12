@@ -73,6 +73,9 @@ export const translations = {
     pending: {
       title: 'Pending Payments',
       summary: '{count} unpaid · {total}',
+      totalOwed: 'Total balance due',
+      unpaidCases: 'Unpaid cases',
+      advanceAvailable: 'Advance balance available: {amount}',
       selectAll: 'Select all',
       selected: '{count} selected · {total}',
       payChapa: 'Pay with Chapa',
@@ -446,6 +449,9 @@ export const translations = {
     pending: {
       title: 'የሚቀሩ ክፍያዎች',
       summary: '{count} ያልተከፈለ · {total}',
+      totalOwed: 'ጠቅላላ የሚቀር ሂሳብ',
+      unpaidCases: 'ያልተከፈሉ ጉዳዮች',
+      advanceAvailable: 'ያለዎት ቅድመ ክፍያ ሂሳብ፡ {amount}',
       selectAll: 'ሁሉንም ምረጥ',
       selected: '{count} ተመርጧል · {total}',
       payChapa: 'በቻፓ ክፈል',
