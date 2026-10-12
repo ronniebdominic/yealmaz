@@ -132,6 +132,20 @@ router.get('/revenue', protect, restrict('ADMIN'), async (req, res) => {
 // Returns revenue + pending summaries for Finance dashboard (daily/MTD/YTD)
 // Body factored into computeFinanceReport() — see computeDashboardSummary()'s
 // comment above for why (shared by the route and the Telegram bot's tools).
+// ONE definition of "outstanding" for every dashboard (Finance Pending, Admin
+// Outstanding Payment, Trusted Partners): a DELIVERED case whose payment isn't
+// VERIFIED, valued at what it is billed for now. Case.totalAmount is the source
+// of truth (Payment.amount can be stale after a later price edit); a rejected
+// receipt is still owed. A remake only counts when it actually carries a charge.
+// Returns the still-owed amount (billed minus part payments), or 0 if none.
+function outstandingOwed(c) {
+  if (c.status != null && c.status !== 'DELIVERED') return 0;
+  if ((c.payment?.status || 'PENDING') === 'VERIFIED') return 0;
+  const billed = c.totalAmount > 0 ? c.totalAmount : (c.payment?.amount ?? 0);
+  if (!(billed > 0)) return 0;
+  return Math.max(billed - (c.payment?.amountReceived || 0), 0);
+}
+
 async function computeFinanceReport({ from, to, search } = {}) {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -183,7 +197,7 @@ async function computeFinanceReport({ from, to, search } = {}) {
       // excludes remakes, whose billed amount is decided after review and
       // would otherwise double-count the original case's value.
       prisma.case.findMany({
-        where: { status: 'DELIVERED', remake: false, ...(search ? { OR: [
+        where: { status: 'DELIVERED', ...(search ? { OR: [
           { clinic: { name: { contains: search, mode: 'insensitive' } } },
           { patientName: { contains: search, mode: 'insensitive' } },
           { caseNumber: { contains: search, mode: 'insensitive' } },
@@ -211,14 +225,11 @@ async function computeFinanceReport({ from, to, search } = {}) {
       }),
     ]);
 
-    const UNPAID_PAYMENT_STATUSES = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'];
     let pendingCount = 0, pendingAmount = 0;
     for (const c of pendingCases) {
-      const payStatus = c.payment?.status || 'PENDING'; // no Payment row at all reads as never-billed, i.e. PENDING
-      if (!UNPAID_PAYMENT_STATUSES.includes(payStatus)) continue;
-      const billed = c.payment?.amount ?? c.totalAmount ?? 0;
-      if (billed <= 0) continue; // nothing priced yet isn't billable outstanding
-      pendingAmount += billed - (c.payment?.amountReceived || 0);
+      const owed = outstandingOwed(c);
+      if (owed <= 0) continue;
+      pendingAmount += owed;
       pendingCount += 1;
     }
 
@@ -467,7 +478,6 @@ async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
     // cohort, paid or not. Outstanding = the subset still unpaid (net of any
     // partial amountReceived). Both derived from the same deliveredCohortCases
     // list so they can never drift apart from each other.
-    const UNPAID_STATUSES = ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'];
     let deliveredCaseValue = 0;
     let outstandingNetAmount = 0;
     let outstandingCount = 0;
@@ -476,14 +486,13 @@ async function computeAdminAnalytics({ from, to, clinicId, search } = {}) {
       // double-count work whose original case was already billed. Skipped
       // entirely here (not just left out of the sum) so deliveredCaseValue
       // and outstanding stay the same cohort and can't drift apart.
-      if (c.remake) continue;
-      const billed = c.payment?.amount ?? c.totalAmount ?? 0;
-      deliveredCaseValue += billed;
-      const payStatus = c.payment?.status || 'PENDING';
-      if (billed > 0 && UNPAID_STATUSES.includes(payStatus)) {
-        outstandingNetAmount += billed - (c.payment?.amountReceived || 0);
+      const owed = outstandingOwed(c);
+      if (owed > 0) {
+        outstandingNetAmount += owed;
         outstandingCount += 1;
       }
+      if (c.remake) continue; // a remake's value would double-count the original in the case-value total
+      deliveredCaseValue += c.payment?.amount ?? c.totalAmount ?? 0;
     }
 
     for (const p of trendPayments) {
@@ -834,31 +843,24 @@ async function computeClinicBalances() {
   const cached = await appCache.get(cacheKey);
   if (cached) return cached;
 
-  const payments = await prisma.payment.findMany({
-    where: {
-      status: { in: ['PENDING', 'PAYMENT_REQUESTED', 'SCREENSHOT_UPLOADED'] },
-      amount: { gt: 0 },   // only include cases where a non-zero amount is set
-      // Outstanding excludes in-progress cases — only unpaid balances on
-      // DELIVERED cases count as outstanding.
-      case: { status: 'DELIVERED' },
-    },
+  // Case-driven and using the same outstandingOwed() rule as the Finance, Admin
+  // and Trusted Partners figures, so this tab always adds up to them.
+  const delivered = await prisma.case.findMany({
+    where: { status: 'DELIVERED' },
     select: {
-      id: true, status: true, amount: true, amountReceived: true, updatedAt: true,
-      case: {
-        select: {
-          id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true, deliveryDate: true, createdAt: true,
-          clinic: { select: { id: true, name: true, isExcluded: true } },
-        }
-      }
+      id: true, caseNumber: true, patientName: true, workType: true, units: true, dueDate: true,
+      deliveryDate: true, createdAt: true, status: true, totalAmount: true,
+      payment: { select: { status: true, amount: true, amountReceived: true, updatedAt: true } },
+      clinic: { select: { id: true, name: true, isExcluded: true } },
     },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: { deliveryDate: 'desc' },
   });
 
   const clinicMap = {};
-  for (const p of payments) {
-    const clinic = p.case?.clinic;
-    if (!clinic) continue;
-    const remaining = (p.amount || 0) - (p.amountReceived || 0); // still owed, after any partial collection
+  for (const c of delivered) {
+    const remaining = outstandingOwed(c);
+    if (remaining <= 0 || !c.clinic) continue;
+    const clinic = c.clinic;
     if (!clinicMap[clinic.id]) {
       clinicMap[clinic.id] = {
         id: clinic.id, name: clinic.name, isExcluded: clinic.isExcluded,
@@ -868,11 +870,12 @@ async function computeClinicBalances() {
     clinicMap[clinic.id].pendingCount++;
     clinicMap[clinic.id].pendingAmount += remaining;
     clinicMap[clinic.id].cases.push({
-      caseId: p.case.id, caseNumber: p.case.caseNumber,
-      patientName: p.case.patientName, workType: p.case.workType,
-      units: p.case.units, dueDate: p.case.dueDate,
-      deliveryDate: p.case.deliveryDate, createdAt: p.case.createdAt,
-      paymentStatus: p.status, amount: remaining, amountReceived: p.amountReceived || 0, updatedAt: p.updatedAt,
+      caseId: c.id, caseNumber: c.caseNumber,
+      patientName: c.patientName, workType: c.workType,
+      units: c.units, dueDate: c.dueDate,
+      deliveryDate: c.deliveryDate, createdAt: c.createdAt,
+      paymentStatus: c.payment?.status || 'PENDING', amount: remaining,
+      amountReceived: c.payment?.amountReceived || 0, updatedAt: c.payment?.updatedAt || c.deliveryDate,
     });
   }
 
@@ -964,8 +967,8 @@ async function computeTrustedPartnersSummary() {
       // entries. Outstanding = what's still owed (billed amount minus any
       // partial collected), exclusive of in-progress cases — only unpaid
       // balances on DELIVERED cases count.
-      const outstandingCases = cases.filter(c => c.status === 'DELIVERED' && c.payment?.status !== 'VERIFIED' && c.totalAmount);
-      const outstanding      = outstandingCases.reduce((s, c) => s + (c.totalAmount - (c.payment?.amountReceived || 0)), 0);
+      const outstandingCases = cases.filter(c => outstandingOwed(c) > 0);
+      const outstanding      = outstandingCases.reduce((s, c) => s + outstandingOwed(c), 0);
       const outstandingCount = outstandingCases.length;
 
       // Aging — days since the oldest unpaid case was created
