@@ -198,6 +198,9 @@ const SHIFT_BOUNDARY_TYPES = ['CLOCK_IN', 'CLOCK_OUT'];
 const STAFF_ROLES = ['DELIVERY', 'RECEPTIONIST', 'DISPATCH', 'LAB_TECH', 'FINANCE', 'INVENTORY_MANAGER', 'HR_MANAGER', 'LEADER'];
 
 router.post('/self', protect, restrict(...STAFF_ROLES), async (req, res) => {
+  // Phone/GPS clock-in is switched off: the fingerprint device is the only source of attendance.
+  return res.status(410).json({ error: 'Clock in from the app has been turned off. Please use the fingerprint device.' });
+  // eslint-disable-next-line no-unreachable
   try {
     const { type, latitude, longitude } = req.body || {};
     if (!SELF_TYPES.includes(type)) {

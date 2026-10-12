@@ -6,7 +6,6 @@
 // a Leader is also an employee).
 import { useAuth } from '../AuthContext';
 import { MdLogout, MdGroups, MdAutorenew } from 'react-icons/md';
-import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import TeamLeaveRequests from '../components/TeamLeaveRequests';
 import CaseReviewQueue from '../components/CaseReviewQueue';
@@ -28,7 +27,7 @@ export default function LeaderDashboard() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginLeft: 'auto' }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{initials}</div>
-          <AttendanceClock /> <LeaveRequestButton />
+          <LeaveRequestButton />
           <ThemeToggle tone="page" />
             <button onClick={logout} title="Logout" className="btn btn-ghost btn-sm">
             <MdLogout size={15} />

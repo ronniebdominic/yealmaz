@@ -6,7 +6,6 @@
 // nothing is implemented twice.
 import { useAuth } from '../AuthContext';
 import { MdLogout } from 'react-icons/md';
-import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import HRWorkspace from './hr/HRWorkspace';
 import ThemeToggle from '../components/ThemeToggle';
@@ -43,8 +42,7 @@ export default function HRDashboard() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginLeft: 'auto' }}>
           {/* Primary + secondary workflow actions */}
-          <AttendanceClock />
-          <LeaveRequestButton />
+                    <LeaveRequestButton />
           {/* User controls — quieter, set off by a divider */}
           <span className="hr-hide-sm" style={{ width: 1, height: 22, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

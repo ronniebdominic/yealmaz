@@ -23,7 +23,6 @@ import {
   MdLogout,
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString } from '../utils/date';
-import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import DailyReconciliationTab from './finance/DailyReconciliationTab';
 import BulkPaymentModal, { remainingOf } from './finance/BulkPaymentModal';
@@ -2989,7 +2988,7 @@ export default function FinanceDashboard() {
         </div>
         <NavList onNav={setTabAndClose} />
         <div className="drawer-footer">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /> <LeaveRequestButton /></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><LeaveRequestButton /></div>
           <div className="user-info">
             <div className="user-avatar" style={{ background: 'var(--green)', color: '#fff' }}>{initials}</div>
             <div>
@@ -3016,7 +3015,7 @@ export default function FinanceDashboard() {
         <NavList onNav={setTab} />
 
         <div className="sidebar-footer">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><AttendanceClock /> <LeaveRequestButton /></div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}><LeaveRequestButton /></div>
           <div className="user-info">
             <div className="user-avatar" style={{ background: 'var(--green)', color: '#fff' }}>{initials}</div>
             <div>

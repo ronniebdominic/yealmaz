@@ -13,7 +13,6 @@ import { useLiveLocationSharing } from '../hooks/useLiveLocationSharing';
 import { feedback, soundEnabled, setSoundEnabled } from '../utils/feedback';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import CountUp from '../components/CountUp';
-import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import InstallAppBanner from '../components/InstallAppBanner';
 import MyDeliveryPerformanceModal from '../components/MyDeliveryPerformanceModal';
@@ -450,7 +449,7 @@ function MenuPanel({ onClose, user, sharing, locError, onToggleLocation, onOpenP
         </div>
 
         <div className="dp-drawer-sec">Attendance</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><AttendanceClock /></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}></div>
 
         <div className="dp-drawer-sec">Leave</div>
         <LeaveRequestButton />

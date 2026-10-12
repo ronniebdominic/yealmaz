@@ -8,7 +8,6 @@ import {
   MdLogout, MdAdd, MdEdit, MdClose, MdWarning, MdCheckCircle,
   MdCancel, MdHistory, MdInventory2, MdPendingActions, MdTrendingUp, MdTrendingDown,
 } from 'react-icons/md';
-import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import ThemeToggle from '../components/ThemeToggle';
 
@@ -331,8 +330,7 @@ export default function InventoryDashboard() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginLeft: 'auto' }}>
-          <AttendanceClock />
-          <LeaveRequestButton />
+                    <LeaveRequestButton />
           <span className="inv-hide-sm" style={{ width: 1, height: 22, background: 'var(--border)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--amber-dim)', color: 'var(--amber)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{initials}</div>

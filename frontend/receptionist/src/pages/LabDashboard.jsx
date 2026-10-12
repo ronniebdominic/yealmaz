@@ -14,7 +14,6 @@ import {
   MdNotifications, MdChevronRight,
 } from 'react-icons/md';
 import { todayLocal, toLocalDateString, startOfWeekLocal, startOfMonthLocal } from '../utils/date';
-import AttendanceClock from '../components/AttendanceClock';
 import LeaveRequestButton from '../components/LeaveRequestButton';
 import TeamLeaveRequests from '../components/TeamLeaveRequests';
 import CaseReviewQueue from '../components/CaseReviewQueue';
@@ -1013,8 +1012,7 @@ export default function LabDashboard() {
               {selectedDept.label}
             </span>
           )}
-          <AttendanceClock />
-        </div>
+                  </div>
       </header>
 
       <div style={{ flex: 1, padding: 'var(--tp-pad, 16px)', paddingBottom: 28, overflowY: 'auto' }} key={tab} className="tp-fade">
