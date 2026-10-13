@@ -5,9 +5,8 @@
 // sets req.user later in the request, so the row is written on response
 // 'finish', when it is known who did it and whether it succeeded.
 
-const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // Not user edits: credentials, bot/AI chatter, read-state noise.

@@ -1,11 +1,10 @@
 // Ye-Almaz — Inventory Management Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── GET /api/inventory/items ──────────────────────────────
 router.get('/items', protect, async (req, res) => {

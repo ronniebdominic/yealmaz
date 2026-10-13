@@ -8,13 +8,12 @@
 // how case-pickup assignment does), and collection lives in delivery.js —
 // this file only owns the request/schedule/cancel lifecycle.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const CASE_SUMMARY_SELECT = {
   id: true, caseNumber: true, patientName: true, workType: true, status: true,

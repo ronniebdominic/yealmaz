@@ -3,14 +3,13 @@
 // UNPAID with no automatic PayrollAdjustment creation until Phase 2 wires
 // in Salary Structures (an hourly/overtime rate doesn't exist yet).
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { resolveShiftForUserDate, computeDaySummary } = require('../services/attendanceDaySummary');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {

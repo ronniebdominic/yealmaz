@@ -1,11 +1,10 @@
 // Ye-Almaz — User Management Routes (Admin only)
 const express = require('express');
 const bcrypt  = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Same department codes used by the scan station picker (scan.js DEPARTMENTS).
 const VALID_DEPARTMENTS = new Set([

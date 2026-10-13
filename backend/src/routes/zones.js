@@ -1,10 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const CACHE_KEY = 'zones';
 

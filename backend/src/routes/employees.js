@@ -5,14 +5,13 @@
 // it, so existing broad User queries elsewhere in the app never touch or
 // risk exposing salary/bank data.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 
 // The kiosk PIN hash must never leave the server. bcrypt over a 4-6 digit

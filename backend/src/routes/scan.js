@@ -1,12 +1,11 @@
 // Ye-Almaz — QR Scan Route
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── Department definitions ────────────────────────────────
 const DEPARTMENTS = {

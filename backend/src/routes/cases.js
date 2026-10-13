@@ -1,7 +1,6 @@
 // Ye-Almaz — Cases Routes
 const express = require('express');
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
 const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
@@ -12,7 +11,7 @@ const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Case numbers continue the imported sequence: YDL26005688, YDL26005689, …
 // Backed by the Postgres sequence `case_number_seq` (seeded to 26005687), so

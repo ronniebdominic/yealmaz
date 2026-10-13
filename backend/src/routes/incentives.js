@@ -5,7 +5,6 @@
 // everything else (quality/QC/remake/revenue/custom) needs a manually
 // entered actual value rather than a fabricated number.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
@@ -13,7 +12,7 @@ const { SCAN_PATTERN } = require('../utils/scanAttribution');
 const { resolveShiftForUserDate, computeDaySummary } = require('../services/attendanceDaySummary');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 
 const AUTO_METRICS = ['PRODUCTION_UNITS', 'CASES', 'ATTENDANCE'];

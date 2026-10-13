@@ -4,14 +4,13 @@
 // run-creation as a REIMBURSEMENT PayrollAdjustment, then marked
 // REIMBURSED once that entry exists.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

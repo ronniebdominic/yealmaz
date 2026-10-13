@@ -1,6 +1,5 @@
 // Ye-Almaz — Delivery Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
@@ -10,7 +9,7 @@ const { localDayKey } = require('../utils/scanAttribution');
 const liveLocations = require('../state/liveLocations');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── GET /api/delivery/assigned ───────────────────────────
 router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {

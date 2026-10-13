@@ -3,12 +3,11 @@
 // has it and when) — an asset's full assignment history stays intact
 // across handoffs, same never-overwrite spirit as ShiftAssignment.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {

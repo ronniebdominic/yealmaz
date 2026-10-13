@@ -1,13 +1,12 @@
 // Ye-Almaz — Lab Tech Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Internal lab-floor endpoints — includes full stage notes (incl. Milling/Margin
 // tech comments), so these are never reachable by the CLINIC role.

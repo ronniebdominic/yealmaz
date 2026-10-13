@@ -18,9 +18,8 @@
 // SINGLE AUDIT POINT (same rule as botTools.js): nothing in this file may
 // create/update/delete/upsert. Every query below is findMany/count/aggregate/
 // groupBy only.
-const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Deliberately excludes payroll, salary, advances, expense claims,
 // performance reviews and employee documents. The bot's access boundary is

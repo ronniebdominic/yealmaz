@@ -1,7 +1,6 @@
 // Ye-Almaz — Dashboard / Analytics Routes
 const express = require('express');
 const { outstandingOwed, paidOf } = require('../services/financeRules');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
@@ -9,7 +8,7 @@ const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanA
 const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isNonAgentDeliveredNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Active lab-production stages only — excludes intake (PENDING_PICKUP,
 // PICKUP_ASSIGNED), dispatch/terminal (READY_TO_DISPATCH, OUT_FOR_DELIVERY,

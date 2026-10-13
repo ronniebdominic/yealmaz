@@ -5,7 +5,6 @@
 // existing buildWorkbookBuffer/sendXlsx helper (same infrastructure
 // payments.js/cases.js already use for exports).
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { localDayKey } = require('../utils/scanAttribution');
@@ -13,7 +12,7 @@ const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const { resolveShiftForUserDate, computeDaySummary } = require('../services/attendanceDaySummary');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 const money = n => (n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

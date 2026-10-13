@@ -1,6 +1,5 @@
 // Ye-Almaz — Payments Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { Chapa } = require('chapa-nodejs');
@@ -11,7 +10,7 @@ const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { billedOf } = require('../services/financeRules');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const chapa = process.env.CHAPA_SECRET_KEY
   ? new Chapa({

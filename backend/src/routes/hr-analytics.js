@@ -4,14 +4,13 @@
 // expiring certifications, probation ending, contract expiry, pending
 // approvals) — all read from data that already exists elsewhere.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { localDayKey } = require('../utils/scanAttribution');
 const { resolveShiftForUserDate, computeDaySummary } = require('../services/attendanceDaySummary');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {

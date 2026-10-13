@@ -1,12 +1,11 @@
 // Ye-Almaz — Rewards System Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { pointsForWork, listRates } = require('../services/rewardRates');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── Helper: upsert clinic points record ──────────────────
 async function ensureClinicPoints(clinicId) {

@@ -2,12 +2,11 @@
 // Certification "status" (Valid/Expiring Soon/Expired) is computed from
 // expiryDate at read time — never stored, so it can't silently go stale.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const EXPIRING_SOON_DAYS = 30;
 function certStatus(expiryDate) {

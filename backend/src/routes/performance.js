@@ -5,14 +5,13 @@
 // IncentiveAward) rather than duplicating any of it into a new tracking
 // system. PerformanceReview stores only the qualitative manager note.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { SCAN_PATTERN } = require('../utils/scanAttribution');
 const { resolveShiftForUserDate, computeDaySummary } = require('../services/attendanceDaySummary');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
 
 router.get('/:userId', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {

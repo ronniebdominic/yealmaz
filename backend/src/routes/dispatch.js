@@ -1,13 +1,12 @@
 // Ye-Almaz — Dispatch Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { sendPushToClinic, sendPushToUser } = require('../utils/webpush');
 const { clawBackCasePoints } = require('../utils/rewards');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Fallback due-date calculator (mirrors the one in cases.js)
 async function getDueDays(workType) {

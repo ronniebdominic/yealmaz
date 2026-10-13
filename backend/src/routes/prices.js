@@ -1,10 +1,9 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { appCache, invalidate } = require('../cache');
 const { protect, restrict } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // GET /api/prices
 router.get('/', protect, async (req, res) => {

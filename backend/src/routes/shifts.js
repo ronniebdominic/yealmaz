@@ -7,12 +7,11 @@
 // themselves are never deleted (isActive soft-disable only), since
 // ShiftAssignment history references them by id.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 

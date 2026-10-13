@@ -1,11 +1,10 @@
 // Ye-Almaz — Push Notification Subscription + In-App Notification Routes
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { sendPushToUser } = require('../utils/webpush');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── GET /api/notifications/vapid-public-key ──────────────
 // Clinic app fetches this on startup to subscribe

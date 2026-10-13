@@ -6,7 +6,6 @@
 // POST /devices/heartbeat shares the same auth and lets HR see from the LMS
 // whether that bridge/terminal is actually online (GET /devices).
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
@@ -16,7 +15,7 @@ const { resolveShiftForUserDate, computeDaySummary } = require('../services/atte
 const { getLeaveDayCount } = require('../utils/leaveDayCount');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const DUPLICATE_WINDOW_MS = 60 * 1000;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;

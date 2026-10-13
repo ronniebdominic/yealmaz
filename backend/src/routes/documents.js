@@ -4,14 +4,13 @@
 // rather than overwriting, so older uploads for the same document name
 // stay retrievable.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

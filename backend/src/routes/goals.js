@@ -1,11 +1,10 @@
 // Ye-Almaz — Goals / KPIs (Phase 3)
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 router.get('/', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {
   try {

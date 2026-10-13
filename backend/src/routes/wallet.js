@@ -1,6 +1,5 @@
 // Ye-Almaz — Clinic advance-payment wallet
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { Chapa } = require('chapa-nodejs');
@@ -11,7 +10,7 @@ const { sendPushToClinic } = require('../utils/webpush');
 const { applyWalletToClinicOutstanding, applyWalletToCase } = require('../services/walletDeduction');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const chapa = process.env.CHAPA_SECRET_KEY
   ? new Chapa({ secretKey: process.env.CHAPA_SECRET_KEY, webhookSecret: process.env.CHAPA_WEBHOOK_SECRET || undefined })

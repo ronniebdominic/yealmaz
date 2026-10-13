@@ -3,12 +3,11 @@
 // employee's list on first use; HR can add/remove tasks freely afterward
 // — "allow HR to customize checklist."
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const DEFAULT_TASKS = [
   'Contract signed', 'ID collected', 'Bank details on file', 'ERP account created',

@@ -5,12 +5,11 @@
 // User.isActive=false (both existing fields/flags) — never deletes the
 // employee or their history.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const WORKFLOW = ['RESIGNATION', 'NOTICE', 'ASSET_RETURN', 'ACCESS_REVOCATION', 'LEAVE_SETTLEMENT', 'FINAL_PAYROLL', 'EXIT_INTERVIEW', 'ARCHIVED'];
 

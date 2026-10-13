@@ -3,9 +3,8 @@
 // upserted (not just appended) so status/price/scan-number changes made
 // after creation (e.g. at Accept time) update the SAME row.
 const { google } = require('googleapis');
-const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+const prisma = require('../db');
 const SHEET_ID   = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = process.env.GOOGLE_SHEET_TAB_NAME || 'Cases';
 

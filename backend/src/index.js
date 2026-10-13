@@ -15,11 +15,10 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const http = require('http');
 const { Server } = require('socket.io');
-const { PrismaClient } = require('@prisma/client');
 
 const app = express();
 const server = http.createServer(app);
-const prisma = new PrismaClient();
+const prisma = require('./db');
 
 // ── Socket.io setup ──────────────────────────────────────
 const io = new Server(server, {

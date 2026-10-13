@@ -1,10 +1,9 @@
 // Ye-Almaz — Case Stages Route
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── GET /api/stages/:caseId ──────────────────────────────
 // Full stage history for a case. Clinics only ever see their own case's

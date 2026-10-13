@@ -22,10 +22,9 @@
 // slipped"), since cause isn't in the data.
 //
 // READ-ONLY, same audit rule as botTools.js/botOperations.js.
-const { PrismaClient } = require('@prisma/client');
 const dashboard = require('../routes/dashboard');
 
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── Auditable thresholds ──────────────────────────────────
 const T = {

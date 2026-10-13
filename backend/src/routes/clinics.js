@@ -2,12 +2,11 @@ const express  = require('express');
 const crypto    = require('crypto');
 const bcrypt    = require('bcryptjs');
 const QRCode    = require('qrcode');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 const ONBOARDING_TOKEN_TTL_DAYS = 14;
 

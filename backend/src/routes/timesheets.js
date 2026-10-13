@@ -6,14 +6,13 @@
 // duration/session concept, just discrete timestamped activity markers.
 // scan.js/CaseStage are never written to from here.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN } = require('../utils/scanAttribution');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // Mirrors scan.js's DEPARTMENTS list conceptually — hardcoded here rather
 // than a configurable table for Phase 1 (HR Settings-driven categories are

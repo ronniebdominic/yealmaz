@@ -4,12 +4,11 @@
 // salary calculations." Assignment follows the same never-overwrite
 // history pattern as ShiftAssignment (see shifts.js).
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 // ── Components ────────────────────────────────────────────
 router.get('/components', protect, restrict('HR_MANAGER', 'ADMIN'), async (req, res) => {

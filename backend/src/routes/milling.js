@@ -4,12 +4,11 @@
 // no batch/blank concept linking them. A lab tech logs blank -> crown
 // yield as an independent event here, not tied to any case.
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../db');
 
 async function getBonusSetting() {
   let s = await prisma.millingBonusSetting.findFirst();
