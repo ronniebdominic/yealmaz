@@ -36,6 +36,12 @@ export default function RewardsScreen() {
     staleTime: 60_000,
   });
 
+  const { data: earnRates } = useQuery({
+    queryKey: ['rewards', 'rates'],
+    queryFn: () => api.get('/rewards/rates').then(r => r.data),
+    staleTime: 10 * 60_000,
+  });
+
   const available = my?.available ?? 0;
   const refreshing = isRefetching && !isLoading;
 
@@ -121,6 +127,18 @@ export default function RewardsScreen() {
         {/* ── Rewards catalog ── */}
         {tab === 'Rewards' && (
           <>
+            {earnRates?.rates?.length ? (
+              <GlassCard strong style={styles.earnCard}>
+                <Text style={styles.sectionTitle}>{t('rewards.howToEarn')}</Text>
+                {earnRates.rates.map(r => (
+                  <View key={r.key} style={styles.earnRow}>
+                    <Text style={styles.earnLabel}>{r.label}</Text>
+                    <Text style={styles.earnValue}>{r.rate} {t('rewards.pts')} / {r.perUnit === 'tray' ? t('rewards.perTray') : t('rewards.perUnit')}</Text>
+                  </View>
+                ))}
+                <Text style={styles.earnNote}>{t('rewards.earnNote', { n: earnRates.flatPerCase })}</Text>
+              </GlassCard>
+            ) : null}
             {items.length === 0 ? (
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="gift-outline" size={36} color={Colors.text3} style={{ marginBottom: 12 }} />
@@ -281,6 +299,11 @@ const styles = StyleSheet.create({
   redeemBtnTextDisabled: { color: Colors.text3 },
 
   section: { marginBottom: Spacing.xl },
+  earnCard: { padding: Spacing.lg, marginBottom: Spacing.md },
+  earnRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 8 },
+  earnLabel: { fontSize: 13, fontFamily: FontFamily.medium, color: Colors.text1, flexShrink: 1 },
+  earnValue: { fontSize: 13, fontFamily: FontFamily.bold, color: Colors.primary },
+  earnNote: { fontSize: 11, color: Colors.text3, marginTop: Spacing.sm },
   sectionTitle: {
     fontSize: 11, fontFamily: FontFamily.bold, color: Colors.text3,
     letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: Spacing.md,

@@ -556,7 +556,7 @@ router.post('/', protect, async (req, res) => {
 
     // Award reward points if submitted by a clinic
     if (req.user.role === 'CLINIC') {
-      awardCasePoints(req.user.id, updatedCase.id, updatedCase.caseNumber).catch(() => {});
+      awardCasePoints(req.user.id, updatedCase.id, updatedCase.caseNumber, updatedCase).catch(() => {});
     }
 
     await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
@@ -606,7 +606,7 @@ router.post('/bulk', protect, async (req, res) => {
     // Reward points + socket emits happen after the transaction commits —
     // same as the single-case path, so a slow non-DB call never holds a DB lock.
     if (req.user.role === 'CLINIC') {
-      for (const c of cases) awardCasePoints(req.user.id, c.id, c.caseNumber).catch(() => {});
+      for (const c of cases) awardCasePoints(req.user.id, c.id, c.caseNumber, c).catch(() => {});
     }
 
     await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');

@@ -218,6 +218,10 @@ export const translations = {
       earned: 'Earned',
       redeemed: 'Redeemed',
       hint: 'Earn points with every new case you submit',
+      howToEarn: 'HOW YOU EARN POINTS',
+      perUnit: 'unit',
+      perTray: 'tray',
+      earnNote: 'Other work types earn {n} pts per case. Remakes and redos earn no points.',
       emptyTitle: 'No rewards available yet',
       emptySub: 'The lab will add rewards soon. Keep earning points!',
       redeem: 'Redeem',
@@ -588,6 +592,10 @@ export const translations = {
 
     rewards: {
       title: 'ሽልማቶች',
+      howToEarn: 'ነጥብ የሚያገኙበት መንገድ',
+      perUnit: 'አሃድ',
+      perTray: 'ትሬይ',
+      earnNote: 'ሌሎች የሥራ ዓይነቶች በአንድ ጉዳይ {n} ነጥብ ያስገኛሉ። ድጋሚ ሥራዎች ነጥብ አያስገኙም።',
       tabRewards: 'ሽልማቶች',
       tabHistory: 'ታሪክ',
       available: 'ያለ',

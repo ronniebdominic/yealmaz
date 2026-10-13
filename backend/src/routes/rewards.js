@@ -3,6 +3,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
+const { pointsForWork, listRates } = require('../services/rewardRates');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -17,9 +18,19 @@ async function ensureClinicPoints(clinicId) {
 }
 
 // ── Helper: award points for a case ──────────────────────
-async function awardCasePoints(clinicId, caseId, caseNumber) {
-  const setting = await prisma.rewardSetting.findFirst();
-  const pts = setting?.pointsPerCase ?? 10;
+async function awardCasePoints(clinicId, caseId, caseNumber, caseInfo = {}) {
+  // Points scale with the work (rate x units) for the work types in rewardRates.js; anything else
+  // earns the flat per-case amount. Remakes/redos are free re-work, so they earn nothing extra.
+  const work = (caseInfo.remake || caseInfo.isRedo) ? null : pointsForWork(caseInfo.workType, caseInfo.units);
+  let pts, description;
+  if (work) {
+    pts = work.points;
+    description = `Case submitted — ${caseNumber} (${work.qty} ${work.perUnit}${work.qty > 1 ? 's' : ''} × ${work.rate} pts, ${work.label})`;
+  } else {
+    const setting = await prisma.rewardSetting.findFirst();
+    pts = setting?.pointsPerCase ?? 10;
+    description = `Case submitted — ${caseNumber}`;
+  }
   if (pts <= 0) return;
   await ensureClinicPoints(clinicId);
   await prisma.clinicPoints.update({
@@ -32,11 +43,22 @@ async function awardCasePoints(clinicId, caseId, caseNumber) {
       caseId,
       type: 'EARN',
       points: pts,
-      description: `Case submitted — ${caseNumber}`,
+      description,
     },
   });
   await invalidate(`rewards:clinic:${clinicId}`);
 }
+
+// ── GET /api/rewards/rates ────────────────────────────────
+// How points are earned, for the clinic app and the admin Rewards page.
+router.get('/rates', protect, async (req, res) => {
+  try {
+    const setting = await prisma.rewardSetting.findFirst();
+    res.json({ rates: listRates(), flatPerCase: setting?.pointsPerCase ?? 10 });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not load reward rates.' });
+  }
+});
 // ── GET /api/rewards/settings ─────────────────────────────
 router.get('/settings', protect, async (req, res) => {
   try {
