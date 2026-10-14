@@ -156,7 +156,7 @@ const FLAT_PRICE_TYPES = new Set([
   'Night Guard', 'Night Guard Soft', 'Night Guard Hard',
   'Retainer', 'Orthodontic Retainer', 'Clear Aligner', 'Clear Aligner Setup',
   'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
-  'Sports Guard', 'Bite Splint', 'Gingival Mask',
+  'Sports Guard', 'Bite Splint', 'Gingival Mask', 'Complete Denture',
 ]);
 
 function SendPaymentRequestModal({ caseData, onDone, onClose }) {
@@ -171,7 +171,7 @@ function SendPaymentRequestModal({ caseData, onDone, onClose }) {
       if (!entry) return;
       const isExpress = caseData.deliveryType === 'EXPRESS' && entry.expressPrice != null;
       const unitPrice = isExpress ? entry.expressPrice : entry.price;
-      const isFlat = FLAT_PRICE_TYPES.has(caseData.workType);
+      const isFlat = !!entry.isFlatRate || FLAT_PRICE_TYPES.has(caseData.workType);
       const count = isFlat ? 1 : Math.max(1, caseData.units || 1);
       const total = Math.round(unitPrice * count * (caseData.isRedo ? 0.5 : 1));
       setCalcHint({ unitPrice, count, isFlat, isExpress, isRedo: caseData.isRedo, total });

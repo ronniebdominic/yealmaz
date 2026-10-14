@@ -43,6 +43,14 @@ function formatDueDate(isoDate) {
 // ── Flat-rate work types (priced per item/arch, NOT multiplied by tooth count) ──
 const FLAT_PRICE_TYPES = new Set([
   'Night Guard', 'Retainer', 'Clear Aligner', 'Bleaching Tray', 'Flexible Denture', 'Fexible Denture', '3D Printed Model',
+  'Complete Denture',
+]);
+
+// Work types clinics can't pick themselves — they apply only to selected clinics, so the lab
+// assigns them when it accepts the case (the staff acceptance form lists every work type).
+const CLINIC_HIDDEN_WORK_TYPES = new Set([
+  'PFM Discount',     // only for selected clinics — the lab applies it at acceptance
+  'Complete Denture', // no longer offered (only Flexible Denture is)
 ]);
 
 // ── Odontogram ────────────────────────────────────────────
@@ -285,7 +293,7 @@ function WorkItemCard({
     if (!p) return null;
     const isExpress = deliveryType === 'EXPRESS' && p.expressPrice != null;
     const unit = isExpress ? p.expressPrice : p.price;
-    const isFlat = FLAT_PRICE_TYPES.has(item.workType);
+    const isFlat = !!p.isFlatRate || FLAT_PRICE_TYPES.has(item.workType); // the price table's flat-rate flag wins
     const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
     const total = Math.round(unit * count);
     return { unit, count, isFlat, isExpress, total };
@@ -384,7 +392,7 @@ function WorkItemCard({
               </Text>
             ) : (
               <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-                {Object.values(priceMap).map(p => (
+                {Object.values(priceMap).filter(p => !CLINIC_HIDDEN_WORK_TYPES.has(p.workType)).map(p => (
                   <TouchableOpacity
                     key={p.workType}
                     style={[styles.dropdownItem, styles.dropdownItemRow, item.workType === p.workType && styles.dropdownItemActive]}
@@ -650,13 +658,16 @@ export default function NewCaseScreen({ navigation }) {
     setSubmitting(true);
     try {
       const buildItemPayload = (item, index) => {
-        const resolvedUnits = item.selectedTeeth.length > 0
-          ? item.selectedTeeth.length
-          : item.manualUnits ? parseInt(item.manualUnits) : undefined;
         const p = priceMap[item.workType];
         const isExpress = form.deliveryType === 'EXPRESS' && p?.expressPrice != null;
         const unit = p ? (isExpress ? p.expressPrice : p.price) : null;
-        const isFlat = FLAT_PRICE_TYPES.has(item.workType);
+        const isFlat = !!p?.isFlatRate || FLAT_PRICE_TYPES.has(item.workType);
+        // A flat-rate item (complete denture, night guard…) is ONE appliance however many teeth it
+        // covers, so it counts as 1 unit — not one per tooth. (Aligners count trays, not teeth.)
+        const countsTeeth = !isFlat || /aligner/i.test(item.workType || '');
+        const resolvedUnits = item.selectedTeeth.length > 0
+          ? (countsTeeth ? item.selectedTeeth.length : 1)
+          : item.manualUnits ? parseInt(item.manualUnits) : undefined;
         const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
         // Arch scan fee rides on the first item only — one scan session covers the whole visit.
         const fee = index === 0 ? archFee : 0;

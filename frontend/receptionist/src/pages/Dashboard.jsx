@@ -1,3 +1,4 @@
+import { RETIRED_WORK_TYPES } from '../utils/workTypes';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -153,7 +154,7 @@ function AdditionalAcceptItem({ item, index, onChange, onRemove, pricesData, pri
           <label style={lbl}>WORK TYPE *</label>
           <select style={inputSt} value={selWorkType} onChange={e => handleWT(e.target.value)}>
             <option value="">— Select work type —</option>
-            {pricesData.map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
+            {pricesData.filter(p => !RETIRED_WORK_TYPES.has(p.workType) || p.workType === selWorkType).map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
           </select>
         </div>
       </div>
@@ -452,7 +453,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
           <label style={lbl}>WORK TYPE *</label>
           <select style={inputSt} value={selWorkType} onChange={e => handleWT(e.target.value)}>
             <option value="">— Select work type —</option>
-            {pricesData.map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
+            {pricesData.filter(p => !RETIRED_WORK_TYPES.has(p.workType) || p.workType === selWorkType).map(p => <option key={p.workType} value={p.workType}>{p.workType} — Br {p.price?.toLocaleString('en-US')}</option>)}
           </select>
         </div>
       </div>

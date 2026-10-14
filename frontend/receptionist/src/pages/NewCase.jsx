@@ -1,3 +1,4 @@
+import { RETIRED_WORK_TYPES } from '../utils/workTypes';
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import SearchableSelect from '../components/SearchableSelect';
@@ -519,7 +520,7 @@ export default function NewCase() {
 
   // Build grouped work-type list from DB (single source of truth)
   const workTypeGroups = useMemo(() => {
-    const dbTypes = new Set(pricesData.map(p => p.workType));
+    const dbTypes = new Set(pricesData.filter(p => !RETIRED_WORK_TYPES.has(p.workType)).map(p => p.workType));
     const grouped = {};
     for (const wt of dbTypes) {
       const group = TYPE_TO_GROUP[wt] || 'Other';
@@ -598,8 +599,11 @@ export default function NewCase() {
       const dropOffAtLab = form.intakeMethod === 'DROP_OFF' || isEmailFile;
 
       const buildItemPayload = (item) => {
+        // A flat-rate item (complete denture, night guard…) is ONE appliance however many teeth it
+        // covers, so it counts as 1 unit — not one per tooth. (Aligners count trays, not teeth.)
+        const countsTeeth = !flatRateMap[item.workType] || /aligner/i.test(item.workType || '');
         const resolvedUnits = item.selectedTeeth.length > 0
-          ? item.selectedTeeth.length
+          ? (countsTeeth ? item.selectedTeeth.length : 1)
           : item.manualUnits ? parseInt(item.manualUnits) : undefined;
         const discountNum = parseFloat(item.discountValue);
         const hasDiscount = item.discountType && !isNaN(discountNum) && discountNum >= 0;
