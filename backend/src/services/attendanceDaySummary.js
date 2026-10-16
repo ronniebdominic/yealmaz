@@ -45,6 +45,9 @@ function timeOnDate(date, hhmm) {
 
 const minutesBetween = (a, b) => (b.getTime() - a.getTime()) / 60000;
 
+// Punches after this local hour (7 PM) are not counted towards the day.
+const DAY_CUTOFF_HOUR = 19;
+
 /**
  * @param {Object} args
  * @param {Date} args.date - the calendar day being summarized
@@ -57,22 +60,29 @@ const minutesBetween = (a, b) => (b.getTime() - a.getTime()) / 60000;
 function computeDaySummary({ date, events, shift, holiday, leaveRecord, correction }) {
   const sorted = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-  // Working time is the span from the day's FIRST CLOCK_IN to its LAST
-  // CLOCK_OUT. IN/OUT pairs in between (lunch runs, re-badges) don't
-  // subtract anything; only explicitly recorded breaks do.
+  // Company rule: a day is its FIRST punch (clock-in) and its LAST punch (clock-out), taken from
+  // punches up to 7 PM local (Ethiopian) time. Everything in between — lunch runs, re-badges, extra
+  // scans — is ignored, and so is anything after 7 PM. The punch TYPE is deliberately not trusted:
+  // the fingerprint terminal often cannot say whether a scan was "in" or "out", so the bridge only
+  // guesses by alternating. Position in the day is what decides, not the label.
+  const cutoff = new Date(date);
+  cutoff.setHours(DAY_CUTOFF_HOUR, 0, 0, 0);
+  const punches = sorted.filter(e =>
+    (e.type === 'CLOCK_IN' || e.type === 'CLOCK_OUT') && new Date(e.timestamp) <= cutoff);
+
   let clockIn = null, clockOut = null;
   // Which source produced the punch that became clockIn/clockOut — lets the
   // UI show a device/manual/kiosk/geofence badge without a second query.
   let clockInSource = null, clockOutSource = null;
 
-  const firstIn = sorted.find(e => e.type === 'CLOCK_IN');
-  if (firstIn) {
-    clockIn = new Date(firstIn.timestamp);
-    clockInSource = firstIn.source;
-    const lastOut = [...sorted].reverse().find(e => e.type === 'CLOCK_OUT');
-    if (lastOut && new Date(lastOut.timestamp) > clockIn) {
-      clockOut = new Date(lastOut.timestamp);
-      clockOutSource = lastOut.source;
+  if (punches.length) {
+    const first = punches[0];
+    const last = punches[punches.length - 1];
+    clockIn = new Date(first.timestamp);
+    clockInSource = first.source;
+    if (new Date(last.timestamp) > clockIn) {
+      clockOut = new Date(last.timestamp);
+      clockOutSource = last.source;
     }
   }
 
@@ -94,12 +104,9 @@ function computeDaySummary({ date, events, shift, holiday, leaveRecord, correcti
   const breakMinutes = breakSegments.reduce((sum, [s, e]) => sum + minutesBetween(s, e), 0);
   let workingMinutes = clockIn && clockOut ? Math.max(0, minutesBetween(clockIn, clockOut) - breakMinutes) : 0;
 
-  // No CLOCK_IN, or no CLOCK_OUT after it, means the day has no end yet
-  // (today) or is missing a punch (a past day). Today, a CLOCK_IN after the
-  // last CLOCK_OUT also means the person is presumably back on site.
-  const lastType = sorted.length ? sorted[sorted.length - 1].type : null;
-  const hasOpenSegment = sorted.length > 0 && (!clockIn || !clockOut ||
-    (lastType === 'CLOCK_IN' && localDayKey(date) === localDayKey(new Date())));
+  // Only one punch (or none usable) means the day has no end yet (today) or is missing a punch (a
+  // past day). With two or more punches the last one is the clock-out.
+  const hasOpenSegment = sorted.length > 0 && (!clockIn || !clockOut);
 
   // An approved correction overrides the raw-derived clock-in/out and
   // working-minutes for every downstream calculation — the raw events
