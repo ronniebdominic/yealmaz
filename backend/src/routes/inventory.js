@@ -254,6 +254,95 @@ router.get('/transactions', protect, restrict('INVENTORY_MANAGER', 'ADMIN'), asy
   }
 });
 
+// ── Deleting entries (ADMIN only) ─────────────────────────────────────────────
+// Deleting an entry puts stock back exactly as if it had never happened, so the ledger and each
+// item's quantity on hand keep adding up. The audit log records who deleted what.
+const INVENTORY_CACHE = ['inventory:items*', 'inventory:transactions*', 'inventory:requests*', 'dashboard:inventory-summary'];
+
+// A single ledger entry (restock / adjustment). Entries created by fulfilling a request belong to
+// that request — delete the request instead, which reverses them together.
+router.delete('/transactions/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const txn = await prisma.inventoryTransaction.findUnique({ where: { id: req.params.id }, include: { item: true } });
+    if (!txn) return res.status(404).json({ error: 'Entry not found.' });
+    if (txn.relatedRequestId) {
+      return res.status(409).json({ error: 'This entry was created by a goods request. Delete the request instead — that reverses it.' });
+    }
+    // quantity is a signed delta, so undoing it means subtracting it.
+    const newQty = txn.item.quantityOnHand - txn.quantity;
+    if (newQty < 0) {
+      return res.status(409).json({ error: `Removing this entry would take ${txn.item.name} below zero (on hand ${txn.item.quantityOnHand}, entry ${txn.quantity > 0 ? '+' : ''}${txn.quantity}).` });
+    }
+    await prisma.$transaction([
+      prisma.inventoryItem.update({ where: { id: txn.itemId }, data: { quantityOnHand: newQty } }),
+      prisma.inventoryTransaction.delete({ where: { id: txn.id } }),
+    ]);
+    await invalidate(...INVENTORY_CACHE);
+    res.json({ success: true, quantityOnHand: newQty });
+  } catch (err) {
+    console.error('[inventory delete transaction]', err);
+    res.status(500).json({ error: 'Could not delete the entry.' });
+  }
+});
+
+// A goods request of any status. A fulfilled one also removes the stock it issued and returns it.
+router.delete('/requests/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const request = await prisma.inventoryRequest.findUnique({
+      where: { id: req.params.id },
+      include: { item: true, transactions: true },
+    });
+    if (!request) return res.status(404).json({ error: 'Request not found.' });
+
+    const net = request.transactions.reduce((sum, t) => sum + t.quantity, 0); // negative for issued stock
+    const newQty = request.item.quantityOnHand - net;
+    if (newQty < 0) {
+      return res.status(409).json({ error: `Reversing this request would take ${request.item.name} below zero.` });
+    }
+    const ops = [];
+    if (request.transactions.length) {
+      ops.push(prisma.inventoryTransaction.deleteMany({ where: { relatedRequestId: request.id } }));
+      ops.push(prisma.inventoryItem.update({ where: { id: request.itemId }, data: { quantityOnHand: newQty } }));
+    }
+    ops.push(prisma.inventoryRequest.delete({ where: { id: request.id } }));
+    await prisma.$transaction(ops);
+    await invalidate(...INVENTORY_CACHE);
+    res.json({ success: true, stockReturned: request.transactions.length ? -net : 0 });
+  } catch (err) {
+    console.error('[inventory delete request]', err);
+    res.status(500).json({ error: 'Could not delete the request.' });
+  }
+});
+
+// A whole item. If it has history (ledger entries / requests) the first call answers 409 with the
+// counts so the screen can ask for confirmation; calling again with ?force=true deletes it all.
+router.delete('/items/:id', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const item = await prisma.inventoryItem.findUnique({ where: { id: req.params.id } });
+    if (!item) return res.status(404).json({ error: 'Item not found.' });
+    const [transactions, requests] = await Promise.all([
+      prisma.inventoryTransaction.count({ where: { itemId: item.id } }),
+      prisma.inventoryRequest.count({ where: { itemId: item.id } }),
+    ]);
+    if ((transactions || requests) && req.query.force !== 'true') {
+      return res.status(409).json({
+        needsConfirm: true, transactions, requests,
+        error: `${item.name} has ${transactions} ledger entr${transactions === 1 ? 'y' : 'ies'} and ${requests} request${requests === 1 ? '' : 's'}. Deleting it removes all of them.`,
+      });
+    }
+    await prisma.$transaction([
+      prisma.inventoryTransaction.deleteMany({ where: { itemId: item.id } }),
+      prisma.inventoryRequest.deleteMany({ where: { itemId: item.id } }),
+      prisma.inventoryItem.delete({ where: { id: item.id } }),
+    ]);
+    await invalidate(...INVENTORY_CACHE);
+    res.json({ success: true, removedTransactions: transactions, removedRequests: requests });
+  } catch (err) {
+    console.error('[inventory delete item]', err);
+    res.status(500).json({ error: 'Could not delete the item.' });
+  }
+});
+
 // ── GET /api/inventory/summary ────────────────────────────
 // Single shared endpoint feeding both InventoryDashboard.jsx's own KPIs
 // and AdminDashboard.jsx's lightweight Inventory section.

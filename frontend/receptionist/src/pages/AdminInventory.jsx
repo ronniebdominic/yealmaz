@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Field, inputStyle } from '../utils/adminForms';
 import {
   MdWarehouse, MdEmojiEvents, MdWarning, MdTrendingUp, MdTrendingDown,
-  MdAdd, MdEdit, MdInventory2, MdSwapVert,
+  MdAdd, MdEdit, MdInventory2, MdSwapVert, MdDelete, MdCheckCircle, MdCancel, MdRateReview,
 } from 'react-icons/md';
 
 const TABS = ['Stock', 'Requests', 'Ledger', 'Milling Leaderboard'];
@@ -261,6 +261,76 @@ function AdjustStockModal({ item, onSaved, onClose }) {
   );
 }
 
+// ── Review (accept / reject) a goods request ──────────────
+// Same action the inventory manager has: an admin can approve or reject a pending request too.
+function ReviewRequestModal({ request, onSaved, onClose }) {
+  const [action, setAction] = useState('ACCEPT');
+  const [quantityApproved, setQuantityApproved] = useState(request.quantityRequested);
+  const [reviewNote, setReviewNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/inventory/requests/${request.id}`, {
+        action,
+        quantityApproved: action === 'ACCEPT' ? parseInt(quantityApproved) : undefined,
+        reviewNote,
+      });
+      toast.success(action === 'ACCEPT' ? 'Request accepted' : 'Request rejected');
+      onSaved();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not process request');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="modal-header">
+          <div className="modal-title">Review Request</div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', padding: '12px 14px', border: '1px solid var(--border)', fontSize: 13 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+              {request.item?.name} <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>({request.quantityRequested} {request.item?.unit})</span>
+            </div>
+            <div style={{ color: 'var(--text-3)' }}>Requested by <strong>{request.requestedBy?.name}</strong> — {request.department}</div>
+            {request.requesterNote && <div style={{ marginTop: 6, fontStyle: 'italic', color: 'var(--text-3)' }}>"{request.requesterNote}"</div>}
+          </div>
+          <div className="seg" style={{ width: '100%' }}>
+            <button style={{ flex: 1 }} className={action === 'ACCEPT' ? 'active' : ''} onClick={() => setAction('ACCEPT')}>
+              <MdCheckCircle size={14} style={{ marginRight: 4, verticalAlign: '-2px' }} /> Accept
+            </button>
+            <button style={{ flex: 1 }} className={action === 'REJECT' ? 'active' : ''} onClick={() => setAction('REJECT')}>
+              <MdCancel size={14} style={{ marginRight: 4, verticalAlign: '-2px' }} /> Reject
+            </button>
+          </div>
+          {action === 'ACCEPT' && (
+            <div className="form-group" style={{ margin: 0 }}>
+              <label>Quantity to issue</label>
+              <input type="number" min="1" value={quantityApproved} onChange={e => setQuantityApproved(e.target.value)} />
+            </div>
+          )}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Note</label>
+            <input value={reviewNote} onChange={e => setReviewNote(e.target.value)} placeholder="Optional note" />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className={`btn ${action === 'ACCEPT' ? 'btn-success' : 'btn-danger'}`} onClick={save} disabled={saving}>
+            {saving ? 'Processing…' : action === 'ACCEPT' ? 'Confirm Accept' : 'Confirm Reject'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminInventory() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('Stock');
@@ -268,6 +338,7 @@ export default function AdminInventory() {
   const [showAdd, setShowAdd] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [adjustTarget, setAdjustTarget] = useState(null);
+  const [reviewTarget, setReviewTarget] = useState(null);
 
   const { data: items = [] } = useQuery({
     queryKey: ['admin', 'inventory', 'items'],
@@ -294,6 +365,50 @@ export default function AdminInventory() {
     queryClient.invalidateQueries({ queryKey: ['admin', 'inventory', 'items'] });
     queryClient.invalidateQueries({ queryKey: ['admin', 'inventory', 'transactions'] });
   };
+  const refreshAll = () => {
+    refreshItems();
+    queryClient.invalidateQueries({ queryKey: ['admin', 'inventory', 'requests'] });
+  };
+
+  // Admin-only deletes. Each asks first and says what will happen to stock.
+  const deleteItem = async (i) => {
+    if (!window.confirm(`Delete "${i.name}" from inventory?`)) return;
+    try {
+      await api.delete(`/inventory/items/${i.id}`);
+      toast.success(`${i.name} deleted`);
+      refreshAll();
+    } catch (err) {
+      if (err.response?.status === 409 && err.response.data?.needsConfirm) {
+        if (!window.confirm(`${err.response.data.error}\n\nThis cannot be undone. Delete everything?`)) return;
+        try {
+          await api.delete(`/inventory/items/${i.id}`, { params: { force: true } });
+          toast.success(`${i.name} and its history deleted`);
+          refreshAll();
+        } catch (e2) { toast.error(e2.response?.data?.error || 'Could not delete the item'); }
+      } else {
+        toast.error(err.response?.data?.error || 'Could not delete the item');
+      }
+    }
+  };
+  const deleteRequest = async (r) => {
+    const returns = r.status === 'FULFILLED' ? ` The ${r.quantityApproved} ${r.item?.unit || ''} it issued will be returned to stock.` : '';
+    if (!window.confirm(`Delete this request for ${r.item?.name}?${returns}`)) return;
+    try {
+      await api.delete(`/inventory/requests/${r.id}`);
+      toast.success('Request deleted');
+      refreshAll();
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not delete the request'); }
+  };
+  const deleteEntry = async (t) => {
+    const sign = t.quantity > 0 ? `+${t.quantity}` : t.quantity;
+    if (!window.confirm(`Delete this ledger entry (${t.type} ${sign} ${t.item?.name})? Stock will be corrected by ${-t.quantity > 0 ? '+' : ''}${-t.quantity}.`)) return;
+    try {
+      await api.delete(`/inventory/transactions/${t.id}`);
+      toast.success('Entry deleted and stock corrected');
+      refreshAll();
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not delete the entry'); }
+  };
+
   const handleSaved = () => { refreshItems(); setShowAdd(false); setEditTarget(null); };
   const handleAdjusted = () => { refreshItems(); setAdjustTarget(null); };
 
@@ -358,6 +473,9 @@ export default function AdminInventory() {
                             <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(i)}>
                               <MdEdit className="mi" size={14} /> Edit
                             </button>
+                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => deleteItem(i)} title="Delete item">
+                              <MdDelete className="mi" size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -384,12 +502,12 @@ export default function AdminInventory() {
                   <thead>
                     <tr>
                       <th>Item</th><th>Qty</th><th>Requested By</th><th>Department</th>
-                      <th>Status</th><th>Reviewed By</th><th>When</th>
+                      <th>Status</th><th>Reviewed By</th><th>When</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {requests.length === 0 ? (
-                      <tr><td colSpan={7} className="empty-state">No requests</td></tr>
+                      <tr><td colSpan={8} className="empty-state">No requests</td></tr>
                     ) : requests.map(r => (
                       <tr key={r.id}>
                         <td style={{ fontWeight: 600 }}>{r.item?.name}</td>
@@ -401,6 +519,18 @@ export default function AdminInventory() {
                         </td>
                         <td style={{ color: 'var(--text-3)' }}>{r.reviewedBy?.name || '—'}</td>
                         <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(r.createdAt), 'dd MMM yyyy, h:mm a')}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end' }}>
+                            {r.status === 'PENDING' && (
+                              <button className="btn btn-success btn-sm" onClick={() => setReviewTarget(r)} title="Accept or reject this request">
+                                <MdRateReview className="mi" size={14} /> Review
+                              </button>
+                            )}
+                            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => deleteRequest(r)} title="Delete request">
+                              <MdDelete className="mi" size={14} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -415,11 +545,11 @@ export default function AdminInventory() {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Item</th><th>Type</th><th>Qty</th><th>Performed By</th><th>Note</th><th>When</th></tr>
+                  <tr><th>Item</th><th>Type</th><th>Qty</th><th>Performed By</th><th>Note</th><th>When</th><th></th></tr>
                 </thead>
                 <tbody>
                   {transactions.length === 0 ? (
-                    <tr><td colSpan={6} className="empty-state">No stock movement yet</td></tr>
+                    <tr><td colSpan={7} className="empty-state">No stock movement yet</td></tr>
                   ) : transactions.map(t => (
                     <tr key={t.id}>
                       <td style={{ fontWeight: 600 }}>{t.item?.name}</td>
@@ -430,6 +560,15 @@ export default function AdminInventory() {
                       <td>{t.performedBy?.name}</td>
                       <td style={{ color: 'var(--text-3)', fontSize: 12 }}>{t.note || '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--text-3)' }}>{format(new Date(t.createdAt), 'dd MMM yyyy, h:mm a')}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {t.relatedRequestId ? (
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }} title="Delete the request to reverse this entry">via request</span>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => deleteEntry(t)} title="Delete entry">
+                            <MdDelete className="mi" size={14} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -467,6 +606,7 @@ export default function AdminInventory() {
 
       {showAdd && <ItemFormModal onSaved={handleSaved} onClose={() => setShowAdd(false)} />}
       {editTarget && <ItemFormModal initial={editTarget} onSaved={handleSaved} onClose={() => setEditTarget(null)} />}
+      {reviewTarget && <ReviewRequestModal request={reviewTarget} onSaved={() => { refreshAll(); setReviewTarget(null); }} onClose={() => setReviewTarget(null)} />}
       {adjustTarget && <AdjustStockModal item={adjustTarget} onSaved={handleAdjusted} onClose={() => setAdjustTarget(null)} />}
     </AdminLayout>
   );
