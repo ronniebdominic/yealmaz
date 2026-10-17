@@ -2,6 +2,7 @@
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const { protect, restrict } = require('../middleware/auth');
+const { BASE_ROLES } = require('./staffRoles');
 
 const router = express.Router();
 const prisma = require('../db');
@@ -25,13 +26,28 @@ const SAFE_SELECT = {
   departments: true, phone: true, station: true,
   zoneId: true, zone: { select: { id: true, name: true } },
   isActive: true, isSharedAccount: true, createdAt: true,
+  staffRoleId: true, staffRole: { select: { id: true, name: true, baseRole: true } },
 };
+
+// Resolves the role a user ends up with. Picking a staff role ("Front Office")
+// sets role to that staff role's access level; picking a built-in role clears
+// the staff role. Returns { role, staffRoleId } or { error }.
+async function resolveRole(role, staffRoleId) {
+  if (staffRoleId) {
+    const sr = await prisma.staffRole.findUnique({ where: { id: staffRoleId } });
+    if (!sr) return { error: 'That role no longer exists.' };
+    return { role: sr.baseRole, staffRoleId: sr.id };
+  }
+  if (!BASE_ROLES.has(role)) return { error: 'Pick a valid role.' };
+  return { role, staffRoleId: null };
+}
 
 // ── GET /api/users ───────────────────────────────────────
 router.get('/', protect, restrict('ADMIN'), async (req, res) => {
   try {
+    // CLINIC logins are managed from the Clinics page, not here.
     const users = await prisma.user.findMany({
-      where: { role: { not: 'ADMIN' } },
+      where: { role: { not: 'CLINIC' } },
       select: SAFE_SELECT,
       orderBy: [{ role: 'asc' }, { name: 'asc' }],
     });
@@ -43,15 +59,18 @@ router.get('/', protect, restrict('ADMIN'), async (req, res) => {
 });
 
 // ── POST /api/users ──────────────────────────────────────
-router.post('/', protect, restrict('ADMIN'), async (req, res) => {
+// HR Managers onboard new hires here too (HR → Employees → Add Employee),
+// but only an admin can create a user with Admin access.
+router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
-    const { name, email, password, role, departments, phone, station, zoneId, isSharedAccount } = req.body;
+    const { name, email, password, departments, phone, station, zoneId, isSharedAccount } = req.body;
 
     if (!name?.trim())     return res.status(400).json({ error: 'Name is required.' });
     if (!email?.trim())    return res.status(400).json({ error: 'Email is required.' });
     if (!password?.trim()) return res.status(400).json({ error: 'Password is required.' });
-    if (!role)             return res.status(400).json({ error: 'Role is required.' });
-    if (role === 'ADMIN')  return res.status(400).json({ error: 'Cannot create admin users here.' });
+    const { role, staffRoleId, error: roleError } = await resolveRole(req.body.role, req.body.staffRoleId);
+    if (roleError) return res.status(400).json({ error: roleError });
+    if (role === 'ADMIN' && req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Only an admin can create users with Admin access.' });
 
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) return res.status(409).json({ error: 'A user with this email already exists.' });
@@ -67,6 +86,7 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
         email:       email.trim().toLowerCase(),
         password:    hashed,
         role,
+        staffRoleId,
         departments: role === 'LAB_TECH' ? cleaned : [],
         phone:       phone?.trim() || null,
         station:     station?.trim() || null,
@@ -86,17 +106,26 @@ router.post('/', protect, restrict('ADMIN'), async (req, res) => {
 // ── PATCH /api/users/:id ─────────────────────────────────
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, email, password, role, departments, phone, station, zoneId, isActive, isSharedAccount } = req.body;
+    const { name, email, password, role, staffRoleId, departments, phone, station, zoneId, isActive, isSharedAccount } = req.body;
 
-    // Prevent modifying other admins
     const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { role: true } });
     if (!target) return res.status(404).json({ error: 'User not found.' });
-    if (target.role === 'ADMIN') return res.status(403).json({ error: 'Cannot modify admin users.' });
+    if (target.role === 'CLINIC') return res.status(403).json({ error: 'Clinic logins are managed from the Clinics page.' });
 
     const data = {};
     if (name     !== undefined) data.name       = name.trim();
     if (email    !== undefined) data.email      = email.trim().toLowerCase();
-    if (role     !== undefined && role !== 'ADMIN') data.role = role;
+    if (role !== undefined || staffRoleId !== undefined) {
+      const resolved = await resolveRole(role, staffRoleId);
+      if (resolved.error) return res.status(400).json({ error: resolved.error });
+      data.role = resolved.role;
+      data.staffRoleId = resolved.staffRoleId;
+    }
+    // An admin can't lock themselves out from this screen.
+    if (req.params.id === req.user.id) {
+      if (data.role && data.role !== 'ADMIN') return res.status(400).json({ error: 'You cannot remove your own admin access.' });
+      if (isActive === false) return res.status(400).json({ error: 'You cannot deactivate your own account.' });
+    }
     if (phone    !== undefined) data.phone      = phone?.trim() || null;
     if (station  !== undefined) data.station    = station?.trim() || null;
     if (zoneId   !== undefined) data.zoneId     = zoneId || null;

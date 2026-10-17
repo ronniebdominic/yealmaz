@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../api';
 import { format } from 'date-fns';
-import { MdSearch, MdPersonAdd } from 'react-icons/md';
+import { MdSearch, MdPersonAdd, MdBadge } from 'react-icons/md';
 import { inputStyle } from '../../../utils/adminForms';
 
 const STATUS_FILTERS = [
@@ -17,7 +17,7 @@ const STATUS_FILTERS = [
 ];
 const PAGE_SIZE = 15;
 
-export default function EmployeesTab({ employees, onSelectEmployee, onAddEmployee, refresh, initialStatusFilter }) {
+export default function EmployeesTab({ employees, onSelectEmployee, onAddEmployee, onManageRoles, refresh, initialStatusFilter }) {
   const [search, setSearch] = useState('');
   // Seeded once from the HR Dashboard's "Active" card (see HRWorkspace) — a
   // plain useState default, not an effect, since this component remounts
@@ -66,6 +66,11 @@ export default function EmployeesTab({ employees, onSelectEmployee, onAddEmploye
           <option value="CONTRACT">Contract</option>
           <option value="INTERN">Intern</option>
         </select>
+        {onManageRoles && (
+          <button className="btn btn-ghost btn-sm" onClick={onManageRoles} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <MdBadge size={14} /> Roles
+          </button>
+        )}
         <button className="btn btn-primary btn-sm" onClick={onAddEmployee} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <MdPersonAdd size={14} /> Add Employee
         </button>

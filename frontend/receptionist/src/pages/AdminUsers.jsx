@@ -7,14 +7,17 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
+import { RolesModal, useStaffRoles } from '../components/StaffRoles';
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
   MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
-  MdHandshake, MdPointOfSale, MdSupervisorAccount, MdDialpad,
+  MdHandshake, MdPointOfSale, MdSupervisorAccount, MdDialpad, MdAdminPanelSettings,
+  MdBadge,
 } from 'react-icons/md';
 
 // ── Constants ─────────────────────────────────────────────
 const ROLES = [
+  { value: 'ADMIN',             label: 'Admin',              icon: MdAdminPanelSettings },
   { value: 'RECEPTIONIST',      label: 'Receptionist',       icon: MdFolder },
   { value: 'LAB_TECH',          label: 'Lab Technician',     icon: MdBiotech },
   { value: 'DELIVERY',          label: 'Delivery',           icon: MdLocalShipping },
@@ -48,6 +51,7 @@ const DEPARTMENTS = [
 ];
 
 const ROLE_COLORS = {
+  ADMIN:             { bg: 'rgba(220,38,38,0.1)',   color: 'var(--red)'  },
   RECEPTIONIST:      { bg: 'rgba(29,78,216,0.1)',   color: 'var(--blue)' },
   LAB_TECH:          { bg: 'rgba(124,58,237,0.1)',  color: 'var(--purple)'     },
   DELIVERY:          { bg: 'rgba(217,119,6,0.1)',   color: 'var(--amber)'     },
@@ -60,6 +64,10 @@ const ROLE_COLORS = {
   LEADER:            { bg: 'rgba(219,39,119,0.1)',  color: '#DB2777'     },
 };
 
+// A user's role as one select value: "staff:<id>" for an admin-created role,
+// otherwise the built-in role name.
+const roleKeyOf = (u) => u.staffRoleId ? `staff:${u.staffRoleId}` : u.role;
+const roleLabelOf = (u) => u.staffRole?.name || ROLE_MAP[u.role]?.label || u.role;
 
 // ── User Form Modal ───────────────────────────────────────
 function UserFormModal({ initial, onSaved, onClose }) {
@@ -70,14 +78,21 @@ function UserFormModal({ initial, onSaved, onClose }) {
     phone:           initial.phone           || '',
     station:         initial.station         || '',
     zoneId:          initial.zoneId          || '',
-    role:            initial.role            || 'RECEPTIONIST',
+    roleKey:         roleKeyOf(initial),
     departments:     initial.departments     || [],
     isSharedAccount: initial.isSharedAccount || false,
     password:        '',
   } : {
     name: '', email: '', phone: '', station: '', zoneId: '',
-    role: 'RECEPTIONIST', departments: [], isSharedAccount: false, password: generatePassword(),
+    roleKey: 'RECEPTIONIST', departments: [], isSharedAccount: false, password: generatePassword(),
   });
+  const staffRoles = useStaffRoles();
+  const pickedStaffRole = form.roleKey.startsWith('staff:')
+    ? staffRoles.find(r => `staff:${r.id}` === form.roleKey)
+    : null;
+  // The access level the user will actually get — drives the department picker.
+  const effectiveRole = pickedStaffRole ? pickedStaffRole.baseRole
+    : form.roleKey.startsWith('staff:') ? initial?.role : form.roleKey;
   const [showPass,           setShowPass]           = useState(!isEdit);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [saving,             setSaving]             = useState(false);
@@ -109,8 +124,10 @@ function UserFormModal({ initial, onSaved, onClose }) {
         phone: form.phone.trim() || undefined,
         station: form.station.trim() || undefined,
         zoneId: form.zoneId || '',
-        role:  form.role,
-        departments: form.role === 'LAB_TECH' ? form.departments : [],
+        ...(form.roleKey.startsWith('staff:')
+          ? { staffRoleId: form.roleKey.slice(6) }
+          : { role: form.roleKey, staffRoleId: null }),
+        departments: effectiveRole === 'LAB_TECH' ? form.departments : [],
         isSharedAccount: form.isSharedAccount,
       };
       if (form.password.trim()) payload.password = form.password.trim();
@@ -160,13 +177,27 @@ function UserFormModal({ initial, onSaved, onClose }) {
             <Field label="Role" hint="required">
               <select
                 style={{ ...inputStyle, cursor: 'pointer' }}
-                value={form.role}
-                onChange={e => { set('role', e.target.value); set('departments', []); }}
+                value={form.roleKey}
+                onChange={e => { set('roleKey', e.target.value); set('departments', []); }}
               >
-                {ROLES.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
+                {staffRoles.length > 0 && (
+                  <optgroup label="Custom roles">
+                    {staffRoles.map(r => (
+                      <option key={r.id} value={`staff:${r.id}`}>{r.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Built-in roles">
+                  {ROLES.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </optgroup>
               </select>
+              {pickedStaffRole && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                  {ROLE_MAP[pickedStaffRole.baseRole]?.label || pickedStaffRole.baseRole} access
+                </div>
+              )}
             </Field>
 
             {/* Shared/department login — not a real person (e.g. "Zirconia Fitting",
@@ -186,7 +217,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
             </div>
 
             {/* Departments — LAB_TECH only, multi-select */}
-            {form.role === 'LAB_TECH' && (
+            {effectiveRole === 'LAB_TECH' && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <Field
                   label="Departments"
@@ -430,7 +461,7 @@ function CredsCard({ user, password, onClose }) {
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 20 }}>
             {[
               { label: 'Name',     value: user.name },
-              { label: 'Role',     value: ROLE_MAP[user.role]?.label || user.role },
+              { label: 'Role',     value: roleLabelOf(user) },
               { label: 'Email',    value: user.email, copy: true },
               { label: 'Password', value: password,   copy: true, mono: true },
             ].map((row, i, arr) => (
@@ -463,7 +494,7 @@ function CredsCard({ user, password, onClose }) {
 }
 
 // ── Main Page ─────────────────────────────────────────────
-const ROLE_FILTERS = [{ label: 'All', value: '' }, ...ROLES.map(r => ({ label: r.label, value: r.value }))];
+const BUILT_IN_FILTERS = ROLES.map(r => ({ label: r.label, value: r.value }));
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();
@@ -473,6 +504,13 @@ export default function AdminUsers() {
   const [pinTarget,    setPinTarget]    = useState(null);
   const [roleFilter,   setRoleFilter]   = useState('');
   const [search,       setSearch]       = useState('');
+  const [showRoles,    setShowRoles]    = useState(false);
+  const staffRoles = useStaffRoles();
+  const roleFilters = [
+    { label: 'All', value: '' },
+    ...staffRoles.map(r => ({ label: r.name, value: `staff:${r.id}` })),
+    ...BUILT_IN_FILTERS,
+  ];
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['admin', 'users'],
@@ -483,7 +521,7 @@ export default function AdminUsers() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
 
   const filtered = users.filter(u => {
-    const matchRole = !roleFilter || u.role === roleFilter;
+    const matchRole = !roleFilter || (roleFilter.startsWith('staff:') ? roleKeyOf(u) === roleFilter : u.role === roleFilter);
     const matchSearch = !search.trim() ||
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -504,12 +542,17 @@ export default function AdminUsers() {
     <AdminLayout>
       <div className="topbar">
         <div className="topbar-title">Users</div>
-        <button
-          onClick={() => setShowForm(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-        >
-          + New User
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => setShowRoles(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MdBadge size={15} /> Roles
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          >
+            + New User
+          </button>
+        </div>
       </div>
 
       <div className="content">
@@ -524,7 +567,7 @@ export default function AdminUsers() {
           </div>
         </div>
         <div className="filters" style={{ marginBottom: 20 }}>
-          {ROLE_FILTERS.map(f => (
+          {roleFilters.map(f => (
             <button key={f.value} className={`filter-chip ${roleFilter === f.value ? 'active' : ''}`}
               onClick={() => setRoleFilter(f.value)}>
               {f.label}
@@ -596,8 +639,11 @@ export default function AdminUsers() {
                         <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.email}</td>
                         <td style={{ padding: '8px 10px' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            {roleInfo.icon && <roleInfo.icon size={11} />} {roleInfo.label || u.role}
+                            {roleInfo.icon && <roleInfo.icon size={11} />} {roleLabelOf(u)}
                           </span>
+                          {u.staffRole && (
+                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{roleInfo.label || u.role} access</div>
+                          )}
                         </td>
                         <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
                           title={u.role === 'LAB_TECH' ? (u.departments || []).map(c => DEPARTMENTS.find(d => d.code === c)?.label || c).join(', ') : ''}>
@@ -632,7 +678,7 @@ export default function AdminUsers() {
                               onClick={() => {
                                 api.patch(`/users/${u.id}`, { isActive: !u.isActive })
                                   .then(() => { toast.success(`${u.name} ${u.isActive ? 'deactivated' : 'activated'}`); refresh(); })
-                                  .catch(() => toast.error('Update failed'));
+                                  .catch(err => toast.error(err.response?.data?.error || 'Update failed'));
                               }}
                               style={{ display: 'flex', alignItems: 'center', gap: 3, background: u.isActive ? 'rgba(229,62,62,0.07)' : 'rgba(22,163,74,0.08)', color: u.isActive ? 'var(--red)' : 'var(--green)', border: `1px solid ${u.isActive ? 'rgba(229,62,62,0.2)' : 'rgba(22,163,74,0.25)'}`, borderRadius: 6, padding: '4px 9px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                             >
@@ -651,6 +697,7 @@ export default function AdminUsers() {
       </div>
 
       {showForm    && <UserFormModal onSaved={handleSaved} onClose={() => setShowForm(false)} />}
+      {showRoles   && <RolesModal levels={ROLES} onChanged={refresh} onClose={() => setShowRoles(false)} />}
       {pinTarget   && <KioskPinModal user={pinTarget} onClose={() => setPinTarget(null)} />}
       {editTarget  && <UserFormModal initial={editTarget} onSaved={handleSaved} onClose={() => setEditTarget(null)} />}
 

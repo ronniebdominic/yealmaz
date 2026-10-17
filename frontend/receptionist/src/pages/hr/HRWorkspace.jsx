@@ -15,6 +15,7 @@ import {
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import { RolesModal, useStaffRoles } from '../../components/StaffRoles';
 
 import EmployeesTab from './tabs/EmployeesTab';
 import AttendanceTab from './tabs/AttendanceTab';
@@ -128,10 +129,28 @@ function HRWorkspaceStyles() {
 // then hands off to the full Employee Profile editor for everything else.
 // Full password-reset/management still lives in Admin > Users; this is
 // just enough to get a new hire into the HR roster.
-function AddEmployeeModal({ onClose, onCreated }) {
+// Built-in access levels HR can assign. Admin is only offered when an admin is
+// using the HR workspace — the backend refuses it from an HR Manager anyway.
+const ACCESS_LEVELS = [
+  { value: 'LAB_TECH',          label: 'Lab Technician' },
+  { value: 'RECEPTIONIST',      label: 'Receptionist' },
+  { value: 'DELIVERY',          label: 'Delivery' },
+  { value: 'DISPATCH',          label: 'Dispatch' },
+  { value: 'FINANCE',           label: 'Finance' },
+  { value: 'FINANCE_AP',        label: 'Finance — AP (Trusted Partners)' },
+  { value: 'FINANCE_CASHIER',   label: 'Finance — Cashier' },
+  { value: 'INVENTORY_MANAGER', label: 'Inventory Manager' },
+  { value: 'HR_MANAGER',        label: 'HR Manager' },
+  { value: 'LEADER',            label: 'Operation Manager' },
+];
+const accessLevelsFor = (viewerRole) =>
+  viewerRole === 'ADMIN' ? [{ value: 'ADMIN', label: 'Admin' }, ...ACCESS_LEVELS] : ACCESS_LEVELS;
+
+function AddEmployeeModal({ levels, onManageRoles, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('LAB_TECH');
+  const [role, setRole] = useState('LAB_TECH'); // built-in role, or "staff:<id>" for a custom role
+  const staffRoles = useStaffRoles().filter(r => levels.some(l => l.value === r.baseRole));
   const [password, setPassword] = useState(() => generatePassword());
   const [showPass, setShowPass] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,7 +159,10 @@ function AddEmployeeModal({ onClose, onCreated }) {
     if (!name.trim() || !email.trim()) { toast.error('Name and email are required'); return; }
     setSaving(true);
     try {
-      const { data } = await api.post('/users', { name, email, password, role });
+      const { data } = await api.post('/users', {
+        name, email, password,
+        ...(role.startsWith('staff:') ? { staffRoleId: role.slice(6) } : { role }),
+      });
       toast.success(`${data.name} added — email ${email}, password ${password}`, { duration: 8000 });
       onCreated(data);
     } catch (err) { toast.error(err.response?.data?.error || 'Could not create employee'); }
@@ -159,14 +181,19 @@ function AddEmployeeModal({ onClose, onCreated }) {
           <Field label="Email"><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} /></Field>
           <Field label="Role">
             <select style={inputStyle} value={role} onChange={e => setRole(e.target.value)}>
-              <option value="LAB_TECH">Lab Technician</option>
-              <option value="RECEPTIONIST">Receptionist</option>
-              <option value="DELIVERY">Delivery</option>
-              <option value="DISPATCH">Dispatch</option>
-              <option value="FINANCE">Finance</option>
-              <option value="INVENTORY_MANAGER">Inventory Manager</option>
-              <option value="HR_MANAGER">HR Manager</option>
+              {staffRoles.length > 0 && (
+                <optgroup label="Custom roles">
+                  {staffRoles.map(r => <option key={r.id} value={`staff:${r.id}`}>{r.name}</option>)}
+                </optgroup>
+              )}
+              <optgroup label="Built-in roles">
+                {levels.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </optgroup>
             </select>
+            <button type="button" onClick={onManageRoles}
+              style={{ background: 'none', border: 'none', padding: 0, marginTop: 5, fontSize: 12, color: 'var(--blue)', cursor: 'pointer' }}>
+              Role not listed? Create a role
+            </button>
           </Field>
           <Field label="Password">
             <PasswordInput value={password} onChange={setPassword} showPass={showPass}
@@ -197,6 +224,7 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
   const goTo = (label, focus = null) => { setTab(label); setNavFocus(focus); setNavSeq(n => n + 1); setMoreOpen(false); };
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [showRoles, setShowRoles] = useState(false);
   const [showClockEvent, setShowClockEvent] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
 
@@ -252,6 +280,7 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
             employees={employees}
             onSelectEmployee={e => setSelectedEmployeeId(e.id)}
             onAddEmployee={() => setShowAddEmployee(true)}
+            onManageRoles={() => setShowRoles(true)}
             refresh={refresh}
             initialStatusFilter={navFocus?.statusFilter}
           />
@@ -284,9 +313,11 @@ export default function HRWorkspace({ role = 'ADMIN' }) {
           onClose={() => setSelectedEmployeeId(null)} refresh={refresh} />
       )}
       {showAddEmployee && (
-        <AddEmployeeModal onClose={() => setShowAddEmployee(false)}
+        <AddEmployeeModal levels={accessLevelsFor(role)} onManageRoles={() => setShowRoles(true)}
+          onClose={() => setShowAddEmployee(false)}
           onCreated={(user) => { setShowAddEmployee(false); refresh(); setSelectedEmployeeId(user.id); }} />
       )}
+      {showRoles && <RolesModal levels={accessLevelsFor(role)} onClose={() => setShowRoles(false)} />}
       {showClockEvent && (
         <ClockEventModal employees={employees} onClose={() => setShowClockEvent(false)}
           onSaved={() => { setShowClockEvent(false); refresh(); }} />

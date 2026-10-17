@@ -3,12 +3,13 @@
 // FINALIZED ("Closed") workflow, a totals summary, and distinguishes
 // auto-generated adjustments (salary structure/overtime/advances/
 // expenses/incentives, pulled in automatically at run creation) from
-// HR's manual ones.
+// HR's manual ones. Before approval a run can be regenerated or deleted;
+// those auto lines are only recorded as paid when the run is marked Paid.
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../../api';
 import toast from 'react-hot-toast';
-import { MdAdd, MdArrowForward, MdPrint, MdAutoAwesome } from 'react-icons/md';
+import { MdAdd, MdArrowForward, MdPrint, MdAutoAwesome, MdRefresh, MdDelete } from 'react-icons/md';
 import { printPayslip } from '../../../utils/printPayslip';
 import { inputStyle } from '../../../utils/adminForms';
 import AdjustmentModal from '../components/AdjustmentModal';
@@ -70,9 +71,30 @@ export default function PayrollRunsTab({ canManage }) {
     } catch (err) { toast.error(err.response?.data?.error || 'Could not create run'); }
   };
 
+  const regenerateRun = async (run) => {
+    if (!window.confirm('Rebuild this run from current data?\n\nBase salaries and auto lines (salary structure, overtime, advances, expenses, incentives) are recalculated and new employees are added. Manual adjustments are kept.')) return;
+    try {
+      const res = await api.post(`/payroll/runs/${run.id}/regenerate`);
+      toast.success(`Run regenerated — ${res.data.employeeCount} employees` + (res.data.missingSalaryCount ? ` (${res.data.missingSalaryCount} missing a salary)` : ''));
+      refresh();
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not regenerate run'); }
+  };
+
+  const deleteRun = async (run) => {
+    if (!window.confirm(`Delete the ${MONTH_NAMES[run.periodMonth - 1]} ${run.periodYear} payroll run and all its entries and adjustments?`)) return;
+    try {
+      await api.delete(`/payroll/runs/${run.id}`);
+      toast.success('Payroll run deleted');
+      if (activeRunId === run.id) setActiveRunId(null);
+      refresh();
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not delete run'); }
+  };
+
   const advanceRun = async (run) => {
     const idx = WORKFLOW.indexOf(run.status);
     const next = WORKFLOW[idx + 1];
+    if (next === 'APPROVED' && !window.confirm('Approve this payroll run? After approval it can no longer be adjusted, regenerated or deleted.')) return;
+    if (next === 'PAID' && !window.confirm('Mark this run as paid? Overtime, advance repayments, expense reimbursements and incentives in it will be recorded as paid.')) return;
     if (next === 'FINALIZED' && !window.confirm('Close this payroll run? Once closed it cannot be reopened or adjusted.')) return;
     try {
       await api.patch(`/payroll/runs/${run.id}/advance`);
@@ -121,6 +143,11 @@ export default function PayrollRunsTab({ canManage }) {
                   <td>{r.createdBy?.name || '—'}</td>
                   <td style={{ textAlign: 'right' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setActiveRunId(r.id)}>View</button>
+                    {canManage && ADJUSTABLE_STATUSES.includes(r.status) && (
+                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', marginLeft: 4 }} onClick={() => deleteRun(r)} title="Delete run">
+                        <MdDelete size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -138,11 +165,18 @@ export default function PayrollRunsTab({ canManage }) {
                 Workflow: {WORKFLOW.map(s => STATUS_LABELS[s]).join(' → ')} — currently <strong>{STATUS_LABELS[activeRun.status]}</strong>
               </div>
             </div>
-            {canManage && WORKFLOW.indexOf(activeRun.status) < WORKFLOW.length - 1 && (
-              <button className="btn btn-success btn-sm" onClick={() => advanceRun(activeRun)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <MdArrowForward size={14} /> Advance to {STATUS_LABELS[WORKFLOW[WORKFLOW.indexOf(activeRun.status) + 1]]}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {canManage && ADJUSTABLE_STATUSES.includes(activeRun.status) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => regenerateRun(activeRun)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <MdRefresh size={14} /> Regenerate
+                </button>
+              )}
+              {canManage && WORKFLOW.indexOf(activeRun.status) < WORKFLOW.length - 1 && (
+                <button className="btn btn-success btn-sm" onClick={() => advanceRun(activeRun)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <MdArrowForward size={14} /> Advance to {STATUS_LABELS[WORKFLOW[WORKFLOW.indexOf(activeRun.status) + 1]]}
+                </button>
+              )}
+            </div>
           </div>
 
           {activeRun.totals && (
