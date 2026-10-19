@@ -27,7 +27,12 @@ export function RolesModal({ levels, onChanged = () => {}, onClose }) {
   const queryClient = useQueryClient();
   const staffRoles = useStaffRoles();
   const [name, setName] = useState('');
-  const [baseRole, setBaseRole] = useState(levels[0]?.value || 'RECEPTIONIST');
+  // No default access level: it has to be chosen on purpose. (It used to start on the first entry,
+  // Admin, so a role created without touching the dropdown silently got full admin access.)
+  const [baseRole, setBaseRole] = useState('');
+  // Admin is listed last so it is never the easy pick.
+  const orderedLevels = [...levels.filter(l => l.value !== 'ADMIN'), ...levels.filter(l => l.value === 'ADMIN')];
+  const ADMIN_WARNING = 'Admin access gives this role FULL control of the whole system — everyone on it can see and change everything, including users, payments and settings. Grant it only to people who must have it.';
   const [editing, setEditing] = useState(null); // { id, name, baseRole }
   const [busy, setBusy] = useState(false);
 
@@ -44,11 +49,20 @@ export function RolesModal({ levels, onChanged = () => {}, onClose }) {
 
   const create = async () => {
     if (!name.trim()) { toast.error('Role name is required'); return; }
-    if (await run(() => api.post('/staff-roles', { name: name.trim(), baseRole }), `${name.trim()} role created`)) setName('');
+    if (!baseRole) { toast.error('Choose an access level for this role'); return; }
+    const admin = baseRole === 'ADMIN';
+    if (admin && !window.confirm(`${ADMIN_WARNING}\n\nCreate "${name.trim()}" with Admin access?`)) return;
+    if (await run(() => api.post('/staff-roles', { name: name.trim(), baseRole, ...(admin ? { confirmAdmin: true } : {}) }), `${name.trim()} role created`)) {
+      setName('');
+      setBaseRole('');
+    }
   };
   const saveEdit = async () => {
     if (!editing.name.trim()) { toast.error('Role name is required'); return; }
-    if (await run(() => api.patch(`/staff-roles/${editing.id}`, { name: editing.name.trim(), baseRole: editing.baseRole }), 'Role updated')) setEditing(null);
+    const original = staffRoles.find(r => r.id === editing.id);
+    const grantingAdmin = editing.baseRole === 'ADMIN' && original?.baseRole !== 'ADMIN';
+    if (grantingAdmin && !window.confirm(`${ADMIN_WARNING}\n\nMove everyone on "${editing.name.trim()}" to Admin access?`)) return;
+    if (await run(() => api.patch(`/staff-roles/${editing.id}`, { name: editing.name.trim(), baseRole: editing.baseRole, ...(grantingAdmin ? { confirmAdmin: true } : {}) }), 'Role updated')) setEditing(null);
   };
   const remove = (r) => {
     if (!window.confirm(`Delete the "${r.name}" role?`)) return;
@@ -57,7 +71,8 @@ export function RolesModal({ levels, onChanged = () => {}, onClose }) {
 
   const levelSelect = (value, onChange) => (
     <select style={{ ...inputStyle, cursor: 'pointer' }} value={value} onChange={e => onChange(e.target.value)}>
-      {levels.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+      {value === '' && <option value="" disabled>Choose an access level…</option>}
+      {orderedLevels.map(r => <option key={r.value} value={r.value}>{r.value === 'ADMIN' ? `${r.label} (full access)` : r.label}</option>)}
     </select>
   );
 
@@ -84,11 +99,17 @@ export function RolesModal({ levels, onChanged = () => {}, onClose }) {
               {levelSelect(baseRole, setBaseRole)}
             </Field>
             <div style={{ marginBottom: 16 }}>
-              <button className="btn btn-primary" disabled={busy} onClick={create} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button className="btn btn-primary" disabled={busy || !baseRole || !name.trim()} onClick={create} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <MdAdd size={15} /> Add
               </button>
             </div>
           </div>
+
+          {baseRole === 'ADMIN' && (
+            <div style={{ fontSize: 12, color: 'var(--red)', background: 'var(--red-dim)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+              {ADMIN_WARNING}
+            </div>
+          )}
 
           <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
             {staffRoles.length === 0 ? (
@@ -110,7 +131,7 @@ export function RolesModal({ levels, onChanged = () => {}, onClose }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 700 }}>{r.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
-                        {levelLabel(r.baseRole)} access · {r._count?.users ?? 0} staff
+                        <span style={r.baseRole === 'ADMIN' ? { color: 'var(--red)', fontWeight: 700 } : undefined}>{levelLabel(r.baseRole)} access</span> · {r._count?.users ?? 0} staff
                       </div>
                     </div>
                     {canEdit(r) ? (

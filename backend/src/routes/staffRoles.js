@@ -19,6 +19,9 @@ const BASE_ROLES = new Set([
 // admin access — otherwise HR could make themselves (or anyone) an admin.
 const canGrant = (user, baseRole) => baseRole !== 'ADMIN' || user.role === 'ADMIN';
 const ADMIN_ONLY_ERROR = 'Only an admin can create or change roles with Admin access.';
+// Admin access is never granted by default or by accident: the caller must say so explicitly
+// (the screen asks the person to confirm and then sends confirmAdmin: true).
+const ADMIN_CONFIRM_ERROR = 'Admin access gives full control of the whole system. Confirm it explicitly to grant it.';
 
 // ── GET /api/staff-roles ─────────────────────────────────
 router.get('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
@@ -41,6 +44,9 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
     if (!name?.trim()) return res.status(400).json({ error: 'Role name is required.' });
     if (!BASE_ROLES.has(baseRole)) return res.status(400).json({ error: 'Pick a valid access level.' });
     if (!canGrant(req.user, baseRole)) return res.status(403).json({ error: ADMIN_ONLY_ERROR });
+    if (baseRole === 'ADMIN' && req.body.confirmAdmin !== true) {
+      return res.status(400).json({ error: ADMIN_CONFIRM_ERROR, needsConfirm: true });
+    }
 
     const exists = await prisma.staffRole.findUnique({ where: { name: name.trim() } });
     if (exists) return res.status(409).json({ error: 'A role with this name already exists.' });
@@ -75,6 +81,9 @@ router.patch('/:id', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) 
     if (baseRole !== undefined) {
       if (!BASE_ROLES.has(baseRole)) return res.status(400).json({ error: 'Pick a valid access level.' });
       data.baseRole = baseRole;
+      if (baseRole === 'ADMIN' && current.baseRole !== 'ADMIN' && req.body.confirmAdmin !== true) {
+        return res.status(400).json({ error: ADMIN_CONFIRM_ERROR, needsConfirm: true });
+      }
     }
 
     if (data.baseRole && data.baseRole !== req.user.role) {

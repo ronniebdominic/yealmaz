@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Field, inputStyle } from '../utils/adminForms';
 import {
   MdWarehouse, MdEmojiEvents, MdWarning, MdTrendingUp, MdTrendingDown,
-  MdAdd, MdEdit, MdInventory2, MdSwapVert, MdDelete, MdCheckCircle, MdCancel, MdRateReview,
+  MdAdd, MdEdit, MdInventory2, MdSwapVert, MdDelete, MdCheckCircle, MdCancel, MdRateReview, MdSearch,
 } from 'react-icons/md';
 
 const TABS = ['Stock', 'Requests', 'Ledger', 'Milling Leaderboard'];
@@ -335,6 +335,7 @@ export default function AdminInventory() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState('Stock');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [adjustTarget, setAdjustTarget] = useState(null);
@@ -360,6 +361,15 @@ export default function AdminInventory() {
     queryFn: () => api.get('/milling/leaderboard').then(r => r.data),
     enabled: tab === 'Milling Leaderboard',
   });
+
+  // Search filters what is already loaded, on whichever tab is open.
+  const q = search.trim().toLowerCase();
+  const has = (...vals) => vals.some(v => String(v ?? '').toLowerCase().includes(q));
+  const shownItems = !q ? items : items.filter(i => has(i.name, i.unit, i.isActive ? 'active' : 'inactive'));
+  const shownRequests = !q ? requests : requests.filter(r =>
+    has(r.item?.name, r.requestedBy?.name, r.department, r.status, r.reviewedBy?.name, r.requesterNote, r.reviewNote));
+  const shownTransactions = !q ? transactions : transactions.filter(t =>
+    has(t.item?.name, t.type, t.performedBy?.name, t.note));
 
   const refreshItems = () => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'inventory', 'items'] });
@@ -433,9 +443,25 @@ export default function AdminInventory() {
       <div className="content">
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>{t}</button>
+            <button key={t} onClick={() => { setTab(t); setSearch(''); }} className={`btn btn-sm ${tab === t ? 'btn-primary' : 'btn-ghost'}`}>{t}</button>
           ))}
         </div>
+
+        {tab !== 'Milling Leaderboard' && (
+          <div className="search-input" style={{ maxWidth: 420, marginBottom: 16 }}>
+            <span className="icon mi"><MdSearch size={16} /></span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={
+                tab === 'Stock' ? 'Search items…'
+                : tab === 'Requests' ? 'Search item, requester, department, status…'
+                : 'Search item, type, person, note…'
+              }
+            />
+            {search && <button className="btn btn-ghost btn-sm" onClick={() => setSearch('')} style={{ color: 'var(--red)' }}>✕</button>}
+          </div>
+        )}
 
         {tab === 'Stock' && (
           <div className="card">
@@ -451,9 +477,9 @@ export default function AdminInventory() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.length === 0 ? (
-                    <tr><td colSpan={5} className="empty-state">No inventory items yet</td></tr>
-                  ) : items.map(i => {
+                  {shownItems.length === 0 ? (
+                    <tr><td colSpan={5} className="empty-state">{q ? 'No items match your search' : 'No inventory items yet'}</td></tr>
+                  ) : shownItems.map(i => {
                     const low = i.reorderThreshold != null && i.quantityOnHand <= i.reorderThreshold;
                     return (
                       <tr key={i.id} style={low ? { background: 'var(--red-dim)' } : undefined}>
@@ -506,9 +532,9 @@ export default function AdminInventory() {
                     </tr>
                   </thead>
                   <tbody>
-                    {requests.length === 0 ? (
-                      <tr><td colSpan={8} className="empty-state">No requests</td></tr>
-                    ) : requests.map(r => (
+                    {shownRequests.length === 0 ? (
+                      <tr><td colSpan={8} className="empty-state">{q ? 'No requests match your search' : 'No requests'}</td></tr>
+                    ) : shownRequests.map(r => (
                       <tr key={r.id}>
                         <td style={{ fontWeight: 600 }}>{r.item?.name}</td>
                         <td>{r.status === 'FULFILLED' ? r.quantityApproved : r.quantityRequested} {r.item?.unit}</td>
@@ -548,9 +574,9 @@ export default function AdminInventory() {
                   <tr><th>Item</th><th>Type</th><th>Qty</th><th>Performed By</th><th>Note</th><th>When</th><th></th></tr>
                 </thead>
                 <tbody>
-                  {transactions.length === 0 ? (
-                    <tr><td colSpan={7} className="empty-state">No stock movement yet</td></tr>
-                  ) : transactions.map(t => (
+                  {shownTransactions.length === 0 ? (
+                    <tr><td colSpan={7} className="empty-state">{q ? 'No entries match your search' : 'No stock movement yet'}</td></tr>
+                  ) : shownTransactions.map(t => (
                     <tr key={t.id}>
                       <td style={{ fontWeight: 600 }}>{t.item?.name}</td>
                       <td>{t.type}</td>

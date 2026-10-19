@@ -116,6 +116,10 @@ function UserFormModal({ initial, onSaved, onClose }) {
     if (!form.email.trim()) { toast.error('Email is required'); return; }
     if (!isEdit && !form.password.trim()) { toast.error('Password is required'); return; }
 
+    // Anything that ends up as Admin (a built-in Admin or a role built on Admin access) needs an explicit yes.
+    const grantsAdmin = effectiveRole === 'ADMIN' && (!isEdit || initial.role !== 'ADMIN');
+    if (grantsAdmin && !window.confirm(`Admin access gives full control of the whole system — users, payments, settings, everything.\n\nGive ${form.name.trim()} Admin access?`)) return;
+
     setSaving(true);
     try {
       const payload = {
@@ -129,6 +133,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
           : { role: form.roleKey, staffRoleId: null }),
         departments: effectiveRole === 'LAB_TECH' ? form.departments : [],
         isSharedAccount: form.isSharedAccount,
+        ...(grantsAdmin ? { confirmAdmin: true } : {}),
       };
       if (form.password.trim()) payload.password = form.password.trim();
 

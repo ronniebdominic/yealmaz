@@ -71,6 +71,9 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
     const { role, staffRoleId, error: roleError } = await resolveRole(req.body.role, req.body.staffRoleId);
     if (roleError) return res.status(400).json({ error: roleError });
     if (role === 'ADMIN' && req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Only an admin can create users with Admin access.' });
+    if (role === 'ADMIN' && req.body.confirmAdmin !== true) {
+      return res.status(400).json({ error: 'Admin access gives full control of the whole system. Confirm it explicitly to grant it.', needsConfirm: true });
+    }
 
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) return res.status(409).json({ error: 'A user with this email already exists.' });
@@ -118,6 +121,9 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
     if (role !== undefined || staffRoleId !== undefined) {
       const resolved = await resolveRole(role, staffRoleId);
       if (resolved.error) return res.status(400).json({ error: resolved.error });
+      if (resolved.role === 'ADMIN' && target.role !== 'ADMIN' && req.body.confirmAdmin !== true) {
+        return res.status(400).json({ error: 'Admin access gives full control of the whole system. Confirm it explicitly to grant it.', needsConfirm: true });
+      }
       data.role = resolved.role;
       data.staffRoleId = resolved.staffRoleId;
     }
