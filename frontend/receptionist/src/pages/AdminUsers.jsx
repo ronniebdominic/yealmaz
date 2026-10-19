@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
-import { RolesModal, useStaffRoles, staffRoleLabel, groupStaffRoles } from '../components/StaffRoles';
+import { RolesModal, useStaffRoles, staffRoleLabel, groupStaffRoles, STAFF_DEPARTMENTS } from '../components/StaffRoles';
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
   MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
@@ -66,6 +66,18 @@ const ROLE_COLORS = {
 
 // A user's role as one select value: "staff:<id>" for an admin-created role,
 // otherwise the built-in role name.
+// The company department a person belongs to. A custom role carries its own; a built-in role maps to
+// the department that normally owns it, so every user lands in a department without extra setup.
+const DEPARTMENT_OF_BUILT_IN_ROLE = {
+  ADMIN: 'Admin',
+  RECEPTIONIST: 'Front Office', DISPATCH: 'Front Office', DELIVERY: 'Front Office',
+  LAB_TECH: 'Operation', LEADER: 'Operation',
+  FINANCE: 'Finance', FINANCE_AP: 'Finance', FINANCE_CASHIER: 'Finance',
+  INVENTORY_MANAGER: 'Inventory',
+  HR_MANAGER: 'HR',
+};
+const departmentOf = (u) => u.staffRole?.department || DEPARTMENT_OF_BUILT_IN_ROLE[u.role] || 'Other';
+
 const roleKeyOf = (u) => u.staffRoleId ? `staff:${u.staffRoleId}` : u.role;
 const roleLabelOf = (u) => (u.staffRole ? staffRoleLabel(u.staffRole) : ROLE_MAP[u.role]?.label || u.role);
 
@@ -508,11 +520,12 @@ export default function AdminUsers() {
   const [newCreds,     setNewCreds]     = useState(null);
   const [pinTarget,    setPinTarget]    = useState(null);
   const [roleFilter,   setRoleFilter]   = useState('');
+  const [deptFilter,   setDeptFilter]   = useState('');
   const [search,       setSearch]       = useState('');
   const [showRoles,    setShowRoles]    = useState(false);
   const staffRoles = useStaffRoles();
   const roleFilters = [
-    { label: 'All', value: '' },
+    { label: 'All roles', value: '' },
     ...staffRoles.map(r => ({ label: staffRoleLabel(r), value: `staff:${r.id}` })),
     ...BUILT_IN_FILTERS,
   ];
@@ -525,15 +538,26 @@ export default function AdminUsers() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
 
+  // Department chips: the usual ones first, then any extra department that actually has people in it.
+  const deptCounts = users.reduce((m, u) => { const d = departmentOf(u); m[d] = (m[d] || 0) + 1; return m; }, {});
+  const deptChips = [
+    ...STAFF_DEPARTMENTS.filter(d => deptCounts[d]),
+    ...Object.keys(deptCounts).filter(d => !STAFF_DEPARTMENTS.includes(d)).sort(),
+  ];
+
   const filtered = users.filter(u => {
     const matchRole = !roleFilter || (roleFilter.startsWith('staff:') ? roleKeyOf(u) === roleFilter : u.role === roleFilter);
+    const matchDept = !deptFilter || departmentOf(u) === deptFilter;
+    const q = search.toLowerCase();
     const matchSearch = !search.trim() ||
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      (u.station || '').toLowerCase().includes(search.toLowerCase()) ||
-      (u.zone?.name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (u.departments || []).join(' ').toLowerCase().includes(search.toLowerCase());
-    return matchRole && matchSearch;
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      departmentOf(u).toLowerCase().includes(q) ||
+      roleLabelOf(u).toLowerCase().includes(q) ||
+      (u.station || '').toLowerCase().includes(q) ||
+      (u.zone?.name || '').toLowerCase().includes(q) ||
+      (u.departments || []).join(' ').toLowerCase().includes(q);
+    return matchRole && matchDept && matchSearch;
   });
 
   const handleSaved = (user, plainPassword) => {
@@ -566,16 +590,21 @@ export default function AdminUsers() {
           <div className="search-input" style={{ flex: 1, minWidth: 220 }}>
             <span className="icon mi"><MdSearch size={16} /></span>
             <input
-              placeholder="Search by name, email or department…"
+              placeholder="Search by name, email, department or role…"
               value={search} onChange={e => setSearch(e.target.value)}
             />
           </div>
+          <select style={{ ...inputStyle, width: 'auto', minWidth: 190, cursor: 'pointer' }} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+            {roleFilters.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
         </div>
         <div className="filters" style={{ marginBottom: 20 }}>
-          {roleFilters.map(f => (
-            <button key={f.value} className={`filter-chip ${roleFilter === f.value ? 'active' : ''}`}
-              onClick={() => setRoleFilter(f.value)}>
-              {f.label}
+          <button className={`filter-chip ${deptFilter === '' ? 'active' : ''}`} onClick={() => setDeptFilter('')}>
+            All departments <span style={{ opacity: 0.7, marginLeft: 4 }}>{users.length}</span>
+          </button>
+          {deptChips.map(d => (
+            <button key={d} className={`filter-chip ${deptFilter === d ? 'active' : ''}`} onClick={() => setDeptFilter(d)}>
+              {d} <span style={{ opacity: 0.7, marginLeft: 4 }}>{deptCounts[d]}</span>
             </button>
           ))}
         </div>
@@ -589,7 +618,7 @@ export default function AdminUsers() {
               <div className="empty-state">
                 <div className="empty-icon mi"><MdPerson size={32} /></div>
                 <div className="empty-title">No users found</div>
-                <p>{search || roleFilter ? 'Try adjusting your search or filter' : 'Add the first user with the button above'}</p>
+                <p>{search || roleFilter || deptFilter ? 'Try adjusting your search or filter' : 'Add the first user with the button above'}</p>
               </div>
             ) : (
               <table className="users-table" style={{ tableLayout: 'fixed', minWidth: 1100 }}>
@@ -650,13 +679,16 @@ export default function AdminUsers() {
                             <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{roleInfo.label || u.role} access</div>
                           )}
                         </td>
-                        <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        <td style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                           title={u.role === 'LAB_TECH' ? (u.departments || []).map(c => DEPARTMENTS.find(d => d.code === c)?.label || c).join(', ') : ''}>
-                          {u.role === 'LAB_TECH'
-                            ? ((u.departments?.length)
-                                ? u.departments.map(c => DEPARTMENTS.find(d => d.code === c)?.label || c).join(', ')
-                                : <span style={{ color: 'var(--text-3)' }}>Flexible</span>)
-                            : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                          {departmentOf(u)}
+                          {u.role === 'LAB_TECH' && (
+                            <div style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {u.departments?.length
+                                ? u.departments.map(c => DEPARTMENTS.find(d => d.code === c)?.label?.replace(' Department', '') || c).join(', ')
+                                : 'All lab stages'}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '8px 10px', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.phone || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
                         <td style={{ padding: '8px 10px', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.station || <span style={{ color: 'var(--text-3)' }}>—</span>}</td>
