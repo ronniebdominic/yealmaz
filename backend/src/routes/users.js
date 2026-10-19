@@ -26,7 +26,7 @@ const SAFE_SELECT = {
   departments: true, phone: true, station: true,
   zoneId: true, zone: { select: { id: true, name: true } },
   isActive: true, isSharedAccount: true, createdAt: true,
-  staffRoleId: true, staffRole: { select: { id: true, name: true, baseRole: true } },
+  staffRoleId: true, staffRole: { select: { id: true, name: true, department: true, baseRole: true } },
 };
 
 // Resolves the role a user ends up with. Picking a staff role ("Front Office")

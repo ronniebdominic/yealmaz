@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
-import { RolesModal, useStaffRoles } from '../components/StaffRoles';
+import { RolesModal, useStaffRoles, staffRoleLabel, groupStaffRoles } from '../components/StaffRoles';
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
   MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
@@ -67,7 +67,7 @@ const ROLE_COLORS = {
 // A user's role as one select value: "staff:<id>" for an admin-created role,
 // otherwise the built-in role name.
 const roleKeyOf = (u) => u.staffRoleId ? `staff:${u.staffRoleId}` : u.role;
-const roleLabelOf = (u) => u.staffRole?.name || ROLE_MAP[u.role]?.label || u.role;
+const roleLabelOf = (u) => (u.staffRole ? staffRoleLabel(u.staffRole) : ROLE_MAP[u.role]?.label || u.role);
 
 // ── User Form Modal ───────────────────────────────────────
 function UserFormModal({ initial, onSaved, onClose }) {
@@ -185,13 +185,13 @@ function UserFormModal({ initial, onSaved, onClose }) {
                 value={form.roleKey}
                 onChange={e => { set('roleKey', e.target.value); set('departments', []); }}
               >
-                {staffRoles.length > 0 && (
-                  <optgroup label="Custom roles">
-                    {staffRoles.map(r => (
+                {groupStaffRoles(staffRoles).map(g => (
+                  <optgroup key={g.department || '_none'} label={g.department || 'Custom roles'}>
+                    {g.roles.map(r => (
                       <option key={r.id} value={`staff:${r.id}`}>{r.name}</option>
                     ))}
                   </optgroup>
-                )}
+                ))}
                 <optgroup label="Built-in roles">
                   {ROLES.map(r => (
                     <option key={r.value} value={r.value}>{r.label}</option>
@@ -513,7 +513,7 @@ export default function AdminUsers() {
   const staffRoles = useStaffRoles();
   const roleFilters = [
     { label: 'All', value: '' },
-    ...staffRoles.map(r => ({ label: r.name, value: `staff:${r.id}` })),
+    ...staffRoles.map(r => ({ label: staffRoleLabel(r), value: `staff:${r.id}` })),
     ...BUILT_IN_FILTERS,
   ];
 

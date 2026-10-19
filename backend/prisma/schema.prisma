@@ -136,14 +136,16 @@ enum Role {
 // enum everywhere — a user on a staff role always has role = baseRole — so a
 // new staff role never needs code changes to work.
 model StaffRole {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  baseRole  Role
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  department String? // group the job title belongs to: Front Office, Support Staff, Operation, HR, Finance, Inventory…
+  name       String // the job title, e.g. "Cashier" (the same title may exist in two departments)
+  baseRole   Role
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   users User[]
 
+  @@unique([department, name])
   @@map("staff_roles")
 }
 

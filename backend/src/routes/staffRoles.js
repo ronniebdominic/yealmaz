@@ -27,7 +27,7 @@ const ADMIN_CONFIRM_ERROR = 'Admin access gives full control of the whole system
 router.get('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
     const roles = await prisma.staffRole.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: [{ department: 'asc' }, { name: 'asc' }],
       include: { _count: { select: { users: true } } },
     });
     res.json(roles);
@@ -41,6 +41,7 @@ router.get('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
 router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
     const { name, baseRole } = req.body;
+    const department = req.body.department?.trim() || null;
     if (!name?.trim()) return res.status(400).json({ error: 'Role name is required.' });
     if (!BASE_ROLES.has(baseRole)) return res.status(400).json({ error: 'Pick a valid access level.' });
     if (!canGrant(req.user, baseRole)) return res.status(403).json({ error: ADMIN_ONLY_ERROR });
@@ -48,10 +49,10 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
       return res.status(400).json({ error: ADMIN_CONFIRM_ERROR, needsConfirm: true });
     }
 
-    const exists = await prisma.staffRole.findUnique({ where: { name: name.trim() } });
-    if (exists) return res.status(409).json({ error: 'A role with this name already exists.' });
+    const exists = await prisma.staffRole.findFirst({ where: { name: name.trim(), department } });
+    if (exists) return res.status(409).json({ error: department ? `${department} already has a role called ${name.trim()}.` : 'A role with this name already exists.' });
 
-    const role = await prisma.staffRole.create({ data: { name: name.trim(), baseRole } });
+    const role = await prisma.staffRole.create({ data: { name: name.trim(), department, baseRole } });
     res.status(201).json({ ...role, _count: { users: 0 } });
   } catch (err) {
     console.error(err);
@@ -66,6 +67,7 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
 router.patch('/:id', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
   try {
     const { name, baseRole } = req.body;
+    const department = req.body.department === undefined ? undefined : (req.body.department?.trim() || null);
     const current = await prisma.staffRole.findUnique({ where: { id: req.params.id } });
     if (!current) return res.status(404).json({ error: 'Role not found.' });
     if (!canGrant(req.user, current.baseRole) || (baseRole !== undefined && !canGrant(req.user, baseRole))) {
@@ -74,9 +76,18 @@ router.patch('/:id', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) 
     const data = {};
     if (name !== undefined) {
       if (!name.trim()) return res.status(400).json({ error: 'Role name is required.' });
-      const clash = await prisma.staffRole.findFirst({ where: { name: name.trim(), id: { not: req.params.id } } });
-      if (clash) return res.status(409).json({ error: 'A role with this name already exists.' });
       data.name = name.trim();
+    }
+    if (department !== undefined) data.department = department;
+    if (data.name !== undefined || data.department !== undefined) {
+      const clash = await prisma.staffRole.findFirst({
+        where: {
+          name: data.name !== undefined ? data.name : current.name,
+          department: data.department !== undefined ? data.department : current.department,
+          id: { not: req.params.id },
+        },
+      });
+      if (clash) return res.status(409).json({ error: 'That department already has a role with this name.' });
     }
     if (baseRole !== undefined) {
       if (!BASE_ROLES.has(baseRole)) return res.status(400).json({ error: 'Pick a valid access level.' });

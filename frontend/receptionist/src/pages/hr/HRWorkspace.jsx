@@ -15,7 +15,7 @@ import {
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { RolesModal, useStaffRoles } from '../../components/StaffRoles';
+import { RolesModal, useStaffRoles, groupStaffRoles } from '../../components/StaffRoles';
 
 import EmployeesTab from './tabs/EmployeesTab';
 import AttendanceTab from './tabs/AttendanceTab';
@@ -181,11 +181,11 @@ function AddEmployeeModal({ levels, onManageRoles, onClose, onCreated }) {
           <Field label="Email"><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} /></Field>
           <Field label="Role">
             <select style={inputStyle} value={role} onChange={e => setRole(e.target.value)}>
-              {staffRoles.length > 0 && (
-                <optgroup label="Custom roles">
-                  {staffRoles.map(r => <option key={r.id} value={`staff:${r.id}`}>{r.name}</option>)}
+              {groupStaffRoles(staffRoles).map(g => (
+                <optgroup key={g.department || '_none'} label={g.department || 'Custom roles'}>
+                  {g.roles.map(r => <option key={r.id} value={`staff:${r.id}`}>{r.name}</option>)}
                 </optgroup>
-              )}
+              ))}
               <optgroup label="Built-in roles">
                 {levels.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
               </optgroup>
