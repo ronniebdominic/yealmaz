@@ -23,6 +23,10 @@ export default function AdminRewards() {
     queryKey: ['rewards', 'settings'],
     queryFn: () => api.get('/rewards/settings').then(r => r.data),
   });
+  const { data: rates } = useQuery({
+    queryKey: ['rewards', 'rates'],
+    queryFn: () => api.get('/rewards/rates').then(r => r.data),
+  });
   const [ppc, setPpc] = useState('');
   const savePpc = async () => {
     const v = parseInt(ppc);
@@ -122,9 +126,10 @@ export default function AdminRewards() {
         {/* ── Settings ── */}
         {tab === 'Settings' && (
           <div className="card" style={{ maxWidth: 480, padding: 28 }}>
-            <h3 style={{ marginBottom: 20, fontSize: 16, fontWeight: 700 }}>Points per Case</h3>
+            <h3 style={{ marginBottom: 20, fontSize: 16, fontWeight: 700 }}>Default Points per Case</h3>
             <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 20 }}>
-              Each time a clinic submits a new case through the app, they earn this many reward points.
+              A clinic earns this many points for a case whose work type has no rate of its own (see the table below).
+              Remakes and redos earn no points.
             </p>
             <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '16px 20px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>Current setting</span>
@@ -141,6 +146,19 @@ export default function AdminRewards() {
               />
               <button className="btn btn-primary" onClick={savePpc}>Save</button>
             </div>
+            {rates?.rates?.length > 0 && (
+              <div style={{ marginTop: 28 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', letterSpacing: .5, marginBottom: 8 }}>
+                  PER-UNIT RATES (what clinics see)
+                </div>
+                {rates.rates.map(r => (
+                  <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                    <span>{r.label}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{r.rate} pts / {r.perUnit === 'tray' ? 'tray' : 'unit'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
