@@ -89,7 +89,10 @@ router.post('/events', async (req, res) => {
       return res.status(400).json({ error: 'employeeCode, timestamp and type (CLOCK_IN/CLOCK_OUT) are required.' });
     }
     const profile = await prisma.employeeProfile.findUnique({ where: { employeeCode } });
-    if (!profile) return res.status(404).json({ error: 'Unknown employee code.' });
+    // 422, not 404: the request is fine, the person just isn't registered. The bridge sends punches in
+    // order and retries a 404 forever, so one unregistered person at the front of its queue used to block
+    // everyone behind them. A 422 makes the bridge set that punch aside for review and carry on.
+    if (!profile) return res.status(422).json({ error: 'Unknown employee code.', code: 'UNKNOWN_EMPLOYEE' });
 
     const event = await recordEvent({ userId: profile.userId, timestamp, type, source: 'BIOMETRIC', deviceId });
     await invalidate('attendance:events*', 'dashboard:hr-summary');

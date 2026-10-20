@@ -20,6 +20,24 @@ rather than the terminal also keeps the API secret off a wall-mounted
 device, and queues punches locally so an internet outage or a Railway
 redeploy never loses someone's attendance.
 
+## Running it on a Raspberry Pi instead of the PC
+
+A Raspberry Pi Zero 2 W (or any Pi) can replace the bridge PC — same program, nothing else to
+install, and it is always on at a fraction of the power. Copy this whole folder to the Pi
+(`scp -r attendance-bridge pi@<pi-address>:/home/pi/`), then on the Pi:
+
+```bash
+cd ~/attendance-bridge/raspberry-pi
+sudo ./install.sh
+```
+
+The script installs Node.js 18+ if needed, asks for the API secret and terminal password (stored
+in `/etc/yealmaz-bridge.env`, root-only), installs a service that starts at boot and restarts on
+failure, and turns off Wi-Fi sleep. Afterwards: reserve the Pi's address in the router, point the
+terminal's HTTP Listening at it (step 3 below), and switch the old PC bridge off. Use
+`journalctl -u yealmaz-bridge -f` to watch it. The rest of this README still applies — wherever it
+says "the PC", read "the Pi".
+
 ## If this PC gets switched off
 
 Push has no recovery path — the terminal sends each event once and moves
