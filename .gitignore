@@ -13,3 +13,4 @@ gsk_*
 *.pem
 *secret*.txt
 *token*.txt
+.tv-demo.json

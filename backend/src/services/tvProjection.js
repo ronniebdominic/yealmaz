@@ -72,6 +72,7 @@ function employeeStatus({ attendance, currentCase, lastScanAt, now }) {
   return 'WORKING';
 }
 
+const pretty = (st) => (st || '').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 const firstName = (full) => (full || '').trim().split(/\s+/)[0] || '';
 const caseLabel = (c) => c.caseNumber || null;
 
@@ -218,8 +219,9 @@ function buildSnapshot(input) {
   const soon = now.getTime() + cfg.alerts.dueSoonHours * HOUR;
   const slim = (c, extra = {}) => ({
     caseNumber: caseLabel(c), workType: c.workType, units: c.units ?? null,
-    stage: c.status, stageLabel: c.dept?.label || c.status,
+    stage: c.status, stageLabel: c.dept?.label || pretty(c.status),
     owner: c.owner ? firstName(c.owner.name) : null,
+    awaitingAssignment: !!(c.dept && !c.owner), // only meaningful for cases sitting in a lab department
     since: c.enteredAt, dueDate: c.dueDate || null, ...extra,
   });
   const labFloor = inLab.filter(c => c.dept || ['PAYMENT_INVOICING', 'READY_TO_DISPATCH', 'ON_HOLD', 'REMAKE', 'CASE_ACCEPTED'].includes(c.status));

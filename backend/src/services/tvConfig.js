@@ -19,7 +19,7 @@ const DEFAULT_CONFIG = {
   interstitialSlogan: '', // empty = no slogan line; needs management approval before use
   visibleDepartments: [], // empty = all
   hiddenEmployeeIds: [],
-  employeesPerPage: 12,
+  employeesPerPage: 8,
   performance: {
     periodDays: 7,
     minSample: 10, // fewer finished cases than this => "Not enough data" for rate metrics
@@ -65,7 +65,9 @@ function sanitizeConfig(raw) {
       screens.push({ id: s.id, enabled: s.enabled !== false, seconds: num(s.seconds, 5, 300, base.seconds) });
     }
   }
-  for (const base of d.screens) if (!screens.some(x => x.id === base.id)) screens.push({ ...base }); // never lose a screen
+  // Never lose a screen from the list. With no screens sent at all (first run) they come back as the defaults; if a
+  // save lists only some, the omitted ones are kept but switched OFF — leaving something out must never turn it on.
+  for (const base of d.screens) if (!screens.some(x => x.id === base.id)) screens.push({ ...base, enabled: inScreens.length === 0 ? base.enabled : false });
   const p = input.performance || {}, a = input.alerts || {}, ach = input.achievements || {};
   return {
     title: typeof input.title === 'string' && input.title.trim() ? input.title.trim().slice(0, 80) : d.title,

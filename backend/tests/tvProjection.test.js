@@ -147,6 +147,10 @@ test('config sanitising clamps and never drops a screen', () => {
   assert.equal(c.transitionMs, 0);
   assert.equal(c.animationIntensity, DEFAULT_CONFIG.animationIntensity);
   assert.equal(sanitizeConfig(null).screens.length, 6);
+  assert.ok(sanitizeConfig(null).screens.every(s => s.enabled), 'first run: all screens on');
+  const partial = sanitizeConfig({ screens: [{ id: 'command', enabled: true, seconds: 10 }] });
+  assert.equal(partial.screens.filter(s => s.enabled).length, 1, 'omitted screens are kept but off');
+  assert.equal(partial.screens.length, 6);
 });
 
 test('hidden employees are not shown', () => {

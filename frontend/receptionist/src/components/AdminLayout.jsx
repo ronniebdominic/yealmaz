@@ -5,7 +5,7 @@ import {
   MdAnalytics, MdPrecisionManufacturing, MdAssignment, MdLocalHospital,
   MdGroup, MdAttachMoney, MdCardGiftcard, MdLogout, MdMap, MdBadge, MdWarehouse, MdGroups,
   MdDesk, MdPointOfSale, MdLocalShipping, MdTwoWheeler, MdScience, MdSupervisorAccount, MdInventory,
-  MdPeopleAlt, MdDelete, MdHistory, MdHealthAndSafety,
+  MdPeopleAlt, MdDelete, MdHistory, MdHealthAndSafety, MdTv,
 } from 'react-icons/md';
 import FloatingAIAssistant from './FloatingAIAssistant';
 import ThemeToggle from './ThemeToggle';
@@ -73,6 +73,9 @@ function NavItems({ active, onNav }) {
       </button>
       <button className={active('/admin/rewards')} onClick={() => onNav('/admin/rewards')}>
         <MdCardGiftcard className="mi" size={17} /> Rewards
+      </button>
+      <button className={active('/admin/tv')} onClick={() => onNav('/admin/tv')}>
+        <MdTv className="mi" size={17} /> TV Display
       </button>
       <button className={active('/admin/inventory')} onClick={() => onNav('/admin/inventory')}>
         <MdWarehouse className="mi" size={17} /> Inventory

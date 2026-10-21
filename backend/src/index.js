@@ -75,12 +75,17 @@ const tvNs = io.of('/tv');
 tvService.setNamespace(tvNs);
 tvNs.use(async (socket, next) => {
   const token = socket.handshake.auth?.token;
+  let display = null;
   try {
-    const display = await tvService.verifyDisplayToken(token);
-    if (display) { socket.display = display; return next(); }
+    display = await tvService.verifyDisplayToken(token);
+  } catch {
+    return next(new Error('unavailable')); // the database hiccuped: a valid display must not be treated as revoked
+  }
+  if (display) { socket.display = display; return next(); }
+  try {
     const user = token ? jwt.verify(token, process.env.JWT_SECRET) : null;
     if (user?.role === 'ADMIN') { socket.preview = true; return next(); }
-  } catch { /* fall through */ }
+  } catch { /* not a valid admin token */ }
   next(new Error('unauthorised'));
 });
 tvNs.on('connection', (socket) => {
