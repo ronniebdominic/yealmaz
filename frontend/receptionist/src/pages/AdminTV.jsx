@@ -45,7 +45,7 @@ function MapEditor({ departments, value, onChange, unit, hint }) {
 
 export default function AdminTV() {
   const qc = useQueryClient();
-  const { data: cfgData } = useQuery({ queryKey: ['tv', 'config'], queryFn: () => api.get('/tv/config').then(r => r.data.config) });
+  const { data: cfgData, isError: cfgError, error: cfgErr, refetch: refetchCfg } = useQuery({ queryKey: ['tv', 'config'], queryFn: () => api.get('/tv/config').then(r => r.data.config), retry: 1 });
   const { data: displays = [] } = useQuery({ queryKey: ['tv', 'displays'], queryFn: () => api.get('/tv/displays').then(r => r.data), refetchInterval: 15000 });
   const { data: departments = [] } = useQuery({ queryKey: ['scan', 'departments'], queryFn: () => api.get('/scan/departments').then(r => r.data.filter(d => !['RECEPTION', 'PAYMENT', 'DISPATCH'].includes(d.code))) });
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => api.get('/users').then(r => r.data) });
@@ -77,7 +77,26 @@ export default function AdminTV() {
     catch { toast.error('Could not revoke'); }
   };
 
-  if (!cfg) return <AdminLayout><div className="content"><p style={{ color: 'var(--text-3)' }}>Loading TV settings…</p></div></AdminLayout>;
+  if (!cfg) {
+    const status = cfgErr?.response?.status;
+    return (
+      <AdminLayout>
+        <div className="content">
+          {cfgError ? (
+            <div className="card" style={{ padding: 24, maxWidth: 640 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>TV settings could not be loaded</div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-2)', marginBottom: 14 }}>
+                {status === 404
+                  ? 'The server does not have the TV feature yet — the backend is probably still deploying. Try again in a few minutes.'
+                  : 'The server returned an error. If this is the first time, make sure the TV database tables have been created (2026-10-22-tv-command-center.sql).'}
+              </p>
+              <button className="btn btn-primary" onClick={() => refetchCfg()}>Try again</button>
+            </div>
+          ) : <p style={{ color: 'var(--text-3)' }}>Loading TV settings…</p>}
+        </div>
+      </AdminLayout>
+    );
+  }
   const up = (patch) => setCfg(c => ({ ...c, ...patch }));
   const upPerf = (patch) => setCfg(c => ({ ...c, performance: { ...c.performance, ...patch } }));
   const upAlerts = (patch) => setCfg(c => ({ ...c, alerts: { ...c.alerts, ...patch } }));
