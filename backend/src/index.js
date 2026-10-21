@@ -67,6 +67,29 @@ io.on('connection', (socket) => {
   socket.on('join_user', (userId) => join(!!user && user.id === userId, `user_${userId}`));
 });
 
+
+// ── Live production TV: its own namespace, so display connections never touch the staff rooms.
+// A display authenticates with its paired token (revocable); an admin JWT is accepted for previews.
+const tvService = require('./services/tvService');
+const tvNs = io.of('/tv');
+tvService.setNamespace(tvNs);
+tvNs.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token;
+  try {
+    const display = await tvService.verifyDisplayToken(token);
+    if (display) { socket.display = display; return next(); }
+    const user = token ? jwt.verify(token, process.env.JWT_SECRET) : null;
+    if (user?.role === 'ADMIN') { socket.preview = true; return next(); }
+  } catch { /* fall through */ }
+  next(new Error('unauthorised'));
+});
+tvNs.on('connection', (socket) => {
+  socket.join(tvService.TV_ROOM);
+  if (socket.display) socket.join(`display_${socket.display.id}`);
+  // Heartbeat: the TV treats silence as stale data, so answer its pings with the server's own clock.
+  socket.on('tv:ping', (ack) => { if (typeof ack === 'function') ack({ serverTime: new Date().toISOString() }); });
+});
+
 // ── Middleware ───────────────────────────────────────────
 app.set('trust proxy', 1); // Railway sits behind a proxy; needed for express-rate-limit v7+
 app.use(compression());
@@ -104,6 +127,7 @@ app.use('/api/dispatch',      require('./routes/dispatch'));
 app.use('/api/dashboard',     require('./routes/dashboard'));
 app.use('/api/lab',           require('./routes/lab'));
 app.use('/api/scan',          require('./routes/scan'));      // Public QR scan endpoint
+app.use('/api/tv',            require('./routes/tv'));        // Live production TV (paired displays + admin)
 app.use('/api/prices',        require('./routes/prices'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/rewards',       require('./routes/rewards'));

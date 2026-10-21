@@ -7,6 +7,7 @@ const { clawBackCasePoints } = require('../utils/rewards');
 
 const router = express.Router();
 const prisma = require('../db');
+const { recordEvent } = require('../services/tvService');
 
 // Fallback due-date calculator (mirrors the one in cases.js)
 async function getDueDays(workType) {
@@ -383,6 +384,7 @@ router.post('/:caseId/cancel-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
     );
 
     const io = req.app.get('io');
+    await recordEvent({ type: 'STATUS_CHANGED', caseId: updated.id, caseNumber: updated.caseNumber, stage: updated.status, actorUserId: req.user.id, actorName: req.user.name });
     io.to('lab_staff').emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });
 
@@ -608,6 +610,7 @@ router.post('/:caseId/self-pickup', protect, restrict('DISPATCH', 'ADMIN'), asyn
       caseId: updated.id, caseNumber: updated.caseNumber,
       status: 'DELIVERED', message: 'Your case has been picked up!'
     });
+    await recordEvent({ type: 'DELIVERED', caseId: updated.id, caseNumber: updated.caseNumber, stage: 'DELIVERED', actorUserId: req.user.id });
     io.to('lab_staff').emit('case_delivered', { caseId: updated.id, caseNumber: updated.caseNumber });
 
     sendPushToClinic(prisma, updated.clinicId, {

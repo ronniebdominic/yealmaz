@@ -12,6 +12,7 @@ const { startOfDay, endOfDay } = require('../utils/dateRange');
 
 const router = express.Router();
 const prisma = require('../db');
+const { recordEvent } = require('../services/tvService');
 
 // Case numbers continue the imported sequence: YDL26005688, YDL26005689, …
 // Backed by the Postgres sequence `case_number_seq` (seeded to 26005687), so
@@ -827,6 +828,7 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
     );
 
     const io = req.app.get('io');
+    await recordEvent({ type: 'CASE_ACCEPTED', caseId: accepted.id, caseNumber: accepted.caseNumber, stage: 'CASE_ACCEPTED', actorUserId: req.user.id, actorName: req.user.name });
     io.to('lab_staff').emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
     io.to(`clinic_${accepted.clinicId}`).emit('case_updated', { caseId: accepted.id, caseNumber: accepted.caseNumber, status: 'CASE_ACCEPTED' });
     for (const c of additionalCases) {
@@ -1491,6 +1493,7 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
     invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'lab:active');
 
     const io = req.app.get('io');
+    await recordEvent({ type: 'STATUS_CHANGED', caseId: updated.id, caseNumber: updated.caseNumber, stage: updated.status, fromStage: existing.status, actorUserId: req.user.id, actorName: req.user.name });
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', {
       caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status
     });

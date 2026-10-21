@@ -10,6 +10,7 @@ const liveLocations = require('../state/liveLocations');
 
 const router = express.Router();
 const prisma = require('../db');
+const { recordEvent } = require('../services/tvService');
 
 // ── GET /api/delivery/assigned ───────────────────────────
 router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
@@ -262,6 +263,7 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
       caseId: caseData.id, caseNumber: caseData.caseNumber,
       status: 'DELIVERED', message: 'Your case has been delivered!'
     });
+    await recordEvent({ type: 'DELIVERED', caseId: caseData.id, caseNumber: caseData.caseNumber, stage: 'DELIVERED', actorUserId: req.user.id });
     io.to('lab_staff').emit('case_delivered', { caseId: caseData.id, caseNumber: caseData.caseNumber });
 
     // Push notification to the clinic

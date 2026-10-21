@@ -1846,3 +1846,52 @@ model AuditLog {
   @@index([module, createdAt])
   @@map("audit_logs")
 }
+
+// ── LIVE PRODUCTION TV ─────────────────────────────────────
+// Append-only log of things that happened on the lab floor, written right after the change it describes
+// is saved. `seq` only ever grows, so a TV that remembers the last number it saw can ask for everything
+// after it and never miss a change. Holds display-safe facts only (no patient or clinic data).
+model ProductionEvent {
+  seq         BigInt   @id @default(autoincrement())
+  type        String // CASE_CREATED, CASE_ACCEPTED, STAGE_ENTERED, READY_FOR_DISPATCH, DELIVERED, ATTENDANCE_CHANGED ...
+  caseId      String?
+  caseNumber  String?
+  stage       String? // CaseStatus the case moved to
+  fromStage   String? // CaseStatus it moved from
+  department  String? // lab department code (scan.js DEPARTMENTS key)
+  actorUserId String?
+  actorName   String?
+  occurredAt  DateTime @default(now())
+  data        Json?
+
+  @@index([occurredAt])
+  @@index([caseId])
+  @@map("production_events")
+}
+
+// One row ("default") holding every setting the TV reads: screens, rotation, visibility, targets, weights.
+model TvConfig {
+  id          String   @id @default("default")
+  config      Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("tv_config")
+}
+
+// A paired TV. Read-only by construction (it can only reach /api/tv/*). The token itself is never stored,
+// only its hash, so a database leak does not hand out working TV sessions; revoking sets revokedAt.
+model DisplaySession {
+  id               String    @id @default(uuid())
+  label            String
+  tokenHash        String?   @unique
+  pairingHash      String?   @unique
+  pairingExpiresAt DateTime?
+  createdById      String
+  createdAt        DateTime  @default(now())
+  pairedAt         DateTime?
+  lastSeenAt       DateTime?
+  revokedAt        DateTime?
+
+  @@map("display_sessions")
+}

@@ -3,6 +3,7 @@ const express = require('express');
 const { invalidate } = require('../cache');
 const { sendPushToClinic } = require('../utils/webpush');
 const { protect } = require('../middleware/auth');
+const { recordEvent } = require('../services/tvService');
 
 const router = express.Router();
 const prisma = require('../db');
@@ -249,6 +250,13 @@ router.post('/:caseId', protect, async (req, res) => {
     };
 
     invalidate(`case:${caseId}`, `case:lab:${caseId}`, 'lab:active:*', 'cases:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dispatch:queue', 'dispatch:milling', 'dashboard:lab-performance:*');
+
+    // Live TV: one committed fact per scan. Awaited so the TV sees it as soon as the scan returns; never throws.
+    await recordEvent({
+      type: finalStatus === 'READY_TO_DISPATCH' ? 'READY_FOR_DISPATCH' : 'STAGE_ENTERED',
+      caseId, caseNumber: caseData.caseNumber, stage: finalStatus, fromStage: caseData.status,
+      department, actorUserId: req.user.id, actorName: techName || req.user.name,
+    });
 
     io.to('lab_staff').emit('stage_scanned', payload);
     io.to(`clinic_${caseData.clinic.id}`).emit('case_updated', payload);
