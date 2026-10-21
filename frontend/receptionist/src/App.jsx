@@ -23,6 +23,8 @@ import AdminClinics from './pages/AdminClinics';
 import AdminUsers from './pages/AdminUsers';
 import AdminZones from './pages/AdminZones';
 import AdminRewards from './pages/AdminRewards';
+import AdminTV from './pages/AdminTV';
+import TVLive from './tv/TVLive';
 import AdminInventory from './pages/AdminInventory';
 import InventoryDashboard from './pages/InventoryDashboard';
 import AdminHR from './pages/AdminHR';
@@ -91,6 +93,8 @@ function AppRoutes() {
       {/* Shared reception tablet. Deliberately outside ProtectedRoute: there is no
           user session on that device - see pages/AttendanceKiosk.jsx. */}
       <Route path="/kiosk" element={<AttendanceKiosk />} />
+      {/* Laboratory television — read-only, signs in with its own paired display token, never a staff login. */}
+      <Route path="/tv/live" element={<TVLive />} />
       {/* Clinic self-onboarding via QR/link token — no user session on that device either. */}
       <Route path="/onboard/:token" element={<ClinicOnboarding />} />
       <Route path="/" element={<ProtectedRoute><RoleHome /></ProtectedRoute>} />
@@ -110,6 +114,7 @@ function AppRoutes() {
       <Route path="/admin/trash" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminTrash /></ProtectedRoute>} />
       <Route path="/admin/ai-chat" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminAIChat /></ProtectedRoute>} />
       <Route path="/admin/zones" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminZones /></ProtectedRoute>} />
+      <Route path="/admin/tv" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminTV /></ProtectedRoute>} />
       <Route path="/admin/rewards" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminRewards /></ProtectedRoute>} />
       <Route path="/admin/inventory" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminInventory /></ProtectedRoute>} />
       <Route path="/admin/hr" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminHR /></ProtectedRoute>} />

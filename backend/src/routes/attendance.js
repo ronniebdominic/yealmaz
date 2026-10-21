@@ -16,6 +16,7 @@ const { getLeaveDayCount } = require('../utils/leaveDayCount');
 
 const router = express.Router();
 const prisma = require('../db');
+const { recordEvent: recordTvEvent } = require('../services/tvService');
 
 const DUPLICATE_WINDOW_MS = 60 * 1000;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
@@ -65,12 +66,14 @@ async function recordEvent({ userId, timestamp, type, source, deviceId, recorded
     if (!priorStart) note = `auto-flagged: no matching ${startType === 'CLOCK_IN' ? 'clock-in' : 'break start'}`;
   }
 
-  return prisma.attendanceEvent.create({
+  const created = await prisma.attendanceEvent.create({
     data: {
       userId, timestamp: ts, type, source, deviceId: deviceId || null, recordedById: recordedById || null, note,
       latitude: latitude ?? null, longitude: longitude ?? null, distanceMeters: distanceMeters ?? null,
     },
   });
+  await recordTvEvent({ type: 'ATTENDANCE_CHANGED', actorUserId: userId, data: { punch: type } }); // live TV
+  return created;
 }
 
 // Shared by every endpoint the bridge itself calls (never a browser) —

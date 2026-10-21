@@ -5,3 +5,12 @@ node_modules/
 dist/
 .vercel
 .env*
+
+# Stray secret/scratch files must never be committed
+gsk_*
+**/gsk_*
+*.key
+*.pem
+*secret*.txt
+*token*.txt
+.tv-demo.json
