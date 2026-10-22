@@ -7,6 +7,7 @@ const { clawBackCasePoints } = require('../utils/rewards');
 
 const router = express.Router();
 const prisma = require('../db');
+const { NOT_ATTENDANCE_ONLY } = require('../utils/attendanceOnly');
 const { recordEvent } = require('../services/tvService');
 
 // Fallback due-date calculator (mirrors the one in cases.js)
@@ -51,7 +52,7 @@ router.get('/stations', protect, restrict('DISPATCH', 'ADMIN', 'DELIVERY'), asyn
 router.get('/executives', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
   try {
     const executives = await prisma.user.findMany({
-      where: { role: 'DELIVERY', isActive: true },
+      where: { role: 'DELIVERY', isActive: true, ...NOT_ATTENDANCE_ONLY },
       select: {
         id: true, name: true, email: true, phone: true, station: true,
         zone: { select: { id: true, name: true } },

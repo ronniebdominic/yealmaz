@@ -15,7 +15,7 @@ import {
 } from 'react-icons/md';
 import { Field, inputStyle, generatePassword, PasswordInput } from '../../utils/adminForms';
 import ErrorBoundary from '../../components/ErrorBoundary';
-import { RolesModal, useStaffRoles, groupStaffRoles } from '../../components/StaffRoles';
+import { RolesModal, useStaffRoles, groupStaffRoles, ATTENDANCE_ONLY_DEPARTMENT } from '../../components/StaffRoles';
 
 import EmployeesTab from './tabs/EmployeesTab';
 import AttendanceTab from './tabs/AttendanceTab';
@@ -155,15 +155,17 @@ function AddEmployeeModal({ levels, onManageRoles, onClose, onCreated }) {
   const [showPass, setShowPass] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const attendanceOnly = staffRoles.find(r => role === `staff:${r.id}`)?.department === ATTENDANCE_ONLY_DEPARTMENT;
+
   const submit = async () => {
-    if (!name.trim() || !email.trim()) { toast.error('Name and email are required'); return; }
+    if (!name.trim() || (!attendanceOnly && !email.trim())) { toast.error(attendanceOnly ? 'Name is required' : 'Name and email are required'); return; }
     setSaving(true);
     try {
       const { data } = await api.post('/users', {
-        name, email, password,
+        name, ...(attendanceOnly ? {} : { email, password }),
         ...(role.startsWith('staff:') ? { staffRoleId: role.slice(6) } : { role }),
       });
-      toast.success(`${data.name} added — email ${email}, password ${password}`, { duration: 8000 });
+      toast.success(attendanceOnly ? `${data.name} added — attendance only, no login` : `${data.name} added — email ${email}, password ${password}`, { duration: 8000 });
       onCreated(data);
     } catch (err) { toast.error(err.response?.data?.error || 'Could not create employee'); }
     finally { setSaving(false); }
@@ -178,7 +180,7 @@ function AddEmployeeModal({ levels, onManageRoles, onClose, onCreated }) {
         </div>
         <div className="modal-body">
           <Field label="Full Name"><input style={inputStyle} value={name} onChange={e => setName(e.target.value)} autoFocus /></Field>
-          <Field label="Email"><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} /></Field>
+          {!attendanceOnly && <Field label="Email"><input type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} /></Field>}
           <Field label="Role">
             <select style={inputStyle} value={role} onChange={e => setRole(e.target.value)}>
               {groupStaffRoles(staffRoles).map(g => (
@@ -195,10 +197,16 @@ function AddEmployeeModal({ levels, onManageRoles, onClose, onCreated }) {
               Role not listed? Create a role
             </button>
           </Field>
-          <Field label="Password">
-            <PasswordInput value={password} onChange={setPassword} showPass={showPass}
-              onToggleShow={() => setShowPass(s => !s)} onRegenerate={() => setPassword(generatePassword())} />
-          </Field>
+          {attendanceOnly ? (
+            <div style={{ fontSize: 12.5, color: 'var(--text-2)', background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 14 }}>
+              Support staff are <b>attendance only</b> — no login is created. They appear in HR attendance and payroll, and nowhere else.
+            </div>
+          ) : (
+            <Field label="Password">
+              <PasswordInput value={password} onChange={setPassword} showPass={showPass}
+                onToggleShow={() => setShowPass(s => !s)} onRegenerate={() => setPassword(generatePassword())} />
+            </Field>
+          )}
           <button className="btn btn-primary" onClick={submit} disabled={saving} style={{ width: '100%' }}>
             {saving ? 'Creating…' : '✓ Create & Continue'}
           </button>

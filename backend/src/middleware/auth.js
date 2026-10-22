@@ -1,6 +1,7 @@
 // Ye-Almaz — Auth Middleware
 const jwt = require('jsonwebtoken');
 const prisma = require('../db');
+const { isAttendanceOnly } = require('../utils/attendanceOnly');
 
 // A login token carries the role the person had when they logged in and stays valid for days. Trusting
 // it alone meant a demoted or deactivated account kept its old access until the token expired. So every
@@ -18,8 +19,8 @@ async function currentIdentity(decoded) {
     const clinic = await prisma.clinic.findUnique({ where: { id: decoded.id }, select: { isActive: true } });
     record = clinic ? { role: 'CLINIC', isActive: clinic.isActive } : null;
   } else {
-    const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { role: true, isActive: true, departments: true } });
-    record = user ? { role: user.role, isActive: user.isActive, departments: user.departments } : null;
+    const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { role: true, isActive: true, departments: true, staffRole: { select: { department: true } } } });
+    record = user ? { role: user.role, isActive: user.isActive && !isAttendanceOnly(user), departments: user.departments } : null;
   }
   const entry = record ? { at: Date.now(), ...record } : { at: Date.now(), missing: true };
   identityCache.set(decoded.id, entry);

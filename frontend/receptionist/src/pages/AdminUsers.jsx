@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generatePassword, inputStyle, labelStyle, Field, PasswordInput } from '../utils/adminForms';
-import { RolesModal, useStaffRoles, staffRoleLabel, groupStaffRoles, STAFF_DEPARTMENTS } from '../components/StaffRoles';
+import { RolesModal, useStaffRoles, staffRoleLabel, groupStaffRoles, STAFF_DEPARTMENTS, ATTENDANCE_ONLY_DEPARTMENT } from '../components/StaffRoles';
 import {
   MdFolder, MdBiotech, MdLocalShipping, MdInventory2, MdPaid, MdEdit,
   MdPerson, MdCheckCircle, MdVpnKey, MdSearch, MdPause, MdPlayArrow, MdWarehouse, MdGroups,
@@ -103,6 +103,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
     ? staffRoles.find(r => `staff:${r.id}` === form.roleKey)
     : null;
   // The access level the user will actually get — drives the department picker.
+  const attendanceOnly = !isEdit && pickedStaffRole?.department === ATTENDANCE_ONLY_DEPARTMENT; // support staff: no login at all
   const effectiveRole = pickedStaffRole ? pickedStaffRole.baseRole
     : form.roleKey.startsWith('staff:') ? initial?.role : form.roleKey;
   const [showPass,           setShowPass]           = useState(!isEdit);
@@ -125,8 +126,8 @@ function UserFormModal({ initial, onSaved, onClose }) {
 
   const submit = async () => {
     if (!form.name.trim())  { toast.error('Name is required');  return; }
-    if (!form.email.trim()) { toast.error('Email is required'); return; }
-    if (!isEdit && !form.password.trim()) { toast.error('Password is required'); return; }
+    if (!attendanceOnly && !form.email.trim()) { toast.error('Email is required'); return; }
+    if (!isEdit && !attendanceOnly && !form.password.trim()) { toast.error('Password is required'); return; }
 
     // Anything that ends up as Admin (a built-in Admin or a role built on Admin access) needs an explicit yes.
     const grantsAdmin = effectiveRole === 'ADMIN' && (!isEdit || initial.role !== 'ADMIN');
@@ -136,7 +137,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
     try {
       const payload = {
         name:  form.name.trim(),
-        email: form.email.trim(),
+        ...(attendanceOnly ? {} : { email: form.email.trim() }),
         phone: form.phone.trim() || undefined,
         station: form.station.trim() || undefined,
         zoneId: form.zoneId || '',
@@ -147,7 +148,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
         isSharedAccount: form.isSharedAccount,
         ...(grantsAdmin ? { confirmAdmin: true } : {}),
       };
-      if (form.password.trim()) payload.password = form.password.trim();
+      if (!attendanceOnly && form.password.trim()) payload.password = form.password.trim();
 
       let saved;
       if (isEdit) {
@@ -159,7 +160,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
         saved = data;
         toast.success(`${saved.name} created`);
       }
-      onSaved(saved, !isEdit ? form.password : null);
+      onSaved(saved, !isEdit && !attendanceOnly ? form.password : null);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Save failed');
     } finally {
@@ -264,12 +265,18 @@ function UserFormModal({ initial, onSaved, onClose }) {
             )}
 
             {/* Email */}
+            {attendanceOnly ? (
+              <div style={{ gridColumn: '1 / -1', fontSize: 12.5, color: 'var(--text-2)', background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+                Support staff are <b>attendance only</b> — no email, no password, no login. They appear in HR attendance and payroll only.
+              </div>
+            ) : (
             <div style={{ gridColumn: '1 / -1' }}>
               <Field label="Email" hint="used to log in">
                 <input style={inputStyle} type="email" placeholder="user@yealmaz.com"
                   value={form.email} onChange={e => set('email', e.target.value)} />
               </Field>
             </div>
+            )}
 
             {/* Phone */}
             <div style={{ gridColumn: '1 / -1' }}>
@@ -292,7 +299,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
             </Field>
 
             {/* Password */}
-            <div style={{ gridColumn: '1 / -1' }}>
+            {!attendanceOnly && <div style={{ gridColumn: '1 / -1' }}>
               {isEdit ? (
                 !showPasswordChange ? (
                   <button
@@ -335,7 +342,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
                   />
                 </Field>
               )}
-            </div>
+            </div>}
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>

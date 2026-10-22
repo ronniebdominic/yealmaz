@@ -8,6 +8,8 @@ import { Field, inputStyle } from '../utils/adminForms';
 import { MdBadge, MdDelete, MdAdd, MdEdit } from 'react-icons/md';
 
 // The departments the business uses (free text is still allowed for a new one).
+// Support staff (janitor, chef, ...) are attendance-only: no email, no password, no login.
+export const ATTENDANCE_ONLY_DEPARTMENT = 'Support Staff';
 export const STAFF_DEPARTMENTS = ['Front Office', 'Support Staff', 'Operation', 'HR', 'Finance', 'Inventory', 'Admin'];
 
 // "Front Office · Cashier" — the department first so two Cashiers can be told apart.

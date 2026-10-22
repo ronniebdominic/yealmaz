@@ -1,4 +1,5 @@
 // Ye-Almaz — User Management Routes (Admin only)
+const crypto = require('crypto');
 const express = require('express');
 const bcrypt  = require('bcryptjs');
 const { protect, restrict } = require('../middleware/auth');
@@ -6,6 +7,7 @@ const { BASE_ROLES } = require('./staffRoles');
 
 const router = express.Router();
 const prisma = require('../db');
+const { isAttendanceOnly } = require('../utils/attendanceOnly');
 
 // Same department codes used by the scan station picker (scan.js DEPARTMENTS).
 const VALID_DEPARTMENTS = new Set([
@@ -66,27 +68,34 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
     const { name, email, password, departments, phone, station, zoneId, isSharedAccount } = req.body;
 
     if (!name?.trim())     return res.status(400).json({ error: 'Name is required.' });
-    if (!email?.trim())    return res.status(400).json({ error: 'Email is required.' });
-    if (!password?.trim()) return res.status(400).json({ error: 'Password is required.' });
     const { role, staffRoleId, error: roleError } = await resolveRole(req.body.role, req.body.staffRoleId);
     if (roleError) return res.status(400).json({ error: roleError });
+    // Support staff are attendance-only: no email or password is asked for, and the account cannot log in.
+    const staffRole = staffRoleId ? await prisma.staffRole.findUnique({ where: { id: staffRoleId }, select: { department: true } }) : null;
+    const attendanceOnly = isAttendanceOnly({ staffRole });
+    if (!attendanceOnly && !email?.trim())    return res.status(400).json({ error: 'Email is required.' });
+    if (!attendanceOnly && !password?.trim()) return res.status(400).json({ error: 'Password is required.' });
     if (role === 'ADMIN' && req.user.role !== 'ADMIN') return res.status(403).json({ error: 'Only an admin can create users with Admin access.' });
     if (role === 'ADMIN' && req.body.confirmAdmin !== true) {
       return res.status(400).json({ error: 'Admin access gives full control of the whole system. Confirm it explicitly to grant it.', needsConfirm: true });
     }
 
-    const exists = await prisma.user.findUnique({ where: { email } });
+    // A placeholder address keeps the unique email column satisfied; the random password is never shown or used.
+    const loginEmail = attendanceOnly ? `no-login.${crypto.randomUUID()}@yealmaz.invalid` : email.trim().toLowerCase();
+    const loginPassword = attendanceOnly ? crypto.randomBytes(24).toString('hex') : password.trim();
+
+    const exists = await prisma.user.findUnique({ where: { email: loginEmail } });
     if (exists) return res.status(409).json({ error: 'A user with this email already exists.' });
 
     const { cleaned, invalid } = parseDepartments(departments);
     if (invalid.length) return res.status(400).json({ error: `Unknown department(s): ${invalid.join(', ')}` });
 
-    const hashed = await bcrypt.hash(password.trim(), 10);
+    const hashed = await bcrypt.hash(loginPassword, 10);
 
     const user = await prisma.user.create({
       data: {
         name:        name.trim(),
-        email:       email.trim().toLowerCase(),
+        email:       loginEmail,
         password:    hashed,
         role,
         staffRoleId,

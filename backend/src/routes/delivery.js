@@ -10,6 +10,7 @@ const liveLocations = require('../state/liveLocations');
 
 const router = express.Router();
 const prisma = require('../db');
+const { NOT_ATTENDANCE_ONLY } = require('../utils/attendanceOnly');
 const { recordEvent } = require('../services/tvService');
 
 // ── GET /api/delivery/assigned ───────────────────────────
@@ -34,7 +35,7 @@ router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res)
     // to null the moment a case is delivered, so it's resolved as its own
     // explicit case-ID list instead.
     const [agents, todayStages] = await Promise.all([
-      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+      prisma.user.findMany({ where: { role: 'DELIVERY', ...NOT_ATTENDANCE_ONLY }, select: { id: true, name: true, isActive: true } }),
       prisma.caseStage.findMany({
         where: { stageName: 'DELIVERED', scannedAt: { gte: todayStart } },
         select: { scannedBy: true, notes: true, caseId: true },
@@ -102,7 +103,7 @@ router.get('/history', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) 
     if (to) { const d = new Date(`${to}T00:00:00`); d.setHours(23, 59, 59, 999); scannedAtFilter.lte = d; }
 
     const [agents, stages] = await Promise.all([
-      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+      prisma.user.findMany({ where: { role: 'DELIVERY', ...NOT_ATTENDANCE_ONLY }, select: { id: true, name: true, isActive: true } }),
       prisma.caseStage.findMany({
         where: {
           OR: DELIVERY_EVENT_STAGE_OR,
@@ -428,7 +429,7 @@ router.get('/my-performance', protect, restrict('DELIVERY', 'ADMIN'), async (req
     const dateFrom = from ? startOfDay(from) : defaultFrom;
 
     const [agents, stages] = await Promise.all([
-      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true } }),
+      prisma.user.findMany({ where: { role: 'DELIVERY', ...NOT_ATTENDANCE_ONLY }, select: { id: true, name: true, isActive: true } }),
       prisma.caseStage.findMany({
         where: { OR: DELIVERY_EVENT_STAGE_OR, scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
         select: {

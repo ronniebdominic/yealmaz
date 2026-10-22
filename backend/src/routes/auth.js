@@ -6,6 +6,7 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 const prisma = require('../db');
+const { isAttendanceOnly } = require('../utils/attendanceOnly');
 
 // Helper: generate JWT
 const generateToken = (payload) => {
@@ -26,9 +27,10 @@ router.post('/login', async (req, res) => {
 
     // Case-insensitive lookup — some staff emails were seeded with mixed
     // case, but a login form shouldn't require typing the exact case back.
-    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } }, include: { staffRole: { select: { department: true } } } });
 
-    if (!user || !user.isActive) {
+    // Attendance-only support staff never log in.
+    if (!user || !user.isActive || isAttendanceOnly(user)) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 

@@ -9,6 +9,7 @@ const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isNo
 
 const router = express.Router();
 const prisma = require('../db');
+const { NOT_ATTENDANCE_ONLY } = require('../utils/attendanceOnly');
 
 // Active lab-production stages only — excludes intake (PENDING_PICKUP,
 // PICKUP_ASSIGNED), dispatch/terminal (READY_TO_DISPATCH, OUT_FOR_DELIVERY,
@@ -740,7 +741,7 @@ async function computeDeliveryPerformance({ from, to } = {}) {
     const dateFrom = from ? startOfDay(from) : new Date(new Date().getFullYear(), 0, 1);
 
     const [agents, stages] = await Promise.all([
-      prisma.user.findMany({ where: { role: 'DELIVERY' }, select: { id: true, name: true, isActive: true, station: true } }),
+      prisma.user.findMany({ where: { role: 'DELIVERY', ...NOT_ATTENDANCE_ONLY }, select: { id: true, name: true, isActive: true, station: true } }),
       prisma.caseStage.findMany({
         where: { OR: DELIVERY_EVENT_STAGE_OR, scannedAt: { gte: dateFrom, lte: dateTo }, scannedBy: { not: null } },
         select: { stageName: true, scannedBy: true, scannedAt: true, notes: true, caseId: true, case: { select: { clinic: { select: { name: true } } } } },
