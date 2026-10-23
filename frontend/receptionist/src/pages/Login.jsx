@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { version } from '../../package.json';
-import LoginRobot from '../components/LoginRobot';
+import LoginDentalScene from '../components/LoginDentalScene';
 import '../styles/login-v8.css';
 
 // Sign-in page (design: loginpagev8). The sign-in logic is unchanged — same fields, same login call, same error text,
@@ -48,7 +48,7 @@ export default function Login() {
         <div className="left-pane-backdrop" />
         <div className="robot-ambient-grid" />
         <div className="robot-showcase-container">
-          <LoginRobot
+          <LoginDentalScene
             activeField={activeField}
             formStatus={loading ? 'loading' : 'idle'}
             email={form.email}
