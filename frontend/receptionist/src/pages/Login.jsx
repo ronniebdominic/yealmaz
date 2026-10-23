@@ -1,13 +1,12 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { version } from '../../package.json';
-import LoginDentalScene from '../components/LoginDentalScene';
 import '../styles/login-v8.css';
 
 // Sign-in page (design: loginpagev8). The sign-in logic is unchanged — same fields, same login call, same error text,
-// same redirect. The character squad only watches the form: it looks at you, reacts while you type, covers its eyes
-// for the password. Sign-up / social / "remember me" from the design are not part of this app and are not shown.
+// same redirect. The left side is a photo of the lab with the Ye-Almaz logo. Sign-up / social / "remember me" from the
+// design are not part of this app and are not shown.
 export default function Login() {
   const { login, loading } = useAuth();
   const navigate = useNavigate();
@@ -15,21 +14,11 @@ export default function Login() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // what the squad reacts to
-  const [activeField, setActiveField] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingField, setTypingField] = useState(null);
-  const typingTimer = useRef(null);
+  const [activeField, setActiveField] = useState(null); // highlights the focused field
 
-  const onType = (field, value) => {
-    setForm(f => ({ ...f, [field]: value }));
-    setIsTyping(true);
-    setTypingField(field);
-    clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => setIsTyping(false), 1200);
-  };
-  const onFocus = (field) => { setActiveField(field); setTypingField(field); };
-  const onBlur = () => { setActiveField(null); setIsTyping(false); };
+  const onType = (field, value) => setForm(f => ({ ...f, [field]: value }));
+  const onFocus = (field) => setActiveField(field);
+  const onBlur = () => setActiveField(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,17 +33,15 @@ export default function Login() {
 
   return (
     <div className="login-screen-layout">
-      <section className="robot-left-pane" aria-hidden="true">
-        <div className="left-pane-backdrop" />
-        <div className="robot-ambient-grid" />
-        <div className="robot-showcase-container">
-          <LoginDentalScene
-            activeField={activeField}
-            formStatus={loading ? 'loading' : 'idle'}
-            email={form.email}
-            isTyping={isTyping}
-            typingField={typingField}
-          />
+      <section className="login-photo-pane" aria-label="Ye-Almaz dental laboratory">
+        <img className="login-photo" src="/login-lab.jpg" alt="A technician holding a resin-printed aligner plate beside a dental 3D printer" />
+        <div className="login-photo-shade" />
+        <div className="login-photo-brand">
+          <img className="login-photo-logo" src="/logo.png" alt="Ye-Almaz Dental Laboratory" />
+          <div>
+            <b>Ye-Almaz Dental Laboratory</b>
+            <span>Addis Ababa</span>
+          </div>
         </div>
       </section>
 

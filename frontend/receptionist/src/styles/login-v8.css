@@ -1416,3 +1416,18 @@
   -webkit-text-fill-color: var(--text-primary); -webkit-box-shadow: 0 0 0 40px #ffffff inset; caret-color: var(--text-primary);
 }
 .login-screen-layout .input-container input::placeholder { color: var(--text-muted); }
+
+/* ── left side: the lab photo with the Ye-Almaz logo ─────────────────── */
+.login-screen-layout .login-photo-pane { flex: 1.25; position: relative; overflow: hidden; min-height: 100vh; background: #1e293b; }
+.login-screen-layout .login-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 68% center; display: block; }
+.login-screen-layout .login-photo-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15, 23, 42, 0.18) 0%, rgba(15, 23, 42, 0) 35%, rgba(15, 23, 42, 0.62) 100%); }
+.login-screen-layout .login-photo-brand { position: absolute; left: clamp(20px, 3vw, 44px); bottom: clamp(20px, 3vw, 40px); display: flex; align-items: center; gap: 16px; color: #fff; }
+.login-screen-layout .login-photo-logo { width: 76px; height: 76px; border-radius: 50%; object-fit: contain; background: #fff; padding: 4px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35); flex: none; }
+.login-screen-layout .login-photo-brand b { display: block; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4); }
+.login-screen-layout .login-photo-brand span { display: block; font-size: 13.5px; opacity: 0.88; margin-top: 2px; }
+@media (max-width: 960px) {
+  .login-screen-layout .login-photo-pane { flex: none; min-height: 300px; order: 1; }
+  .login-screen-layout .login-photo { object-position: 72% 40%; }
+  .login-screen-layout .login-photo-logo { width: 60px; height: 60px; }
+  .login-screen-layout .login-photo-brand b { font-size: 17px; }
+}
