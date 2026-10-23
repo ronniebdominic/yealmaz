@@ -9,6 +9,7 @@ import {
 } from 'react-icons/md';
 import FloatingAIAssistant from './FloatingAIAssistant';
 import ThemeToggle from './ThemeToggle';
+import '../styles/admin-fluenta.css';
 
 // Dashboards each staff role normally logs into directly — the admin
 // account can open any of these to view/operate them without a separate
@@ -112,7 +113,7 @@ export default function AdminLayout({ children }) {
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AD';
 
   return (
-    <div className="app">
+    <div className="app fl">
       {/* ── Mobile topbar ───────────────────────────────── */}
       <div className="mobile-topbar">
         <button className="hamburger" onClick={() => setOpen(true)} aria-label="Open menu">☰</button>

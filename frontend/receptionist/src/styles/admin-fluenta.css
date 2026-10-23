@@ -1,0 +1,188 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Admin — "Fluenta" skin (from the Dashboard v15 reference design)
+   ───────────────────────────────────────────────────────────────────────
+   Applies only inside the Admin layout (<div class="app fl">). It works the way the rest of the app does:
+   it redefines the design TOKENS (surfaces, borders, text, accent, radii) so every page that already uses
+   .card / .btn / table / input / var(--surface) follows without edits, then restyles the shell (floating glass
+   panels, pill navigation) and a few primitives (pill buttons and chips, soft inputs, rounded modals).
+   Dark is the main theme; light is the same design on a pastel ground. Nothing outside .fl is touched.
+   ═══════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* ── Tokens: dark (default) ─────────────────────────────────────────── */
+.app.fl {
+  --font-body: 'Outfit', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --page: #08080f; --glow-a: #1d2a5c; --glow-b: #4a1d3a; --glow-c: #2c2160;
+  --shell: rgba(20, 20, 32, 0.72); --shell-line: rgba(255, 255, 255, 0.06);
+  --solid: #f2f2f8; --on-solid: #14141d;
+
+  --bg: #08080f;
+  --surface: #20202f; --surface-2: #2a2a3b; --surface-3: #333346;
+  --glass: rgba(32, 32, 48, 0.8); --glass-strong: rgba(28, 28, 42, 0.94);
+  --glass-sheen: none; --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --overlay: #1c1c2a; --scrim: rgba(4, 4, 10, 0.66);
+  --border: #2c2c3d; --border-soft: rgba(255, 255, 255, 0.05); --border-2: #3e3e53;
+  --glass-border: rgba(255, 255, 255, 0.06); --glass-edge: rgba(0, 0, 0, 0.25);
+
+  --text-1: #f2f2f8; --text-2: #d2d2de; --text-3: #9494a8; --text-4: #6a6a7e; --text-on-brand: #ffffff;
+
+  --brand: #8f7cf3; --brand-hover: #a08df6; --brand-active: #7461e6; --brand-soft: #b3a6fa; --brand-strong: #7461e6;
+  --brand-tint: rgba(143, 124, 243, 0.16); --brand-tint-2: rgba(143, 124, 243, 0.26); --brand-ring: rgba(143, 124, 243, 0.45);
+  /* the app's older code names these directly; aliases must be redefined here or they keep the old blue */
+  --blue: #8f7cf3; --blue-light: #b3a6fa; --blue-dim: rgba(143, 124, 243, 0.16);
+  --accent: #6db3f2; --accent-dim: rgba(109, 179, 242, 0.16); --on-accent: #0b1f33;
+
+  --green: #3cc47a; --green-dim: rgba(60, 196, 122, 0.14); --green-line: rgba(60, 196, 122, 0.30);
+  --amber: #f5c542; --amber-dim: rgba(245, 197, 66, 0.13); --amber-line: rgba(245, 197, 66, 0.30);
+  --red: #f2666b; --red-dim: rgba(242, 102, 107, 0.14); --red-line: rgba(242, 102, 107, 0.30);
+
+  --radius-xs: 8px; --radius-sm: 12px; --radius: 14px; --radius-md: 16px; --radius-lg: 22px; --radius-xl: 28px;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3); --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.28); --shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 14px 30px -18px rgba(0, 0, 0, 0.75); --shadow-lg: 0 24px 50px -24px rgba(0, 0, 0, 0.8);
+  --shadow-overlay: 0 28px 70px -20px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --glass-topbar-bg: transparent; --glass-sidebar-bg: transparent; --glass-sidebar-border: transparent;
+  color-scheme: dark;
+}
+
+/* ── Tokens: light (same design on a pastel ground) ─────────────────── */
+html[data-theme='light'] .app.fl {
+  --page: #cbcbf3; --glow-a: #c9d9ff; --glow-b: #ffd9e6; --glow-c: #e3dcff;
+  --shell: rgba(250, 250, 255, 0.66); --shell-line: rgba(255, 255, 255, 0.9);
+  --solid: #19191d; --on-solid: #ffffff;
+
+  --bg: #e9e7fb;
+  --surface: #ffffff; --surface-2: #f3f3f8; --surface-3: #e7e7f0;
+  --glass: rgba(255, 255, 255, 0.86); --glass-strong: rgba(255, 255, 255, 0.96);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --overlay: #ffffff; --scrim: rgba(40, 36, 90, 0.32);
+  --border: #e2e2ec; --border-soft: #ececf3; --border-2: #cfcfdc;
+  --glass-border: rgba(255, 255, 255, 0.9); --glass-edge: rgba(60, 50, 140, 0.06);
+
+  --text-1: #17171b; --text-2: #3c3c45; --text-3: #6b6b7a; --text-4: #9c9ca8;
+
+  --brand: #7461e6; --brand-hover: #6552d6; --brand-active: #5846c4; --brand-soft: #8f7cf3; --brand-strong: #5846c4;
+  --brand-tint: rgba(116, 97, 230, 0.10); --brand-tint-2: rgba(116, 97, 230, 0.17); --brand-ring: rgba(116, 97, 230, 0.35);
+  --blue: #7461e6; --blue-light: #8f7cf3; --blue-dim: rgba(116, 97, 230, 0.10);
+  --accent: #2f7fd0; --accent-dim: rgba(47, 127, 208, 0.12); --on-accent: #ffffff;
+
+  --green: #1b8f50; --green-dim: rgba(35, 161, 91, 0.12); --green-line: rgba(35, 161, 91, 0.30);
+  --amber: #a8700a; --amber-dim: rgba(240, 180, 0, 0.16); --amber-line: rgba(168, 112, 10, 0.32);
+  --red: #d63a40; --red-dim: rgba(229, 72, 77, 0.10); --red-line: rgba(229, 72, 77, 0.28);
+
+  --shadow-xs: 0 1px 2px rgba(60, 50, 140, 0.08); --shadow-sm: 0 2px 8px rgba(60, 50, 140, 0.08);
+  --shadow: 0 10px 30px -22px rgba(60, 50, 140, 0.3); --shadow-md: 0 14px 34px -20px rgba(60, 50, 140, 0.35);
+  --shadow-lg: 0 24px 50px -24px rgba(40, 36, 90, 0.35);
+  --shadow-overlay: 0 24px 60px -18px rgba(40, 36, 90, 0.3), 0 4px 14px -6px rgba(40, 36, 90, 0.1);
+  color-scheme: light;
+}
+
+/* The old light theme pins the sidebar/drawer to dark text tokens (it used to be a navy rail). The new rail is
+   pale in light mode, so hand it the light tokens back. */
+html[data-theme='light'] .app.fl :is(.sidebar, .drawer, .mobile-topbar) {
+  --text-1: #17171b; --text-2: #3c3c45; --text-3: #6b6b7a; --text-4: #9c9ca8;
+  --border: #e2e2ec; --border-soft: #ececf3; --border-2: #cfcfdc;
+  --surface-2: #f3f3f8; --surface-3: #e7e7f0;
+  --accent: #2f7fd0; --accent-dim: rgba(47, 127, 208, 0.12); --on-accent: #ffffff; --on-green: #ffffff;
+  --brand-soft: #8f7cf3; --brand-tint: rgba(116, 97, 230, 0.10);
+  --green: #1b8f50; --red: #d63a40; --amber: #a8700a;
+  color-scheme: light;
+}
+
+/* ── Shell: a soft backdrop with two floating glass panels ─────────── */
+html .app.fl {
+  font-family: var(--font-body);
+  color: var(--text-1);
+  background:
+    radial-gradient(60vw 55vw at 100% -8%, color-mix(in srgb, var(--glow-a) 70%, transparent), transparent 68%),
+    radial-gradient(55vw 50vw at -6% 108%, color-mix(in srgb, var(--glow-b) 70%, transparent), transparent 68%),
+    radial-gradient(40vw 36vw at 40% 40%, color-mix(in srgb, var(--glow-c) 45%, transparent), transparent 70%),
+    var(--page);
+  padding: clamp(8px, 1.1vw, 18px);
+  gap: clamp(10px, 1.1vw, 18px);
+}
+html .app.fl .sidebar,
+html .app.fl .main {
+  background: var(--shell);
+  border: 1px solid var(--shell-line);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(26px) saturate(140%);
+  box-shadow: var(--shadow-lg);
+}
+html .app.fl .sidebar { border-radius: 32px; width: 252px; min-width: 252px; }
+html .app.fl .main { border-radius: 36px; }
+html .app.fl .main > .topbar { flex-shrink: 0; }
+
+/* sidebar content: tokens instead of the old always-white text */
+html .app.fl .sidebar-logo, html .app.fl .drawer-logo { border-bottom: 1px solid var(--border); padding: 22px 20px 16px; }
+html .app.fl .sidebar-logo .lab-name, html .app.fl .drawer-logo .lab-name { color: var(--text-1); font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+html .app.fl .sidebar-logo img, html .app.fl .drawer-logo img { background: #fff; border: 0; box-shadow: 0 0 0 4px var(--brand-tint); }
+html .app.fl .role-badge { color: var(--brand-soft); background: var(--brand-tint); border-color: transparent; }
+html[data-theme='light'] .app.fl .role-badge { color: var(--brand); }
+html .app.fl .nav-section-label { color: var(--text-4); font-size: 10.5px; letter-spacing: 0.12em; padding: 16px 14px 6px; }
+html .app.fl .nav-item {
+  color: var(--text-2); border-radius: 999px; padding: 10px 14px; gap: 12px; font-size: 14px; font-weight: 450;
+}
+html .app.fl .nav-item .mi { opacity: 0.85; }
+html .app.fl .nav-item:hover { background: var(--surface-2); color: var(--text-1); }
+html .app.fl .nav-item.active {
+  background: var(--solid); color: var(--on-solid); font-weight: 600; box-shadow: var(--shadow-sm);
+}
+html .app.fl .nav-item.active::before { display: none; }
+html .app.fl .sidebar-footer, html .app.fl .drawer-footer { border-top: 1px solid var(--border); }
+html .app.fl .user-avatar { background: var(--solid); color: var(--on-solid); }
+html .app.fl .user-name { color: var(--text-1); }
+html .app.fl .user-role { color: var(--text-3); }
+html .app.fl .logout-btn { color: var(--text-3); background: var(--surface-2); border-radius: 50%; padding: 8px; }
+html .app.fl .logout-btn:hover { color: var(--text-1); background: var(--surface-3); }
+
+/* page header: a large, light title like the reference */
+html .app.fl .topbar {
+  height: auto; min-height: 76px; padding: 18px clamp(18px, 2.6vw, 36px) 6px;
+  background: transparent; border-bottom: 0; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html .app.fl .topbar-title { font-size: clamp(22px, 1.4vw + 12px, 32px); font-weight: 500; letter-spacing: -0.025em; }
+html .app.fl .page-title { font-size: clamp(20px, 1vw + 12px, 26px); font-weight: 500; }
+
+/* ── Cards, tables ──────────────────────────────────────────────────── */
+html .app.fl .card, html .app.fl .glass-card { background: var(--glass); border-color: var(--glass-border); box-shadow: var(--shadow); }
+html .app.fl .card-header { border-bottom-color: var(--border); }
+html .app.fl .card-title { font-weight: 500; letter-spacing: -0.015em; }
+html .app.fl .stat-card { background: var(--glass); border-radius: 24px; }
+html .app.fl table { border-collapse: separate; border-spacing: 0; }
+html .app.fl th { font-weight: 500; color: var(--text-3); letter-spacing: 0.06em; background: transparent; border-bottom: 1px solid var(--border); }
+html .app.fl td { border-bottom: 1px solid var(--border-soft); }
+html .app.fl tbody tr:hover td { background: var(--surface-2); }
+
+/* ── Buttons, chips, inputs, modals ─────────────────────────────────── */
+html .app.fl .btn { border-radius: 999px; font-weight: 500; }
+html .app.fl .btn-primary { background: var(--solid); color: var(--on-solid); box-shadow: var(--shadow-sm); }
+html .app.fl .btn-primary:hover:not(:disabled) { background: var(--solid); filter: brightness(1.08); }
+html .app.fl .btn-primary:active:not(:disabled) { filter: brightness(0.94); }
+html .app.fl .btn-ghost { background: var(--surface-2); border-color: transparent; color: var(--text-1); }
+html .app.fl .btn-ghost:hover { background: var(--surface-3); border-color: transparent; }
+html .app.fl .btn-sm { border-radius: 999px; }
+html .app.fl .filter-chip { border-radius: 999px; background: var(--surface-2); border-color: transparent; color: var(--text-2); }
+html .app.fl .filter-chip:hover { background: var(--surface-3); color: var(--text-1); border-color: transparent; }
+html .app.fl .filter-chip.active { background: var(--solid); border-color: transparent; color: var(--on-solid); }
+html .app.fl input:not([type='checkbox']):not([type='radio']), html .app.fl select, html .app.fl textarea {
+  background: var(--surface-2); border-color: var(--border); border-radius: 14px; color: var(--text-1);
+}
+html .app.fl input:focus, html .app.fl select:focus, html .app.fl textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+html .app.fl .modal-overlay { background: var(--scrim); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+html .app.fl .modal { background: var(--overlay); border-radius: 28px; border-color: var(--border); box-shadow: var(--shadow-overlay); }
+html .app.fl .modal-header { border-bottom-color: var(--border); }
+html .app.fl .badge { border-radius: 999px; }
+
+/* ── Mobile: keep the existing top bar + drawer, in the new colours ── */
+html .app.fl .mobile-topbar { background: var(--shell); border-bottom: 1px solid var(--shell-line); color: var(--text-1); }
+html .app.fl .drawer { background: var(--overlay); border-right: 1px solid var(--border); }
+html .app.fl .hamburger { color: var(--text-1); }
+@media (max-width: 900px) {
+  html .app.fl { padding: 0; gap: 0; }
+  html .app.fl .main { border-radius: 0; border: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html .app.fl .topbar { padding-top: 12px; }
+}
+
+/* the sticky footer used a hard-coded navy; use the surface token and follow the panel's rounded corners */
+html .app.fl .sidebar .sidebar-footer { background: var(--overlay); border-radius: 0 0 32px 32px; }
