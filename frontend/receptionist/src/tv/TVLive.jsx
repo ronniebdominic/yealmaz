@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './tv.css';
 import { createTvStore } from './tvClient';
-import { TvContext, useStoreState, useTicker, effectiveIntensity, fmtTime, fmtDate } from './hooks';
+import { TvContext, useStoreState, useTicker, effectiveIntensity, fmtTime, fmtDate, prettyStage } from './hooks';
 import { SCREEN_META } from './registry';
 import { screenSeconds } from './screenRules';
 
@@ -210,7 +210,7 @@ export default function TVLive() {
               <button onClick={toggleFullscreen}>{fullscreen ? 'Exit full screen' : 'Full screen'}</button>
             </nav>
             <div className="tv-progress"><span key={`${current}-${paused}-${seconds}`} className={paused || !autoRotate ? 'still' : ''} style={{ animationDuration: `${seconds}s` }} /></div>
-            <div className="tv-feed-line">{state.feed[0] && state.feed[0].type !== 'ATTENDANCE_CHANGED' ? `${state.feed[0].caseNumber || ''} ${state.feed[0].type === 'STAGE_ENTERED' ? '→ ' + (state.feed[0].stage || '').replace(/_/g, ' ').toLowerCase() : ''}` : ''}</div>
+            <div className="tv-feed-line">{state.feed[0] && state.feed[0].type !== 'ATTENDANCE_CHANGED' ? `${state.feed[0].caseNumber || ''} ${state.feed[0].type === 'STAGE_ENTERED' ? '→ ' + prettyStage(state.feed[0].stage) : ''}` : ''}</div>
           </footer>
 
           {celebrate && <div className="tv-celebrate" key={state.celebration.at}><b>✓ {state.celebration.caseNumber || 'Case'}</b> completed{Array.from({ length: 10 }, (_, i) => <i key={i} style={{ '--i': i }} />)}</div>}

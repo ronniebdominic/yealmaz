@@ -85,6 +85,7 @@ export function createTvStore({ preview = false } = {}) {
       const newlyCritical = prevCriticalCount != null && crit > prevCriticalCount;
       prevCriticalCount = crit;
       lastSeq = Math.max(lastSeq, snap.seq || 0);
+      if (!state.config) request('/config').then(r => set({ config: r.config })).catch(() => {}); // the first settings request may have failed while the server was down
       set({ snapshot: snap, phase: 'ready', error: null, lastOkAt: Date.now(), highlightEmployees: diffHighlights(prev, snap), ...(newlyCritical ? { criticalAlertAt: Date.now() } : {}) });
       evaluateConn();
     } catch (err) {

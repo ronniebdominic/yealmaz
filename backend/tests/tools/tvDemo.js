@@ -22,6 +22,7 @@ const arg = (n, d) => (process.argv.find(a => a.startsWith(`--${n}=`)) || '').sp
 const EMP = Number(arg('employees', 26));
 const PORT = Number(arg('port', 5099));
 const SIM = process.argv.includes('--simulate');
+const EMPTY = process.argv.includes('--empty'); // no staff, no cases: the "nothing has happened yet" state
 
 const FIRST = ['Abebe', 'Kebede', 'Almaz', 'Tigist', 'Dawit', 'Selam', 'Henok', 'Meron', 'Yonas', 'Hana', 'Biniam', 'Rahel', 'Samson', 'Liya', 'Mulugeta', 'Saron', 'Fikru', 'Betty', 'Natnael', 'Eden', 'Tesfaye', 'Mahlet', 'Robel', 'Winta', 'Bereket', 'Kidist', 'Elias', 'Zelalem', 'Ruth', 'Amanuel'];
 const LAST = ['Tesfaye', 'Alemu', 'Bekele', 'Girma', 'Hailu', 'Mengistu', 'Wolde', 'Assefa', 'Negash', 'Desta'];
@@ -36,6 +37,7 @@ async function seed() {
   await prisma.$executeRawUnsafe('TRUNCATE case_stages, cases, attendance_events, users, clinics, staff_roles, shifts, holidays CASCADE');
   const clinic = await prisma.clinic.create({ data: { name: 'Test Clinic', password: 'x', email: 'c@test.local' } });
   const admin = await prisma.user.create({ data: { name: 'Admin', email: 'admin@test.local', password: 'x', role: 'ADMIN' } });
+  if (EMPTY) { await tv.saveConfig({}, admin.id); return { admin, techs: [], present: [] }; }
   const depts = LAB_DEPARTMENTS.filter(d => d.code !== 'QC');
   const techs = [];
   for (let i = 0; i < EMP; i++) {
