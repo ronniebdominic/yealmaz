@@ -1,7 +1,9 @@
 # Ye-Almaz Live Production TV (`/tv/live`)
 
-A read-only, always-on laboratory television. Six rotating screens (Command Center, Employee Wall, Performance
-Board, Case Pipeline, Critical Cases, Team Achievements) driven by real production data.
+A read-only, always-on laboratory television. Eleven rotating screens driven by real production data: Command Center,
+Dispatch Flow, Live Case Status Board, Employee Wall, Lab Scans Today, HR Attendance Today, Delivery Performance,
+Performance Board, Case Pipeline, Critical Cases, Team Achievements. Each can be switched off, re-ordered and timed
+in Admin → TV Display.
 
 Branch: `feature/tv-command-center`. **Not merged, not deployed.**
 
@@ -39,6 +41,20 @@ case, WAITING FOR APPROVAL from remake review / under-review. On duty = a punch 
 * Quality = share of finished cases with no later remake; on-time = share of visits within the department's
   expected bench time. Both show **Not enough data** below the minimum sample (default 10 finished cases) or
   without a target. Quality, timeliness, workload and trend are shown separately, never blended into one score.
+
+## The operations screens
+* **Dispatch Flow** — the six stages in the lab's order: Pending pick up → Pick up in progress → Out for delivery →
+  Ready for dispatch → Ready for delivery → Delivered (today). Buckets use the same rules as the Dispatch dashboard
+  (ready for dispatch = payment verified, trusted partner, free remake; ready for delivery = still awaiting payment).
+* **Live Case Status Board** — per department: cases scanned today and cases there now. Totals: scans today (the sum of
+  the department rows), distinct cases in operation today, and cases in departments now (each counted once).
+* **HR · Attendance Today** — Present (includes late), Late, Absent, On leave, from the HR attendance rules (shift,
+  grace, approved leave, holidays). Nobody is "absent" before their shift starts. Support staff are included;
+  administrator logins are not. Names, job title and clock-in time only.
+* **Delivery Performance** — today's pick-ups and deliveries per driver (same attribution as the admin Delivery
+  Performance page) plus cases each driver currently holds.
+* **Lab Scans Today** — scans per technician, their share of all scans today, and scans ÷ cases in process. Counts only;
+  the scoring formula is deliberately left open.
 
 ## Security
 * A TV signs in with a one-time pairing code (10 min, single use) from **Admin → TV Display** and receives its own

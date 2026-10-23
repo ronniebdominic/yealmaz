@@ -3,6 +3,9 @@ const crypto = require('node:crypto');
 const prisma = require('../db');
 const { DEFAULT_CONFIG, sanitizeConfig } = require('./tvConfig');
 const { buildSnapshot } = require('./tvProjection');
+const extras = require('./tvExtras');
+const { DELIVERY_EVENT_STAGE_OR, buildAgentNameMaps } = require('../utils/deliveryAttribution');
+const { NOT_ATTENDANCE_ONLY } = require('../utils/attendanceOnly');
 
 const TV_ROOM = 'tv';
 const SNAPSHOT_TTL_MS = 3000;
@@ -81,13 +84,16 @@ async function computeSnapshot() {
   const since = new Date(now.getTime() - 2 * config.performance.periodDays * 24 * 3600 * 1000);
 
   const seq = await latestSeq(); // read first: anything newer than this arrives as a delta
-  const cases = await prisma.case.findMany({
+  const caseRows = await prisma.case.findMany({
     where: { status: { notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'] } },
     select: {
       id: true, caseNumber: true, workType: true, units: true, status: true, dueDate: true, remake: true, redo: true,
       isRedo: true, remakeStatus: true, createdAt: true, updatedAt: true,
+      // used only to choose a dispatch bucket; never copied into the snapshot
+      paymentStatus: true, assignedDeliveryId: true, clinic: { select: { isExcluded: true } },
     },
   });
+  const cases = caseRows.map(({ clinic, ...c }) => ({ ...c, isTrustedPartner: !!clinic?.isExcluded }));
   const ids = cases.map(c => c.id);
   const stageRows = await prisma.caseStage.findMany({
     where: { OR: [{ caseId: { in: ids } }, { scannedAt: { gte: since } }] },
@@ -123,7 +129,35 @@ async function computeSnapshot() {
   const attendanceByUser = new Map();
   for (const ev of events) { if (!attendanceByUser.has(ev.userId)) attendanceByUser.set(ev.userId, []); attendanceByUser.get(ev.userId).push(ev); }
 
-  return buildSnapshot({ now, dayStart, cases, stageRowsByCase, employees, attendanceByUser, remadeCaseIds, caseMetaById, config, seq });
+  const base = buildSnapshot({ now, dayStart, cases, stageRowsByCase, employees, attendanceByUser, remadeCaseIds, caseMetaById, config, seq });
+
+  // ── extra screens: HR lists, delivery performance (each from the same tables the HR / delivery pages use)
+  const dayEnd = new Date(dayStart); dayEnd.setHours(23, 59, 59, 999);
+  const [hrUsers, dayEvents, leaveRecords, holiday, corrections, assignments, agents, deliveryEvents] = await Promise.all([
+    prisma.user.findMany({ where: { isSharedAccount: false, isActive: true, OR: [{ role: { not: 'ADMIN' } }, { employeeProfile: { isNot: null } }] }, select: { id: true, name: true, role: true, staffRole: { select: { name: true, department: true } } } }),
+    prisma.attendanceEvent.findMany({ where: { timestamp: { gte: dayStart, lte: dayEnd } }, select: { userId: true, type: true, timestamp: true, source: true } }),
+    prisma.leaveRecord.findMany({ where: { status: 'APPROVED', fromDate: { lte: dayEnd }, toDate: { gte: dayStart } } }),
+    prisma.holiday.findUnique({ where: { date: dayStart } }).catch(() => null),
+    prisma.attendanceCorrection.findMany({ where: { date: dayStart } }),
+    prisma.shiftAssignment.findMany({ where: { effectiveFrom: { lte: dayStart }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: dayStart } }] }, orderBy: { effectiveFrom: 'desc' }, include: { shift: true } }),
+    prisma.user.findMany({ where: { role: 'DELIVERY', isActive: true, ...NOT_ATTENDANCE_ONLY }, select: { id: true, name: true, isActive: true } }),
+    prisma.caseStage.findMany({ where: { OR: DELIVERY_EVENT_STAGE_OR, scannedAt: { gte: dayStart }, scannedBy: { not: null } }, select: { stageName: true, scannedBy: true, notes: true, scannedAt: true, caseId: true } }),
+  ]);
+  const group = (rows) => { const m = new Map(); for (const r of rows) { if (!m.has(r.userId)) m.set(r.userId, []); m.get(r.userId).push(r); } return m; };
+  const shiftByUser = new Map();
+  for (const a of assignments) if (!shiftByUser.has(a.userId)) shiftByUser.set(a.userId, a.shift);
+
+  return {
+    ...base,
+    dispatch: extras.buildDispatchBoard({ cases, stageRowsByCase, dayStart, now }),
+    statusBoard: extras.buildStatusBoard({ cases, stageRowsByCase, dayStart, config }),
+    hr: extras.buildHrBoard({
+      day: dayStart, now, employees: hrUsers, eventsByUser: group(dayEvents), leaveByUser: new Map(leaveRecords.map(l => [l.userId, l])),
+      shiftByUser, correctionByUser: new Map(corrections.map(c => [c.userId, c])), holiday, hiddenIds: config.hiddenEmployeeIds,
+    }),
+    delivery: extras.buildDeliveryBoard({ agents, events: deliveryEvents, maps: buildAgentNameMaps(agents), activeCases: cases }),
+    labScans: extras.buildLabScans({ stageRowsByCase, employees, dayStart, inProcess: base.kpis.inProduction, hiddenIds: config.hiddenEmployeeIds }),
+  };
 }
 
 // Coalesces concurrent requests and reuses a result for a few seconds, so many TVs cost one computation.

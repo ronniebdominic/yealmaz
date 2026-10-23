@@ -1,6 +1,8 @@
 // Ye-Almaz TV — how long a screen stays up. Pure functions, shared by the rotation and the screens.
 export const MIN_PAGE_SECONDS = 8;
 export const PERF_PER_PAGE = 8;
+export const ROWS_PER_PAGE = 8; // delivery / lab-scan rows per page
+export const HR_ROWS = 9; // names per column per page on the HR screen
 
 // The configured time, stretched so every page of a long list is shown for at least MIN_PAGE_SECONDS.
 // Nothing is ever dropped because it did not fit.
@@ -8,6 +10,9 @@ export function pageCount(id, snap, cfg) {
   if (!snap) return 1;
   if (id === 'employees') return Math.max(1, Math.ceil(snap.employees.length / cfg.employeesPerPage));
   if (id === 'performance') return Math.max(1, Math.ceil((snap.performance.ranked.length + snap.performance.unranked.length) / PERF_PER_PAGE));
+  if (id === 'delivery') return Math.max(1, Math.ceil((snap.delivery?.drivers.length || 0) / ROWS_PER_PAGE));
+  if (id === 'labscans') return Math.max(1, Math.ceil((snap.labScans?.rows.length || 0) / ROWS_PER_PAGE));
+  if (id === 'hr') return Math.max(1, ...['present', 'late', 'absent', 'onLeave'].map(k => Math.ceil((snap.hr?.[k].length || 0) / HR_ROWS)));
   return 1;
 }
 export function screenSeconds(screen, snap, cfg) {

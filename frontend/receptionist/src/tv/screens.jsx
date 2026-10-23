@@ -1,25 +1,9 @@
 // Ye-Almaz TV — the six screens. Every number comes from the backend snapshot; nothing here invents data.
 import { useEffect, useMemo, useState } from 'react';
-import { useTv, useCountUp, elapsed, ago, durationShort, STATUS_META, EVENT_LABEL, prettyStage } from './hooks';
+import Pager from './Pager';
+import { useTv, usePager, useCountUp, elapsed, ago, durationShort, STATUS_META, EVENT_LABEL, prettyStage } from './hooks';
 
 import { PERF_PER_PAGE } from './screenRules';
-
-// Rotates through pages while the screen is mounted; the interval dies with the screen.
-function usePager(pages, totalSeconds) {
-  const [page, setPage] = useState(0);
-  useEffect(() => {
-    if (pages <= 1) return undefined;
-    const id = setInterval(() => setPage(p => (p + 1) % pages), (totalSeconds * 1000) / pages);
-    return () => clearInterval(id);
-  }, [pages, totalSeconds]);
-  return Math.min(page, pages - 1);
-}
-
-const Pager = ({ page, pages }) => pages > 1 ? (
-  <div className="tv-pager" aria-label={`Page ${page + 1} of ${pages}`}>
-    {Array.from({ length: pages }, (_, i) => <span key={i} className={i === page ? 'on' : ''} />)}
-  </div>
-) : null;
 
 const Kpi = ({ label, value, sub, tone = '' }) => {
   const { intensity } = useTv();
@@ -238,14 +222,14 @@ export function CriticalScreen({ snap }) {
           return (
             <section key={col.key} className={`tv-crit-col ${col.tone} ${list.length ? '' : 'quiet'}`}>
               <h3>{col.title}<span>{list.length}</span></h3>
-              {list.slice(0, 5).map(c => (
+              {list.slice(0, list.length > 5 ? 4 : 5).map(c => (
                 <div className="tv-crit-row" key={c.caseNumber + col.key}>
                   <b>{c.caseNumber || 'Case'}</b>
                   <span className="tv-crit-stage">{c.stageLabel}</span>
                   <span className="tv-dim">{c.owner || (c.awaitingAssignment ? 'AWAITING ASSIGNMENT' : '')}{c.owner || c.awaitingAssignment ? ' · ' : ''}{ago(c.since, now)}</span>
                 </div>
               ))}
-              {list.length > 5 ? <div className="tv-dim tv-more">+{list.length - 5} more</div> : null}
+              {list.length > 5 ? <div className="tv-dim tv-more">+{list.length - 4} more</div> : null}
             </section>
           );
         })}

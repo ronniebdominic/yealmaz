@@ -1,13 +1,18 @@
 // Ye-Almaz — settings for the lab TV: screens, timing, visibility, targets. Stored as one JSON row
 // (TvConfig "default"); everything is clamped here so a bad save can never blank or crash the screen.
-const SCREEN_IDS = ['command', 'employees', 'performance', 'pipeline', 'critical', 'achievements'];
+const SCREEN_IDS = ['command', 'dispatch', 'statusboard', 'employees', 'labscans', 'hr', 'delivery', 'performance', 'pipeline', 'critical', 'achievements'];
 
 const DEFAULT_CONFIG = {
   title: 'Live Production Command Center',
   autoRotate: true,
   screens: [
     { id: 'command', enabled: true, seconds: 30 },
+    { id: 'dispatch', enabled: true, seconds: 25 },
+    { id: 'statusboard', enabled: true, seconds: 30 },
     { id: 'employees', enabled: true, seconds: 35 },
+    { id: 'labscans', enabled: true, seconds: 30 },
+    { id: 'hr', enabled: true, seconds: 30 },
+    { id: 'delivery', enabled: true, seconds: 25 },
     { id: 'performance', enabled: true, seconds: 30 },
     { id: 'pipeline', enabled: true, seconds: 30 },
     { id: 'critical', enabled: true, seconds: 20 },

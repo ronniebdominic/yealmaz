@@ -247,3 +247,78 @@
 .tv-emp-grid.dense .tv-emp-case.none { font-size: 21px; }
 .tv-emp-grid.dense .tv-emp footer { font-size: 17px; padding-top: 6px; }
 .tv-emp-grid.dense .tv-emp footer b { font-size: 20px; }
+
+/* ── dispatch segment */
+.tv-dsp { height: 100%; display: flex; flex-direction: column; gap: 26px; padding-bottom: 28px; }
+.tv-dsp-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 30px; }
+.tv-dsp-cell { position: relative; min-height: 0; }
+.tv-dsp-cell:not(:last-child)::after { content: ''; position: absolute; right: -27px; top: 50%; width: 24px; height: 4px; background: var(--blue); }
+.tv-dsp-cell:not(:last-child)::before { content: ''; position: absolute; right: -30px; top: calc(50% - 7px); border-left: 10px solid var(--blue); border-top: 9px solid transparent; border-bottom: 9px solid transparent; }
+.tv-dsp-tile { height: 100%; padding: 22px 20px; border-radius: 24px; background: var(--panel); border: 2px solid rgba(74,123,240,.4); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.tv-dsp-tile.teal { border-color: rgba(45,212,191,.55); } .tv-dsp-tile.green { border-color: rgba(52,211,153,.6); }
+.tv-dsp-tile.amber { border-color: rgba(245,158,11,.65); } .tv-dsp-tile.done { border-color: rgba(232,176,75,.7); background: rgba(232,176,75,.07); }
+.tv-dsp-step { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.1); font-size: 22px; font-weight: 800; }
+.tv-dsp-label { font-size: 27px; font-weight: 700; line-height: 1.15; min-height: 64px; display: grid; place-items: center; }
+.tv-dsp-count { font-size: 128px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; margin: auto 0; }
+.tv-dsp-tile.blue .tv-dsp-count { color: #8fb0ff; } .tv-dsp-tile.teal .tv-dsp-count { color: var(--teal); } .tv-dsp-tile.green .tv-dsp-count { color: var(--green); }
+.tv-dsp-tile.amber .tv-dsp-count { color: var(--amber); } .tv-dsp-tile.done .tv-dsp-count { color: var(--gold); }
+.tv-dsp-hint { font-size: 19px; color: var(--dim); } .tv-dsp-old { font-size: 18px; color: var(--amber); }
+.tv-dsp-share { padding: 20px 28px; } .tv-dsp-share h3 { margin-bottom: 14px; } .tv-dsp-share h3 b { color: var(--text); font-size: 34px; margin-left: 14px; }
+.tv-stack { display: flex; height: 54px; border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.06); gap: 3px; }
+.tv-stack-seg { display: grid; place-items: center; font-size: 26px; font-weight: 800; min-width: 6px; transition: flex-grow .8s ease; }
+.tv-stack-seg.blue, .tv-stack-legend i.blue { background: #4a7bf0; } .tv-stack-seg.teal, .tv-stack-legend i.teal { background: #2dd4bf; color: #04252a; }
+.tv-stack-seg.green, .tv-stack-legend i.green { background: #34d399; color: #04301f; } .tv-stack-seg.amber, .tv-stack-legend i.amber { background: #f59e0b; color: #2b1500; }
+.tv-stack-empty { color: var(--dim); font-size: 22px; padding-left: 18px; align-self: center; }
+.tv-stack-legend { display: flex; gap: 28px; margin-top: 12px; font-size: 19px; color: var(--dim); }
+.tv-stack-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 8px; vertical-align: -1px; }
+
+/* ── live status board */
+.tv-sbd { height: 100%; display: flex; flex-direction: column; gap: 22px; padding-bottom: 28px; }
+.tv-sbd-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.tv-sbd .tv-kpi { padding: 16px 24px; } .tv-sbd .tv-kpi-label { min-height: 0; } .tv-sbd .tv-kpi-value { font-size: 72px; }
+.tv-sbd-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.tv-sbd-col { display: flex; flex-direction: column; justify-content: space-around; padding: 14px 26px; overflow: hidden; }
+.tv-sbd-row { display: grid; grid-template-columns: 250px 1fr 108px 82px; gap: 16px; align-items: center; font-size: 23px; }
+.tv-sbd-num, .tv-sbd-now { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
+.tv-sbd-num b { font-size: 32px; } .tv-sbd-now b { font-size: 26px; color: var(--teal); } .tv-sbd small { font-size: 13px; color: var(--dim); letter-spacing: .06em; text-transform: uppercase; }
+
+/* ── HR lists */
+.tv-hr { height: 100%; display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+.tv-hr-cols { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+.tv-hr-col { background: var(--panel); border: 1px solid var(--line); border-top: 6px solid var(--grey); border-radius: 20px; padding: 16px 20px; overflow: hidden; display: flex; flex-direction: column; }
+.tv-hr-col.green { border-top-color: var(--green); } .tv-hr-col.amber { border-top-color: var(--amber); } .tv-hr-col.red { border-top-color: var(--red); } .tv-hr-col.purple { border-top-color: var(--purple); }
+.tv-hr-col h3 { margin: 0 0 8px; font-size: 26px; display: flex; justify-content: space-between; align-items: center; }
+.tv-hr-col h3 span { font-size: 54px; font-weight: 800; }
+.tv-hr-col.green h3 span { color: var(--green); } .tv-hr-col.amber h3 span { color: var(--amber); } .tv-hr-col.red h3 span { color: var(--red); } .tv-hr-col.purple h3 span { color: var(--purple); }
+.tv-hr-none { color: var(--dim); font-size: 21px; padding: 14px 0; }
+.tv-hr-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); min-height: 66px; }
+.tv-hr-who { display: flex; flex-direction: column; min-width: 0; } .tv-hr-who b { font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-hr-who small { font-size: 15px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-hr-meta { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.tv-hr-col.amber .tv-hr-meta { color: var(--amber); }
+
+/* ── delivery + lab scans */
+.tv-del { height: 100%; display: flex; flex-direction: column; gap: 18px; padding-bottom: 8px; }
+.tv-del-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr 1.6fr; gap: 22px; align-items: stretch; }
+.tv-del .tv-kpi { padding: 14px 22px; } .tv-del .tv-kpi-label { min-height: 0; font-size: 19px; } .tv-del .tv-kpi-value { font-size: 64px; }
+.tv-kpi-note { font-size: 17px; color: var(--dim); align-self: center; line-height: 1.35; }
+.tv-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.tv-list-row { flex: 1; min-height: 0; max-height: 78px; display: grid; grid-template-columns: 56px 300px 1fr 130px 170px 170px; gap: 20px; align-items: center; padding: 0 24px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.tv-avatar.big { width: 52px; height: 52px; font-size: 20px; }
+.tv-list-who { display: flex; flex-direction: column; min-width: 0; } .tv-list-who b { font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .tv-list-who small { font-size: 16px; color: var(--dim); }
+.tv-list-metric { text-align: center; } .tv-list-metric label { display: block; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.tv-list-metric b { font-size: 30px; line-height: 1.1; } .tv-list-metric small { display: block; font-size: 13px; color: var(--dim); }
+
+/* review fixes: delivery metrics fit their row, equal hint height so counts align, HR title note */
+.tv-list-row { grid-template-columns: 56px 280px 1fr 120px 130px 130px 110px; max-height: 84px; }
+.tv-list-metric { overflow: hidden; }
+.tv-list-metric b { display: block; }
+.tv-dsp-hint { min-height: 52px; display: grid; place-items: center; }
+.tv-hr-col h3 .tv-hr-title { font-size: 26px; font-weight: 600; display: flex; flex-direction: column; line-height: 1.1; }
+.tv-hr-col h3 .tv-hr-title small { font-size: 14px; color: var(--dim); font-weight: 400; letter-spacing: .06em; text-transform: none; }
+.tv-hr-col h3 span:last-child { font-size: 54px; font-weight: 800; }
+
+.tv-list-row.lab { grid-template-columns: 56px 300px 1fr 120px 190px 190px; }
+.tv-perf-metric label, .tv-perf-metric small { line-height: 1.1; }
+.tv-perf-metric b { line-height: 1.05; }
+.tv-more { padding-top: 4px; line-height: 1.1; }

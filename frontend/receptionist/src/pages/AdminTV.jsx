@@ -7,7 +7,8 @@ import AdminLayout from '../components/AdminLayout';
 import api from '../api';
 
 const SCREEN_TITLES = {
-  command: 'Live Command Center', employees: 'Live Employee Wall', performance: 'Performance Board',
+  command: 'Live Command Center', dispatch: 'Dispatch Flow', statusboard: 'Live Case Status Board', labscans: 'Lab Scans Today',
+  hr: 'HR · Attendance Today', delivery: 'Delivery Performance', employees: 'Live Employee Wall', performance: 'Performance Board',
   pipeline: 'Live Case Pipeline', critical: 'Critical Cases', achievements: 'Team Achievements',
 };
 const field = { border: '1.5px solid var(--border)', borderRadius: 8, padding: '7px 10px', fontSize: 14, background: 'var(--surface)', color: 'var(--text)' };

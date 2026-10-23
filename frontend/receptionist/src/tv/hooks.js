@@ -86,3 +86,14 @@ export const EVENT_LABEL = {
   STATUS_CHANGED: 'now', DELIVERED: 'delivered', ATTENDANCE_CHANGED: 'attendance updated',
 };
 export const prettyStage = (s) => (s || '').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+// Rotates through pages while the screen is mounted; the interval dies with the screen.
+export function usePager(pages, totalSeconds) {
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    if (pages <= 1) return undefined;
+    const id = setInterval(() => setPage(p => (p + 1) % pages), (totalSeconds * 1000) / pages);
+    return () => clearInterval(id);
+  }, [pages, totalSeconds]);
+  return Math.min(page, pages - 1);
+}

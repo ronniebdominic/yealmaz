@@ -10,7 +10,8 @@ import { TvContext, useStoreState, useTicker, effectiveIntensity, fmtTime, fmtDa
 import { SCREEN_META } from './registry';
 import { screenSeconds } from './screenRules';
 
-const TRANSITION_BY_TARGET = { command: 'logo', employees: 'slide', performance: 'stagger', pipeline: 'zoom', critical: 'blur', achievements: 'fade' };
+const TRANSITION_BY_TARGET = { command: 'logo', dispatch: 'slide', statusboard: 'zoom', labscans: 'stagger', hr: 'fade', delivery: 'slide', employees: 'slide', performance: 'stagger', pipeline: 'zoom', critical: 'blur', achievements: 'fade' };
+const REQUIRES = { dispatch: 'dispatch', statusboard: 'statusBoard', hr: 'hr', delivery: 'delivery', labscans: 'labScans' };
 const INTRO_MS = 2800;
 const INTERSTITIAL_MS = 3200;
 
@@ -167,6 +168,8 @@ export default function TVLive() {
   const renderScreen = (id) => {
     const meta = SCREEN_META[id];
     if (!meta || !snap || !cfg) return <div className="tv-loading">Connecting to production data…</div>;
+    // a newer TV talking to an older backend (during a deploy) shows a waiting message instead of crashing
+    if (REQUIRES[id] && !snap[REQUIRES[id]]) return <div className="tv-loading">Waiting for the server to provide this screen…</div>;
     const sc = screens.find(s => s.id === id) || { id, seconds: 30 };
     const { Component } = meta;
     return <Component snap={snap} cfg={cfg} seconds={screenSeconds(sc, snap, cfg)} />;

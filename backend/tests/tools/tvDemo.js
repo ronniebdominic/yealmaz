@@ -33,7 +33,7 @@ const sinceMidnightMin = Math.max(10, Math.floor((Date.now() - midnight.getTime(
 
 async function seed() {
   await prisma.$executeRawUnsafe('TRUNCATE production_events, display_sessions, tv_config RESTART IDENTITY');
-  await prisma.$executeRawUnsafe('TRUNCATE case_stages, cases, attendance_events, users, clinics CASCADE');
+  await prisma.$executeRawUnsafe('TRUNCATE case_stages, cases, attendance_events, users, clinics, staff_roles, shifts, holidays CASCADE');
   const clinic = await prisma.clinic.create({ data: { name: 'Test Clinic', password: 'x', email: 'c@test.local' } });
   const admin = await prisma.user.create({ data: { name: 'Admin', email: 'admin@test.local', password: 'x', role: 'ADMIN' } });
   const depts = LAB_DEPARTMENTS.filter(d => d.code !== 'QC');
@@ -89,6 +89,53 @@ async function seed() {
   const att = present.map(clock);
   for (const t of present.filter(t => onBreak.has(t.id))) att.push({ userId: t.id, timestamp: minsAgo(5), type: 'BREAK_START', source: 'BIOMETRIC' });
   await prisma.attendanceEvent.createMany({ data: att });
+
+
+  // ── operations extras for the dispatch / HR / delivery / scan screens (synthetic test data)
+  const nowMin = Math.floor((Date.now() - midnight.getTime()) / 60000);
+  const startMin = Math.max(1, nowMin - 180);
+  const hhmm = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const shift = await prisma.shift.create({ data: { name: 'Office Hour', startTime: hhmm(startMin), endTime: '23:59', gracePeriodMinutes: 10, lateThresholdMinutes: 0, workingDays: [0, 1, 2, 3, 4, 5, 6] } });
+  const trusted = await prisma.clinic.create({ data: { name: 'Trusted Test Clinic', password: 'x', email: 'trusted@test.local', isExcluded: true } });
+  const supportRole = await prisma.staffRole.create({ data: { department: 'Support Staff', name: 'Janitor', baseRole: 'DELIVERY' } });
+  const chefRole = await prisma.staffRole.create({ data: { department: 'Support Staff', name: 'Chef', baseRole: 'DELIVERY' } });
+  const person = (name, role, extra = {}) => prisma.user.create({ data: { name, email: `${name.toLowerCase().replace(/\W+/g, '.')}@test.local`, password: 'x', role, ...extra } });
+  const drivers = [];
+  for (const n of ['Yared Driver', 'Samuel Rider', 'Abenezer Courier', 'Tomas Driver', 'Mekdes Rider', 'Girma Courier']) drivers.push(await person(n, 'DELIVERY'));
+  const office = [];
+  for (const n of ['Sara Reception', 'Hanna Reception', 'Mulu Dispatch', 'Fitsum Finance', 'Liya HR']) office.push(await person(n, n.includes('Dispatch') ? 'DISPATCH' : n.includes('Finance') ? 'FINANCE' : n.includes('HR') ? 'HR_MANAGER' : 'RECEPTIONIST'));
+  const support = [await person('Almaz Janitor', 'DELIVERY', { staffRoleId: supportRole.id }), await person('Chaltu Chef', 'DELIVERY', { staffRoleId: chefRole.id }), await person('Zewdu Janitor', 'DELIVERY', { staffRoleId: supportRole.id })];
+
+  const everyone = [...techs, ...drivers, ...office, ...support];
+  await prisma.shiftAssignment.createMany({ data: everyone.map(u => ({ userId: u.id, shiftId: shift.id, effectiveFrom: new Date(midnight.getTime() - 86400000), createdById: admin.id })) });
+  const punch = (u, minOfDay) => ({ userId: u.id, timestamp: new Date(midnight.getTime() + Math.min(minOfDay, nowMin - 1) * 60000), type: 'CLOCK_IN', source: 'BIOMETRIC' });
+  const more = [];
+  drivers.slice(0, 5).forEach((u, i) => more.push(punch(u, startMin + 2 + i)));
+  office.forEach((u, i) => more.push(punch(u, i === 1 ? startMin + 55 : startMin + 3 + i))); // one late
+  support.slice(0, 2).forEach((u, i) => more.push(punch(u, startMin + 6 + i)));
+  await prisma.attendanceEvent.createMany({ data: more });
+  const onLeave = techs.filter((_, i) => i % 7 === 3).slice(0, 2);
+  for (const u of [...onLeave, drivers[5]]) await prisma.leaveRecord.create({ data: { userId: u.id, fromDate: new Date(midnight.getTime() - 86400000), toDate: new Date(midnight.getTime() + 86400000), status: 'APPROVED', recordedById: admin.id } });
+
+  const drow = (caseId, stageName, by, at, notes) => ({ caseId, stageName, scannedBy: by, scannedAt: at, notes });
+  const extra = [];
+  for (let k = 0; k < 3; k++) { const c = await mk('PENDING_PICKUP'); extra.push(drow(c.id, 'PENDING_PICKUP', 'Reception', minsAgo(rnd(30, 300)), 'Awaiting pickup')); }
+  for (let k = 0; k < 3; k++) { const c = await mk('PICKUP_ASSIGNED', k === 2 ? {} : { assignedDeliveryId: drivers[k].id }); extra.push(drow(c.id, 'PICKUP_ASSIGNED', 'Dispatch', minsAgo(rnd(10, 120)), 'Pickup assigned')); }
+  for (let k = 0; k < 4; k++) {
+    const d = drivers[k % 4];
+    const c = await mk('OUT_FOR_DELIVERY', { assignedDeliveryId: d.id });
+    extra.push(drow(c.id, 'OUT_FOR_DELIVERY', 'Dispatcher', minsAgo(rnd(10, 150)), `Dispatched to ${d.name} for delivery`));
+  }
+  for (let k = 0; k < 3; k++) { const c = await mk('READY_TO_DISPATCH', { paymentStatus: 'VERIFIED' }); extra.push(drow(c.id, 'READY_TO_DISPATCH', 'System', minsAgo(rnd(10, 200)), 'QC passed')); }
+  for (let k = 0; k < 2; k++) { const c = await mk('READY_TO_DISPATCH'); extra.push(drow(c.id, 'READY_TO_DISPATCH', 'System', minsAgo(rnd(10, 200)), 'QC passed')); }
+  { const c = await prisma.case.create({ data: { caseNumber: `YA-${n++}`, patientName: 'Test Patient', workType: 'Crown', units: 2, status: 'READY_TO_DISPATCH', clinicId: trusted.id } }); extra.push(drow(c.id, 'READY_TO_DISPATCH', 'System', minsAgo(40), 'QC passed')); }
+  for (let k = 0; k < 9; k++) {
+    const d = drivers[k % 5];
+    const c = await mk('DELIVERED');
+    extra.push(drow(c.id, 'OUT_FOR_DELIVERY', 'Dispatcher', minsAgo(rnd(60, Math.max(61, sinceMidnightMin))), `Dispatched to ${d.name} for delivery`));
+    extra.push(drow(c.id, 'DELIVERED', d.name, minsAgo(rnd(5, 55)), 'Delivered successfully'));
+  }
+  await prisma.caseStage.createMany({ data: extra });
 
   await tv.saveConfig({
     interstitialEvery: 1,

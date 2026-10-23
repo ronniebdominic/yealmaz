@@ -140,17 +140,17 @@ test('quality uses remakes of the cases a person finished', () => {
 
 test('config sanitising clamps and never drops a screen', () => {
   const c = sanitizeConfig({ screens: [{ id: 'pipeline', seconds: 9999, enabled: false }, { id: 'bogus' }], transitionMs: -5, animationIntensity: 'wild' });
-  assert.equal(c.screens.length, 6);
+  assert.equal(c.screens.length, 11);
   assert.equal(c.screens[0].id, 'pipeline');
   assert.equal(c.screens[0].seconds, 300);
   assert.equal(c.screens[0].enabled, false);
   assert.equal(c.transitionMs, 0);
   assert.equal(c.animationIntensity, DEFAULT_CONFIG.animationIntensity);
-  assert.equal(sanitizeConfig(null).screens.length, 6);
+  assert.equal(sanitizeConfig(null).screens.length, 11);
   assert.ok(sanitizeConfig(null).screens.every(s => s.enabled), 'first run: all screens on');
   const partial = sanitizeConfig({ screens: [{ id: 'command', enabled: true, seconds: 10 }] });
   assert.equal(partial.screens.filter(s => s.enabled).length, 1, 'omitted screens are kept but off');
-  assert.equal(partial.screens.length, 6);
+  assert.equal(partial.screens.length, 11);
 });
 
 test('hidden employees are not shown', () => {
