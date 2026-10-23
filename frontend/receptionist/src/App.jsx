@@ -38,6 +38,7 @@ import DispatchDashboard from './pages/DispatchDashboard';
 import FinanceDashboard from './pages/FinanceDashboard';
 import AdminViewBanner from './components/AdminViewBanner';
 import './index.css';
+import './styles/admin-fluenta.css'; // Fluenta skin for every staff login (applies via <html class="fl-skin">)
 
 const queryClient = new QueryClient({
   defaultOptions: {

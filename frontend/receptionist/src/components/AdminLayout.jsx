@@ -9,7 +9,6 @@ import {
 } from 'react-icons/md';
 import FloatingAIAssistant from './FloatingAIAssistant';
 import ThemeToggle from './ThemeToggle';
-import '../styles/admin-fluenta.css';
 
 // Dashboards each staff role normally logs into directly — the admin
 // account can open any of these to view/operate them without a separate

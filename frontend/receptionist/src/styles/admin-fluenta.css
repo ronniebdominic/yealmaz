@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Admin — "Fluenta" skin (from the Dashboard v15 reference design)
+   Fluenta skin (from the Dashboard v15 reference design) — every staff login
    ───────────────────────────────────────────────────────────────────────
-   Applies only inside the Admin layout (<div class="app fl">). It works the way the rest of the app does:
+   Applies to the whole staff app through <html class="fl-skin"> (the clinic phone app is a separate project). It works the way the rest of the app does:
    it redefines the design TOKENS (surfaces, borders, text, accent, radii) so every page that already uses
    .card / .btn / table / input / var(--surface) follows without edits, then restyles the shell (floating glass
    panels, pill navigation) and a few primitives (pill buttons and chips, soft inputs, rounded modals).
@@ -10,7 +10,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 /* ── Tokens: dark (default) ─────────────────────────────────────────── */
-.app.fl {
+html.fl-skin {
   --font-body: 'Outfit', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   --page: #08080f; --glow-a: #1d2a5c; --glow-b: #4a1d3a; --glow-c: #2c2160;
@@ -46,7 +46,7 @@
 }
 
 /* ── Tokens: light (same design on a pastel ground) ─────────────────── */
-html[data-theme='light'] .app.fl {
+html.fl-skin[data-theme='light'] {
   --page: #cbcbf3; --glow-a: #c9d9ff; --glow-b: #ffd9e6; --glow-c: #e3dcff;
   --shell: rgba(250, 250, 255, 0.66); --shell-line: rgba(255, 255, 255, 0.9);
   --solid: #19191d; --on-solid: #ffffff;
@@ -79,7 +79,7 @@ html[data-theme='light'] .app.fl {
 
 /* The old light theme pins the sidebar/drawer to dark text tokens (it used to be a navy rail). The new rail is
    pale in light mode, so hand it the light tokens back. */
-html[data-theme='light'] .app.fl :is(.sidebar, .drawer, .mobile-topbar) {
+html.fl-skin[data-theme='light'] :is(.sidebar, .drawer, .mobile-topbar) {
   --text-1: #17171b; --text-2: #3c3c45; --text-3: #6b6b7a; --text-4: #9c9ca8;
   --border: #e2e2ec; --border-soft: #ececf3; --border-2: #cfcfdc;
   --surface-2: #f3f3f8; --surface-3: #e7e7f0;
@@ -90,7 +90,7 @@ html[data-theme='light'] .app.fl :is(.sidebar, .drawer, .mobile-topbar) {
 }
 
 /* ── Shell: a soft backdrop with two floating glass panels ─────────── */
-html .app.fl {
+html.fl-skin .app {
   font-family: var(--font-body);
   color: var(--text-1);
   background:
@@ -101,88 +101,91 @@ html .app.fl {
   padding: clamp(8px, 1.1vw, 18px);
   gap: clamp(10px, 1.1vw, 18px);
 }
-html .app.fl .sidebar,
-html .app.fl .main {
+html.fl-skin .app .sidebar,
+html.fl-skin .app .main {
   background: var(--shell);
   border: 1px solid var(--shell-line);
   -webkit-backdrop-filter: blur(26px) saturate(140%);
   backdrop-filter: blur(26px) saturate(140%);
   box-shadow: var(--shadow-lg);
 }
-html .app.fl .sidebar { border-radius: 32px; width: 252px; min-width: 252px; }
-html .app.fl .main { border-radius: 36px; }
-html .app.fl .main > .topbar { flex-shrink: 0; }
+html.fl-skin .app .sidebar { border-radius: 32px; width: 252px; min-width: 252px; }
+html.fl-skin .app .main { border-radius: 36px; }
+html.fl-skin .app .main > .topbar { flex-shrink: 0; }
 
 /* sidebar content: tokens instead of the old always-white text */
-html .app.fl .sidebar-logo, html .app.fl .drawer-logo { border-bottom: 1px solid var(--border); padding: 22px 20px 16px; }
-html .app.fl .sidebar-logo .lab-name, html .app.fl .drawer-logo .lab-name { color: var(--text-1); font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
-html .app.fl .sidebar-logo img, html .app.fl .drawer-logo img { background: #fff; border: 0; box-shadow: 0 0 0 4px var(--brand-tint); }
-html .app.fl .role-badge { color: var(--brand-soft); background: var(--brand-tint); border-color: transparent; }
-html[data-theme='light'] .app.fl .role-badge { color: var(--brand); }
-html .app.fl .nav-section-label { color: var(--text-4); font-size: 10.5px; letter-spacing: 0.12em; padding: 16px 14px 6px; }
-html .app.fl .nav-item {
+html.fl-skin .app .sidebar-logo, html.fl-skin .app .drawer-logo { border-bottom: 1px solid var(--border); padding: 22px 20px 16px; }
+html.fl-skin .app .sidebar-logo .lab-name, html.fl-skin .app .drawer-logo .lab-name { color: var(--text-1); font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+html.fl-skin .app .sidebar-logo img, html.fl-skin .app .drawer-logo img { background: #fff; border: 0; box-shadow: 0 0 0 4px var(--brand-tint); }
+html.fl-skin .app .role-badge { color: var(--brand-soft); background: var(--brand-tint); border-color: transparent; }
+html.fl-skin[data-theme='light'] .app .role-badge { color: var(--brand); }
+html.fl-skin .app .nav-section-label { color: var(--text-4); font-size: 10.5px; letter-spacing: 0.12em; padding: 16px 14px 6px; }
+html.fl-skin .app .nav-item {
   color: var(--text-2); border-radius: 999px; padding: 10px 14px; gap: 12px; font-size: 14px; font-weight: 450;
 }
-html .app.fl .nav-item .mi { opacity: 0.85; }
-html .app.fl .nav-item:hover { background: var(--surface-2); color: var(--text-1); }
-html .app.fl .nav-item.active {
+html.fl-skin .app .nav-item .mi { opacity: 0.85; }
+html.fl-skin .app .nav-item:hover { background: var(--surface-2); color: var(--text-1); }
+html.fl-skin .app .nav-item.active {
   background: var(--solid); color: var(--on-solid); font-weight: 600; box-shadow: var(--shadow-sm);
 }
-html .app.fl .nav-item.active::before { display: none; }
-html .app.fl .sidebar-footer, html .app.fl .drawer-footer { border-top: 1px solid var(--border); }
-html .app.fl .user-avatar { background: var(--solid); color: var(--on-solid); }
-html .app.fl .user-name { color: var(--text-1); }
-html .app.fl .user-role { color: var(--text-3); }
-html .app.fl .logout-btn { color: var(--text-3); background: var(--surface-2); border-radius: 50%; padding: 8px; }
-html .app.fl .logout-btn:hover { color: var(--text-1); background: var(--surface-3); }
+html.fl-skin .app .nav-item.active::before { display: none; }
+html.fl-skin .app .sidebar-footer, html.fl-skin .app .drawer-footer { border-top: 1px solid var(--border); }
+html.fl-skin .app .user-avatar { background: var(--solid); color: var(--on-solid); }
+html.fl-skin .app .user-name { color: var(--text-1); }
+html.fl-skin .app .user-role { color: var(--text-3); }
+html.fl-skin .app .logout-btn { color: var(--text-3); background: var(--surface-2); border-radius: 50%; padding: 8px; }
+html.fl-skin .app .logout-btn:hover { color: var(--text-1); background: var(--surface-3); }
 
 /* page header: a large, light title like the reference */
-html .app.fl .topbar {
+html.fl-skin .app .topbar {
   height: auto; min-height: 76px; padding: 18px clamp(18px, 2.6vw, 36px) 6px;
   background: transparent; border-bottom: 0; -webkit-backdrop-filter: none; backdrop-filter: none;
 }
-html .app.fl .topbar-title { font-size: clamp(22px, 1.4vw + 12px, 32px); font-weight: 500; letter-spacing: -0.025em; }
-html .app.fl .page-title { font-size: clamp(20px, 1vw + 12px, 26px); font-weight: 500; }
+html.fl-skin .app .topbar-title { font-size: clamp(22px, 1.4vw + 12px, 32px); font-weight: 500; letter-spacing: -0.025em; }
+html.fl-skin .app .page-title { font-size: clamp(20px, 1vw + 12px, 26px); font-weight: 500; }
 
 /* ── Cards, tables ──────────────────────────────────────────────────── */
-html .app.fl .card, html .app.fl .glass-card { background: var(--glass); border-color: var(--glass-border); box-shadow: var(--shadow); }
-html .app.fl .card-header { border-bottom-color: var(--border); }
-html .app.fl .card-title { font-weight: 500; letter-spacing: -0.015em; }
-html .app.fl .stat-card { background: var(--glass); border-radius: 24px; }
-html .app.fl table { border-collapse: separate; border-spacing: 0; }
-html .app.fl th { font-weight: 500; color: var(--text-3); letter-spacing: 0.06em; background: transparent; border-bottom: 1px solid var(--border); }
-html .app.fl td { border-bottom: 1px solid var(--border-soft); }
-html .app.fl tbody tr:hover td { background: var(--surface-2); }
+html.fl-skin .app .card, html.fl-skin .app .glass-card { background: var(--glass); border-color: var(--glass-border); box-shadow: var(--shadow); }
+html.fl-skin .app .card-header { border-bottom-color: var(--border); }
+html.fl-skin .app .card-title { font-weight: 500; letter-spacing: -0.015em; }
+html.fl-skin .app .stat-card { background: var(--glass); border-radius: 24px; }
+html.fl-skin .app table { border-collapse: separate; border-spacing: 0; }
+html.fl-skin .app th { font-weight: 500; color: var(--text-3); letter-spacing: 0.06em; background: transparent; border-bottom: 1px solid var(--border); }
+html.fl-skin .app td { border-bottom: 1px solid var(--border-soft); }
+html.fl-skin .app tbody tr:hover td { background: var(--surface-2); }
 
 /* ── Buttons, chips, inputs, modals ─────────────────────────────────── */
-html .app.fl .btn { border-radius: 999px; font-weight: 500; }
-html .app.fl .btn-primary { background: var(--solid); color: var(--on-solid); box-shadow: var(--shadow-sm); }
-html .app.fl .btn-primary:hover:not(:disabled) { background: var(--solid); filter: brightness(1.08); }
-html .app.fl .btn-primary:active:not(:disabled) { filter: brightness(0.94); }
-html .app.fl .btn-ghost { background: var(--surface-2); border-color: transparent; color: var(--text-1); }
-html .app.fl .btn-ghost:hover { background: var(--surface-3); border-color: transparent; }
-html .app.fl .btn-sm { border-radius: 999px; }
-html .app.fl .filter-chip { border-radius: 999px; background: var(--surface-2); border-color: transparent; color: var(--text-2); }
-html .app.fl .filter-chip:hover { background: var(--surface-3); color: var(--text-1); border-color: transparent; }
-html .app.fl .filter-chip.active { background: var(--solid); border-color: transparent; color: var(--on-solid); }
-html .app.fl input:not([type='checkbox']):not([type='radio']), html .app.fl select, html .app.fl textarea {
+html.fl-skin .app .btn { border-radius: 999px; font-weight: 500; }
+html.fl-skin .app .btn-primary { background: var(--solid); color: var(--on-solid); box-shadow: var(--shadow-sm); }
+html.fl-skin .app .btn-primary:hover:not(:disabled) { background: var(--solid); filter: brightness(1.08); }
+html.fl-skin .app .btn-primary:active:not(:disabled) { filter: brightness(0.94); }
+html.fl-skin .app .btn-ghost { background: var(--surface-2); border-color: transparent; color: var(--text-1); }
+html.fl-skin .app .btn-ghost:hover { background: var(--surface-3); border-color: transparent; }
+html.fl-skin .app .btn-sm { border-radius: 999px; }
+html.fl-skin .app .filter-chip { border-radius: 999px; background: var(--surface-2); border-color: transparent; color: var(--text-2); }
+html.fl-skin .app .filter-chip:hover { background: var(--surface-3); color: var(--text-1); border-color: transparent; }
+html.fl-skin .app .filter-chip.active { background: var(--solid); border-color: transparent; color: var(--on-solid); }
+html.fl-skin .app input:not([type='checkbox']):not([type='radio']), html.fl-skin .app select, html.fl-skin .app textarea {
   background: var(--surface-2); border-color: var(--border); border-radius: 14px; color: var(--text-1);
 }
-html .app.fl input:focus, html .app.fl select:focus, html .app.fl textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
-html .app.fl .modal-overlay { background: var(--scrim); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-html .app.fl .modal { background: var(--overlay); border-radius: 28px; border-color: var(--border); box-shadow: var(--shadow-overlay); }
-html .app.fl .modal-header { border-bottom-color: var(--border); }
-html .app.fl .badge { border-radius: 999px; }
+html.fl-skin .app input:focus, html.fl-skin .app select:focus, html.fl-skin .app textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); }
+html.fl-skin .app .modal-overlay { background: var(--scrim); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+html.fl-skin .app .modal { background: var(--overlay); border-radius: 28px; border-color: var(--border); box-shadow: var(--shadow-overlay); }
+html.fl-skin .app .modal-header { border-bottom-color: var(--border); }
+html.fl-skin .app .badge { border-radius: 999px; }
 
 /* ── Mobile: keep the existing top bar + drawer, in the new colours ── */
-html .app.fl .mobile-topbar { background: var(--shell); border-bottom: 1px solid var(--shell-line); color: var(--text-1); }
-html .app.fl .drawer { background: var(--overlay); border-right: 1px solid var(--border); }
-html .app.fl .hamburger { color: var(--text-1); }
+html.fl-skin .app .mobile-topbar { background: var(--shell); border-bottom: 1px solid var(--shell-line); color: var(--text-1); }
+html.fl-skin .app .drawer { background: var(--overlay); border-right: 1px solid var(--border); }
+html.fl-skin .app .hamburger { color: var(--text-1); }
 @media (max-width: 900px) {
-  html .app.fl { padding: 0; gap: 0; }
-  html .app.fl .main { border-radius: 0; border: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  html .app.fl .topbar { padding-top: 12px; }
+  html.fl-skin .app { padding: 0; gap: 0; }
+  html.fl-skin .app .main { border-radius: 0; border: 0; box-shadow: none; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html.fl-skin .app .topbar { padding-top: 12px; }
 }
 
 /* the sticky footer used a hard-coded navy; use the surface token and follow the panel's rounded corners */
-html .app.fl .sidebar .sidebar-footer { background: var(--overlay); border-radius: 0 0 32px 32px; }
+html.fl-skin .app .sidebar .sidebar-footer { background: var(--overlay); border-radius: 0 0 32px 32px; }
+
+/* nav items with a second line (Dispatch): its inline white tint is unreadable on the solid active pill */
+html.fl-skin .app .nav-item.active > div:nth-child(2) { color: var(--on-solid) !important; opacity: 0.7; }
