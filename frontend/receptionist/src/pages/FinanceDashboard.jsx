@@ -2,6 +2,7 @@
 // Standalone page (no Layout wrapper) for FINANCE role users
 // Tabs: Screenshot Approvals · Billing & Invoicing · Verified History
 
+import SidebarToggle from '../components/SidebarToggle';
 import BalanceStrip from '../components/BalanceStrip';
 import { balanceOf, fmtBr } from '../utils/balance';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -3034,6 +3035,7 @@ export default function FinanceDashboard() {
       {/* ── Sidebar (desktop only) ───────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-logo">
+          <SidebarToggle />
           <img
             src="/logo.png" alt="Ye-Almaz"
             style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }}

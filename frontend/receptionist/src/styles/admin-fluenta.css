@@ -189,3 +189,66 @@ html.fl-skin .app .sidebar .sidebar-footer { background: var(--overlay); border-
 
 /* nav items with a second line (Dispatch): its inline white tint is unreadable on the solid active pill */
 html.fl-skin .app .nav-item.active > div:nth-child(2) { color: var(--on-solid) !important; opacity: 0.7; }
+
+
+/* ═══ Sidebar legibility (from the "sidebar ui" design) ═══════════════════════════════════════════
+   Bigger, higher-contrast labels, an icon chip on every item, a strong solid highlight for the open page, clearly
+   separated sections, readable counts — and a collapse button that turns the menu into an icon rail. */
+html.fl-skin .app .sidebar-nav { padding: 8px 12px 12px; }
+html.fl-skin .app .nav-item {
+  font-size: 15px; font-weight: 560; color: var(--text-1); padding: 9px 12px; gap: 12px; margin-bottom: 3px;
+  min-height: 46px; line-height: 1.25; letter-spacing: -0.005em;
+}
+html.fl-skin .app .nav-item .mi {
+  flex: none; box-sizing: content-box; width: 17px; height: 17px; padding: 7px; border-radius: 12px;
+  background: var(--surface-2); color: var(--text-1); opacity: 1;
+}
+html.fl-skin .app .nav-item:hover { background: var(--surface-2); }
+html.fl-skin .app .nav-item:hover .mi { background: var(--surface-3); }
+html.fl-skin .app .nav-item.active {
+  background: linear-gradient(135deg, #7b68ef, #6552de); color: #ffffff; font-weight: 650;
+  box-shadow: 0 10px 22px -12px rgba(101, 82, 222, 0.85);
+}
+html.fl-skin .app .nav-item.active .mi { background: rgba(255, 255, 255, 0.22); color: #ffffff; }
+html.fl-skin .app .nav-item .badge-count {
+  font-size: 12px; font-weight: 700; padding: 2px 8px; min-width: 24px; background: var(--brand); color: #fff;
+}
+html.fl-skin .app .nav-item.active .badge-count { background: #fff; color: #5b49d8; }
+/* second line under an item (Dispatch) */
+html.fl-skin .app .nav-item > div:nth-child(2) { font-size: 11.5px !important; padding-left: 41px !important; }
+html.fl-skin .app .nav-section-label {
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-3); padding: 18px 14px 8px;
+}
+html.fl-skin .app .sidebar-nav > .nav-section-label:not(:first-child),
+html.fl-skin .app .sidebar-nav > div > .nav-section-label:not(:first-child) { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 16px; }
+html.fl-skin .app .sidebar .user-name { font-size: 14px; font-weight: 650; }
+html.fl-skin .app .sidebar .user-role { font-size: 12px; color: var(--text-3); }
+
+/* the collapse button */
+html.fl-skin .app .sidebar .sidebar-logo { position: relative; }
+.sb-toggle {
+  position: absolute; top: 14px; right: 12px; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--text-1); border: 1px solid var(--border);
+  cursor: pointer; padding: 0; transition: background 0.15s;
+}
+.sb-toggle:hover { background: var(--surface-3); }
+@media (max-width: 900px) { .sb-toggle { display: none; } }
+
+/* collapsed: an icon rail */
+html.fl-skin.sb-collapsed .app .sidebar { width: 88px; min-width: 88px; transition: width 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-logo { padding: 16px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-logo .lab-name,
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-logo .role-badge { display: none; }
+html.fl-skin.sb-collapsed .sb-toggle { position: static; order: 2; margin-top: 8px; }
+html.fl-skin.sb-collapsed .app .sidebar .nav-section-label { font-size: 0; padding: 8px 0 0; margin: 6px 14px 4px; border-top: 1px solid var(--border); height: 1px; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-nav > .nav-section-label:first-child { border-top: 0; margin-top: 0; }
+html.fl-skin.sb-collapsed .app .sidebar .nav-item { font-size: 0; justify-content: center; padding: 8px 0; position: relative; }
+html.fl-skin.sb-collapsed .app .sidebar .nav-item > div:nth-child(2),
+html.fl-skin.sb-collapsed .app .sidebar .nav-item span:not(.badge-count) { display: none; }
+html.fl-skin.sb-collapsed .app .sidebar .nav-item > div:first-child { justify-content: center; width: auto; }
+html.fl-skin.sb-collapsed .app .sidebar .nav-item .badge-count { position: absolute; top: 2px; right: 10px; font-size: 10.5px; padding: 0 5px; min-width: 18px; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-footer .user-info { flex-direction: column; gap: 10px; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-footer .user-info > div:not(.user-avatar) { display: none; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-footer { padding: 12px 0; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-footer .logout-btn { margin-left: 0; }
+html.fl-skin.sb-collapsed .app .sidebar .sidebar-footer .btn { display: none; }

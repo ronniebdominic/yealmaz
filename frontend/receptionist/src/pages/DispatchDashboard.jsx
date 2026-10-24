@@ -1,3 +1,4 @@
+import SidebarToggle from '../components/SidebarToggle';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -1024,6 +1025,7 @@ export default function DispatchDashboard() {
 
       <aside className="sidebar">
         <div className="sidebar-logo">
+          <SidebarToggle />
           <img src="/logo.png" alt="Ye-Almaz" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', marginBottom: 6, border: '2px solid rgba(255,255,255,0.15)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
           <span className="role-badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#3B82F6' }}>Dispatch</span>

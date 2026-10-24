@@ -1,3 +1,4 @@
+import SidebarToggle from './SidebarToggle';
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -149,6 +150,7 @@ export default function AdminLayout({ children }) {
       {/* ── Sidebar (desktop only) ───────────────────────── */}
       <aside className="sidebar glass-sidebar">
         <div className="sidebar-logo">
+          <SidebarToggle />
           <img src="/logo.png" alt="Ye-Almaz" style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', marginBottom: 10, border: '1px solid rgba(255,255,255,0.14)', backgroundColor: '#fff' }} />
           <div className="lab-name">Ye-Almaz Dental Lab</div>
           <span className="role-badge">Admin</span>
