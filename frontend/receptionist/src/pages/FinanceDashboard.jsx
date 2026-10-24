@@ -2,6 +2,8 @@
 // Standalone page (no Layout wrapper) for FINANCE role users
 // Tabs: Screenshot Approvals · Billing & Invoicing · Verified History
 
+import BalanceStrip from '../components/BalanceStrip';
+import { balanceOf, fmtBr } from '../utils/balance';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
@@ -1416,7 +1418,10 @@ function BillingCycleModal({ clinic, onClose, onSaved }) {
 
 // ── Trusted Partners Tab ─────────────────────────────────
 function CollectModal({ caseData, onDone, onClose }) {
-  const [amount, setAmount] = useState(caseData.totalAmount?.toString() || '');
+  const bal = balanceOf(caseData);
+  const [amount, setAmount] = useState(bal.invoice > 0 ? String(bal.remaining) : '');
+  const amountNum = parseFloat(amount) || 0;
+  const isPart = bal.invoice > 0 && amountNum > 0 && amountNum < bal.remaining - 0.005;
   const [notes,  setNotes]  = useState('');
   const [withholdTax, setWithholdTax] = useState(false);
   const [taxWithheld, setTaxWithheld] = useState('');
@@ -1426,14 +1431,15 @@ function CollectModal({ caseData, onDone, onClose }) {
   const netReceived = (parseFloat(amount) || 0) - (parseFloat(taxWithheld) || 0);
 
   const submit = async () => {
+    if (bal.invoice > 0 && amountNum > bal.remaining + 0.005) { toast.error(`That is more than the ${fmtBr(bal.remaining)} still owed on this case.`); return; }
     setSaving(true);
     try {
-      await api.post(`/payments/${caseData.id}/collect`, {
+      const { data } = await api.post(`/payments/${caseData.id}/collect`, {
         amount: amount ? parseFloat(amount) : undefined,
         notes:  notes  || undefined,
         taxWithheld: withholdTax && taxWithheld ? parseFloat(taxWithheld) : undefined,
       });
-      toast.success(`Payment collected — ${caseData.caseNumber}`);
+      toast.success(data.complete ? `Payment collected — ${caseData.caseNumber}` : `Part payment recorded — ${fmtBr(data.remaining)} still outstanding on ${caseData.caseNumber}`);
       onDone();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record payment');
@@ -1470,22 +1476,27 @@ function CollectModal({ caseData, onDone, onClose }) {
           </div>
 
           <div style={{ marginBottom: 16 }}>
+            {bal.invoice > 0 && <BalanceStrip bal={bal} />}
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-              Amount Collected (Br)
-              {caseData.totalAmount && (
-                <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                  Invoice: Br {caseData.totalAmount.toLocaleString('en-US')}
-                </span>
-              )}
+              {bal.invoice > 0 ? 'Amount received now (Br)' : 'Amount collected (Br) — this sets the price'}
             </label>
             <input
               type="number" min="0"
-              placeholder={caseData.totalAmount ? String(caseData.totalAmount) : 'Enter amount…'}
+              placeholder={bal.invoice > 0 ? String(bal.remaining) : 'Enter amount…'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               autoFocus
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 15, fontWeight: 600, background: 'var(--surface)', color: 'var(--text-1)' }}
             />
+            {bal.invoice > 0 && amountNum > 0 && (
+              <div style={{ fontSize: 12, marginTop: 6, color: amountNum > bal.remaining + 0.005 ? 'var(--red)' : isPart ? 'var(--amber)' : 'var(--green)', fontWeight: 600 }}>
+                {amountNum > bal.remaining + 0.005
+                  ? `More than the ${fmtBr(bal.remaining)} still owed`
+                  : isPart
+                    ? `Part payment — ${fmtBr(bal.remaining - amountNum)} will stay outstanding`
+                    : 'This settles the case in full'}
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: 16 }}>
@@ -1543,7 +1554,7 @@ function CollectModal({ caseData, onDone, onClose }) {
                 cursor: saving ? 'not-allowed' : 'pointer',
               }}
             >
-              {saving ? 'Saving…' : '✓ Confirm Collected'}
+              {saving ? 'Saving…' : (isPart ? 'Record part payment' : '✓ Confirm collected')}
             </button>
           </div>
         </div>
@@ -1613,6 +1624,16 @@ function TrustedPartnersTab({ queryClient }) {
       setClinicCases(prev => ({ ...prev, [clinicId]: res.data?.cases ?? [] }));
     } catch {}
     finally { setLoadingClinic(null); }
+  };
+
+  // After a payment is recorded, re-read the open clinic's cases so the Paid / Remaining columns update at once
+  // (clearing the cache alone left the open list empty until it was closed and reopened).
+  const reloadExpanded = async (id) => {
+    if (!id) return;
+    try {
+      const res = await api.get('/payments/trusted', { params: { clinicId: id, limit: 200 } });
+      setClinicCases({ [id]: res.data?.cases ?? [] });
+    } catch { /* the list reloads next time it is opened */ }
   };
 
   const cases      = [];
@@ -1868,7 +1889,9 @@ function TrustedPartnersTab({ queryClient }) {
                                 <th style={{ padding: '6px 12px', textAlign: 'left' }}>Work Type</th>
                                 <th style={{ padding: '6px 12px', textAlign: 'center' }}>Units</th>
                                 <th style={{ padding: '6px 12px', textAlign: 'left' }}>Status</th>
-                                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Amount</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Invoice</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Paid</th>
+                                <th style={{ padding: '6px 12px', textAlign: 'right' }}>Remaining</th>
                                 <th style={{ padding: '6px 12px' }}>Actions</th>
                               </tr>
                             </thead>
@@ -1880,14 +1903,19 @@ function TrustedPartnersTab({ queryClient }) {
                                   <td style={{ padding: '8px 12px', color: 'var(--text-2)' }}>{cas.workType}</td>
                                   <td style={{ padding: '8px 12px', textAlign: 'center' }}>{cas.units ?? '—'}</td>
                                   <td style={{ padding: '8px 12px' }}><StatusBadge status={cas.status} /></td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--green)' }}>
-                                    {cas.totalAmount ? `Br ${cas.totalAmount.toLocaleString('en-US')}` : '—'}
-                                  </td>
+                                  {(() => { const b = balanceOf(cas); return (<>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: 'var(--text-1)' }}>{b.invoice > 0 ? fmtBr(b.invoice) : '—'}</td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: b.paid > 0 ? 'var(--green)' : 'var(--text-3)' }}>
+                                      {b.paid > 0 ? fmtBr(b.paid) : '—'}
+                                      {b.paid > 0 && b.remaining > 0 && <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--amber)' }}>part paid</div>}
+                                    </td>
+                                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: b.remaining > 0 ? 'var(--red)' : 'var(--green)' }}>{b.invoice > 0 ? fmtBr(b.remaining) : '—'}</td>
+                                  </>); })()}
                                   <td style={{ padding: '8px 12px' }}>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                       <button onClick={() => setCollect(cas)}
                                         style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <MdPaid size={12} /> Collected
+                                        <MdPaid size={12} /> Record payment
                                       </button>
                                       <button onClick={() => setStatement({ clinicId: cas.clinicId, clinic: cas.clinic })}
                                         style={{ background: 'var(--brand-tint)', color: 'var(--blue)', border: '1px solid rgba(37,99,235,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -1932,6 +1960,7 @@ function TrustedPartnersTab({ queryClient }) {
             queryClient.invalidateQueries({ queryKey: ['trusted-partners-summary'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
             setClinicCases({});
+            reloadExpanded(expanded);
           }}
           onClose={() => setCollect(null)}
         />
@@ -1947,6 +1976,7 @@ function TrustedPartnersTab({ queryClient }) {
             queryClient.invalidateQueries({ queryKey: ['trusted-partners-summary'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
             setClinicCases({});
+            reloadExpanded(expanded);
           }}
         />
       )}

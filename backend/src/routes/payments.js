@@ -7,7 +7,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
-const { billedOf } = require('../services/financeRules');
+const { billedOf, paidOf, remainingOf } = require('../services/financeRules');
 
 const router = express.Router();
 const prisma = require('../db');
@@ -726,41 +726,63 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
 
-    // Some clinics deduct a withholding tax (they file it to the government
-    // directly) before paying the remainder — that deducted amount is NOT
-    // owed to us, so it must never be conflated with amount/totalAmount (the
-    // true invoice value) or amountReceived (a genuine still-owed shortfall).
+    // `amount` is what was RECEIVED NOW. It never rewrites the invoice: a priced case keeps its billed amount, the
+    // money received is added to what was already paid, and the case stays outstanding (with the balance shown) until
+    // the payments add up to the bill. Before this, entering Br 12,500 against a Br 20,000 case collected the whole case
+    // and shrank its invoice to 12,500, so the remaining Br 7,500 vanished and "paid" and "remaining" could not be told
+    // apart. Some clinics also deduct a withholding tax (filed to the government directly): it counts towards the
+    // balance exactly like cash (see recordInstallment) but is never conflated with the invoice value.
     const amountNum = amount ? parseFloat(amount) : null;
     if (amountNum != null && !(amountNum > 0)) return res.status(400).json({ error: 'Amount must be a positive number.' });
-    const resolvedAmount = amountNum != null ? amountNum : billedOf(caseData);
     let taxWithheldAmount = null;
     if (taxWithheld) {
       taxWithheldAmount = parseFloat(taxWithheld);
       if (isNaN(taxWithheldAmount) || taxWithheldAmount < 0) {
         return res.status(400).json({ error: 'Tax withheld must be a non-negative number.' });
       }
-      if (resolvedAmount != null && taxWithheldAmount > resolvedAmount) {
-        return res.status(400).json({ error: 'Tax withheld cannot exceed the amount collected.' });
-      }
     }
 
-    const payment = await collectCase(prisma, caseData, req.user, { amount: amountNum, notes, taxWithheldAmount });
+    const billed = billedOf(caseData);
+    let result;
+    if (billed > 0) {
+      const { remaining } = balanceOf(caseData);
+      if (remaining <= MONEY_EPS) return res.status(400).json({ error: 'Nothing is left to collect on this case.' });
+      const credit = amountNum != null ? amountNum : remaining; // no amount typed = the whole balance
+      if (credit > remaining + MONEY_EPS) {
+        return res.status(400).json({ error: `That is more than the Br ${remaining.toLocaleString('en-US')} still owed on this case.` });
+      }
+      if (taxWithheldAmount != null && taxWithheldAmount > credit + MONEY_EPS) {
+        return res.status(400).json({ error: 'Tax withheld cannot exceed the amount collected.' });
+      }
+      result = await recordInstallment(prisma, caseData, req.user, { credit, taxAmount: taxWithheldAmount, notes });
+    } else {
+      // An unpriced case: the amount typed IS the price (the one situation where collecting sets the invoice).
+      if (amountNum == null) return res.status(400).json({ error: 'Enter the amount collected — this case has no price yet.' });
+      if (taxWithheldAmount != null && taxWithheldAmount > amountNum) {
+        return res.status(400).json({ error: 'Tax withheld cannot exceed the amount collected.' });
+      }
+      await collectCase(prisma, caseData, req.user, { amount: amountNum, notes, taxWithheldAmount });
+      result = { complete: true, remaining: 0, received: amountNum };
+    }
+    const payment = await prisma.payment.findUnique({ where: { caseId: caseData.id } });
 
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
-    const io = req.app.get('io');
-    io.to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
-      caseId:  caseData.id,
-      caseNumber: caseData.caseNumber,
-      action:  'APPROVE',
-      message: 'Payment has been confirmed by the lab.'
-    });
-    require('../utils/webpush').sendPushToClinic(prisma, caseData.clinic.id, {
-      title: '✅ Payment Received', body: `Case ${caseData.caseNumber}: your payment was confirmed by the lab.`,
-      data: { caseId: caseData.id, type: 'payment_verified' },
-    });
+    if (result.complete) {
+      const io = req.app.get('io');
+      io.to(`clinic_${caseData.clinic.id}`).emit('payment_verified', {
+        caseId:  caseData.id,
+        caseNumber: caseData.caseNumber,
+        action:  'APPROVE',
+        message: 'Payment has been confirmed by the lab.'
+      });
+      require('../utils/webpush').sendPushToClinic(prisma, caseData.clinic.id, {
+        title: '✅ Payment Received', body: `Case ${caseData.caseNumber}: your payment was confirmed by the lab.`,
+        data: { caseId: caseData.id, type: 'payment_verified' },
+      });
+    }
 
-    res.json({ success: true, payment });
+    res.json({ success: true, payment, complete: result.complete, received: result.received, remaining: result.remaining });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Could not collect payment.' });
@@ -1274,8 +1296,11 @@ router.get('/trusted', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_AP'), asyn
       prisma.case.count({ where }),
     ]);
 
+    // Billed / paid / remaining are computed once here from the shared money rules, so finance sees the paid part and
+    // the balance of every case separately and no screen has to re-derive them.
+    const withMoney = cases.map(c => ({ ...c, billed: billedOf(c), paid: paidOf(c), remaining: remainingOf(c) }));
     const result = {
-      cases,
+      cases: withMoney,
       pagination: { total, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / parseInt(limit)) },
     };
     await appCache.set(cacheKey, result, 30);

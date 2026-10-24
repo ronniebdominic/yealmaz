@@ -1,6 +1,8 @@
 // Ye-Almaz — Admin Case Management
 // Full case list with delete, manual payment collection, and payment override (admin only)
 
+import BalanceStrip from '../components/BalanceStrip';
+import { balanceOf, fmtBr } from '../utils/balance';
 import { useState, useMemo } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import { StatusBadge, PaymentBadge } from '../components/StatusBadge';
@@ -116,7 +118,10 @@ function DeleteConfirmModal({ caseData, onConfirm, onClose, deleting }) {
 
 // ── Collect Payment Modal ─────────────────────────────────
 function CollectPaymentModal({ caseData, onDone, onClose }) {
-  const [amount, setAmount] = useState(caseData.totalAmount?.toString() || '');
+  const bal = balanceOf(caseData);
+  const [amount, setAmount] = useState(bal.invoice > 0 ? String(bal.remaining) : '');
+  const amountNum = parseFloat(amount) || 0;
+  const isPart = bal.invoice > 0 && amountNum > 0 && amountNum < bal.remaining - 0.005;
   const [notes,  setNotes]  = useState('');
   const [withholdTax, setWithholdTax] = useState(false);
   const [taxWithheld, setTaxWithheld] = useState('');
@@ -125,14 +130,15 @@ function CollectPaymentModal({ caseData, onDone, onClose }) {
   const netReceived = (parseFloat(amount) || 0) - (parseFloat(taxWithheld) || 0);
 
   const submit = async () => {
+    if (bal.invoice > 0 && amountNum > bal.remaining + 0.005) { toast.error(`That is more than the ${fmtBr(bal.remaining)} still owed on this case.`); return; }
     setSaving(true);
     try {
-      await api.post(`/payments/${caseData.id}/collect`, {
+      const { data } = await api.post(`/payments/${caseData.id}/collect`, {
         amount: amount ? parseFloat(amount) : undefined,
         notes:  notes  || undefined,
         taxWithheld: withholdTax && taxWithheld ? parseFloat(taxWithheld) : undefined,
       });
-      toast.success(`Payment collected for ${caseData.caseNumber}`);
+      toast.success(data.complete ? `Payment collected — ${caseData.caseNumber}` : `Part payment recorded — ${fmtBr(data.remaining)} still outstanding on ${caseData.caseNumber}`);
       onDone();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record payment');
@@ -157,22 +163,27 @@ function CollectPaymentModal({ caseData, onDone, onClose }) {
           <CaseInfoCard caseData={caseData} />
 
           <div style={{ marginBottom: 16 }}>
+            {bal.invoice > 0 && <BalanceStrip bal={bal} />}
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-              Amount Collected (Br)
-              {caseData.totalAmount && (
-                <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                  Invoice: Br {caseData.totalAmount.toLocaleString('en-US')}
-                </span>
-              )}
+              {bal.invoice > 0 ? 'Amount received now (Br)' : 'Amount collected (Br) — this sets the price'}
             </label>
             <input
               type="number" min="0"
-              placeholder={caseData.totalAmount ? String(caseData.totalAmount) : 'Enter amount…'}
+              placeholder={bal.invoice > 0 ? String(bal.remaining) : 'Enter amount…'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               autoFocus
               style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 15, fontWeight: 600, background: 'var(--surface)', color: 'var(--text-1)' }}
             />
+            {bal.invoice > 0 && amountNum > 0 && (
+              <div style={{ fontSize: 12, marginTop: 6, color: amountNum > bal.remaining + 0.005 ? 'var(--red)' : isPart ? 'var(--amber)' : 'var(--green)', fontWeight: 600 }}>
+                {amountNum > bal.remaining + 0.005
+                  ? `More than the ${fmtBr(bal.remaining)} still owed`
+                  : isPart
+                    ? `Part payment — ${fmtBr(bal.remaining - amountNum)} will stay outstanding`
+                    : 'This settles the case in full'}
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: 16 }}>
@@ -229,7 +240,7 @@ function CollectPaymentModal({ caseData, onDone, onClose }) {
                 cursor: saving ? 'not-allowed' : 'pointer',
               }}
             >
-              {saving ? 'Saving…' : '✓ Confirm Payment Collected'}
+              {saving ? 'Saving…' : (isPart ? 'Record part payment' : '✓ Confirm collected')}
             </button>
           </div>
         </div>
