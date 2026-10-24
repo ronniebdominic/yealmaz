@@ -8,6 +8,7 @@ const { BASE_ROLES } = require('./staffRoles');
 const router = express.Router();
 const prisma = require('../db');
 const { isAttendanceOnly } = require('../utils/attendanceOnly');
+const { invalidateStaffLists } = require('../utils/invalidateStaffLists');
 
 // Same department codes used by the scan station picker (scan.js DEPARTMENTS).
 const VALID_DEPARTMENTS = new Set([
@@ -108,6 +109,7 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
       select: SAFE_SELECT,
     });
 
+    await invalidateStaffLists();
     res.status(201).json(user);
   } catch (err) {
     console.error(err);
@@ -162,6 +164,7 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       select: SAFE_SELECT,
     });
 
+    await invalidateStaffLists();
     res.json(user);
   } catch (err) {
     console.error(err);

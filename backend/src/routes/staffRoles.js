@@ -6,6 +6,7 @@ const express = require('express');
 const { protect, restrict } = require('../middleware/auth');
 
 const router = express.Router();
+const { invalidateStaffLists } = require('../utils/invalidateStaffLists');
 const prisma = require('../db');
 
 // Access levels a staff role can sit on. CLINIC is the external clinic app,
@@ -53,6 +54,7 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
     if (exists) return res.status(409).json({ error: department ? `${department} already has a role called ${name.trim()}.` : 'A role with this name already exists.' });
 
     const role = await prisma.staffRole.create({ data: { name: name.trim(), department, baseRole } });
+    await invalidateStaffLists();
     res.status(201).json({ ...role, _count: { users: 0 } });
   } catch (err) {
     console.error(err);
@@ -111,6 +113,7 @@ router.patch('/:id', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) 
     }
     const [role] = await prisma.$transaction(ops);
     const count = await prisma.user.count({ where: { staffRoleId: role.id } });
+    await invalidateStaffLists(); // a role's department/access can change who appears on delivery, lab and HR lists
     res.json({ ...role, _count: { users: count } });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Role not found.' });
@@ -129,6 +132,7 @@ router.delete('/:id', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res)
     const count = await prisma.user.count({ where: { staffRoleId: req.params.id } });
     if (count) return res.status(400).json({ error: `${count} staff member${count === 1 ? ' is' : 's are'} on this role. Move them to another role first.` });
     await prisma.staffRole.delete({ where: { id: req.params.id } });
+    await invalidateStaffLists();
     res.json({ success: true });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Role not found.' });
