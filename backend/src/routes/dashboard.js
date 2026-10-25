@@ -5,7 +5,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
-const { buildAgentNameMaps, matchDeliveryAgent, NON_AGENT_DELIVERY_MARKERS, isNonAgentDeliveredNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
+const { buildAgentNameMaps, matchDeliveryAgent, matchDeliveryAgentDetailed, NON_AGENT_DELIVERY_MARKERS, isNonAgentDeliveredNote, isSelfPickupNote, isHistoricalRegistrationNote, isPaymentCollectionNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
 const prisma = require('../db');
@@ -752,13 +752,13 @@ async function computeDeliveryPerformance({ from, to } = {}) {
 
     const perAgent = new Map(agents.map(a => [a.id, {
       id: a.id, name: a.name, isActive: a.isActive, station: a.station,
-      totalPickups: 0, totalDeliveries: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
+      totalPickups: 0, totalDeliveries: 0, firstNameMatches: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
       lastActiveAt: null,
     }]));
     let unattributedOrders = 0;
 
     for (const s of stages) {
-      const agent = matchDeliveryAgent(s.scannedBy, s.notes, nameMaps);
+      const { agent, how } = matchDeliveryAgentDetailed(s.scannedBy, s.notes, nameMaps);
       const classified = classifyDeliveryEvent(s.stageName);
       if (!classified) continue;
       if (!agent) {
@@ -774,6 +774,7 @@ async function computeDeliveryPerformance({ from, to } = {}) {
       }
 
       const agg = perAgent.get(agent.id);
+      if (how === 'first-name') agg.firstNameMatches++;
       if (classified.type === 'PICKUP') agg.totalPickups++; else agg.totalDeliveries++;
       agg.cases.add(s.caseId);
       if (s.case?.clinic?.name) agg.clinics.add(s.case.clinic.name);
@@ -787,9 +788,28 @@ async function computeDeliveryPerformance({ from, to } = {}) {
     // share below.
     const totalLabOrders = [...perAgent.values()].reduce((sum, a) => sum + a.totalPickups + a.totalDeliveries, 0) + unattributedOrders;
 
+    // Where every DELIVERED entry in the range went, so the drivers' deliveries can be checked against the lab-wide
+    // "Delivered" figure: some deliveries are legitimately nobody's trip (the clinic collected it, a historical entry,
+    // a payment note) and some are made by an admin on the driver's behalf.
+    const deliveredRows = await prisma.caseStage.findMany({
+      where: { stageName: 'DELIVERED', scannedAt: { gte: dateFrom, lte: dateTo } },
+      select: { scannedBy: true, notes: true, caseId: true },
+    });
+    const recon = { deliveredEntries: deliveredRows.length, distinctCasesDelivered: new Set(deliveredRows.map(r => r.caseId)).size,
+      byDrivers: 0, selfPickup: 0, historicalEntry: 0, paymentNote: 0, adminOrSystem: 0, unmatched: 0 };
+    for (const r of deliveredRows) {
+      if (isSelfPickupNote(r.notes)) recon.selfPickup++;
+      else if (isHistoricalRegistrationNote(r.notes)) recon.historicalEntry++;
+      else if (isPaymentCollectionNote(r.notes)) recon.paymentNote++;
+      else if (NON_AGENT_DELIVERY_MARKERS.has((r.scannedBy || '').trim())) recon.adminOrSystem++;
+      else if (matchDeliveryAgentDetailed(r.scannedBy, r.notes, nameMaps).agent) recon.byDrivers++;
+      else recon.unmatched++;
+    }
+
     const result = {
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       unattributedOrders,
+      deliveryReconciliation: recon,
       totalLabOrders,
       agents: [...perAgent.values()].map(a => {
         const activeDays = Object.keys(a.dailyCounts).length;
@@ -800,6 +820,7 @@ async function computeDeliveryPerformance({ from, to } = {}) {
           totalDeliveries: a.totalDeliveries,
           totalOrders,
           uniqueCases: a.cases.size,
+          firstNameMatches: a.firstNameMatches,
           uniqueClinics: a.clinics.size,
           activeDays,
           avgPerActiveDay: activeDays > 0 ? Math.round((totalOrders / activeDays) * 10) / 10 : 0,

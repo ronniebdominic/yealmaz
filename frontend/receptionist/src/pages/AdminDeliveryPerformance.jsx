@@ -89,12 +89,20 @@ function AgentCard({ agent, from, to }) {
         <Stat label="Delivered" value={agent.totalDeliveries.toLocaleString('en-US')} info="Every case they marked Delivered in the selected range." />
         <Stat label="Clinics" value={agent.uniqueClinics.toLocaleString('en-US')} info="Distinct clinics they handled a pickup or delivery for." />
         <Stat label="Active Days" value={agent.activeDays} info="Calendar days with at least one pickup or delivery in the selected range." />
-        <Stat label="Total Orders" value={agent.totalOrders.toLocaleString('en-US')} info="Pickups + deliveries combined — their overall order volume in the selected range." />
+        <Stat label="Total Orders" value={agent.totalOrders.toLocaleString('en-US')} info={`Pickups + deliveries combined (${agent.totalPickups} + ${agent.totalDeliveries}). The same case is counted twice when this driver both picked it up and delivered it — they covered ${agent.uniqueCases} distinct case${agent.uniqueCases !== 1 ? 's' : ''}.`} />
         <Stat label="Lab Share" value={agent.shareOfTotalPercent != null ? `${agent.shareOfTotalPercent}%` : '—'} info="Their combined pickups + deliveries as a share of every order the whole lab handled in the selected range." />
       </div>
 
       {agent.totalOrders > 0 && <ActivitySparkline dailyCounts={agent.dailyCounts} from={from} to={to} />}
 
+      <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 10 }}>
+        <strong>{agent.uniqueCases.toLocaleString('en-US')}</strong> distinct case{agent.uniqueCases !== 1 ? 's' : ''} handled
+        {agent.firstNameMatches > 0 && (
+          <span style={{ color: 'var(--amber)', marginLeft: 8 }} title="These entries did not carry this driver's full name; they were matched on the first name alone. Check that they really are this driver's.">
+            ⚠ {agent.firstNameMatches} matched by first name only
+          </span>
+        )}
+      </div>
       <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
         {agent.lastActiveAt
           ? `Last active ${new Date(agent.lastActiveAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`
@@ -157,6 +165,24 @@ export default function AdminDeliveryPerformance() {
               <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
                 <strong style={{ color: 'var(--text-1)' }}>{data.totalLabOrders.toLocaleString('en-US')}</strong> total lab orders (pickups + deliveries) in this range — each agent's "Lab Share" below is their portion of that.
               </p>
+            )}
+            {data.deliveryReconciliation && data.deliveryReconciliation.deliveredEntries > 0 && (
+              <details style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 14 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>How the deliveries add up</summary>
+                <div style={{ marginTop: 8, lineHeight: 1.7 }}>
+                  {(() => { const r = data.deliveryReconciliation; return (
+                    <>
+                      <div><strong>{r.deliveredEntries.toLocaleString('en-US')}</strong> “Delivered” entries in this range ({r.distinctCasesDelivered.toLocaleString('en-US')} distinct cases):</div>
+                      <div>• by the drivers listed below: <strong>{r.byDrivers.toLocaleString('en-US')}</strong></div>
+                      <div>• collected by the clinic itself (self pickup): {r.selfPickup.toLocaleString('en-US')}</div>
+                      <div>• entered as historical records: {r.historicalEntry.toLocaleString('en-US')}</div>
+                      <div>• payment notes on already-delivered cases: {r.paymentNote.toLocaleString('en-US')}</div>
+                      <div>• marked by an admin / the system: {r.adminOrSystem.toLocaleString('en-US')}</div>
+                      <div>• by a name that matches no current driver: {r.unmatched.toLocaleString('en-US')}</div>
+                    </>
+                  ); })()}
+                </div>
+              </details>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
               {agents.map(a => <AgentCard key={a.id} agent={a} from={fromDate} to={toDate} />)}

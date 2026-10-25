@@ -130,19 +130,29 @@ function buildAgentNameMaps(agents) {
 // Returns the matched agent record, or null if this event isn't a real
 // delivery-agent action (self-pickup/admin/import) or can't be matched to
 // any current DELIVERY account.
-function matchDeliveryAgent(scannedBy, notes, maps) {
+function matchDeliveryAgentDetailed(scannedBy, notes, maps) {
   // Dispatch-assigned lab pickup — the real driver's name is in the note
   // text, not scannedBy (that's the dispatcher). See DISPATCHED_TO_PATTERN
   // above for why this exists.
   const dispatchedMatch = DISPATCHED_TO_PATTERN.exec((notes || '').trim());
   const rawName = (dispatchedMatch ? dispatchedMatch[1] : scannedBy || '').trim();
 
-  if (!rawName || NON_AGENT_DELIVERY_MARKERS.has(rawName) || isNonAgentDeliveredNote(notes)) return null;
+  if (!rawName || NON_AGENT_DELIVERY_MARKERS.has(rawName) || isNonAgentDeliveredNote(notes)) return { agent: null, how: null };
   const cleanRawName = rawName.toLowerCase();
-  return maps.byName.get(cleanRawName) || maps.byFirstName.get(cleanRawName.split(/\s+/)[0]) || null;
+  const exact = maps.byName.get(cleanRawName);
+  if (exact) return { agent: exact, how: 'name' };
+  // Last resort: the first word alone, when it is unique among the drivers. Useful when a name was typed in short, but
+  // it is a guess — so callers can count these separately and show them as "matched by first name only".
+  const byFirst = maps.byFirstName.get(cleanRawName.split(/\s+/)[0]);
+  return byFirst ? { agent: byFirst, how: 'first-name' } : { agent: null, how: null };
+}
+
+function matchDeliveryAgent(scannedBy, notes, maps) {
+  return matchDeliveryAgentDetailed(scannedBy, notes, maps).agent;
 }
 
 module.exports = {
+  matchDeliveryAgentDetailed,
   NON_AGENT_DELIVERY_MARKERS, isSelfPickupNote, isHistoricalRegistrationNote, isPaymentCollectionNote,
   isNonAgentDeliveredNote, buildAgentNameMaps, matchDeliveryAgent,
   PICKUP_IMPRESSION_NOTE, PICKUP_LAB_NOTE, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent,
