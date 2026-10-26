@@ -719,11 +719,20 @@ function PerformanceTab() {
 }
 
 // ── Request Goods (any lab tech, any department) ───────────
-function RequestGoodsModal({ onClose }) {
+function RequestGoodsModal({ onClose, currentDepartment }) {
   const { user } = useAuth();
+  // The options are department NAMES. A technician with no fixed department ("flexible") gets "General" plus whichever
+  // department they are currently working in. The first option is pre-selected so the form can never be sent with the
+  // department empty (it used to start empty while the list showed "GENERAL", so the request was refused).
+  const nameOf = (code) => DEPARTMENTS.find(d => d.code === code)?.label || code;
+  const departmentOptions = [...new Set([
+    ...(currentDepartment ? [nameOf(currentDepartment)] : []),
+    ...((user?.departments?.length ? user.departments : []).map(nameOf)),
+    ...(user?.departments?.length ? [] : ['General']),
+  ])];
   const [itemId, setItemId] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [department, setDepartment] = useState(user?.departments?.[0] || '');
+  const [department, setDepartment] = useState(departmentOptions[0] || 'General');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -731,9 +740,6 @@ function RequestGoodsModal({ onClose }) {
     queryKey: ['inventory', 'items', 'active'],
     queryFn: () => api.get('/inventory/items', { params: { activeOnly: true } }).then(r => r.data),
   });
-
-  const departmentOptions = (user?.departments?.length ? user.departments : ['GENERAL'])
-    .map(code => DEPARTMENTS.find(d => d.code === code)?.label || code);
 
   const submit = async () => {
     if (!itemId || !quantity || !department) { toast.error('Item, quantity and department are required'); return; }
@@ -1064,6 +1070,9 @@ export default function LabDashboard() {
                 <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', maxWidth: 240, margin: '0 auto' }}>
                   Choose your department above, then scan.
                 </p>
+                <button className="btn btn-ghost" style={{ marginTop: 16, gap: 8 }} onClick={() => setShowRequestGoods(true)}>
+                  <MdAddBox size={16} /> Request Goods
+                </button>
               </div>
             ) : (
               <>
@@ -1180,7 +1189,7 @@ export default function LabDashboard() {
       {/* ── Modals ── */}
       {showScanner && <QRScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
       {showManual && <ManualEntryModal onSubmit={handleScan} onClose={() => setShowManual(false)} />}
-      {showRequestGoods && <RequestGoodsModal onClose={() => setShowRequestGoods(false)} />}
+      {showRequestGoods && <RequestGoodsModal currentDepartment={activeDept} onClose={() => setShowRequestGoods(false)} />}
       {showMillingYield && <MillingYieldModal onClose={() => setShowMillingYield(false)} />}
       {scanResult && (
         <ScanResultModal
