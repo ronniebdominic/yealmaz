@@ -12,7 +12,9 @@ async function applyWalletToCase(prisma, caseId, actor = { id: null, name: 'Adva
   const payments = require('../routes/payments'); // lazy: avoids a require cycle
 
   const result = await prisma.$transaction(async (tx) => {
-    // Serialise concurrent deductions on this case (delivery, payment request, bulk pay can all fire at once).
+    // Serialise concurrent deductions on this case (delivery, payment request, bulk pay can all fire at once) — and a cashier
+    // collecting by hand: they take the same per-case lock.
+    await payments.lockCase(tx, caseId);
     await tx.$queryRaw`SELECT id FROM payments WHERE "caseId" = ${caseId} FOR UPDATE`;
     const caseData = await tx.case.findUnique({ where: { id: caseId }, include: { payment: true } });
     if (!caseData) return { applied: 0 };

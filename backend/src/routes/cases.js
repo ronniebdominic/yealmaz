@@ -57,6 +57,17 @@ async function getDueDays(db, workType, isExpress = false) {
 // so the two entry points can never drift apart. Throws { status, message }
 // on validation failure; the caller's route handler catches and responds.
 // `db` is either `prisma` or a `$transaction` tx client.
+// The clinic app describes the work; it never sets money or history. The lab prices a case when it accepts it. Before this,
+// a clinic login could post its own totalAmount / discount, or a delivery date that made the case DELIVERED on the spot
+// (priced Br 1, earning reward points) without anyone at the lab having seen it.
+const CLINIC_FORBIDDEN_FIELDS = ['totalAmount', 'discountType', 'discountValue', 'deliveryDate', 'redo', 'isRedo'];
+function withoutClinicOnlyFields(user, fields) {
+  if (user?.role !== 'CLINIC' || !fields) return fields;
+  const clean = { ...fields };
+  for (const f of CLINIC_FORBIDDEN_FIELDS) delete clean[f];
+  return clean;
+}
+
 async function createSingleCase(db, fields, actorUser) {
   const {
     patientName, patientAge, doctorName, doctorPhone, patientGender, workType,
@@ -552,7 +563,7 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const clinicId = req.user.role === 'CLINIC' ? req.user.id : req.body.clinicId;
-    const updatedCase = await createSingleCase(prisma, { ...req.body, clinicId }, req.user);
+    const updatedCase = await createSingleCase(prisma, { ...withoutClinicOnlyFields(req.user, req.body), clinicId }, req.user);
 
     // Award reward points if submitted by a clinic
     if (req.user.role === 'CLINIC') {
@@ -598,7 +609,7 @@ router.post('/bulk', protect, async (req, res) => {
     const cases = await prisma.$transaction(async (tx) => {
       const created = [];
       for (const item of items) {
-        created.push(await createSingleCase(tx, { ...shared, ...item, clinicId, orderGroupId }, req.user));
+        created.push(await createSingleCase(tx, withoutClinicOnlyFields(req.user, { ...shared, ...item, clinicId, orderGroupId }), req.user));
       }
       return created;
     });
@@ -1167,7 +1178,7 @@ router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST', 'LAB_TECH'
     if (shadeChanged) caseData.shade = shade || null;
 
     if (unitsChanged) {
-      if (existing.payment?.status === 'VERIFIED') {
+      if (existing.payment?.status === 'VERIFIED' || (existing.payment?.amountReceived || 0) > 0) {
         priceAdjustment = { changed: false, reason: 'payment_verified', oldAmount: existing.totalAmount ?? null, newAmount: existing.totalAmount ?? null };
       } else {
         const priceRow = await prisma.workTypePrice.findUnique({ where: { workType: existing.workType } });
@@ -1202,7 +1213,7 @@ router.patch('/:id/units', protect, restrict('ADMIN', 'RECEPTIONIST', 'LAB_TECH'
       const priceNote = !unitsChanged ? '' : priceAdjustment.changed
         ? ` — billed amount adjusted from Br ${priceAdjustment.oldAmount?.toLocaleString('en-US')} to Br ${priceAdjustment.newAmount.toLocaleString('en-US')}`
         : priceAdjustment.reason === 'payment_verified'
-          ? ' — amount left unchanged (payment already verified)'
+          ? ' — amount left unchanged (money already received on this case)'
           : '';
       const changes = [
         unitsChanged && `units ${existing.units ?? '—'} → ${units}`,
@@ -1576,6 +1587,19 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
     // directly. Synced here the same way PATCH /:id/units already does:
     // skipped once a payment is VERIFIED (a settled invoice is never quietly
     // rewritten), and only when totalAmount was actually part of this edit.
+    // A price change on a case that already has money on it would leave the invoice, the amount received and the receipts
+    // disagreeing (a paid case showing one figure here and another in revenue, or a part-paid case priced below what was
+    // already received so it can never be collected). Payment Override changes the invoice and the amount received together.
+    if ('totalAmount' in data && data.totalAmount !== existing.totalAmount && existing.payment) {
+      const received = existing.payment.amountReceived || 0;
+      if (existing.payment.status === 'VERIFIED') {
+        return res.status(409).json({ error: 'This case is already paid, so its price is locked. To correct it, use Override on the case (it changes the invoice and the amount received together).' });
+      }
+      if (received > 0) {
+        return res.status(409).json({ error: `Br ${received.toLocaleString('en-US')} has already been received on this case, so its price can't be edited here. Use Override on the case to change the invoice and the amount received together.` });
+      }
+    }
+
     let amountNote = '';
     const syncPaymentAmount = 'totalAmount' in data && data.totalAmount != null
       && existing.payment && existing.payment.status !== 'VERIFIED'

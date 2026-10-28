@@ -285,9 +285,9 @@ router.post('/chapa/webhook', async (req, res) => {
     const signature = req.headers['x-chapa-signature'] || req.headers['chapa-signature'];
     const rawBody = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body || {});
 
-    if (process.env.CHAPA_WEBHOOK_SECRET && signature) {
+    if (process.env.CHAPA_WEBHOOK_SECRET) {
       let valid = false;
-      try { valid = chapa.verifyWebhook(rawBody, signature); }
+      try { valid = !!signature && chapa.verifyWebhook(rawBody, signature); }
       catch (e) { console.warn('[Chapa webhook] verify threw:', e.message); }
       if (!valid) {
         console.warn('[Chapa webhook] signature mismatch — rejecting');
@@ -720,12 +720,6 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
   try {
     const { amount, notes, taxWithheld } = req.body;
 
-    const caseData = await prisma.case.findUnique({
-      where: { id: req.params.caseId },
-      include: { clinic: { select: { id: true, name: true } }, payment: true }
-    });
-    if (!caseData) return res.status(404).json({ error: 'Case not found.' });
-
     // `amount` is what was RECEIVED NOW. It never rewrites the invoice: a priced case keeps its billed amount, the
     // money received is added to what was already paid, and the case stays outstanding (with the balance shown) until
     // the payments add up to the bill. Before this, entering Br 12,500 against a Br 20,000 case collected the whole case
@@ -742,28 +736,47 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
       }
     }
 
-    const billed = billedOf(caseData);
-    let result;
-    if (billed > 0) {
-      const { remaining } = balanceOf(caseData);
-      if (remaining <= MONEY_EPS) return res.status(400).json({ error: 'Nothing is left to collect on this case.' });
-      const credit = amountNum != null ? amountNum : remaining; // no amount typed = the whole balance
-      if (credit > remaining + MONEY_EPS) {
-        return res.status(400).json({ error: `That is more than the Br ${remaining.toLocaleString('en-US')} still owed on this case.` });
+    // Everything that records money against a case runs under that case's lock and re-reads the case INSIDE it. Two
+    // cashiers (or a cashier and the advance-balance deduction at delivery) acting at the same moment used to both read
+    // the same balance, so both receipts were saved while the running total only counted one. A case that is already
+    // paid is refused too: collecting again recorded a second payment on it.
+    const outcome = await prisma.$transaction(async (tx) => {
+      await lockCase(tx, req.params.caseId);
+      const caseData = await tx.case.findUnique({
+        where: { id: req.params.caseId },
+        include: { clinic: { select: { id: true, name: true } }, payment: true }
+      });
+      if (!caseData) return { fail: [404, 'Case not found.'] };
+      if (caseData.paymentStatus === 'VERIFIED' || caseData.payment?.status === 'VERIFIED') {
+        return { fail: [409, 'This case is already paid in full. If that was a mistake, an admin can undo it with Payment Override.'] };
       }
-      if (taxWithheldAmount != null && taxWithheldAmount > credit + MONEY_EPS) {
-        return res.status(400).json({ error: 'Tax withheld cannot exceed the amount collected.' });
+
+      const billed = billedOf(caseData);
+      let result;
+      if (billed > 0) {
+        const { remaining } = balanceOf(caseData);
+        if (remaining <= MONEY_EPS) return { fail: [400, 'Nothing is left to collect on this case.'] };
+        const credit = amountNum != null ? amountNum : remaining; // no amount typed = the whole balance
+        if (credit > remaining + MONEY_EPS) {
+          return { fail: [400, `That is more than the Br ${remaining.toLocaleString('en-US')} still owed on this case.`] };
+        }
+        if (taxWithheldAmount != null && taxWithheldAmount > credit + MONEY_EPS) {
+          return { fail: [400, 'Tax withheld cannot exceed the amount collected.'] };
+        }
+        result = await recordInstallment(tx, caseData, req.user, { credit, taxAmount: taxWithheldAmount, notes });
+      } else {
+        // An unpriced case: the amount typed IS the price (the one situation where collecting sets the invoice).
+        if (amountNum == null) return { fail: [400, 'Enter the amount collected — this case has no price yet.'] };
+        if (taxWithheldAmount != null && taxWithheldAmount > amountNum) {
+          return { fail: [400, 'Tax withheld cannot exceed the amount collected.'] };
+        }
+        await collectCase(tx, caseData, req.user, { amount: amountNum, notes, taxWithheldAmount });
+        result = { complete: true, remaining: 0, received: amountNum };
       }
-      result = await recordInstallment(prisma, caseData, req.user, { credit, taxAmount: taxWithheldAmount, notes });
-    } else {
-      // An unpriced case: the amount typed IS the price (the one situation where collecting sets the invoice).
-      if (amountNum == null) return res.status(400).json({ error: 'Enter the amount collected — this case has no price yet.' });
-      if (taxWithheldAmount != null && taxWithheldAmount > amountNum) {
-        return res.status(400).json({ error: 'Tax withheld cannot exceed the amount collected.' });
-      }
-      await collectCase(prisma, caseData, req.user, { amount: amountNum, notes, taxWithheldAmount });
-      result = { complete: true, remaining: 0, received: amountNum };
-    }
+      return { caseData, result };
+    }, { timeout: 15_000 });
+    if (outcome.fail) return res.status(outcome.fail[0]).json({ error: outcome.fail[1] });
+    const { caseData, result } = outcome;
     const payment = await prisma.payment.findUnique({ where: { caseId: caseData.id } });
 
     await invalidate(`case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
@@ -804,6 +817,12 @@ router.post('/:caseId/collect', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_C
 // case ends up identical to one collected in a single go.
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 const MONEY_EPS = 0.005;
+
+// One writer at a time per case. Advisory (not a row lock) because a case may have no payment row yet. Held until the
+// surrounding transaction ends. The advance-balance deduction takes the same lock (services/walletDeduction.js).
+async function lockCase(tx, caseId) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${caseId}))`;
+}
 
 function balanceOf(caseData) {
   const due = billedOf(caseData);
@@ -854,6 +873,7 @@ async function recordInstallment(db, caseData, user, { credit, taxAmount, refere
 }
 
 router.balanceOf = balanceOf;
+router.lockCase = lockCase;
 router.recordInstallment = recordInstallment;
 
 // ── POST /api/payments/collect-bulk ─────────────────────
@@ -943,7 +963,13 @@ router.post('/collect-bulk', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASH
 
     let totalCredit = 0, totalTax = 0, completed = 0, partial = 0;
     await prisma.$transaction(async (tx) => {
-      for (const { c, credit } of plan) {
+      for (const { c: planned, credit } of plan) {
+        // What was checked above may be stale by now (someone else collected it a moment ago): look again under the lock.
+        await lockCase(tx, planned.id);
+        const c = await tx.case.findUnique({ where: { id: planned.id }, include: { clinic: { select: { id: true, name: true, isExcluded: true } }, payment: true } });
+        if (!c || c.paymentStatus === 'VERIFIED' || c.payment?.status === 'VERIFIED' || credit > balanceOf(c).remaining + MONEY_EPS) {
+          throw Object.assign(new Error('STALE'), { code: 'STALE', caseNumber: planned.caseNumber || planned.id });
+        }
         const tax = pct != null ? round2(credit * pct / 100) : 0;
         const r = await recordInstallment(tx, c, req.user, { credit, taxAmount: tax, reference: ref, notes: noteText });
         totalCredit += credit; totalTax += tax;
@@ -973,6 +999,9 @@ router.post('/collect-bulk', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASH
       netCashReceived: round2(totalCredit - totalTax),
     });
   } catch (err) {
+    if (err.code === 'STALE') {
+      return res.status(409).json({ error: `Case ${err.caseNumber} was paid or changed by someone else while you were recording this. Nothing was recorded — reload and try again.` });
+    }
     console.error('[payments collect-bulk]', err);
     res.status(500).json({ error: 'Could not record the payments - nothing was changed.' });
   }

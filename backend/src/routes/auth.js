@@ -2,11 +2,23 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 const prisma = require('../db');
 const { isAttendanceOnly } = require('../utils/attendanceOnly');
+
+// Password guessing: the general API limit (500 per 15 minutes per address) is far too loose for a login. Only FAILED
+// attempts count, so a whole office behind one address can still sign in all day.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many failed sign-in attempts. Please wait 15 minutes and try again.' },
+});
 
 // Helper: generate JWT
 const generateToken = (payload) => {
@@ -17,7 +29,7 @@ const generateToken = (payload) => {
 
 // ── POST /api/auth/login ─────────────────────────────────
 // Used by: Admin, Receptionist, Delivery staff
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -66,7 +78,7 @@ router.post('/login', async (req, res) => {
 
 // ── POST /api/auth/clinic/login ──────────────────────────
 // Used by: Clinic mobile app
-router.post('/clinic/login', async (req, res) => {
+router.post('/clinic/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 

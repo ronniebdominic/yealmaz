@@ -121,6 +121,6 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
 
   test('a case with nothing left to collect is refused', async () => {
     const r = await call(`/payments/${ids.partial}/collect`, { token: ids.jwt, method: 'POST', body: { amount: 100 } });
-    assert.equal(r.status, 400);
+    assert.equal(r.status, 409, 'a settled case is refused as already paid');
   });
 }

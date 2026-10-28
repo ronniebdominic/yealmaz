@@ -179,38 +179,30 @@ router.post('/redeem', protect, restrict('CLINIC'), async (req, res) => {
   try {
     const { rewardItemId } = req.body;
     if (!rewardItemId) return res.status(400).json({ error: 'rewardItemId is required.' });
-    const [item, points] = await Promise.all([
-      prisma.rewardItem.findUnique({ where: { id: rewardItemId } }),
-      prisma.clinicPoints.findUnique({ where: { clinicId: req.user.id } }),
-    ]);
+    const item = await prisma.rewardItem.findUnique({ where: { id: rewardItemId } });
     if (!item || !item.isActive) return res.status(404).json({ error: 'Reward not found or inactive.' });
-    const available = (points?.totalEarned ?? 0) - (points?.totalRedeemed ?? 0);
-    if (available < item.pointsCost) {
+    await ensureClinicPoints(req.user.id);
+
+    // The balance check and the deduction are ONE conditional update. Checking first and deducting afterwards let several
+    // requests sent together all pass the check, so one balance bought the same reward several times over.
+    const redemption = await prisma.$transaction(async (tx) => {
+      const taken = await tx.$executeRaw`UPDATE clinic_points SET "totalRedeemed" = "totalRedeemed" + ${item.pointsCost}
+        WHERE "clinicId" = ${req.user.id} AND "totalEarned" - "totalRedeemed" >= ${item.pointsCost}`;
+      if (taken === 0) return null;
+      const created = await tx.rewardRedemption.create({
+        data: { clinicId: req.user.id, rewardItemId, pointsSpent: item.pointsCost, status: 'PENDING' },
+        include: { rewardItem: { select: { name: true } } },
+      });
+      await tx.rewardTransaction.create({
+        data: { clinicId: req.user.id, type: 'REDEEM', points: -item.pointsCost, description: `Redeemed: ${item.name}` },
+      });
+      return created;
+    });
+    if (!redemption) {
+      const points = await prisma.clinicPoints.findUnique({ where: { clinicId: req.user.id } });
+      const available = (points?.totalEarned ?? 0) - (points?.totalRedeemed ?? 0);
       return res.status(400).json({ error: `Not enough points. Need ${item.pointsCost}, have ${available}.` });
     }
-    const redemption = await prisma.rewardRedemption.create({
-      data: {
-        clinicId:    req.user.id,
-        rewardItemId,
-        pointsSpent: item.pointsCost,
-        status:      'PENDING',
-      },
-      include: { rewardItem: { select: { name: true } } },
-    });
-    // Reserve points immediately (deduct when approved if you prefer — here deduct on request)
-    await ensureClinicPoints(req.user.id);
-    await prisma.clinicPoints.update({
-      where: { clinicId: req.user.id },
-      data: { totalRedeemed: { increment: item.pointsCost } },
-    });
-    await prisma.rewardTransaction.create({
-      data: {
-        clinicId:    req.user.id,
-        type:        'REDEEM',
-        points:      -item.pointsCost,
-        description: `Redeemed: ${item.name}`,
-      },
-    });
     await invalidate(`rewards:clinic:${req.user.id}`);
     res.status(201).json(redemption);
   } catch (err) {
