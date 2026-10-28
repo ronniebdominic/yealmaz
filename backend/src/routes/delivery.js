@@ -13,6 +13,11 @@ const prisma = require('../db');
 const { NOT_ATTENDANCE_ONLY } = require('../utils/attendanceOnly');
 const { recordEvent } = require('../services/tvService');
 
+// A driver acts only on the cases dispatch assigned to them (an admin may act on any). Before this, any driver could pick up,
+// deliver or hand back ANY case in the right stage, including a colleague's.
+const notMine = (req, caseData) => req.user.role === 'DELIVERY' && caseData.assignedDeliveryId !== req.user.id;
+const NOT_ASSIGNED = { error: 'This case is not assigned to you.' };
+
 // ── GET /api/delivery/assigned ───────────────────────────
 router.get('/assigned', protect, restrict('DELIVERY', 'ADMIN'), async (req, res) => {
   const { page = 1, limit = 50 } = req.query;
@@ -164,6 +169,7 @@ router.post('/:caseId/collect-impression', protect, restrict('DELIVERY', 'ADMIN'
   try {
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (notMine(req, caseData)) return res.status(403).json(NOT_ASSIGNED);
     if (caseData.status !== 'PICKUP_ASSIGNED') {
       return res.status(400).json({ error: 'Case is not in PICKUP_ASSIGNED status.' });
     }
@@ -207,6 +213,7 @@ router.post('/:caseId/pickup', protect, restrict('DELIVERY', 'ADMIN'), async (re
   try {
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (notMine(req, caseData)) return res.status(403).json(NOT_ASSIGNED);
     if (caseData.status !== 'READY_TO_DISPATCH') {
       return res.status(409).json({ error: `Case is ${caseData.status.replace(/_/g, ' ').toLowerCase()}, not ready for dispatch.` });
     }
@@ -237,8 +244,9 @@ router.post('/:caseId/deliver', protect, restrict('DELIVERY', 'ADMIN'), async (r
   try {
     const { notes } = req.body;
 
-    const current = await prisma.case.findUnique({ where: { id: req.params.caseId }, select: { status: true } });
+    const current = await prisma.case.findUnique({ where: { id: req.params.caseId }, select: { status: true, assignedDeliveryId: true } });
     if (!current) return res.status(404).json({ error: 'Case not found.' });
+    if (notMine(req, current)) return res.status(403).json(NOT_ASSIGNED);
     if (current.status !== 'OUT_FOR_DELIVERY') {
       return res.status(409).json({ error: current.status === 'DELIVERED' ? 'This case is already delivered.' : `Case is ${current.status.replace(/_/g, ' ').toLowerCase()}, not out for delivery.` });
     }
@@ -288,6 +296,7 @@ router.post('/:caseId/return-to-pickup-queue', protect, restrict('DELIVERY', 'AD
     const { reason = 'Could not collect impression — returned to pickup queue' } = req.body;
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (notMine(req, caseData)) return res.status(403).json(NOT_ASSIGNED);
     if (caseData.status !== 'PICKUP_ASSIGNED') {
       return res.status(409).json({ error: 'Only a case awaiting impression pickup can be returned to the pickup queue.' });
     }
@@ -325,6 +334,7 @@ router.post('/:caseId/return-to-dispatch', protect, restrict('DELIVERY', 'ADMIN'
     const { reason = 'Returned to dispatch queue by delivery staff' } = req.body;
     const caseData = await prisma.case.findUnique({ where: { id: req.params.caseId } });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+    if (notMine(req, caseData)) return res.status(403).json(NOT_ASSIGNED);
     if (!['OUT_FOR_DELIVERY', 'READY_TO_DISPATCH'].includes(caseData.status)) {
       return res.status(409).json({ error: 'Only a case that is out for delivery can be returned to dispatch.' });
     }

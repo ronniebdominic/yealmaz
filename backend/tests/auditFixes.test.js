@@ -41,6 +41,8 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     app.use('/api/payments', require('../src/routes/payments'));
     app.use('/api/cases', require('../src/routes/cases'));
     app.use('/api/rewards', require('../src/routes/rewards'));
+    app.use('/api/delivery', require('../src/routes/delivery'));
+    app.use('/api/scan', require('../src/routes/scan'));
     server = http.createServer(app);
     await new Promise(r => server.listen(0, '127.0.0.1', r));
     base = `http://127.0.0.1:${server.address().port}/api`;
@@ -95,6 +97,62 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     assert.equal(r.body.deliveryDate, null);
     assert.equal(r.body.discountType, null);
     assert.equal(r.body.caseNumber, null, 'no scan number before the lab accepts it');
+  });
+
+  test('a driver can only deliver a case dispatch assigned to them', async () => {
+    const a = await prisma.user.create({ data: { name: 'Driver A', email: 'da@t.local', password: 'x', role: 'DELIVERY' } });
+    const b = await prisma.user.create({ data: { name: 'Driver B', email: 'db@t.local', password: 'x', role: 'DELIVERY' } });
+    const tokA = jwt.sign({ id: a.id, role: 'DELIVERY', name: a.name }, process.env.JWT_SECRET);
+    const tokB = jwt.sign({ id: b.id, role: 'DELIVERY', name: b.name }, process.env.JWT_SECRET);
+    const c = await mk({ status: 'OUT_FOR_DELIVERY', deliveryDate: null, assignedDeliveryId: a.id });
+    await prisma.payment.create({ data: { caseId: c.id, amount: 30000, status: 'PENDING' } });
+
+    assert.equal((await call(`/delivery/${c.id}/deliver`, { token: tokB, method: 'POST', body: {} })).status, 403, "another driver's case");
+    assert.equal((await call(`/cases/${c.id}/status`, { token: tokB, method: 'PATCH', body: { status: 'DELIVERED' } })).status, 403, 'the generic status route too');
+    assert.equal((await prisma.case.findUnique({ where: { id: c.id } })).status, 'OUT_FOR_DELIVERY');
+
+    assert.equal((await call(`/delivery/${c.id}/deliver`, { token: tokA, method: 'POST', body: {} })).status, 200, 'their own case');
+    assert.equal((await prisma.case.findUnique({ where: { id: c.id } })).status, 'DELIVERED');
+  });
+
+  test("a clinic's submission earns its points when the lab accepts the case, worked out from the case as accepted", async () => {
+    await prisma.clinicPoints.deleteMany({ where: { clinicId: ids.clinic } });
+    const r = await call('/cases', { token: ids.clinicTok, method: 'POST', body: { patientName: 'Pts', workType: 'PFM', doctorName: 'D', doctorPhone: '1', shade: 'A1', units: 500 } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    await new Promise(x => setTimeout(x, 300));
+    let p = await prisma.clinicPoints.findUnique({ where: { clinicId: ids.clinic } });
+    assert.equal(p?.totalEarned ?? 0, 0, 'nothing is earned on the clinic\'s say-so');
+    assert.equal(await prisma.rewardTransaction.count({ where: { caseId: r.body.id, type: 'PENDING' } }), 1);
+
+    // the lab corrects the units, then accepts
+    await call(`/cases/${r.body.id}/units`, { token: ids.admin, method: 'PATCH', body: { units: 2 } });
+    const acc = await call(`/cases/${r.body.id}/status`, { token: ids.admin, method: 'PATCH', body: { status: 'CASE_ACCEPTED' } });
+    assert.equal(acc.status, 200, JSON.stringify(acc.body));
+    p = await prisma.clinicPoints.findUnique({ where: { clinicId: ids.clinic } });
+    const earned = await prisma.rewardTransaction.findMany({ where: { caseId: r.body.id, type: 'EARN' } });
+    assert.equal(earned.length, 1);
+    assert.equal(p.totalEarned, earned[0].points);
+    assert.ok(earned[0].points > 0 && earned[0].points < 500, `points follow the corrected 2 units, not the claimed 500 (got ${earned[0].points})`);
+    assert.equal(await prisma.rewardTransaction.count({ where: { caseId: r.body.id, type: 'PENDING' } }), 0);
+
+    // moving it on again never pays twice
+    await call(`/cases/${r.body.id}/status`, { token: ids.admin, method: 'PATCH', body: { status: 'DESIGNING' } });
+    assert.equal((await prisma.clinicPoints.findUnique({ where: { clinicId: ids.clinic } })).totalEarned, earned[0].points);
+  });
+
+  test('the public QR page shows no patient or clinic name, and its JSON form needs a staff sign-in', async () => {
+    const c = await mk({ patientName: 'Zelalem Secretname' });
+    const html = await (await fetch(`${base}/scan/${c.id}`)).text();
+    assert.ok(html.includes(c.caseNumber), 'the case number is still shown');
+    assert.ok(!html.includes('Zelalem'), 'no patient name on the public page');
+    assert.ok(!html.includes('Clinic A'), 'no clinic name on the public page');
+    const anon = await fetch(`${base}/scan/${c.id}`, { headers: { accept: 'application/json' } });
+    assert.equal(anon.status, 401);
+    const clinic = await fetch(`${base}/scan/${c.id}`, { headers: { accept: 'application/json', authorization: `Bearer ${ids.clinicTok}` } });
+    assert.equal(clinic.status, 403);
+    const staff = await fetch(`${base}/scan/${c.id}`, { headers: { accept: 'application/json', authorization: `Bearer ${ids.admin}` } });
+    assert.equal(staff.status, 200);
+    assert.equal((await staff.json()).patientName, 'Zelalem Secretname');
   });
 
   test('redeeming the same points several times at once spends them once', async () => {

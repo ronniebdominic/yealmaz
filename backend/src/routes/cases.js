@@ -5,7 +5,7 @@ const QRCode = require('qrcode');
 const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { checkCaseDate } = require('../services/financeRules');
-const { awardCasePoints } = require('./rewards');
+const { holdCasePoints, releaseCasePoints } = require('./rewards');
 const { clawBackCasePoints } = require('../utils/rewards');
 const { buildWorkbookBuffer, sendXlsx } = require('../utils/excel');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
@@ -567,7 +567,7 @@ router.post('/', protect, async (req, res) => {
 
     // Award reward points if submitted by a clinic
     if (req.user.role === 'CLINIC') {
-      awardCasePoints(req.user.id, updatedCase.id, updatedCase.caseNumber, updatedCase).catch(() => {});
+      holdCasePoints(req.user.id, updatedCase.id, updatedCase.caseNumber).catch(() => {});
     }
 
     await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
@@ -617,7 +617,7 @@ router.post('/bulk', protect, async (req, res) => {
     // Reward points + socket emits happen after the transaction commits —
     // same as the single-case path, so a slow non-DB call never holds a DB lock.
     if (req.user.role === 'CLINIC') {
-      for (const c of cases) awardCasePoints(req.user.id, c.id, c.caseNumber, c).catch(() => {});
+      for (const c of cases) holdCasePoints(req.user.id, c.id, c.caseNumber).catch(() => {});
     }
 
     await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
@@ -837,6 +837,8 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       `case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dispatch:queue',
       ...(additionalCases.length ? ['dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:stations'] : [])
     );
+
+    await releaseCasePoints(req.params.id).catch(() => {}); // a clinic's submission earns its points now that the lab accepted it
 
     const io = req.app.get('io');
     await recordEvent({ type: 'CASE_ACCEPTED', caseId: accepted.id, caseNumber: accepted.caseNumber, stage: 'CASE_ACCEPTED', actorUserId: req.user.id, actorName: req.user.name });
@@ -1449,6 +1451,10 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
 
     const existing = await prisma.case.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Case not found.' });
+    // A driver changes only the cases dispatch assigned to them.
+    if (req.user.role === 'DELIVERY' && existing.assignedDeliveryId !== req.user.id) {
+      return res.status(403).json({ error: 'This case is not assigned to you.' });
+    }
 
     const VALID_STATUSES = ['PENDING_PICKUP','PICKUP_ASSIGNED','CASE_ACCEPTED','PLASTER_DEPARTMENT','MARGIN_DEPARTMENT','SCANNING','DESIGNING','MILLING_SINTERING','RESIN_3D_PRINTING','METAL_3D_PRINTING','METAL_FINISHING','OPAQUE_APPLICATION','CERAMIC_LAYERING','ZIRCONIA_FITTING_FINISHING','GLAZING','THERMO_PRESS','TRIMMING','QUALITY_CHECK','PAYMENT_INVOICING','READY_TO_DISPATCH','OUT_FOR_DELIVERY','DELIVERED','ON_HOLD','REMAKE','CANCELLED','UNDER_REVIEW','REJECTED'];
     if (!VALID_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status.' });
@@ -1499,6 +1505,9 @@ router.patch('/:id/status', protect, restrict('ADMIN', 'RECEPTIONIST', 'DELIVERY
 
     if (status === 'DELIVERED') {
       await require('../services/walletDeduction').applyWalletSafely(prisma, req.params.id);
+    }
+    if (!['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'UNDER_REVIEW', 'REJECTED', 'CANCELLED', 'ON_HOLD'].includes(status)) {
+      await releaseCasePoints(req.params.id).catch(() => {});
     }
 
     invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'lab:active');

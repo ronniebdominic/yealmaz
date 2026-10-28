@@ -299,9 +299,13 @@ router.get('/:caseId', async (req, res) => {
       `);
     }
 
-    // Return JSON for the lab dashboard app
+    // The JSON form carries the patient's and clinic's names, so it needs a signed-in staff account. (The link is printed on the
+    // case label, so anyone holding the label could otherwise read it.)
     if (req.headers.accept?.includes('application/json')) {
-      return res.json({ caseId, caseNumber: caseData.caseNumber, patientName: caseData.patientName, workType: caseData.workType, status: caseData.status, statusLabel: STAGE_LABELS[caseData.status], clinic: caseData.clinic.name, stages: caseData.stages });
+      return protect(req, res, () => {
+        if (req.user.role === 'CLINIC') return res.status(403).json({ error: 'Access denied.' });
+        res.json({ caseId, caseNumber: caseData.caseNumber, patientName: caseData.patientName, workType: caseData.workType, status: caseData.status, statusLabel: STAGE_LABELS[caseData.status], clinic: caseData.clinic.name, stages: caseData.stages });
+      });
     }
 
     // Return HTML for direct browser scan
@@ -330,8 +334,7 @@ router.get('/:caseId', async (req, res) => {
           <div style="font-size:36px;margin-bottom:8px">🦷</div>
           <div class="logo">Ye-Almaz Dental Lab</div>
           <div class="cn">${escapeHtml(caseData.caseNumber)}</div>
-          <div class="patient">${escapeHtml(caseData.patientName)}</div>
-          <div class="work">${escapeHtml(caseData.workType)} · ${escapeHtml(caseData.clinic.name)}</div>
+          <div class="work">${escapeHtml(caseData.workType)}</div>
           <div class="stage">
             <div class="stage-lbl">Current: ${STAGE_LABELS[caseData.status]}</div>
           </div>

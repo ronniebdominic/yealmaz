@@ -48,6 +48,24 @@ async function awardCasePoints(clinicId, caseId, caseNumber, caseInfo = {}) {
   await invalidate(`rewards:clinic:${clinicId}`);
 }
 
+// Points are not earned when a clinic SUBMITS a case — the clinic types the units, so that let a clinic claim any number of
+// units and be paid in points before anyone at the lab had looked at the case. A submission leaves a zero-point marker; the
+// points are worked out from the case as the lab accepted it (its corrected work type and units) when it is accepted.
+async function holdCasePoints(clinicId, caseId, caseNumber) {
+  await prisma.rewardTransaction.create({
+    data: { clinicId, caseId, type: 'PENDING', points: 0, description: `Case submitted${caseNumber ? ` — ${caseNumber}` : ''} (points are added when the lab accepts it)` },
+  });
+}
+
+async function releaseCasePoints(caseId) {
+  const held = await prisma.rewardTransaction.findFirst({ where: { caseId, type: 'PENDING' } });
+  if (!held) return; // not a clinic submission, or already released
+  const claimed = await prisma.rewardTransaction.deleteMany({ where: { id: held.id } }); // only one caller gets to release it
+  if (claimed.count === 0) return;
+  const c = await prisma.case.findUnique({ where: { id: caseId }, select: { clinicId: true, caseNumber: true, workType: true, units: true, remake: true, isRedo: true } });
+  if (c) await awardCasePoints(c.clinicId, caseId, c.caseNumber, c);
+}
+
 // ── GET /api/rewards/rates ────────────────────────────────
 // How points are earned, for the clinic app and the admin Rewards page.
 router.get('/rates', protect, async (req, res) => {
@@ -284,3 +302,5 @@ router.patch('/redemptions/:id', protect, restrict('ADMIN'), async (req, res) =>
 
 module.exports = router;
 module.exports.awardCasePoints = awardCasePoints;
+module.exports.holdCasePoints = holdCasePoints;
+module.exports.releaseCasePoints = releaseCasePoints;
