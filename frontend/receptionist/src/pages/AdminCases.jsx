@@ -262,7 +262,7 @@ const OVERRIDE_OPTIONS = [
   {
     value: 'PENDING',
     label: 'Reset to Pending',
-    desc:  'Clear any screenshot / approval and reset to awaiting payment',
+    desc:  'Undo a wrong payment: back to awaiting payment, keeping only the amount you say was really received',
     color: 'var(--amber)',
     bg:    'rgba(217,119,6,0.08)',
     icon:  MdPendingActions,
@@ -280,18 +280,28 @@ const OVERRIDE_OPTIONS = [
 function OverridePaymentModal({ caseData, onDone, onClose }) {
   const [newStatus, setNewStatus] = useState('VERIFIED');
   const [amount,    setAmount]    = useState(caseData.totalAmount?.toString() || '');
+  // Money already received that stays on the client's account when a payment is undone. A paid case undone starts at 0
+  // (nothing was really paid); a case with part payments starts at what was recorded.
+  const recordedReceived = caseData.payment?.status === 'VERIFIED' ? 0 : (caseData.payment?.amountReceived || 0);
+  const [received, setReceived] = useState(String(recordedReceived));
   const [reason,    setReason]    = useState('');
   const [saving,    setSaving]    = useState(false);
 
   const selected = OVERRIDE_OPTIONS.find(o => o.value === newStatus);
+  const invoiceNow = parseFloat(amount) || caseData.totalAmount || 0;
+  const receivedNum = parseFloat(received) || 0;
+  const stillOwed = Math.max(invoiceNow - receivedNum, 0);
+  const receivedTooHigh = newStatus === 'PENDING' && invoiceNow > 0 && receivedNum >= invoiceNow;
 
   const submit = async () => {
     if (!reason.trim()) { toast.error('A reason is required for payment overrides'); return; }
+    if (receivedTooHigh) { toast.error('Amount received must be less than the invoice — use Verified / Paid if it is fully paid'); return; }
     setSaving(true);
     try {
       await api.post(`/payments/${caseData.id}/override`, {
         status: newStatus,
         amount: amount ? parseFloat(amount) : undefined,
+        ...(newStatus === 'PENDING' ? { amountReceived: receivedNum } : {}),
         reason: reason.trim(),
       });
       toast.success(`Payment overridden → ${selected.label} for ${caseData.caseNumber}`);
@@ -370,11 +380,11 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
             </div>
           </div>
 
-          {/* Amount (optional — only shown for VERIFIED) */}
-          {newStatus === 'VERIFIED' && (
+          {/* Amount (optional — shown for VERIFIED and for Reset to Pending) */}
+          {(newStatus === 'VERIFIED' || newStatus === 'PENDING') && (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
-                Amount (Br) — optional
+                {newStatus === 'PENDING' ? 'Invoice value (Br) — optional' : 'Amount (Br) — optional'}
                 {caseData.totalAmount && (
                   <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
                     Current: Br {caseData.totalAmount.toLocaleString('en-US')}
@@ -388,6 +398,27 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
                 onChange={e => setAmount(e.target.value)}
                 style={{ width: '100%', padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 14, background: 'var(--surface)', color: 'var(--text-1)' }}
               />
+            </div>
+          )}
+
+          {/* What was really received — only when undoing a payment */}
+          {newStatus === 'PENDING' && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+                Amount actually received so far (Br)
+                <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>0 if nothing was really paid</span>
+              </label>
+              <input
+                type="number" min="0"
+                value={received}
+                onChange={e => setReceived(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: `1.5px solid ${receivedTooHigh ? 'var(--red)' : 'var(--border)'}`, borderRadius: 8, fontSize: 14, background: 'var(--surface)', color: 'var(--text-1)' }}
+              />
+              <div style={{ fontSize: 12, marginTop: 6, color: receivedTooHigh ? 'var(--red)' : 'var(--text-3)' }}>
+                {receivedTooHigh
+                  ? 'This is as much as the invoice — choose Verified / Paid instead.'
+                  : <>Invoice Br {invoiceNow.toLocaleString('en-US')} − received Br {receivedNum.toLocaleString('en-US')} = <strong>Br {stillOwed.toLocaleString('en-US')}</strong> still owed by the client.</>}
+              </div>
             </div>
           )}
 
@@ -418,13 +449,13 @@ function OverridePaymentModal({ caseData, onDone, onClose }) {
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
             <button
               onClick={submit}
-              disabled={saving || !reason.trim()}
+              disabled={saving || !reason.trim() || receivedTooHigh}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: saving || !reason.trim() ? 'var(--border)' : selected.color,
+                background: saving || !reason.trim() || receivedTooHigh ? 'var(--border)' : selected.color,
                 color: '#fff', border: 'none', borderRadius: 8,
                 padding: '10px 18px', fontSize: 13, fontWeight: 700,
-                cursor: saving || !reason.trim() ? 'not-allowed' : 'pointer',
+                cursor: saving || !reason.trim() || receivedTooHigh ? 'not-allowed' : 'pointer',
                 transition: 'background .15s',
               }}
             >

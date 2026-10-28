@@ -982,7 +982,7 @@ router.post('/collect-bulk', protect, restrict('ADMIN', 'FINANCE', 'FINANCE_CASH
 // Admin force-sets payment status to any value with a mandatory reason (audit-logged)
 router.post('/:caseId/override', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { status, amount, reason } = req.body;
+    const { status, amount, reason, amountReceived } = req.body;
 
     const VALID = ['PENDING', 'VERIFIED', 'REJECTED'];
     if (!status || !VALID.includes(status)) {
@@ -994,9 +994,27 @@ router.post('/:caseId/override', protect, restrict('ADMIN'), async (req, res) =>
 
     const caseData = await prisma.case.findUnique({
       where: { id: req.params.caseId },
-      include: { clinic: { select: { id: true, name: true } } }
+      include: { clinic: { select: { id: true, name: true } }, payment: { include: { receipts: true } } }
     });
     if (!caseData) return res.status(404).json({ error: 'Case not found.' });
+
+    const hasAmount = amount !== undefined && amount !== null && amount !== '';
+    if (hasAmount && !(parseFloat(amount) >= 0)) return res.status(400).json({ error: 'Amount must be a number.' });
+    const newBilled = hasAmount ? parseFloat(amount) : billedOf(caseData);
+
+    // Returning a case to Pending means "what was recorded as paid was wrong". The money already RECEIVED is stated
+    // explicitly (amountReceived, default 0 = nothing was really paid) instead of being left behind: before, an undone
+    // payment kept its old received amount, so the case showed as paid-up or the balance came out wrong, and an admin who
+    // restored the invoice to Br 30,000 after Br 15,000 had really been paid saw the client owe the whole Br 30,000.
+    let receivedAfter = null;
+    if (status === 'PENDING') {
+      const given = amountReceived !== undefined && amountReceived !== null && amountReceived !== '';
+      receivedAfter = given ? round2(parseFloat(amountReceived)) : 0;
+      if (!(receivedAfter >= 0)) return res.status(400).json({ error: 'Amount received must be a number, 0 or more.' });
+      if (newBilled > 0 && receivedAfter >= newBilled - MONEY_EPS) {
+        return res.status(400).json({ error: 'Amount received must be less than the invoice — if it is fully paid, set the status to Verified / Paid instead.' });
+      }
+    }
 
     // Build payment patch
     const paymentPatch = {
@@ -1013,31 +1031,52 @@ router.post('/:caseId/override', protect, restrict('ADMIN'), async (req, res) =>
       paymentPatch.verifiedAt      = null;
       paymentPatch.screenshotUrl   = null;
       paymentPatch.uploadedAt      = null;
+      paymentPatch.amountReceived  = receivedAfter > 0 ? receivedAfter : null;
+      paymentPatch.taxWithheld     = null;
     }
-    if (amount !== undefined && amount !== null && amount !== '') {
+    if (hasAmount) {
       paymentPatch.amount = parseFloat(amount);
     }
 
-    const payment = await prisma.payment.upsert({
-      where:  { caseId: req.params.caseId },
-      update: paymentPatch,
-      create: { caseId: req.params.caseId, ...paymentPatch }
-    });
-
     const casePatch = { paymentStatus: status };
-    if (amount !== undefined && amount !== null && amount !== '') {
+    if (hasAmount) {
       casePatch.totalAmount = parseFloat(amount);
     }
-    await prisma.case.update({ where: { id: req.params.caseId }, data: casePatch });
 
-    // Audit trail — record in case stages so it shows in timeline
-    await prisma.caseStage.create({
-      data: {
-        caseId:    req.params.caseId,
-        stageName: caseData.status,   // keep current stage, just log the note
-        scannedBy: req.user.name,
-        notes: `[PAYMENT OVERRIDE → ${status}] ${reason.trim()}`,
+    // The payment, its receipts and the case move together or not at all.
+    const priorReceipts = caseData.payment?.receipts || [];
+    const payment = await prisma.$transaction(async (tx) => {
+      const p = await tx.payment.upsert({
+        where:  { caseId: req.params.caseId },
+        update: paymentPatch,
+        create: { caseId: req.params.caseId, ...paymentPatch }
+      });
+      if (status === 'PENDING') {
+        // The receipts are the ledger behind amountReceived, so they have to add up to it. The old ones are removed (their
+        // details go into the audit note below) and what is really held is recorded as one opening balance.
+        await tx.paymentReceipt.deleteMany({ where: { paymentId: p.id } });
+        if (receivedAfter > 0) {
+          await tx.paymentReceipt.create({
+            data: { paymentId: p.id, amount: receivedAfter, notes: `Balance carried after admin override: ${reason.trim()}`, receivedById: req.user.id, receivedByName: req.user.name || null },
+          });
+        }
       }
+      await tx.case.update({ where: { id: req.params.caseId }, data: casePatch });
+
+      // Audit trail — record in case stages so it shows in timeline
+      const wasPaid = caseData.payment?.status === 'VERIFIED' ? billedOf(caseData) : (caseData.payment?.amountReceived || 0);
+      const ledger = status === 'PENDING'
+        ? ` | Received before: Br ${Number(wasPaid).toLocaleString('en-US')}${priorReceipts.length ? ` (${priorReceipts.length} receipt${priorReceipts.length > 1 ? 's' : ''}: ${priorReceipts.map(r => `Br ${r.amount}`).join(', ')})` : ''}; received now: Br ${receivedAfter.toLocaleString('en-US')}; invoice Br ${Number(newBilled).toLocaleString('en-US')}; still owed Br ${Math.max(round2(newBilled - receivedAfter), 0).toLocaleString('en-US')}`
+        : '';
+      await tx.caseStage.create({
+        data: {
+          caseId:    req.params.caseId,
+          stageName: caseData.status,   // keep current stage, just log the note
+          scannedBy: req.user.name,
+          notes: `[PAYMENT OVERRIDE → ${status}] ${reason.trim()}${ledger}`,
+        }
+      });
+      return p;
     });
 
     await invalidate(
