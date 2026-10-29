@@ -94,6 +94,25 @@ export default function AdminRewards() {
   });
   const [rejectNote, setRejectNote] = useState({});
 
+  // ── Correct past points ───────────────────────────────────
+  // Points used to be paid when a clinic submitted a case, from the units the clinic typed. They are now awarded when the
+  // lab accepts the case. This previews, then applies, the same rule to points already awarded.
+  const [recalc, setRecalc] = useState(null);
+  const [recalcBusy, setRecalcBusy] = useState(false);
+  const runRecalc = async (apply) => {
+    if (apply && !window.confirm('Apply these corrections? Points are taken back from cases the lab has not accepted yet (they return when it accepts them) and corrected to the lab\'s units on accepted ones.')) return;
+    setRecalcBusy(true);
+    try {
+      const { data } = await api.post('/rewards/recalculate', { apply });
+      setRecalc(data);
+      if (apply) {
+        qc.invalidateQueries({ queryKey: ['rewards', 'leaderboard'] });
+        toast.success('Past points corrected');
+      }
+    } catch (err) { toast.error(err.response?.data?.error || 'Could not check the points'); }
+    finally { setRecalcBusy(false); }
+  };
+
   const processRedemption = async (id, status) => {
     try {
       await api.patch(`/rewards/redemptions/${id}`, { status, adminNote: rejectNote[id] || null });
@@ -250,6 +269,92 @@ export default function AdminRewards() {
 
         {/* ── Clinic Points Leaderboard ── */}
         {tab === 'Clinic Points' && (
+          <>
+          <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>Correct past points</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>
+                  Points are now awarded when the lab accepts a case, from the units the lab recorded. This checks points awarded earlier
+                  (when they came from the units the clinic typed) and shows what would change. Nothing changes until you apply it.
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost" disabled={recalcBusy} onClick={() => runRecalc(false)}>{recalcBusy && !recalc?.applied ? 'Checking…' : 'Check past points'}</button>
+                {recalc && !recalc.applied && recalc.summary.casesChanged > 0 && (
+                  <button className="btn btn-primary" disabled={recalcBusy} onClick={() => runRecalc(true)}>Apply corrections</button>
+                )}
+              </div>
+            </div>
+
+            {recalc && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                  {[
+                    ['Cases checked', recalc.summary.casesChecked],
+                    [recalc.applied ? 'Cases corrected' : 'Cases to correct', recalc.summary.casesChanged],
+                    ['Held until accepted', recalc.summary.casesHeldUntilAccepted],
+                    ['Points taken back', recalc.summary.pointsRemoved],
+                    ['Points added', recalc.summary.pointsAdded],
+                  ].map(([label, value]) => (
+                    <div key={label} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '10px 14px', minWidth: 120 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600 }}>{label}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>{Number(value).toLocaleString('en-US')}</div>
+                    </div>
+                  ))}
+                </div>
+                {recalc.applied && <div style={{ fontSize: 13, color: 'var(--green)', fontWeight: 600, marginBottom: 10 }}>Applied. Running the check again will show nothing left to correct.</div>}
+                {recalc.summary.casesChanged === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Every past award already matches the case as the lab recorded it.</div>
+                ) : (
+                  <>
+                    {recalc.summary.clinicsWithShortfall > 0 && (
+                      <div style={{ fontSize: 13, color: '#E65100', marginBottom: 10 }}>
+                        {recalc.summary.clinicsWithShortfall} clinic(s) have already spent more than the corrected total. Their balance is left at 0, not made negative; the shortfall column shows the difference.
+                      </div>
+                    )}
+                    <div className="table-wrap" style={{ maxHeight: 260, overflow: 'auto', marginBottom: 12 }}>
+                      <table>
+                        <thead><tr><th>Clinic</th><th style={{ textAlign: 'right' }}>Cases</th><th style={{ textAlign: 'right' }}>Earned before</th><th style={{ textAlign: 'right' }}>Earned after</th><th style={{ textAlign: 'right' }}>Available after</th><th style={{ textAlign: 'right' }}>Shortfall</th></tr></thead>
+                        <tbody>
+                          {recalc.clinics.map(c => (
+                            <tr key={c.clinicId}>
+                              <td style={{ fontWeight: 600 }}>{c.clinicName}</td>
+                              <td style={{ textAlign: 'right' }}>{c.cases}</td>
+                              <td style={{ textAlign: 'right' }}>{c.earnedBefore.toLocaleString('en-US')}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700 }}>{c.earnedAfter.toLocaleString('en-US')}</td>
+                              <td style={{ textAlign: 'right' }}>{c.availableAfter.toLocaleString('en-US')}</td>
+                              <td style={{ textAlign: 'right', color: c.shortfall ? '#E65100' : 'var(--text-3)' }}>{c.shortfall || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <details>
+                      <summary style={{ fontSize: 13, cursor: 'pointer', color: 'var(--text-2)' }}>Show the cases (largest corrections first{recalc.summary.casesChanged > recalc.cases.length ? `, first ${recalc.cases.length}` : ''})</summary>
+                      <div className="table-wrap" style={{ maxHeight: 300, overflow: 'auto', marginTop: 8 }}>
+                        <table>
+                          <thead><tr><th>Case</th><th>Clinic</th><th>Work</th><th style={{ textAlign: 'right' }}>Units now</th><th style={{ textAlign: 'right' }}>Was</th><th style={{ textAlign: 'right' }}>Now</th></tr></thead>
+                          <tbody>
+                            {recalc.cases.map((c, i) => (
+                              <tr key={i}>
+                                <td>{c.caseNumber || <span style={{ color: 'var(--text-3)' }}>not accepted yet</span>}</td>
+                                <td>{c.clinicName}</td>
+                                <td>{c.workType}</td>
+                                <td style={{ textAlign: 'right' }}>{c.units ?? '—'}</td>
+                                <td style={{ textAlign: 'right' }}>{c.before}</td>
+                                <td style={{ textAlign: 'right', fontWeight: 700 }}>{c.held ? 'held' : c.after}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           <div className="card">
             <div className="table-wrap">
               <table>
@@ -288,6 +393,7 @@ export default function AdminRewards() {
               </table>
             </div>
           </div>
+          </>
         )}
 
         {/* ── Redemptions ── */}

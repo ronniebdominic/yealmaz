@@ -17,19 +17,19 @@ async function ensureClinicPoints(clinicId) {
 }
 
 // ── Helper: award points for a case ──────────────────────
-async function awardCasePoints(clinicId, caseId, caseNumber, caseInfo = {}) {
-  // Points scale with the work (rate x units) for the work types in rewardRates.js; anything else
-  // earns the flat per-case amount. Remakes/redos are free re-work, so they earn nothing extra.
+// Points scale with the work (rate x units) for the work types in rewardRates.js; anything else earns the flat per-case
+// amount. Remakes/redos are free re-work, so they earn nothing extra.
+function computePoints(caseInfo, flat) {
   const work = (caseInfo.remake || caseInfo.isRedo) ? null : pointsForWork(caseInfo.workType, caseInfo.units);
-  let pts, description;
-  if (work) {
-    pts = work.points;
-    description = `Case submitted — ${caseNumber} (${work.qty} ${work.perUnit}${work.qty > 1 ? 's' : ''} × ${work.rate} pts, ${work.label})`;
-  } else {
-    const setting = await prisma.rewardSetting.findFirst();
-    pts = setting?.pointsPerCase ?? 10;
-    description = `Case submitted — ${caseNumber}`;
-  }
+  return work ? { pts: work.points, work } : { pts: flat, work: null };
+}
+
+async function awardCasePoints(clinicId, caseId, caseNumber, caseInfo = {}) {
+  const setting = await prisma.rewardSetting.findFirst();
+  const { pts, work } = computePoints(caseInfo, setting?.pointsPerCase ?? 10);
+  const description = work
+    ? `Case submitted — ${caseNumber} (${work.qty} ${work.perUnit}${work.qty > 1 ? 's' : ''} × ${work.rate} pts, ${work.label})`
+    : `Case submitted — ${caseNumber}`;
   if (pts <= 0) return;
   await ensureClinicPoints(clinicId);
   await prisma.clinicPoints.update({
@@ -65,6 +65,101 @@ async function releaseCasePoints(caseId) {
   const c = await prisma.case.findUnique({ where: { id: caseId }, select: { clinicId: true, caseNumber: true, workType: true, units: true, remake: true, isRedo: true } });
   if (c) await awardCasePoints(c.clinicId, caseId, c.caseNumber, c);
 }
+
+// ── POST /api/rewards/recalculate ─────────────────────────
+// Brings points awarded BEFORE points were tied to acceptance in line with the rule: a case earns its points once the lab has
+// accepted it, worked out from the case as accepted. Earlier, points were paid on submission from whatever units the clinic
+// typed. Each past case-earning is compared with what the case earns now:
+//   - not yet accepted by the lab -> its points are taken back and held (they are awarded when it is accepted)
+//   - accepted, but the clinic's units/work type differ from what the lab recorded -> corrected to the lab's figures
+// Body { apply: true } writes it; anything else only previews. Points a clinic has already redeemed are never taken back:
+// a clinic's total is not reduced below what it has spent, and the shortfall is reported instead. Running it again changes nothing.
+const HELD_STATUSES = new Set(['PENDING_PICKUP', 'PICKUP_ASSIGNED', 'UNDER_REVIEW', 'REJECTED']);
+router.post('/recalculate', protect, restrict('ADMIN'), async (req, res) => {
+  try {
+    const apply = req.body?.apply === true;
+    const setting = await prisma.rewardSetting.findFirst();
+    const flat = setting?.pointsPerCase ?? 10;
+
+    const txns = await prisma.rewardTransaction.findMany({
+      where: { type: 'EARN', caseId: { not: null } },
+      include: {
+        case: { select: { caseNumber: true, status: true, workType: true, units: true, remake: true, isRedo: true } },
+        clinic: { select: { name: true } },
+      },
+    });
+
+    const changes = [];
+    for (const t of txns) {
+      const c = t.case;
+      if (!c) continue;
+      const held = (HELD_STATUSES.has(c.status) && !c.caseNumber) || c.status === 'CANCELLED';
+      const after = held ? 0 : computePoints(c, flat).pts;
+      if (!held && after === t.points) continue;
+      changes.push({ txn: t, clinicId: t.clinicId, clinicName: t.clinic?.name || '', caseNumber: c.caseNumber, status: c.status, workType: c.workType, units: c.units, before: t.points, after, held });
+    }
+
+    const byClinic = new Map();
+    for (const ch of changes) {
+      if (!byClinic.has(ch.clinicId)) byClinic.set(ch.clinicId, { clinicId: ch.clinicId, clinicName: ch.clinicName, cases: [], delta: 0 });
+      const g = byClinic.get(ch.clinicId);
+      g.cases.push(ch); g.delta += ch.after - ch.before;
+    }
+    const pointRows = await prisma.clinicPoints.findMany({ where: { clinicId: { in: [...byClinic.keys()] } } });
+    const pointsOf = new Map(pointRows.map(r => [r.clinicId, r]));
+
+    const clinics = [];
+    for (const g of byClinic.values()) {
+      const row = pointsOf.get(g.clinicId) || { totalEarned: 0, totalRedeemed: 0 };
+      const wanted = row.totalEarned + g.delta;
+      const newEarned = Math.max(wanted, row.totalRedeemed); // never below what the clinic has already spent
+      clinics.push({
+        clinicId: g.clinicId, clinicName: g.clinicName, cases: g.cases.length,
+        earnedBefore: row.totalEarned, earnedAfter: newEarned, redeemed: row.totalRedeemed,
+        availableBefore: row.totalEarned - row.totalRedeemed, availableAfter: newEarned - row.totalRedeemed,
+        shortfall: Math.max(row.totalRedeemed - wanted, 0),
+      });
+    }
+
+    if (apply) {
+      for (const g of byClinic.values()) {
+        const k = clinics.find(x => x.clinicId === g.clinicId);
+        await prisma.$transaction(async (tx) => {
+          for (const ch of g.cases) {
+            await tx.rewardTransaction.update({
+              where: { id: ch.txn.id },
+              data: ch.held
+                ? { type: 'PENDING', points: 0, description: `Case submitted${ch.caseNumber ? ` — ${ch.caseNumber}` : ''} (points are added when the lab accepts it)` }
+                : { points: ch.after, description: `${ch.txn.description} — corrected from ${ch.before} to ${ch.after} pts to match the case as the lab accepted it` },
+            });
+          }
+          await tx.clinicPoints.upsert({ where: { clinicId: g.clinicId }, update: { totalEarned: k.earnedAfter }, create: { clinicId: g.clinicId, totalEarned: k.earnedAfter, totalRedeemed: 0 } });
+        }, { timeout: 60_000 });
+      }
+      await invalidate('rewards:clinic:*');
+    }
+
+    const removed = changes.filter(c => c.after < c.before).reduce((n, c) => n + (c.before - c.after), 0);
+    const added = changes.filter(c => c.after > c.before).reduce((n, c) => n + (c.after - c.before), 0);
+    res.json({
+      applied: apply,
+      summary: {
+        casesChecked: txns.length, casesChanged: changes.length,
+        casesHeldUntilAccepted: changes.filter(c => c.held).length,
+        pointsRemoved: removed, pointsAdded: added,
+        clinicsAffected: clinics.length, clinicsWithShortfall: clinics.filter(c => c.shortfall > 0).length,
+      },
+      clinics: clinics.sort((a, b) => (a.earnedAfter - a.earnedBefore) - (b.earnedAfter - b.earnedBefore)),
+      cases: changes
+        .sort((a, b) => (a.after - a.before) - (b.after - b.before))
+        .slice(0, 300)
+        .map(({ txn, ...c }) => c),
+    });
+  } catch (err) {
+    console.error('[rewards recalculate]', err);
+    res.status(500).json({ error: 'Could not recalculate the points. Nothing further was changed.' });
+  }
+});
 
 // ── GET /api/rewards/rates ────────────────────────────────
 // How points are earned, for the clinic app and the admin Rewards page.
@@ -304,3 +399,4 @@ module.exports = router;
 module.exports.awardCasePoints = awardCasePoints;
 module.exports.holdCasePoints = holdCasePoints;
 module.exports.releaseCasePoints = releaseCasePoints;
+module.exports.computePoints = computePoints;
