@@ -112,4 +112,29 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     assert.deepEqual([t.type, t.points], ['EARN', 150]);
     assert.equal((await totals(ids.a)).totalEarned, 330 + 150);
   });
+
+  test('remakes and redos earn nothing: past awards are corrected to 0, and a held one earns nothing when accepted', async () => {
+    // A remake and a redo that were each paid the flat Br-10 points before this rule
+    const remake = await mkCase(ids.a, { status: 'CASE_ACCEPTED', caseNumber: 'YDL5', units: 1, remake: true, remakeStatus: 'REMAKE_FREE' });
+    const redo = await mkCase(ids.a, { status: 'CASE_ACCEPTED', caseNumber: 'YDL6', units: 1, remake: true, redo: true, remakeStatus: 'REDO_CHARGED' });
+    await earn(ids.a, remake.id, 10); await earn(ids.a, redo.id, 10);
+    await prisma.clinicPoints.update({ where: { clinicId: ids.a }, data: { totalEarned: 480 + 20 } });
+
+    const preview = await call('/rewards/recalculate', { token: ids.admin, method: 'POST', body: {} });
+    assert.equal(preview.body.summary.casesChanged, 2);
+    assert.equal(preview.body.summary.pointsRemoved, 20);
+    await call('/rewards/recalculate', { token: ids.admin, method: 'POST', body: { apply: true } });
+    assert.equal((await prisma.rewardTransaction.findFirst({ where: { caseId: remake.id } })).points, 0);
+    assert.equal((await prisma.rewardTransaction.findFirst({ where: { caseId: redo.id } })).points, 0);
+    assert.equal((await totals(ids.a)).totalEarned, 480);
+
+    // A remake the clinic submitted (held) earns nothing once accepted
+    const held = await mkCase(ids.a, { status: 'PENDING_PICKUP', units: 3, remake: true, remakeStatus: 'PENDING_REVIEW' });
+    await prisma.rewardTransaction.create({ data: { clinicId: ids.a, caseId: held.id, type: 'PENDING', points: 0, description: 'held' } });
+    const acc = await call(`/cases/${held.id}/status`, { token: ids.admin, method: 'PATCH', body: { status: 'CASE_ACCEPTED' } });
+    assert.equal(acc.status, 200, JSON.stringify(acc.body));
+    assert.equal(await prisma.rewardTransaction.count({ where: { caseId: held.id, type: 'EARN' } }), 0);
+    assert.equal(await prisma.rewardTransaction.count({ where: { caseId: held.id, type: 'PENDING' } }), 0);
+    assert.equal((await totals(ids.a)).totalEarned, 480);
+  });
 }

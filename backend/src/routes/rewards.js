@@ -18,9 +18,11 @@ async function ensureClinicPoints(clinicId) {
 
 // ── Helper: award points for a case ──────────────────────
 // Points scale with the work (rate x units) for the work types in rewardRates.js; anything else earns the flat per-case
-// amount. Remakes/redos are free re-work, so they earn nothing extra.
+// amount. Remakes and redos are re-work of a case already paid for, so they earn nothing at all (they used to get the flat
+// per-case amount, which contradicted what the Rewards page tells admins).
 function computePoints(caseInfo, flat) {
-  const work = (caseInfo.remake || caseInfo.isRedo) ? null : pointsForWork(caseInfo.workType, caseInfo.units);
+  if (caseInfo.remake || caseInfo.redo || caseInfo.isRedo) return { pts: 0, work: null };
+  const work = pointsForWork(caseInfo.workType, caseInfo.units);
   return work ? { pts: work.points, work } : { pts: flat, work: null };
 }
 
@@ -62,7 +64,7 @@ async function releaseCasePoints(caseId) {
   if (!held) return; // not a clinic submission, or already released
   const claimed = await prisma.rewardTransaction.deleteMany({ where: { id: held.id } }); // only one caller gets to release it
   if (claimed.count === 0) return;
-  const c = await prisma.case.findUnique({ where: { id: caseId }, select: { clinicId: true, caseNumber: true, workType: true, units: true, remake: true, isRedo: true } });
+  const c = await prisma.case.findUnique({ where: { id: caseId }, select: { clinicId: true, caseNumber: true, workType: true, units: true, remake: true, redo: true, isRedo: true } });
   if (c) await awardCasePoints(c.clinicId, caseId, c.caseNumber, c);
 }
 
@@ -84,7 +86,7 @@ router.post('/recalculate', protect, restrict('ADMIN'), async (req, res) => {
     const txns = await prisma.rewardTransaction.findMany({
       where: { type: 'EARN', caseId: { not: null } },
       include: {
-        case: { select: { caseNumber: true, status: true, workType: true, units: true, remake: true, isRedo: true } },
+        case: { select: { caseNumber: true, status: true, workType: true, units: true, remake: true, redo: true, isRedo: true } },
         clinic: { select: { name: true } },
       },
     });
