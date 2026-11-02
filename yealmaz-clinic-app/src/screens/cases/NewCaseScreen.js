@@ -46,6 +46,10 @@ const FLAT_PRICE_TYPES = new Set([
   'Complete Denture',
 ]);
 
+// A flat-rate item (denture, night guard, retainer, aligner...) is one appliance however many teeth it covers: it needs no
+// tooth selection, only a quantity. The lab's price list flag wins; the fixed list is the fallback while it loads.
+const isFlatWorkType = (priceMap, workType) => !!workType && (!!priceMap?.[workType]?.isFlatRate || FLAT_PRICE_TYPES.has(workType));
+
 // Work types clinics can't pick themselves — they apply only to selected clinics, so the lab
 // assigns them when it accepts the case (the staff acceptance form lists every work type).
 const CLINIC_HIDDEN_WORK_TYPES = new Set([
@@ -271,13 +275,14 @@ function WorkItemCard({
   // it — a redo/replacement is almost always the same work, so there's no
   // reason to make the clinic re-type it.
   const selectOriginalCase = (rc) => {
-    const teeth = parseToothNumbers(rc.toothNumbers);
+    const flat = isFlatWorkType(priceMap, rc.workType || item.workType);
+    const teeth = flat ? [] : parseToothNumbers(rc.toothNumbers);
     onChange({
       originalCase: rc,
       workType: rc.workType || item.workType,
       shade: rc.shade || item.shade,
       selectedTeeth: teeth,
-      manualUnits: teeth.length === 0 && rc.units != null ? String(rc.units) : item.manualUnits,
+      manualUnits: (flat || teeth.length === 0) && rc.units != null ? String(rc.units) : item.manualUnits,
     });
     onFillFromOriginal?.(rc);
     setOriginalCasePickerOpen(false);
@@ -293,7 +298,7 @@ function WorkItemCard({
     if (!p) return null;
     const isExpress = deliveryType === 'EXPRESS' && p.expressPrice != null;
     const unit = isExpress ? p.expressPrice : p.price;
-    const isFlat = !!p.isFlatRate || FLAT_PRICE_TYPES.has(item.workType); // the price table's flat-rate flag wins
+    const isFlat = isFlatWorkType(priceMap, item.workType);
     const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
     const total = Math.round(unit * count);
     return { unit, count, isFlat, isExpress, total };
@@ -313,8 +318,12 @@ function WorkItemCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.workType, deliveryType, durationMap, expressDurationMap]);
 
+  const flatItem = isFlatWorkType(priceMap, item.workType);
+
   const selectWorkType = (w) => {
-    onChange({ workType: w });
+    onChange(isFlatWorkType(priceMap, w)
+      ? { workType: w, selectedTeeth: [], manualUnits: item.manualUnits || '1' }
+      : { workType: w });
     setShowWorkTypes(false);
   };
 
@@ -334,42 +343,6 @@ function WorkItemCard({
             <Text style={styles.itemRemove}>{t('newCase.remove')}</Text>
           </TouchableOpacity>
         )}
-      </View>
-
-      {/* Tooth Selection */}
-      <Text style={styles.subHint}>{t('newCase.toothHint')}</Text>
-      <View style={{ marginTop: 10 }}>
-        <Odontogram selected={item.selectedTeeth} onToggle={toggleTooth} />
-      </View>
-
-      <View style={styles.teethSummaryRow}>
-        {item.selectedTeeth.length > 0 ? (
-          <>
-            <Text style={styles.teethSelected}>
-              {t('newCase.selected', { teeth: '' })}<Text style={{ color: Colors.primary, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
-            </Text>
-            <TouchableOpacity onPress={() => onChange({ selectedTeeth: [] })}>
-              <Text style={styles.clearBtn}>{t('common.clearAll')}</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <Text style={styles.teethNone}>{t('newCase.noTeethSelected')}</Text>
-        )}
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>
-          {item.selectedTeeth.length > 0 ? t('newCase.unitsAuto') : t('newCase.units')}
-        </Text>
-        <TextInput
-          style={[styles.input, item.selectedTeeth.length > 0 && { opacity: 0.6 }]}
-          keyboardType="numeric"
-          placeholder={t('newCase.unitsPlaceholder')}
-          placeholderTextColor={Colors.textMuted}
-          value={item.selectedTeeth.length > 0 ? String(item.selectedTeeth.length) : item.manualUnits}
-          onChangeText={v => { if (item.selectedTeeth.length === 0) onChange({ manualUnits: v }); }}
-          editable={item.selectedTeeth.length === 0}
-        />
       </View>
 
       {/* Work Details */}
@@ -430,6 +403,59 @@ function WorkItemCard({
           </View>
         )}
       </View>
+
+      {/* Tooth chart + auto units — or, for a flat-rate item (denture, guard, retainer, aligner), just a quantity */}
+      {flatItem ? (
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>{t('newCase.quantity')}</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder="1"
+            placeholderTextColor={Colors.textMuted}
+            value={item.manualUnits}
+            onChangeText={v => onChange({ manualUnits: v.replace(/[^0-9]/g, '') })}
+          />
+          <Text style={[styles.subHint, { marginTop: 6 }]}>{t('newCase.flatHint')}</Text>
+        </View>
+      ) : (
+        <>
+        <Text style={styles.subHint}>{t('newCase.toothHint')}</Text>
+        <View style={{ marginTop: 10 }}>
+          <Odontogram selected={item.selectedTeeth} onToggle={toggleTooth} />
+        </View>
+
+        <View style={styles.teethSummaryRow}>
+          {item.selectedTeeth.length > 0 ? (
+            <>
+              <Text style={styles.teethSelected}>
+                {t('newCase.selected', { teeth: '' })}<Text style={{ color: Colors.primary, fontWeight: '700' }}>{item.selectedTeeth.join(', ')}</Text>
+              </Text>
+              <TouchableOpacity onPress={() => onChange({ selectedTeeth: [] })}>
+                <Text style={styles.clearBtn}>{t('common.clearAll')}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.teethNone}>{t('newCase.noTeethSelected')}</Text>
+          )}
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>
+            {item.selectedTeeth.length > 0 ? t('newCase.unitsAuto') : t('newCase.units')}
+          </Text>
+          <TextInput
+            style={[styles.input, item.selectedTeeth.length > 0 && { opacity: 0.6 }]}
+            keyboardType="numeric"
+            placeholder={t('newCase.unitsPlaceholder')}
+            placeholderTextColor={Colors.textMuted}
+            value={item.selectedTeeth.length > 0 ? String(item.selectedTeeth.length) : item.manualUnits}
+            onChangeText={v => { if (item.selectedTeeth.length === 0) onChange({ manualUnits: v }); }}
+            editable={item.selectedTeeth.length === 0}
+          />
+        </View>
+        </>
+      )}
 
       {!/aligner/i.test(item.workType || '') && (
         <View style={styles.formGroup}>
@@ -661,13 +687,13 @@ export default function NewCaseScreen({ navigation }) {
         const p = priceMap[item.workType];
         const isExpress = form.deliveryType === 'EXPRESS' && p?.expressPrice != null;
         const unit = p ? (isExpress ? p.expressPrice : p.price) : null;
-        const isFlat = !!p?.isFlatRate || FLAT_PRICE_TYPES.has(item.workType);
-        // A flat-rate item (complete denture, night guard…) is ONE appliance however many teeth it
-        // covers, so it counts as 1 unit — not one per tooth. (Aligners count trays, not teeth.)
-        const countsTeeth = !isFlat || /aligner/i.test(item.workType || '');
-        const resolvedUnits = item.selectedTeeth.length > 0
-          ? (countsTeeth ? item.selectedTeeth.length : 1)
-          : item.manualUnits ? parseInt(item.manualUnits) : undefined;
+        const isFlat = isFlatWorkType(priceMap, item.workType);
+        // A flat-rate item (denture, night guard, retainer, aligner...) is sent as a quantity and no tooth numbers.
+        const resolvedUnits = isFlat
+          ? Math.max(parseInt(item.manualUnits, 10) || 1, 1)
+          : item.selectedTeeth.length > 0
+            ? item.selectedTeeth.length
+            : item.manualUnits ? parseInt(item.manualUnits) : undefined;
         const count = isFlat ? 1 : Math.max(1, item.selectedTeeth.length);
         // Arch scan fee rides on the first item only — one scan session covers the whole visit.
         const fee = index === 0 ? archFee : 0;
@@ -678,7 +704,7 @@ export default function NewCaseScreen({ navigation }) {
         return {
           workType: item.workType,
           shade: item.shade,
-          toothNumbers: item.selectedTeeth.length > 0 ? item.selectedTeeth.join(', ') : undefined,
+          toothNumbers: !isFlat && item.selectedTeeth.length > 0 ? item.selectedTeeth.join(', ') : undefined,
           units: resolvedUnits,
           remake: item.remake,
           remakeReason: item.remake ? (item.remakeReason.trim() || undefined) : undefined,
