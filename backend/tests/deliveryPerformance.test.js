@@ -18,6 +18,7 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     const admin = await prisma.user.create({ data: { name: 'Admin Dashboard', email: 'a@t.local', password: 'x', role: 'ADMIN' } });
     await prisma.user.create({ data: { name: 'Esrael Lemma Lemarro', email: 'e@t.local', password: 'x', role: 'DELIVERY' } });
     await prisma.user.create({ data: { name: 'Dawit Haile Bafa', email: 'd@t.local', password: 'x', role: 'DELIVERY' } });
+    await prisma.user.create({ data: { name: 'Hana Tadesse Gebre', email: 'h@t.local', password: 'x', role: 'DELIVERY' } });
     jwtAdmin = jwt.sign({ id: admin.id, role: 'ADMIN', name: 'Admin' }, process.env.JWT_SECRET);
     const clinic = await prisma.clinic.create({ data: { name: 'C1', password: 'x', email: 'c@t.local' } });
     const mk = (n) => prisma.case.create({ data: { caseNumber: `YDL${n}`, patientName: 'P', workType: 'PFM', status: 'DELIVERED', clinicId: clinic.id } });
@@ -33,6 +34,14 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     const h1 = await mk('H1'); stage(h1.id, 'DELIVERED', 'Admin Dashboard', 'Case registered as historical/delivered');
     const p1 = await mk('P1'); stage(p1.id, 'DELIVERED', 'Fin User', 'Payment collected by Fin User — Br 100');
     const u1 = await mk('U1'); stage(u1.id, 'DELIVERED', 'Someone Gone', 'Delivered successfully');       // a driver who no longer exists
+    // New cases arriving: two impressions confirmed by Hana, one assigned but never confirmed, one clinic self drop-off, one with no pickup step
+    const mkNew = (n) => prisma.case.create({ data: { caseNumber: `YDLN${n}`, patientName: 'P', workType: 'PFM', status: 'PICKUP_ASSIGNED', clinicId: clinic.id } });
+    const IMPRESSION = 'Impression arrived at lab — awaiting receptionist acceptance';
+    const n1 = await mkNew(1); stage(n1.id, 'PICKUP_ASSIGNED', 'Hana Tadesse Gebre', IMPRESSION);
+    const n2 = await mkNew(2); stage(n2.id, 'PICKUP_ASSIGNED', 'Mulu Dispatch', 'Pickup assigned to Hana Tadesse Gebre by dispatch'); stage(n2.id, 'PICKUP_ASSIGNED', 'Hana Tadesse Gebre', IMPRESSION);
+    const n3 = await mkNew(3); stage(n3.id, 'PICKUP_ASSIGNED', 'Mulu Dispatch', 'Pickup assigned to Dawit Haile Bafa by dispatch');
+    const n4 = await mkNew(4); stage(n4.id, 'PICKUP_ASSIGNED', 'Mulu Dispatch', 'Self drop-off by C1 — no delivery partner assigned');
+    await mkNew(5);
     await prisma.caseStage.createMany({ data: rows });
     const app = express();
     app.use(express.json());
@@ -51,13 +60,35 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     const d = by['Dawit Haile Bafa'];
     assert.deepEqual([d.totalDeliveries, d.firstNameMatches], [1, 1], 'a bare first name is matched, and flagged');
     assert.equal(e.firstNameMatches, 0);
-    assert.equal(r.totalLabOrders, e.totalOrders + d.totalOrders + r.unattributedOrders);
-    assert.equal(Math.round((e.shareOfTotalPercent + d.shareOfTotalPercent) * 10) / 10 + Math.round((r.unattributedOrders / r.totalLabOrders) * 1000) / 10 > 99.8, true);
+    const h = by['Hana Tadesse Gebre'];
+    assert.equal(r.totalLabOrders, e.totalOrders + d.totalOrders + h.totalOrders + r.unattributedOrders);
+    assert.equal(Math.round((e.shareOfTotalPercent + d.shareOfTotalPercent + h.shareOfTotalPercent) * 10) / 10 + Math.round((r.unattributedOrders / r.totalLabOrders) * 1000) / 10 > 99.8, true);
     const rc = r.deliveryReconciliation;
     assert.equal(rc.deliveredEntries, 8);
     assert.equal(rc.distinctCasesDelivered, 8);
     assert.deepEqual([rc.byDrivers, rc.selfPickup, rc.historicalEntry, rc.paymentNote, rc.unmatched], [4, 1, 1, 1, 1]);
     assert.equal(rc.byDrivers + rc.selfPickup + rc.historicalEntry + rc.paymentNote + rc.adminOrSystem + rc.unmatched, rc.deliveredEntries, 'every delivered entry is accounted for');
     assert.equal(e.totalDeliveries + d.totalDeliveries, rc.byDrivers, 'the drivers\' deliveries equal the reconciliation line');
+  });
+
+  test('"Picked Up" is split into clinic impressions and lab pickups, and reconciles with the new cases of the range', async () => {
+    const r = await (await fetch(`${base}/dashboard/delivery-performance?from=2020-01-01&to=2030-01-01`, { headers: { authorization: `Bearer ${jwtAdmin}` } })).json();
+    const by = Object.fromEntries(r.agents.map(a => [a.name, a]));
+    const e = by['Esrael Lemma Lemarro'], h = by['Hana Tadesse Gebre'];
+    assert.deepEqual([e.impressionPickups, e.labPickups, e.totalPickups], [0, 3, 3], 'Esrael only took finished cases out for delivery');
+    assert.deepEqual([h.impressionPickups, h.labPickups, h.totalPickups], [2, 0, 2], 'Hana collected two impressions');
+    for (const a of r.agents) assert.equal(a.impressionPickups + a.labPickups, a.totalPickups, `${a.name}: the two kinds add up to Picked Up`);
+
+    const p = r.pickupReconciliation;
+    assert.equal(p.impressionPickups, 2);
+    assert.equal(p.labPickups, 3);
+    assert.equal(p.labCases, 3);
+    // every case in the fixture was created in range: 3 (E) + D1 + S1 + H1 + P1 + U1 + the five new ones = 13
+    assert.equal(p.newCases, 13);
+    assert.equal(p.newCasesPickedUpConfirmed, 2);
+    assert.equal(p.newCasesSelfDropOff, 1);
+    assert.equal(p.newCasesAssignedNotConfirmed, 1);
+    assert.equal(p.newCasesOther, 13 - 2 - 1 - 1);
+    assert.equal(p.newCasesPickedUpConfirmed + p.newCasesSelfDropOff + p.newCasesAssignedNotConfirmed + p.newCasesOther, p.newCases);
   });
 }

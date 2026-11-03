@@ -5,7 +5,7 @@ const { protect, restrict } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 const { startOfDay, endOfDay } = require('../utils/dateRange');
 const { DEPT_SHORT_LABELS, SCAN_PATTERN, localDayKey } = require('../utils/scanAttribution');
-const { buildAgentNameMaps, matchDeliveryAgent, matchDeliveryAgentDetailed, NON_AGENT_DELIVERY_MARKERS, isNonAgentDeliveredNote, isSelfPickupNote, isHistoricalRegistrationNote, isPaymentCollectionNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
+const { PICKUP_IMPRESSION_NOTE, buildAgentNameMaps, matchDeliveryAgent, matchDeliveryAgentDetailed, NON_AGENT_DELIVERY_MARKERS, isNonAgentDeliveredNote, isSelfPickupNote, isHistoricalRegistrationNote, isPaymentCollectionNote, DELIVERY_EVENT_STAGE_OR, classifyDeliveryEvent } = require('../utils/deliveryAttribution');
 
 const router = express.Router();
 const prisma = require('../db');
@@ -752,10 +752,14 @@ async function computeDeliveryPerformance({ from, to } = {}) {
 
     const perAgent = new Map(agents.map(a => [a.id, {
       id: a.id, name: a.name, isActive: a.isActive, station: a.station,
-      totalPickups: 0, totalDeliveries: 0, firstNameMatches: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
+      totalPickups: 0, impressionPickups: 0, labPickups: 0, totalDeliveries: 0, firstNameMatches: 0, cases: new Set(), clinics: new Set(), dailyCounts: {},
       lastActiveAt: null,
     }]));
     let unattributedOrders = 0;
+    // Two different pickups share the "Picked Up" figure: an impression collected from a clinic (a NEW case arriving), and a
+    // finished case collected from the lab floor to be delivered. Kept apart so the figure can be checked against new cases.
+    const impressionCases = new Set(), labCases = new Set();
+    let impressionEvents = 0, labEvents = 0;
 
     for (const s of stages) {
       const { agent, how } = matchDeliveryAgentDetailed(s.scannedBy, s.notes, nameMaps);
@@ -775,7 +779,11 @@ async function computeDeliveryPerformance({ from, to } = {}) {
 
       const agg = perAgent.get(agent.id);
       if (how === 'first-name') agg.firstNameMatches++;
-      if (classified.type === 'PICKUP') agg.totalPickups++; else agg.totalDeliveries++;
+      if (classified.type === 'PICKUP') {
+        agg.totalPickups++;
+        if (classified.pickupKind === 'IMPRESSION') { agg.impressionPickups++; impressionEvents++; impressionCases.add(s.caseId); }
+        else { agg.labPickups++; labEvents++; labCases.add(s.caseId); }
+      } else agg.totalDeliveries++;
       agg.cases.add(s.caseId);
       if (s.case?.clinic?.name) agg.clinics.add(s.case.clinic.name);
       const day = localDayKey(s.scannedAt);
@@ -806,10 +814,47 @@ async function computeDeliveryPerformance({ from, to } = {}) {
       else recon.unmatched++;
     }
 
+    // Where the NEW cases of the range stand: Analytics' "Total Cases" counts every case created in the range, but only a
+    // case whose driver confirmed "Impression arrived at lab" is a credited pickup. Dispatch assigning a driver is not a pickup;
+    // a clinic that drops off itself, or a case registered at the lab, never has one.
+    const createdRows = await prisma.case.findMany({ where: { createdAt: { gte: dateFrom, lte: dateTo } }, select: { id: true } });
+    const createdIds = new Set(createdRows.map(c => c.id));
+    const assignStages = createdIds.size === 0 ? [] : await prisma.caseStage.findMany({
+      where: { stageName: 'PICKUP_ASSIGNED', case: { createdAt: { gte: dateFrom, lte: dateTo } } },
+      select: { caseId: true, notes: true },
+    });
+    const seen = new Map();
+    for (const st of assignStages) {
+      const k = seen.get(st.caseId) || { confirmed: false, selfDropOff: false, assigned: false };
+      if (st.notes === PICKUP_IMPRESSION_NOTE) k.confirmed = true;
+      else if (/^self drop-off/i.test(st.notes || '')) k.selfDropOff = true;
+      else if (/^pickup assigned to/i.test(st.notes || '')) k.assigned = true;
+      seen.set(st.caseId, k);
+    }
+    let newConfirmed = 0, newSelfDropOff = 0, newAssignedOnly = 0;
+    for (const id of createdIds) {
+      const k = seen.get(id);
+      if (!k) continue;
+      if (k.confirmed) newConfirmed++; else if (k.selfDropOff) newSelfDropOff++; else if (k.assigned) newAssignedOnly++;
+    }
+    const pickupReconciliation = {
+      newCases: createdIds.size,
+      newCasesPickedUpConfirmed: newConfirmed,
+      newCasesSelfDropOff: newSelfDropOff,
+      newCasesAssignedNotConfirmed: newAssignedOnly,
+      newCasesOther: createdIds.size - newConfirmed - newSelfDropOff - newAssignedOnly,
+      impressionPickups: impressionEvents,
+      impressionCases: impressionCases.size,
+      impressionFromEarlierCases: [...impressionCases].filter(id => !createdIds.has(id)).length,
+      labPickups: labEvents,
+      labCases: labCases.size,
+    };
+
     const result = {
       range: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       unattributedOrders,
       deliveryReconciliation: recon,
+      pickupReconciliation,
       totalLabOrders,
       agents: [...perAgent.values()].map(a => {
         const activeDays = Object.keys(a.dailyCounts).length;
@@ -817,6 +862,8 @@ async function computeDeliveryPerformance({ from, to } = {}) {
         return {
           id: a.id, name: a.name, isActive: a.isActive, station: a.station,
           totalPickups: a.totalPickups,
+          impressionPickups: a.impressionPickups,
+          labPickups: a.labPickups,
           totalDeliveries: a.totalDeliveries,
           totalOrders,
           uniqueCases: a.cases.size,
