@@ -50,12 +50,18 @@ const FLAT_PRICE_TYPES = new Set([
 // tooth selection, only a quantity. The lab's price list flag wins; the fixed list is the fallback while it loads.
 const isFlatWorkType = (priceMap, workType) => !!workType && (!!priceMap?.[workType]?.isFlatRate || FLAT_PRICE_TYPES.has(workType));
 
-// Work types clinics can't pick themselves — they apply only to selected clinics, so the lab
-// assigns them when it accepts the case (the staff acceptance form lists every work type).
-const CLINIC_HIDDEN_WORK_TYPES = new Set([
-  'PFM Discount',     // only for selected clinics — the lab applies it at acceptance
-  'Complete Denture', // no longer offered (only Flexible Denture is)
-]);
+// The only work types clinics can order, in this order (priced from the lab's price list). Matching ignores case, spaces
+// and punctuation so "E-Max Crown" / "E-max crown" both match; anything not listed here is left for the lab to assign.
+const CLINIC_WORK_TYPE_ORDER = [
+  ['zirconia'], ['pfm'], ['zirconiaveneer'], ['emaxveneer'], ['emaxcrown'],
+  ['flexibledenture', 'fexibledenture'], ['nightguard'], ['retainer'], ['bleachingtray'],
+  ['temporarycrown'], ['metalcoping'], ['clearaligner'], ['onlayinlay', 'inlayonlay'],
+];
+const normWorkType = (w) => String(w || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const clinicWorkTypeRank = (w) => CLINIC_WORK_TYPE_ORDER.findIndex(names => names.includes(normWorkType(w)));
+const clinicWorkTypes = (priceMap) => Object.values(priceMap)
+  .filter(p => clinicWorkTypeRank(p.workType) !== -1)
+  .sort((x, y) => clinicWorkTypeRank(x.workType) - clinicWorkTypeRank(y.workType));
 
 // ── Odontogram ────────────────────────────────────────────
 const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
@@ -365,7 +371,7 @@ function WorkItemCard({
               </Text>
             ) : (
               <ScrollView nestedScrollEnabled style={{ maxHeight: 260 }} showsVerticalScrollIndicator={false}>
-                {Object.values(priceMap).filter(p => !CLINIC_HIDDEN_WORK_TYPES.has(p.workType)).map(p => (
+                {clinicWorkTypes(priceMap).map(p => (
                   <TouchableOpacity
                     key={p.workType}
                     style={[styles.dropdownItem, styles.dropdownItemRow, item.workType === p.workType && styles.dropdownItemActive]}
