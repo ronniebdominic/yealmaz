@@ -56,7 +56,7 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     const r = await (await fetch(`${base}/dashboard/delivery-performance?from=2020-01-01&to=2030-01-01`, { headers: { authorization: `Bearer ${jwtAdmin}` } })).json();
     const by = Object.fromEntries(r.agents.map(a => [a.name, a]));
     const e = by['Esrael Lemma Lemarro'];
-    assert.deepEqual([e.totalPickups, e.totalDeliveries, e.totalOrders, e.uniqueCases], [3, 3, 6, 3], 'same 3 cases picked up and delivered = 6 orders over 3 distinct cases');
+    assert.deepEqual([e.totalPickups, e.totalDeliveries, e.totalOrders, e.uniqueCases], [0, 3, 3, 3], 'dispatch sent 3 cases out and he delivered them: only the 3 deliveries count, not a pickup as well');
     const d = by['Dawit Haile Bafa'];
     assert.deepEqual([d.totalDeliveries, d.firstNameMatches], [1, 1], 'a bare first name is matched, and flagged');
     assert.equal(e.firstNameMatches, 0);
@@ -71,18 +71,17 @@ if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
     assert.equal(e.totalDeliveries + d.totalDeliveries, rc.byDrivers, 'the drivers\' deliveries equal the reconciliation line');
   });
 
-  test('"Picked Up" is split into clinic impressions and lab pickups, and reconciles with the new cases of the range', async () => {
+  test('Picked Up is clinic impressions only (a dispatch is not a pickup) and reconciles with the new cases of the range', async () => {
     const r = await (await fetch(`${base}/dashboard/delivery-performance?from=2020-01-01&to=2030-01-01`, { headers: { authorization: `Bearer ${jwtAdmin}` } })).json();
     const by = Object.fromEntries(r.agents.map(a => [a.name, a]));
     const e = by['Esrael Lemma Lemarro'], h = by['Hana Tadesse Gebre'];
-    assert.deepEqual([e.impressionPickups, e.labPickups, e.totalPickups], [0, 3, 3], 'Esrael only took finished cases out for delivery');
-    assert.deepEqual([h.impressionPickups, h.labPickups, h.totalPickups], [2, 0, 2], 'Hana collected two impressions');
-    for (const a of r.agents) assert.equal(a.impressionPickups + a.labPickups, a.totalPickups, `${a.name}: the two kinds add up to Picked Up`);
+    assert.equal(e.totalPickups, 0, 'cases dispatched out for delivery are not pickups');
+    assert.deepEqual([h.totalPickups, h.totalDeliveries, h.totalOrders], [2, 0, 2], 'Hana collected two impressions');
+    assert.equal(r.agents.reduce((n, a) => n + a.totalPickups, 0), 2, 'the lab-wide Picked Up is only the two impressions');
 
     const p = r.pickupReconciliation;
     assert.equal(p.impressionPickups, 2);
-    assert.equal(p.labPickups, 3);
-    assert.equal(p.labCases, 3);
+    assert.equal(p.impressionCases, 2);
     // every case in the fixture was created in range: 3 (E) + D1 + S1 + H1 + P1 + U1 + the five new ones = 13
     assert.equal(p.newCases, 13);
     assert.equal(p.newCasesPickedUpConfirmed, 2);

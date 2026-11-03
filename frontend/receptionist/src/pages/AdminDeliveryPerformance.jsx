@@ -85,19 +85,13 @@ function AgentCard({ agent, from, to }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 14 }}>
-        <Stat label="Picked Up" value={agent.totalPickups.toLocaleString('en-US')} info={`Two kinds of pickup added together: ${agent.impressionPickups ?? 0} impression${agent.impressionPickups === 1 ? '' : 's'} collected from clinics (new cases arriving) and ${agent.labPickups ?? 0} finished case${agent.labPickups === 1 ? '' : 's'} collected from the lab to deliver.`} />
+        <Stat label="Picked Up" value={agent.totalPickups.toLocaleString('en-US')} info="Impressions collected from clinics (new cases arriving) that the driver confirmed as arrived at the lab, in the selected range. Finished cases sent out for delivery are credited under Delivered instead." />
         <Stat label="Delivered" value={agent.totalDeliveries.toLocaleString('en-US')} info="Every case they marked Delivered in the selected range." />
         <Stat label="Clinics" value={agent.uniqueClinics.toLocaleString('en-US')} info="Distinct clinics they handled a pickup or delivery for." />
         <Stat label="Active Days" value={agent.activeDays} info="Calendar days with at least one pickup or delivery in the selected range." />
         <Stat label="Total Orders" value={agent.totalOrders.toLocaleString('en-US')} info={`Pickups + deliveries combined (${agent.totalPickups} + ${agent.totalDeliveries}). The same case is counted twice when this driver both picked it up and delivered it — they covered ${agent.uniqueCases} distinct case${agent.uniqueCases !== 1 ? 's' : ''}.`} />
         <Stat label="Lab Share" value={agent.shareOfTotalPercent != null ? `${agent.shareOfTotalPercent}%` : '—'} info="Their combined pickups + deliveries as a share of every order the whole lab handled in the selected range." />
       </div>
-
-      {agent.totalPickups > 0 && agent.impressionPickups != null && (
-        <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 6 }}>
-          Picked up: <strong>{agent.impressionPickups.toLocaleString('en-US')}</strong> from clinics (new cases) · <strong>{agent.labPickups.toLocaleString('en-US')}</strong> from the lab (to deliver)
-        </div>
-      )}
 
       {agent.totalOrders > 0 && <ActivitySparkline dailyCounts={agent.dailyCounts} from={from} to={to} />}
 
@@ -172,15 +166,14 @@ export default function AdminDeliveryPerformance() {
                 <strong style={{ color: 'var(--text-1)' }}>{data.totalLabOrders.toLocaleString('en-US')}</strong> total lab orders (pickups + deliveries) in this range — each agent's "Lab Share" below is their portion of that.
               </p>
             )}
-            {data.pickupReconciliation && (data.pickupReconciliation.newCases > 0 || data.pickupReconciliation.impressionPickups + data.pickupReconciliation.labPickups > 0) && (
+            {data.pickupReconciliation && (data.pickupReconciliation.newCases > 0 || data.pickupReconciliation.impressionPickups > 0) && (
               <details style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 14 }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 600 }}>How the pickups add up</summary>
                 <div style={{ marginTop: 8, lineHeight: 1.7 }}>
                   {(() => { const r = data.pickupReconciliation; const n = (v) => Number(v).toLocaleString('en-US'); return (
                     <>
-                      <div>The drivers' “Picked Up” counts <strong>two different things</strong>:</div>
-                      <div>• impressions collected from clinics (a new case arriving): <strong>{n(r.impressionPickups)}</strong> pickups across {n(r.impressionCases)} cases{r.impressionFromEarlierCases > 0 ? ` (${n(r.impressionFromEarlierCases)} of them cases created before this range)` : ''}</div>
-                      <div>• finished cases collected from the lab to deliver: <strong>{n(r.labPickups)}</strong> pickups across {n(r.labCases)} cases</div>
+                      <div>“Picked Up” counts impressions collected from clinics (a new case arriving) that a driver confirmed: <strong>{n(r.impressionPickups)}</strong> pickups across {n(r.impressionCases)} cases{r.impressionFromEarlierCases > 0 ? ` (${n(r.impressionFromEarlierCases)} of them cases created before this range)` : ''}.</div>
+                      <div style={{ color: 'var(--text-3)' }}>Finished cases sent out by dispatch go straight to Out for Delivery and are credited when delivered, not as a pickup.</div>
                       <div style={{ marginTop: 8 }}><strong>{n(r.newCases)}</strong> new cases were created in this range (the Analytics “Total Cases”). Of those:</div>
                       <div>• impression confirmed by a driver: {n(r.newCasesPickedUpConfirmed)}</div>
                       <div>• clinic dropped it off itself: {n(r.newCasesSelfDropOff)}</div>

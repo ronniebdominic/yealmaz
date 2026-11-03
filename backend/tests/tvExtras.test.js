@@ -87,7 +87,7 @@ test('delivery board counts today\'s pickups and deliveries per driver and their
     { stageName: 'DELIVERED', scannedBy: 'Dawit Driver', notes: 'Delivered successfully', scannedAt: ago(2) },
     { stageName: 'DELIVERED', scannedBy: 'Dawit Driver', notes: 'Delivered successfully', scannedAt: ago(1) },
     { stageName: 'DELIVERED', scannedBy: 'Receptionist', notes: 'Self pickup by patient', scannedAt: ago(1) },
-    { stageName: 'OUT_FOR_DELIVERY', scannedBy: 'Dispatcher', notes: 'Dispatched to Eden Rider for delivery', scannedAt: ago(3) },
+    { stageName: 'PICKUP_ASSIGNED', scannedBy: 'Eden Rider', notes: 'Impression arrived at lab — awaiting receptionist acceptance', scannedAt: ago(3) },
   ];
   const activeCases = [kase('1', 'OUT_FOR_DELIVERY', { assignedDeliveryId: 'd1' }), kase('2', 'PICKUP_ASSIGNED', { assignedDeliveryId: 'd1' }), kase('3', 'DESIGNING', { assignedDeliveryId: 'd1' })];
   const b = buildDeliveryBoard({ agents, events, maps: buildAgentNameMaps(agents), activeCases });

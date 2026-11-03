@@ -38,11 +38,16 @@ function isNonAgentDeliveredNote(notes) {
 }
 
 // ── Pickup + delivery event classification ───────────────
-// A driver's work is really two kinds of trip: PICKUP (bringing something
-// TO the lab — either an impression from the clinic, or the finished case
-// from the lab floor itself, on their way out to deliver it) and DELIVERY
-// (dropping the finished case off at the clinic). Both are real,
-// separately credit-worthy actions for performance purposes.
+// A driver's work is two kinds of trip: PICKUP (bringing an impression from a
+// clinic TO the lab — a new case arriving) and DELIVERY (dropping the finished
+// case off at the clinic).
+//
+// Sending a finished case out is NOT a pickup. When dispatch assigns a driver to a
+// ready case the case goes straight to OUT_FOR_DELIVERY ("Dispatched to {name} for
+// delivery"), and the driver is credited when they deliver it. That dispatch step
+// (and a driver pressing "Picked up for delivery" themselves) used to be counted as
+// a "lab pickup", which inflated Picked Up well past the number of new cases and
+// counted the same case twice (once going out, once delivered).
 //
 // The exact note strings below are what delivery.js's own driver-confirmed
 // endpoints write (POST /:caseId/collect-impression and POST /:caseId/pickup)
@@ -66,6 +71,7 @@ const PICKUP_LAB_NOTE = 'Picked up for delivery';
 // recognizing it, the entire lab-pickup leg of driver credit would be
 // invisible. matchDeliveryAgent() below extracts the name from notes for
 // this specific pattern instead of trusting scannedBy.
+// (No longer used to credit a pickup — see classifyDeliveryEvent — but still lets a stage written this way be matched to its driver.)
 const DISPATCHED_TO_PATTERN = /^Dispatched to (.+) for delivery$/i;
 
 // Prisma OR clause matching every CaseStage row that could represent one
@@ -90,17 +96,13 @@ const DELIVERY_EVENT_STAGE_OR = [
     ],
   },
   { stageName: 'PICKUP_ASSIGNED', notes: PICKUP_IMPRESSION_NOTE },
-  { stageName: 'OUT_FOR_DELIVERY', notes: PICKUP_LAB_NOTE },
-  { stageName: 'OUT_FOR_DELIVERY', notes: { startsWith: 'Dispatched to ' } },
 ];
 
 // Classifies an already-matched CaseStage row (from a DELIVERY_EVENT_STAGE_OR
-// query) into the two performance buckets. 'IMPRESSION'/'LAB' distinguish
-// the two pickup kinds for display; both count as PICKUP for totals.
+// query) into the two performance buckets.
 function classifyDeliveryEvent(stageName) {
   if (stageName === 'DELIVERED') return { type: 'DELIVERY', pickupKind: null };
   if (stageName === 'PICKUP_ASSIGNED') return { type: 'PICKUP', pickupKind: 'IMPRESSION' };
-  if (stageName === 'OUT_FOR_DELIVERY') return { type: 'PICKUP', pickupKind: 'LAB' };
   return null;
 }
 
