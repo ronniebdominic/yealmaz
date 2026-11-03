@@ -396,7 +396,7 @@ function AcceptForm({ c, pricesData, priceMap, expressPriceMap, durationMap, exp
   const submit = () => onAccept({
     shade, patientName, workType: selWorkType, doctorName, doctorPhone, units,
     toothNumbers: selectedTeeth.length > 0 ? selectedTeeth.join(', ') : undefined,
-    orderType, totalAmount: showLineage ? '0' : (isLocked ? String(discountedAmt) : totalAmount), dueDate, notes,
+    orderType, totalAmount: showLineage ? '0' : (isLocked ? String(discountedAmt) : (totalAmount || (calcAmt != null ? String(calcAmt) : ''))), dueDate, notes,
     remake: showLineage,
     remakeReason: showLineage ? remakeReason : undefined,
     originalCaseId: showLineage ? originalCase?.id : undefined,

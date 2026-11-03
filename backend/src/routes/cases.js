@@ -764,6 +764,23 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       orderGroupId: orderGroupId || null,
     };
 
+    // A clinic submission has no price (clinics can't set one), so if the form sent no total, price it from the
+    // lab's price list here rather than leaving the case unpriced. An amount the receptionist typed always wins.
+    if (!isRemake && updatedData.totalAmount === undefined && existing.totalAmount == null) {
+      const priceRow = await prisma.workTypePrice.findUnique({ where: { workType: updatedData.workType ?? existing.workType } });
+      if (priceRow) {
+        const useExpress = (updatedData.deliveryType ?? existing.deliveryType) === 'EXPRESS' && priceRow.expressPrice != null;
+        const unitPrice = useExpress ? priceRow.expressPrice : priceRow.price;
+        const count = priceRow.isFlatRate ? 1 : Math.max(1, updatedData.units ?? existing.units ?? 1);
+        let amount = unitPrice * count;
+        if (updatedData.discountType) {
+          const dv = parseFloat(updatedData.discountValue) || 0;
+          amount = Math.max(0, updatedData.discountType === 'PERCENT' ? amount * (1 - dv / 100) : amount - dv);
+        }
+        updatedData.totalAmount = amount;
+      }
+    }
+
     // Split-off items should carry the patient/doctor details as they're
     // actually being saved on THIS accept (updatedData), not the stale
     // pre-accept row — e.g. a doctor name corrected while accepting must
