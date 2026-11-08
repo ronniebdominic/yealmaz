@@ -628,18 +628,18 @@ export default function AdminUsers() {
                 <p>{search || roleFilter || deptFilter ? 'Try adjusting your search or filter' : 'Add the first user with the button above'}</p>
               </div>
             ) : (
-              <table className="users-table" style={{ tableLayout: 'fixed', minWidth: 1100 }}>
+              <table className="users-table" style={{ tableLayout: 'fixed', minWidth: 1250 }}>
                 <colgroup>
-                  <col style={{ width: '13%' }} />
-                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '16%' }} />
                   <col style={{ width: '9%' }} />
                   <col style={{ width: '8%' }} />
-                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '5%' }} />
                   <col style={{ width: '6%' }} />
                   <col style={{ width: '6%' }} />
-                  <col style={{ width: '6%' }} />
-                  <col style={{ width: '7%' }} />
-                  <col style={{ width: '24%' }} />
+                  <col style={{ width: '20%' }} />
                 </colgroup>
                 <thead>
                   <tr>
@@ -679,11 +679,14 @@ export default function AdminUsers() {
                         </td>
                         <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={u.email}>{u.email}</td>
                         <td style={{ padding: '8px 10px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            {roleInfo.icon && <roleInfo.icon size={11} />} {roleLabelOf(u)}
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: roleColor.bg, color: roleColor.color, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: '100%', boxSizing: 'border-box' }} title={roleLabelOf(u)}>
+                            {roleInfo.icon && <roleInfo.icon size={11} style={{ flexShrink: 0 }} />}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{roleLabelOf(u)}</span>
                           </span>
                           {u.staffRole && (
-                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap' }}>{roleInfo.label || u.role} access</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {u.staffRole.department === 'Support Staff' ? 'Attendance only · no login' : `${roleInfo.label || u.role} access`}
+                            </div>
                           )}
                         </td>
                         <td style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
