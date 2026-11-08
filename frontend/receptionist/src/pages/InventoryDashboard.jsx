@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
@@ -335,6 +336,9 @@ export default function InventoryDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--amber-dim)', color: 'var(--amber)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 600 }}>{initials}</div>
             <span className="inv-hide-sm" style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name?.split(' ')[0]}</span>
+            {user?.role !== 'INVENTORY_MANAGER' && (
+              <Link to="/" className="btn btn-tertiary btn-sm" style={{ textDecoration: 'none' }}>← My dashboard</Link>
+            )}
             <ThemeToggle tone="page" />
             <button onClick={logout} title="Logout" className="btn btn-tertiary btn-sm" style={{ padding: 7 }}><MdLogout size={15} /></button>
           </div>

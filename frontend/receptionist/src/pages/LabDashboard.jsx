@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import api, { socket } from '../api';
 import toast from 'react-hot-toast';
@@ -1161,6 +1162,11 @@ export default function LabDashboard() {
             <MyProfileTab />
             <div className="card" style={{ padding: 16, marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <LeaveRequestButton />
+              {(user?.extraRoles || []).includes('INVENTORY_MANAGER') && (
+                <Link to="/inventory" className="btn btn-ghost" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 12px', textDecoration: 'none' }}>
+                  <MdInventory2 size={16} /> Inventory
+                </Link>
+              )}
               <ThemeToggle tone="row" style={{ width: '100%', justifyContent: 'center', padding: '11px 12px' }} />
               <button onClick={logout} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 12px',

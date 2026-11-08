@@ -54,8 +54,10 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children, allowedRoles, allowedEmail }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
-  if (allowedEmail && user.email !== allowedEmail) return <Navigate to="/" replace />;
+  const extra = user.extraRoles || [];
+  if (allowedRoles && !allowedRoles.includes(user.role) && !extra.some(r => allowedRoles.includes(r))) return <Navigate to="/" replace />;
+  // The admin screens belong to the main admin account, plus any admin given the "Admin dashboard" extra access.
+  if (allowedEmail && user.email !== allowedEmail && !extra.includes('ADMIN_DASHBOARD')) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -82,7 +84,7 @@ function RoleHome() {
   if (user.role === 'INVENTORY_MANAGER') return <InventoryDashboard />;
   if (user.role === 'HR_MANAGER') return <HRDashboard />;
   if (user.role === 'LEADER') return <LeaderDashboard />;
-  if (user.role === 'ADMIN' && user.email === 'admindashboard@yealmaz.com') return <Navigate to="/admin" replace />;
+  if (user.role === 'ADMIN' && (user.email === 'admindashboard@yealmaz.com' || (user.extraRoles || []).includes('ADMIN_DASHBOARD'))) return <Navigate to="/admin" replace />;
   return <Dashboard />;
 }
 
@@ -101,6 +103,8 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><RoleHome /></ProtectedRoute>} />
       <Route path="/cases" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Cases /></ProtectedRoute>} />
       <Route path="/cases/new" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST','DISPATCH']}><NewCase /></ProtectedRoute>} />
+      {/* A lab tech (or anyone) an admin gave "Inventory" extra access reaches the inventory screen here. */}
+      <Route path="/inventory" element={<ProtectedRoute allowedRoles={['INVENTORY_MANAGER']}><InventoryDashboard /></ProtectedRoute>} />
       <Route path="/delivery" element={<ProtectedRoute allowedRoles={['ADMIN','RECEPTIONIST']}><Delivery /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['ADMIN']} allowedEmail="admindashboard@yealmaz.com"><AdminPricing /></ProtectedRoute>} />

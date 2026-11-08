@@ -57,6 +57,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       role: user.role,
       name: user.name,
       departments: user.departments || [],
+      extraRoles: user.extraRoles || [],
     });
 
     res.json({
@@ -68,6 +69,7 @@ router.post('/login', loginLimiter, async (req, res) => {
         role: user.role,
         phone: user.phone,
         departments: user.departments || [],
+        extraRoles: user.extraRoles || [],
       }
     });
   } catch (err) {
@@ -135,7 +137,7 @@ router.get('/me', protect, async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, name: true, email: true, role: true, phone: true }
+      select: { id: true, name: true, email: true, role: true, phone: true, extraRoles: true }
     });
     res.json(user);
   } catch (err) {

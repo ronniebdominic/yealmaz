@@ -936,9 +936,9 @@ export default function AdminCases() {
                     <th>Work Type</th>
                     <th style={{ width: 70 }}>Units</th>
                     <th>Amount</th>
-                    <th>Delivered On</th>
                     <th>Status</th>
                     <th>Payment</th>
+                    <th>Delivered On</th>
                     <th>
                       <button
                         onClick={() => {
@@ -956,14 +956,14 @@ export default function AdminCases() {
                         Date {sortBy === 'date' ? (sortDir === 'desc' ? '↓' : '↑') : ''}
                       </button>
                     </th>
-                    <th style={{ minWidth: 200 }}>Actions</th>
+                    <th className="sticky-actions" style={{ minWidth: 200 }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cases.map(c => (
                     <tr key={c.id}>
                       <td><span className="case-number">{c.caseNumber}</span></td>
-                      <td style={{ fontSize: 13 }}>{c.clinic?.name}</td>
+                      <td style={{ fontSize: 13, minWidth: 130 }}>{c.clinic?.name}</td>
                       <td>
                         <span className="patient-name">{c.patientName}</span>
                         {c.doctorName && (
@@ -979,13 +979,13 @@ export default function AdminCases() {
                       </td>
                       <td><StatusBadge status={c.status} /></td>
                       <td><PaymentBadge status={c.paymentStatus} isExcluded={c.clinic?.isExcluded} /></td>
-                      <td style={{ fontSize: 12, color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)' }}>
+                      <td style={{ fontSize: 12, whiteSpace: 'nowrap', color: c.deliveryDate ? 'var(--green)' : 'var(--text-3)' }}>
                         {c.deliveryDate ? format(new Date(c.deliveryDate), 'dd MMM yyyy') : '—'}
                       </td>
-                      <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                      <td style={{ fontSize: 12, whiteSpace: 'nowrap', color: 'var(--text-3)' }}>
                         {format(new Date(c.createdAt), 'dd MMM yyyy')}
                       </td>
-                      <td>
+                      <td className="sticky-actions">
                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
 
                           {/* View */}

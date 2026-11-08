@@ -1,6 +1,6 @@
 // Ye-Almaz — Inventory Management Routes
 const express = require('express');
-const { protect, restrict } = require('../middleware/auth');
+const { protect, restrict, hasAnyRole } = require('../middleware/auth');
 const { appCache, invalidate } = require('../cache');
 
 const router = express.Router();
@@ -147,7 +147,7 @@ router.get('/requests', protect, restrict('LAB_TECH', 'ADMIN', 'INVENTORY_MANAGE
     if (mine === 'true') where.requestedById = req.user.id;
     // Lab techs (unless also viewing "mine") only see their own history —
     // the full queue is Inventory Manager/Admin territory.
-    if (req.user.role === 'LAB_TECH') where.requestedById = req.user.id;
+    if (req.user.role === 'LAB_TECH' && !hasAnyRole(req.user, ['INVENTORY_MANAGER'])) where.requestedById = req.user.id;
 
     const requests = await prisma.inventoryRequest.findMany({
       where,

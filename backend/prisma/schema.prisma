@@ -19,6 +19,7 @@ model User {
   email           String   @unique
   password        String
   role            Role
+  extraRoles      String[] @default([]) // extra access on top of `role`: INVENTORY_MANAGER (a real permission) or ADMIN_DASHBOARD (shows an ADMIN the admin dashboard screens)
   departments     String[] @default([]) // For LAB_TECH: scopes them to these department(s). Empty = unrestricted (all departments).
   phone           String?
   station         String? // for DISPATCH/DELIVERY: which station/area they cover, for routing — matches Clinic.station

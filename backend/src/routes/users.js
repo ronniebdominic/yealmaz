@@ -26,7 +26,7 @@ function parseDepartments(input) {
 
 const SAFE_SELECT = {
   id: true, name: true, email: true, role: true,
-  departments: true, phone: true, station: true,
+  departments: true, extraRoles: true, phone: true, station: true,
   zoneId: true, zone: { select: { id: true, name: true } },
   isActive: true, isSharedAccount: true, createdAt: true,
   staffRoleId: true, staffRole: { select: { id: true, name: true, department: true, baseRole: true } },
@@ -43,6 +43,15 @@ async function resolveRole(role, staffRoleId) {
   }
   if (!BASE_ROLES.has(role)) return { error: 'Pick a valid role.' };
   return { role, staffRoleId: null };
+}
+
+// Extra access an admin can give on top of a person's main role. INVENTORY_MANAGER is a real permission;
+// ADMIN_DASHBOARD only decides whether an ADMIN sees the admin dashboard screens (the server already treats every ADMIN alike).
+const GRANTABLE_EXTRA_ROLES = new Set(['INVENTORY_MANAGER', 'ADMIN_DASHBOARD']);
+function parseExtraRoles(input) {
+  const list = Array.isArray(input) ? input : [];
+  const cleaned = [...new Set(list.map(r => String(r).trim().toUpperCase()).filter(Boolean))];
+  return { cleaned, invalid: cleaned.filter(r => !GRANTABLE_EXTRA_ROLES.has(r)) };
 }
 
 // ── GET /api/users ───────────────────────────────────────
@@ -120,7 +129,7 @@ router.post('/', protect, restrict('ADMIN', 'HR_MANAGER'), async (req, res) => {
 // ── PATCH /api/users/:id ─────────────────────────────────
 router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
   try {
-    const { name, email, password, role, staffRoleId, departments, phone, station, zoneId, isActive, isSharedAccount } = req.body;
+    const { name, email, password, role, staffRoleId, departments, phone, station, zoneId, isActive, isSharedAccount, extraRoles } = req.body;
 
     const target = await prisma.user.findUnique({ where: { id: req.params.id }, select: { role: true } });
     if (!target) return res.status(404).json({ error: 'User not found.' });
@@ -152,6 +161,11 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       const { cleaned, invalid } = parseDepartments(departments);
       if (invalid.length) return res.status(400).json({ error: `Unknown department(s): ${invalid.join(', ')}` });
       data.departments = cleaned;
+    }
+    if (extraRoles !== undefined) {
+      const { cleaned, invalid } = parseExtraRoles(extraRoles);
+      if (invalid.length) return res.status(400).json({ error: `Unknown extra access: ${invalid.join(', ')}` });
+      data.extraRoles = cleaned;
     }
     if (password?.trim()) data.password = await bcrypt.hash(password.trim(), 10);
 

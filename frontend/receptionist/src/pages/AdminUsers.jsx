@@ -93,10 +93,11 @@ function UserFormModal({ initial, onSaved, onClose }) {
     roleKey:         roleKeyOf(initial),
     departments:     initial.departments     || [],
     isSharedAccount: initial.isSharedAccount || false,
+    extraRoles:      initial.extraRoles      || [],
     password:        '',
   } : {
     name: '', email: '', phone: '', station: '', zoneId: '',
-    roleKey: 'RECEPTIONIST', departments: [], isSharedAccount: false, password: generatePassword(),
+    roleKey: 'RECEPTIONIST', departments: [], isSharedAccount: false, extraRoles: [], password: generatePassword(),
   });
   const staffRoles = useStaffRoles();
   const pickedStaffRole = form.roleKey.startsWith('staff:')
@@ -117,6 +118,10 @@ function UserFormModal({ initial, onSaved, onClose }) {
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const toggleExtra = (code) => setForm(f => ({
+    ...f,
+    extraRoles: f.extraRoles.includes(code) ? f.extraRoles.filter(r => r !== code) : [...f.extraRoles, code],
+  }));
   const toggleDept = (code) => setForm(f => ({
     ...f,
     departments: f.departments.includes(code)
@@ -146,6 +151,7 @@ function UserFormModal({ initial, onSaved, onClose }) {
           : { role: form.roleKey, staffRoleId: null }),
         departments: effectiveRole === 'LAB_TECH' ? form.departments : [],
         isSharedAccount: form.isSharedAccount,
+        ...(isEdit ? { extraRoles: form.extraRoles } : {}),
         ...(grantsAdmin ? { confirmAdmin: true } : {}),
       };
       if (!attendanceOnly && form.password.trim()) payload.password = form.password.trim();
@@ -217,6 +223,28 @@ function UserFormModal({ initial, onSaved, onClose }) {
                 </div>
               )}
             </Field>
+
+            {/* Extra access — on top of the main role, so one person can do two jobs without a second login. */}
+            {isEdit && !attendanceOnly && (
+              <div style={{ gridColumn: '1 / -1', marginBottom: 10 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 6 }}>Also has access to</label>
+                {effectiveRole !== 'INVENTORY_MANAGER' && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+                    <input type="checkbox" checked={form.extraRoles.includes('INVENTORY_MANAGER')} onChange={() => toggleExtra('INVENTORY_MANAGER')}
+                      style={{ width: 15, height: 15, accentColor: 'var(--blue)', cursor: 'pointer' }} />
+                    Inventory — approve goods requests, adjust stock, add items
+                  </label>
+                )}
+                {effectiveRole === 'ADMIN' && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-2)' }}>
+                    <input type="checkbox" checked={form.extraRoles.includes('ADMIN_DASHBOARD')} onChange={() => toggleExtra('ADMIN_DASHBOARD')}
+                      style={{ width: 15, height: 15, accentColor: 'var(--blue)', cursor: 'pointer' }} />
+                    Admin dashboard screens (Cases, Users, Pricing, Rewards…)
+                  </label>
+                )}
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>They need to sign out and back in after this changes.</div>
+              </div>
+            )}
 
             {/* Shared/department login — not a real person (e.g. "Zirconia Fitting",
                 "Finance Department"). Excluded from the HR & Payroll employee list. */}
@@ -683,6 +711,11 @@ export default function AdminUsers() {
                             {roleInfo.icon && <roleInfo.icon size={11} style={{ flexShrink: 0 }} />}
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{roleLabelOf(u)}</span>
                           </span>
+                          {(u.extraRoles || []).length > 0 && (
+                            <div style={{ fontSize: 10, color: 'var(--amber)', marginTop: 3, whiteSpace: 'nowrap' }}>
+                              + {u.extraRoles.map(r => r === 'INVENTORY_MANAGER' ? 'Inventory' : r === 'ADMIN_DASHBOARD' ? 'Admin dashboard' : r).join(', ')}
+                            </div>
+                          )}
                           {u.staffRole && (
                             <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {u.staffRole.department === 'Support Staff' ? 'Attendance only · no login' : `${roleInfo.label || u.role} access`}

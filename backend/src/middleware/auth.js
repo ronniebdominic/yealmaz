@@ -8,7 +8,7 @@ const { isAttendanceOnly } = require('../utils/attendanceOnly');
 // request re-reads the person's CURRENT role and active flag (cached for a few seconds, so this costs
 // one small lookup per person per interval, not one per request).
 const IDENTITY_TTL_MS = 15 * 1000;
-const identityCache = new Map(); // id -> { at, role, isActive, departments }
+const identityCache = new Map(); // id -> { at, role, isActive, departments, extraRoles }
 
 async function currentIdentity(decoded) {
   const hit = identityCache.get(decoded.id);
@@ -19,8 +19,8 @@ async function currentIdentity(decoded) {
     const clinic = await prisma.clinic.findUnique({ where: { id: decoded.id }, select: { isActive: true } });
     record = clinic ? { role: 'CLINIC', isActive: clinic.isActive } : null;
   } else {
-    const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { role: true, isActive: true, departments: true, staffRole: { select: { department: true } } } });
-    record = user ? { role: user.role, isActive: user.isActive && !isAttendanceOnly(user), departments: user.departments } : null;
+    const user = await prisma.user.findUnique({ where: { id: decoded.id }, select: { role: true, isActive: true, departments: true, extraRoles: true, staffRole: { select: { department: true } } } });
+    record = user ? { role: user.role, isActive: user.isActive && !isAttendanceOnly(user), departments: user.departments, extraRoles: user.extraRoles || [] } : null;
   }
   const entry = record ? { at: Date.now(), ...record } : { at: Date.now(), missing: true };
   identityCache.set(decoded.id, entry);
@@ -50,7 +50,7 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ error: 'This account is no longer active. Please log in again or contact an admin.' });
     }
     // The database wins over whatever the token says.
-    req.user = { ...decoded, role: current.role, ...(current.departments ? { departments: current.departments } : {}) };
+    req.user = { ...decoded, role: current.role, ...(current.departments ? { departments: current.departments } : {}), extraRoles: current.extraRoles || [] };
   } catch (err) {
     // If the database can't be reached, fall back to the token rather than locking everyone out.
     console.error('[auth] could not re-check the account:', err.message);
@@ -59,6 +59,9 @@ const protect = async (req, res, next) => {
   next();
 };
 
+// A person has one main role plus, optionally, extra access granted by an admin (User.extraRoles).
+const hasAnyRole = (user, roles) => !!user && (roles.includes(user.role) || (user.extraRoles || []).some(r => roles.includes(r)));
+
 // Role-based access — pass one or more roles
 // Usage: restrict('ADMIN', 'RECEPTIONIST')
 const restrict = (...roles) => {
@@ -66,7 +69,7 @@ const restrict = (...roles) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Not authenticated.' });
     }
-    if (!roles.includes(req.user.role)) {
+    if (!hasAnyRole(req.user, roles)) {
       return res.status(403).json({
         error: `Access denied. This action requires: ${roles.join(' or ')}`
       });
@@ -75,4 +78,4 @@ const restrict = (...roles) => {
   };
 };
 
-module.exports = { protect, restrict };
+module.exports = { protect, restrict, hasAnyRole };
