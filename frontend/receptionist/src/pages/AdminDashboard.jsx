@@ -410,6 +410,12 @@ export default function AdminDashboard() {
               <MdPeopleAlt className="mi" size={15} /> Operation Manager
             </button>
           )}
+          {isExtraAdmin && (
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/view/lab')}
+              title="Scan and work cases in the lab, as a lab technician">
+              <MdScience className="mi" size={15} /> Lab
+            </button>
+          )}
           <button className="btn btn-primary btn-sm" onClick={exportToExcel} disabled={loading || !data}>
             <MdBarChart className="mi" size={15} /> Export Excel
           </button>
