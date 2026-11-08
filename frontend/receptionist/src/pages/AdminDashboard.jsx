@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 import AdminLayout from '../components/AdminLayout';
 import SearchableSelect from '../components/SearchableSelect';
 import ExportMenu from '../components/ExportMenu';
@@ -21,7 +22,7 @@ import {
   MdPaid, MdPendingActions, MdAutorenew, MdInventory2, MdBarChart,
   MdSchedule, MdTrackChanges, MdSearch, MdFileDownload, MdCancel,
   MdErrorOutline, MdScience, MdHandshake, MdClose, MdCheck, MdChevronLeft,
-  MdChevronRight, MdInfoOutline, MdHelpOutline, MdWarning, MdEmojiEvents, MdPersonOff,
+  MdChevronRight, MdInfoOutline, MdHelpOutline, MdWarning, MdEmojiEvents, MdPersonOff, MdPeopleAlt,
 } from 'react-icons/md';
 
 const ETB = (v) => 'Br ' + Number(v || 0).toLocaleString('en-US');
@@ -296,6 +297,9 @@ const DRILL_MAP = {
 // ── Main component ────────────────────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // An admin given the "Admin dashboard screens" extra access (e.g. the operations manager) gets a shortcut to that view.
+  const isExtraAdmin = (user?.extraRoles || []).includes('ADMIN_DASHBOARD') && user?.email !== 'admindashboard@yealmaz.com';
   const reducedMotion = usePrefersReducedMotion();
   const chartAnim = { isAnimationActive: !reducedMotion, animationDuration: 550, animationEasing: 'ease-out' };
   const [selectedClinic, setSelectedClinic] = useState('');
@@ -400,6 +404,12 @@ export default function AdminDashboard() {
         {/* Action hierarchy: exporting the analysis is the primary job here;
             the workflow test is a diagnostic and shouldn't compete with it. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isExtraAdmin && (
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/view/leader')}
+              title="Team leave requests and the remake / redo review queue">
+              <MdPeopleAlt className="mi" size={15} /> Operation Manager
+            </button>
+          )}
           <button className="btn btn-primary btn-sm" onClick={exportToExcel} disabled={loading || !data}>
             <MdBarChart className="mi" size={15} /> Export Excel
           </button>
