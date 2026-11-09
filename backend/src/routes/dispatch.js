@@ -106,8 +106,15 @@ router.get('/queue', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) =>
 });
 
 // ── GET /api/dispatch/milling ────────────────────────────
-// Cases currently at the Milling / Sintering stage — informational heads-up
-// so dispatch knows what's coming down the pipeline before it hits QC/delivery.
+// Every case the lab has scanned into Milling / Sintering that is still in production — informational heads-up so
+// dispatch knows what's coming down the pipeline before it hits QC/delivery. A case stays listed after it moves on
+// to the next department (it used to vanish the moment the following scan changed its status); it leaves once it is
+// ready for dispatch, out for delivery, delivered or cancelled. `status` shows where it is now.
+const STILL_IN_PRODUCTION = [
+  'CASE_ACCEPTED', 'PLASTER_DEPARTMENT', 'MARGIN_DEPARTMENT', 'SCANNING', 'DESIGNING', 'MILLING_SINTERING',
+  'RESIN_3D_PRINTING', 'METAL_3D_PRINTING', 'METAL_FINISHING', 'OPAQUE_APPLICATION', 'CERAMIC_LAYERING',
+  'ZIRCONIA_FITTING_FINISHING', 'GLAZING', 'THERMO_PRESS', 'TRIMMING', 'QUALITY_CHECK',
+];
 router.get('/milling', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) => {
   const cacheKey = 'dispatch:milling';
   const cached = await appCache.get(cacheKey);
@@ -115,7 +122,7 @@ router.get('/milling', protect, restrict('DISPATCH', 'ADMIN'), async (req, res) 
 
   try {
     const cases = await prisma.case.findMany({
-      where: { status: 'MILLING_SINTERING' },
+      where: { status: { in: STILL_IN_PRODUCTION }, stages: { some: { stageName: 'MILLING_SINTERING' } } },
       include: {
         clinic: { select: { id: true, code: true, name: true, station: true, zone: { select: { id: true, name: true } } } },
         stages: { where: { stageName: 'MILLING_SINTERING' }, orderBy: { scannedAt: 'desc' }, take: 1 }
@@ -166,7 +173,7 @@ router.post('/:caseId/assign', protect, restrict('DISPATCH', 'ADMIN'), async (re
       }
     });
 
-    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
+    await invalidate('dispatch:queue', 'dispatch:milling', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
 
     // Notify delivery executive via socket
     const io = req.app.get('io');
@@ -220,7 +227,7 @@ router.post('/:caseId/unassign', protect, restrict('DISPATCH', 'ADMIN'), async (
       }
     });
 
-    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
+    await invalidate('dispatch:queue', 'dispatch:milling', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -262,7 +269,7 @@ router.post('/:caseId/assign-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
       }
     });
 
-    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
+    await invalidate('dispatch:queue', 'dispatch:milling', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`);
 
     const io = req.app.get('io');
     io.to(`delivery_${executiveId}`).emit('case_assigned', {
@@ -320,7 +327,7 @@ router.post('/:caseId/self-dropoff', protect, restrict('DISPATCH', 'ADMIN'), asy
       }
     });
 
-    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'dashboard:summary');
+    await invalidate('dispatch:queue', 'dispatch:milling', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_arrived', {
@@ -381,7 +388,7 @@ router.post('/:caseId/cancel-pickup', protect, restrict('DISPATCH', 'ADMIN'), as
 
     await invalidate(
       `case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary',
-      'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations'
+      'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:milling', 'dispatch:stations'
     );
 
     const io = req.app.get('io');
@@ -472,7 +479,7 @@ router.post('/phone-order', protect, restrict('DISPATCH', 'ADMIN'), async (req, 
       data: { caseId: newCase.id, status: 'PENDING' },
     });
 
-    await invalidate('cases:*', 'dispatch:queue', 'dashboard:summary');
+    await invalidate('cases:*', 'dispatch:queue', 'dispatch:milling', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('new_case', {
@@ -542,7 +549,7 @@ router.post('/:caseId/send-out', protect, restrict('DISPATCH', 'ADMIN'), async (
       },
     });
 
-    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'dashboard:summary');
+    await invalidate('dispatch:queue', 'dispatch:milling', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to(`delivery_${executiveId}`).emit('case_assigned', {
@@ -604,7 +611,7 @@ router.post('/:caseId/self-pickup', protect, restrict('DISPATCH', 'ADMIN'), asyn
 
     await require('../services/walletDeduction').applyWalletSafely(prisma, req.params.caseId);
 
-    await invalidate('dispatch:queue', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
+    await invalidate('dispatch:queue', 'dispatch:milling', 'dispatch:stations', 'delivery:*', `case:${req.params.caseId}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*');
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', {

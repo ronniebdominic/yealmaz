@@ -1363,7 +1363,7 @@ export default function DispatchDashboard() {
             <div className="card">
               <div style={{ padding: '10px 18px 0', background: '#ECFEFF', borderRadius: '10px 10px 0 0' }}>
                 <div style={{ fontSize: 12, color: '#0E7490', fontWeight: 600, paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <MdSettings className="mi" size={14} /> These cases have <strong>reached the Milling / Sintering department</strong> — informational only, no dispatch action needed yet. They'll move to Ready for Delivery once QC passes.
+                  <MdSettings className="mi" size={14} /> These cases have <strong>been scanned at the Milling / Sintering department</strong> and are still in production — informational only, no dispatch action needed yet. “Now at” shows where each one is. They move to Ready for Delivery once QC passes.
                 </div>
               </div>
               <div className="card-header">
@@ -1380,6 +1380,7 @@ export default function DispatchDashboard() {
                       { header: 'Unit',        value: c => c.units ?? '' },
                       { header: 'Zone',        value: c => c.clinic?.zone?.name ?? '' },
                       { header: 'Due Date',    value: c => c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '' },
+                      { header: 'Now at',      value: c => String(c.status || '').replace(/_/g, ' ') },
                     ]}
                     filename="in-milling"
                     title="In Milling"
@@ -1390,7 +1391,7 @@ export default function DispatchDashboard() {
                 {milling.length === 0 ? (
                   <div className="empty-state">
                     <div className="empty-icon mi"><MdSettings size={32} /></div>
-                    <div className="empty-title">No cases in milling right now</div>
+                    <div className="empty-title">No cases have been scanned at milling</div>
                     <p>Cases will show up here as soon as the lab scans them into the Milling / Sintering department.</p>
                   </div>
                 ) : (
@@ -1405,6 +1406,7 @@ export default function DispatchDashboard() {
                         <Th>Zone</Th>
                         <Th>Due Date</Th>
                         <Th>Reached Milling</Th>
+                        <Th>Now at</Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1423,6 +1425,7 @@ export default function DispatchDashboard() {
                             <Td style={{ fontSize: 12 }}>{c.clinic?.zone?.name || '—'}</Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>{c.dueDate ? format(new Date(c.dueDate), 'dd MMM yyyy') : '—'}</Td>
                             <Td style={{ fontSize: 12, color: 'var(--text-3)' }}>{stage ? format(new Date(stage.scannedAt), 'dd MMM yyyy, h:mm a') : '—'}</Td>
+                            <Td><StatusBadge status={c.status} /></Td>
                           </tr>
                         );
                       })}

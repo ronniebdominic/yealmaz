@@ -570,7 +570,7 @@ router.post('/', protect, async (req, res) => {
       holdCasePoints(req.user.id, updatedCase.id, updatedCase.caseNumber).catch(() => {});
     }
 
-    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
+    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:milling', 'dispatch:stations');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('new_case', {
@@ -620,7 +620,7 @@ router.post('/bulk', protect, async (req, res) => {
       for (const c of cases) holdCasePoints(req.user.id, c.id, c.caseNumber).catch(() => {});
     }
 
-    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:stations');
+    await invalidate('cases:*', 'payments:*', 'dashboard:summary', 'dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:milling', 'dispatch:stations');
 
     const io = req.app.get('io');
     for (const c of cases) {
@@ -851,7 +851,7 @@ router.post('/:id/accept', protect, restrict('ADMIN', 'RECEPTIONIST'), async (re
       : await doAccept(prisma);
 
     await invalidate(
-      `case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dispatch:queue',
+      `case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dispatch:queue', 'dispatch:milling',
       ...(additionalCases.length ? ['dashboard:cases-by-status', 'dashboard:analytics:*', 'dispatch:stations'] : [])
     );
 
@@ -1446,7 +1446,7 @@ router.patch('/:id/review-decide', protect, async (req, res) => {
       return c;
     });
 
-    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*', 'dispatch:queue');
+    await invalidate(`case:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*', 'dispatch:queue', 'dispatch:milling');
     res.json(updated);
   } catch (err) {
     console.error('[PATCH /cases/:id/review-decide]', err);
@@ -1649,7 +1649,7 @@ router.patch('/:id', protect, restrict('ADMIN'), async (req, res) => {
       }
     });
 
-    await invalidate(`case:${req.params.id}`, `case:lab:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*', 'lab:active:*', 'dispatch:queue');
+    await invalidate(`case:${req.params.id}`, `case:lab:${req.params.id}`, 'cases:*', 'payments:*', 'dashboard:summary', 'dashboard:analytics:*', 'lab:active:*', 'dispatch:queue', 'dispatch:milling');
 
     const io = req.app.get('io');
     io.to(`clinic_${updated.clinicId}`).emit('case_updated', { caseId: updated.id, caseNumber: updated.caseNumber, status: updated.status });

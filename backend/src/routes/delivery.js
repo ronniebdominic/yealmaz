@@ -192,7 +192,7 @@ router.post('/:caseId/collect-impression', protect, restrict('DELIVERY', 'ADMIN'
       }
     });
 
-    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dispatch:milling', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_arrived', {
@@ -310,7 +310,7 @@ router.post('/:caseId/return-to-pickup-queue', protect, restrict('DELIVERY', 'AD
       data: { caseId: req.params.caseId, stageName: 'PENDING_PICKUP', scannedBy: req.user.name, notes: reason },
     });
 
-    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dispatch:milling', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_updated', {
@@ -353,7 +353,7 @@ router.post('/:caseId/return-to-dispatch', protect, restrict('DELIVERY', 'ADMIN'
       },
     });
 
-    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dashboard:summary');
+    await invalidate(`case:${req.params.caseId}`, 'cases:*', 'delivery:*', 'dispatch:queue', 'dispatch:milling', 'dashboard:summary');
 
     const io = req.app.get('io');
     io.to('lab_staff').emit('case_updated', { caseId: caseData.id, caseNumber: caseData.caseNumber, status: 'READY_TO_DISPATCH' });
