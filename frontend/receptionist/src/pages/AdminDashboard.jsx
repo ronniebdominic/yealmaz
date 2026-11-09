@@ -647,7 +647,7 @@ export default function AdminDashboard() {
               <ColorTile icon={MdSettings} label="Total Cases In Progress" value={kpi?.activeCases ?? '—'}
                 sub="In production" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'activeCases'} onClick={() => handleDrill('activeCases')}
-                info="Cases actively moving through the lab right now (plaster, scanning, milling, ceramics, QC, etc). Doesn't include cases that are already finished and just waiting to ship — those are counted separately in 'Ready for Delivery & Dispatch', so a case is never counted in both." />
+                info="Cases actively moving through the lab right now (plaster, scanning, milling, ceramics, QC, etc). Doesn't include cases that are already finished and just waiting to ship — those are counted separately in 'Ready for Delivery & Dispatch', so a case is never counted in both. Only cases ORDERED in the selected date range are counted, so this can be lower than the Case Status Board, which shows every case in the lab right now (and includes Ready to Dispatch)." />
               <ColorTile icon={MdLocalShipping} label="Ready for Delivery & Dispatch" value={kpi?.readyToDispatch ?? '—'}
                 sub="Ready to dispatch" color="var(--amber)" bg="var(--amber-dim)"
                 active={drillKey === 'readyToDispatch'} onClick={() => handleDrill('readyToDispatch')}

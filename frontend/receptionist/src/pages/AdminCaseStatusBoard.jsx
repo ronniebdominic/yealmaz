@@ -49,7 +49,7 @@ const STATUS_FILTERS = [
 ];
 
 // ── Clickable department card ─────────────────────────────
-function DeptCard({ icon: Icon, label, count, active, onClick }) {
+function DeptCard({ icon: Icon, label, count, sub, active, onClick }) {
   return (
     <div
       onClick={onClick}
@@ -71,6 +71,7 @@ function DeptCard({ icon: Icon, label, count, active, onClick }) {
       <div style={{ fontSize: 12, fontWeight: 700, color: active ? 'rgba(255,255,255,0.9)' : 'var(--text-2)' }}>
         {label}
       </div>
+      {sub && <div style={{ fontSize: 10.5, color: active ? 'rgba(255,255,255,0.8)' : 'var(--text-3)', lineHeight: 1.3 }}>{sub}</div>}
     </div>
   );
 }
@@ -118,12 +119,19 @@ export default function AdminCaseStatusBoard() {
     [countMap]
   );
 
+  // The board counts every case in the lab pipeline right now, finished-and-waiting ones included. The Analytics
+  // dashboard's "In Progress" tile leaves Ready to Dispatch out (its own tile) and only counts cases ordered in its date range.
+  const readyCount = countMap.READY_TO_DISPATCH ?? 0;
+  const inProductionCount = allDeptCount - readyCount;
+
   const changeFilter = (setter) => (val) => { setter(val); setPage(1); };
 
   const params = useMemo(() => {
     const p = { limit: PAGE_SIZE, page, sortBy: 'date', sortDir: 'desc' };
     if (statusFilter) p.status        = statusFilter;
-    if (payFilter)    p.paymentStatus = payFilter;
+    // Payment is only settled once a case is delivered, so a payment filter lists delivered orders only (paid / unpaid
+    // after delivery) — not cases still being made, which all read "Unpaid" simply because nothing is due yet.
+    if (payFilter)  { p.paymentStatus = payFilter; p.status = 'DELIVERED'; }
     if (search)       p.search        = search;
     if (clinicId)     p.clinicId      = clinicId;
     if (dateFrom)     p.dateFrom      = dateFrom;
@@ -210,21 +218,27 @@ export default function AdminCaseStatusBoard() {
               icon={f.icon}
               label={f.label}
               count={f.value ? (countMap[f.value] ?? 0) : allDeptCount}
+              sub={f.value ? undefined : `${inProductionCount} in production + ${readyCount} ready to dispatch`}
               active={statusFilter === f.value}
-              onClick={() => changeFilter(setStatusFilter)(f.value)}
+              onClick={() => { setPayFilter(''); changeFilter(setStatusFilter)(f.value); }}
             />
           ))}
         </div>
 
-        {/* Payment filters */}
-        <div className="filters" style={{ marginBottom: 20 }}>
+        {/* Payment filters — delivered orders only */}
+        <div className="filters" style={{ marginBottom: payFilter ? 6 : 20 }}>
           {PAYMENT_FILTERS.map(f => (
             <button key={f.value} className={`filter-chip ${payFilter === f.value ? 'active' : ''}`}
-              onClick={() => changeFilter(setPayFilter)(f.value)}>
+              onClick={() => { if (f.value) setStatusFilter(''); changeFilter(setPayFilter)(f.value); }}>
               {f.label}
             </button>
           ))}
         </div>
+        {payFilter && (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 20 }}>
+            Showing delivered orders only — payment is settled after delivery. Pick a department above to go back to cases in production.
+          </div>
+        )}
 
         {/* Table */}
         <div className="card">
